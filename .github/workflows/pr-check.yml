@@ -83,6 +83,15 @@ jobs:
           cd webui
           npm ci
 
+      - name: Install C++ linters
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=warning,performance,portability --inline-suppr --quiet --error-exitcode=1 -I include src/
+
       - name: Check for console.log statements
         run: |
           cd webui
