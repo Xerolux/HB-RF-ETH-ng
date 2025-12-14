@@ -20,6 +20,7 @@ export default {
     firmware: 'Firmware',
     monitoring: 'Monitoring',
     about: 'About',
+    login: 'Login',
     logout: 'Logout'
   },
 
