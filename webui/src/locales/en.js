@@ -185,6 +185,20 @@ export default {
       allowedHosts: 'Allowed Client IPs',
       allowedHostsHelp: 'Comma-separated IP addresses (e.g. "192.168.1.10,192.168.1.20") or "*" for all'
     },
+    mqtt: {
+      title: 'MQTT Client',
+      enabled: 'Enable MQTT',
+      server: 'Server',
+      serverHelp: 'MQTT Broker Hostname or IP',
+      port: 'Port',
+      portHelp: 'Default: 1883',
+      user: 'User',
+      userHelp: 'Optional: MQTT Username',
+      password: 'Password',
+      passwordHelp: 'Optional: MQTT Password',
+      topicPrefix: 'Topic Prefix',
+      topicPrefixHelp: 'Default: hb-rf-eth - Topics will be like prefix/status/...'
+    },
     enable: 'Enable',
     allowedHosts: 'Allowed Hosts'
   },
