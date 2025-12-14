@@ -47,7 +47,7 @@ void _ntp_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *ad
     }
 }
 
-NtpServer::NtpServer(SystemClock *clk) : _clk(clk), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
+NtpServer::NtpServer(SystemClock *clk) : _clk(clk)
 {
 }
 

@@ -75,7 +75,7 @@ bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame)
     return true;
 }
 
-HMFrame::HMFrame() : counter(0), destination(0), command(0), data(nullptr), data_len(0)
+HMFrame::HMFrame() : data_len(0)
 {
 }
 
