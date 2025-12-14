@@ -185,6 +185,23 @@ export default {
       allowedHosts: 'Erlaubte Client-IPs',
       allowedHostsHelp: 'Komma-getrennte IP-Adressen (z.B. "192.168.1.10,192.168.1.20") oder "*" für alle'
     },
+    mqtt: {
+      title: 'MQTT Client',
+      enabled: 'MQTT aktivieren',
+      server: 'Server',
+      serverHelp: 'MQTT Broker Hostname oder IP',
+      port: 'Port',
+      portHelp: 'Standard: 1883',
+      user: 'Benutzer',
+      userHelp: 'Optional: MQTT Benutzername',
+      password: 'Passwort',
+      passwordHelp: 'Optional: MQTT Passwort',
+      topicPrefix: 'Topic Präfix',
+      topicPrefixHelp: 'Standard: hb-rf-eth - Topics lauten präfix/status/...',
+      haDiscoveryEnabled: 'Home Assistant Discovery',
+      haDiscoveryPrefix: 'Discovery Präfix',
+      haDiscoveryPrefixHelp: 'Standard: homeassistant'
+    },
     enable: 'Aktivieren',
     allowedHosts: 'Erlaubte Hosts'
   },

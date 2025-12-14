@@ -49,6 +49,8 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_MQTT_USER "mqtt_usr"
 #define NVS_MQTT_PASS "mqtt_pw"
 #define NVS_MQTT_PREFIX "mqtt_pfx"
+#define NVS_MQTT_HA_ENABLED "mqtt_ha_en"
+#define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
@@ -303,6 +305,8 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_str(nvs_handle, NVS_MQTT_USER, config->mqtt.user);
     nvs_set_str(nvs_handle, NVS_MQTT_PASS, config->mqtt.password);
     nvs_set_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix);
+    nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled);
+    nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix);
 
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
@@ -331,6 +335,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.enabled = false;
         config->mqtt.port = 1883;
         strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        config->mqtt.ha_discovery_enabled = false;
+        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
 
         return ESP_OK;
     }
@@ -398,6 +404,17 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     str_len = sizeof(config->mqtt.topic_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
         strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+    }
+
+    if (nvs_get_u8(nvs_handle, NVS_MQTT_HA_ENABLED, &u8_val) == ESP_OK) {
+        config->mqtt.ha_discovery_enabled = u8_val;
+    } else {
+        config->mqtt.ha_discovery_enabled = false;
+    }
+
+    str_len = sizeof(config->mqtt.ha_discovery_prefix);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
+        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
     }
 
     nvs_close(nvs_handle);
