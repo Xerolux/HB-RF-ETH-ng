@@ -226,7 +226,7 @@
   >
     <BForm @submit.stop.prevent>
         <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" href="/api/backup" target="_blank">{{ t('settings.downloadBackup') }}</BButton>
+        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
 
         <hr/>
         <p>{{ t('settings.restoreInfo') }}</p>
@@ -467,6 +467,23 @@ const saveSettingsClick = async () => {
     showSuccess.value = true
   } catch (error) {
     showError.value = true
+  }
+}
+
+const downloadBackup = async () => {
+  try {
+    const response = await axios.get('/api/backup', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'settings.json')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Backup download failed:', error)
+    alert(t('settings.backupError'))
   }
 }
 

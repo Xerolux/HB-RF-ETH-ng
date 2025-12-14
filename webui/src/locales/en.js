@@ -92,7 +92,8 @@ export default {
     browse: 'Browse',
     restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
     restoreSuccess: 'Settings successfully restored. System restarting...',
-    restoreError: 'Error restoring settings'
+    restoreError: 'Error restoring settings',
+    backupError: 'Error downloading backup'
   },
 
   // System Info

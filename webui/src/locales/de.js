@@ -92,7 +92,8 @@ export default {
     browse: 'Datei auswählen',
     restoreConfirm: 'Sind Sie sicher? Die aktuellen Einstellungen werden überschrieben und das System neu gestartet.',
     restoreSuccess: 'Einstellungen erfolgreich wiederhergestellt. System startet neu...',
-    restoreError: 'Fehler beim Wiederherstellen der Einstellungen'
+    restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
+    backupError: 'Fehler beim Herunterladen der Sicherung'
   },
 
   // System Info
