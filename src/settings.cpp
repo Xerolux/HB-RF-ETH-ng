@@ -92,7 +92,11 @@ void Settings::load()
   }
 
   // Also try to load explicit passwordChanged flag (overrides auto-detection)
-  GET_BOOL(handle, "passwordChanged", _passwordChanged, _passwordChanged);
+  // We use a temporary variable to avoid self-assignment warning if key is missing
+  {
+      bool currentVal = _passwordChanged;
+      GET_BOOL(handle, "passwordChanged", _passwordChanged, currentVal);
+  }
 
   size_t hostnameLength = sizeof(_hostname);
   if (nvs_get_str(handle, "hostname", _hostname, &hostnameLength) != ESP_OK)
