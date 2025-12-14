@@ -76,6 +76,7 @@ export default {
     // System Settings
     systemSettings: 'System Settings',
     ledBrightness: 'LED Brightness',
+    checkUpdates: 'Check for updates',
     language: 'Language',
 
     // Messages
@@ -138,6 +139,9 @@ export default {
     installedVersion: 'Installed version',
     versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailable: 'An update to version {latestVersion} is available.',
+    onlineUpdate: 'Update Online',
+    onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
+    onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
     updateFile: 'Firmware file',
     noFileChosen: 'No file chosen',
     browse: 'Browse',

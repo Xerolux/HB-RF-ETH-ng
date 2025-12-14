@@ -190,6 +190,9 @@
           </BFormSelect>
         </BInputGroup>
       </BFormGroup>
+      <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
+        <BFormCheckbox v-model="checkUpdates" switch />
+      </BFormGroup>
 
       <BAlert
         variant="success"
@@ -298,6 +301,7 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
+const checkUpdates = ref(true)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -408,6 +412,7 @@ const loadSettings = () => {
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
+  checkUpdates.value = settingsStore.checkUpdates
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -453,6 +458,7 @@ const saveSettingsClick = async () => {
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
+      checkUpdates: checkUpdates.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
