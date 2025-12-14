@@ -77,7 +77,7 @@ jobs:
 
       - name: Setup build environment for C++
         if: matrix.language == 'cpp'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -124,7 +124,7 @@ jobs:
           npm outdated || true
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
