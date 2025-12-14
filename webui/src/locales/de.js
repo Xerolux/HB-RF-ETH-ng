@@ -21,7 +21,8 @@ export default {
     monitoring: 'Monitoring',
     about: 'Über',
     login: 'Anmelden',
-    logout: 'Abmelden'
+    logout: 'Abmelden',
+    toggleTheme: 'Design wechseln'
   },
 
   // Login Page
