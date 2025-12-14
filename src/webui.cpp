@@ -198,61 +198,89 @@ httpd_uri_t post_login_json_handler = {
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
-    cJSON *root = cJSON_CreateObject();
 
-    cJSON *sysinfo = cJSON_AddObjectToObject(root, "sysInfo");
+    // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
+    // This handler is called frequently (1Hz) by the frontend.
+    char buffer[1536]; // Increased buffer to be safe, ESP32 stack usually allows this
 
-    cJSON_AddStringToObject(sysinfo, "serial", _sysInfo->getSerialNumber());
-    cJSON_AddStringToObject(sysinfo, "currentVersion", _sysInfo->getCurrentVersion());
-    cJSON_AddStringToObject(sysinfo, "latestVersion", _updateCheck->getLatestVersion());
-
-    cJSON_AddNumberToObject(sysinfo, "memoryUsage", _sysInfo->getMemoryUsage());
-    cJSON_AddNumberToObject(sysinfo, "cpuUsage", _sysInfo->getCpuUsage());
-    cJSON_AddNumberToObject(sysinfo, "supplyVoltage", _sysInfo->getSupplyVoltage());
-    cJSON_AddNumberToObject(sysinfo, "temperature", _sysInfo->getTemperature());
-    cJSON_AddNumberToObject(sysinfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
-    cJSON_AddStringToObject(sysinfo, "boardRevision", _sysInfo->getBoardRevisionString());
-    cJSON_AddStringToObject(sysinfo, "resetReason", _sysInfo->getResetReason());
-
-    // Ethernet status
-    cJSON_AddBoolToObject(sysinfo, "ethernetConnected", _ethernet->isConnected());
-    cJSON_AddNumberToObject(sysinfo, "ethernetSpeed", _ethernet->getLinkSpeedMbps());
-    cJSON_AddStringToObject(sysinfo, "ethernetDuplex", _ethernet->getDuplexMode());
-
-    cJSON_AddStringToObject(sysinfo, "rawUartRemoteAddress", ip2str(_rawUartUdpListener->getConnectedRemoteAddress()));
-
+    // Determine Radio Module Type String
+    const char* radioModuleTypeStr = "-";
     switch (_radioModuleDetector->getRadioModuleType())
     {
     case RADIO_MODULE_HM_MOD_RPI_PCB:
-        cJSON_AddStringToObject(sysinfo, "radioModuleType", "HM-MOD-RPI-PCB");
+        radioModuleTypeStr = "HM-MOD-RPI-PCB";
         break;
     case RADIO_MODULE_RPI_RF_MOD:
-        cJSON_AddStringToObject(sysinfo, "radioModuleType", "RPI-RF-MOD");
+        radioModuleTypeStr = "RPI-RF-MOD";
         break;
     default:
-        cJSON_AddStringToObject(sysinfo, "radioModuleType", "-");
         break;
     }
-    cJSON_AddStringToObject(sysinfo, "radioModuleSerial", _radioModuleDetector->getSerial());
 
-    // Radio module firmware version
+    // Format Radio MACs
+    char bidCosMAC[16];
+    char hmIPMAC[16];
+    formatRadioMAC(_radioModuleDetector->getBidCosRadioMAC(), bidCosMAC, sizeof(bidCosMAC));
+    formatRadioMAC(_radioModuleDetector->getHmIPRadioMAC(), hmIPMAC, sizeof(hmIPMAC));
+
+    // Format Firmware Version
     const uint8_t *fwVersion = _radioModuleDetector->getFirmwareVersion();
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
-    cJSON_AddStringToObject(sysinfo, "radioModuleFirmwareVersion", fwVersionStr);
 
-    char radioMAC[9];
-    formatRadioMAC(_radioModuleDetector->getBidCosRadioMAC(), radioMAC, sizeof(radioMAC));
-    cJSON_AddStringToObject(sysinfo, "radioModuleBidCosRadioMAC", radioMAC);
-    formatRadioMAC(_radioModuleDetector->getHmIPRadioMAC(), radioMAC, sizeof(radioMAC));
-    cJSON_AddStringToObject(sysinfo, "radioModuleHmIPRadioMAC", radioMAC);
-    cJSON_AddStringToObject(sysinfo, "radioModuleSGTIN", _radioModuleDetector->getSGTIN());
+    // Format JSON
+    // Note: We use "true"/"false" strings for booleans
+    int written = snprintf(buffer, sizeof(buffer),
+        "{\"sysInfo\":{"
+            "\"serial\":\"%s\","
+            "\"currentVersion\":\"%s\","
+            "\"latestVersion\":\"%s\","
+            "\"memoryUsage\":%.2f,"
+            "\"cpuUsage\":%.2f,"
+            "\"supplyVoltage\":%.2f,"
+            "\"temperature\":%.2f,"
+            "\"uptimeSeconds\":%" PRIu64 ","
+            "\"boardRevision\":\"%s\","
+            "\"resetReason\":\"%s\","
+            "\"ethernetConnected\":%s,"
+            "\"ethernetSpeed\":%d,"
+            "\"ethernetDuplex\":\"%s\","
+            "\"rawUartRemoteAddress\":\"%s\","
+            "\"radioModuleType\":\"%s\","
+            "\"radioModuleSerial\":\"%s\","
+            "\"radioModuleFirmwareVersion\":\"%s\","
+            "\"radioModuleBidCosRadioMAC\":\"%s\","
+            "\"radioModuleHmIPRadioMAC\":\"%s\","
+            "\"radioModuleSGTIN\":\"%s\""
+        "}}",
+        _sysInfo->getSerialNumber(),
+        _sysInfo->getCurrentVersion(),
+        _updateCheck->getLatestVersion(),
+        _sysInfo->getMemoryUsage(),
+        _sysInfo->getCpuUsage(),
+        _sysInfo->getSupplyVoltage(),
+        _sysInfo->getTemperature(),
+        _sysInfo->getUptimeSeconds(),
+        _sysInfo->getBoardRevisionString(),
+        _sysInfo->getResetReason(),
+        _ethernet->isConnected() ? "true" : "false",
+        _ethernet->getLinkSpeedMbps(),
+        _ethernet->getDuplexMode(),
+        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()),
+        radioModuleTypeStr,
+        _radioModuleDetector->getSerial(),
+        fwVersionStr,
+        bidCosMAC,
+        hmIPMAC,
+        _radioModuleDetector->getSGTIN()
+    );
 
-    const char *json = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
-    cJSON_Delete(root);
+    if (written < 0 || written >= sizeof(buffer)) {
+        ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
+        return httpd_resp_send_500(req);
+    }
 
+    httpd_resp_sendstr(req, buffer);
     return ESP_OK;
 }
 
@@ -474,15 +502,6 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     // If we want a flat structure or specific structure for restore, we need to match post_settings_json_handler expectations.
     // post_settings_json_handler expects a flat JSON object with keys like "adminPassword", "hostname", etc.
     // But add_settings creates { "settings": { "hostname": ... } }
-
-    // Let's create the flat structure expected by post_settings_json_handler manually or refactor.
-    // For safety, let's just manually add fields to root here to ensure 100% compatibility with restore.
-
-    // Actually, let's look at post_settings_json_handler. It expects:
-    // root -> "adminPassword"
-    // root -> "hostname"
-    // ...
-    // But add_settings adds "settings" -> ...
 
     // We need to flatten it.
     cJSON *settingsObj = cJSON_GetObjectItem(root, "settings");
