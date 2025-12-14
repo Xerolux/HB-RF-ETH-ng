@@ -22,8 +22,15 @@
             {{ locale.name }}
           </BDropdownItem>
         </BNavItemDropdown>
-        <BNavItem @click="themeStore.toggleTheme" class="me-2" style="cursor: pointer;">
-           {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
+        <BNavItem
+          href="#"
+          @click.prevent="themeStore.toggleTheme"
+          class="me-2"
+          v-b-tooltip.hover
+          :title="t('nav.toggleTheme')"
+          :aria-label="t('nav.toggleTheme')"
+        >
+          {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
         </BNavItem>
         <BNavForm v-if="loginStore.isLoggedIn">
           <BButton size="sm" variant="outline-light" @click.prevent="logout">{{ t('nav.logout') }}</BButton>
