@@ -53,6 +53,8 @@ private:
 
 public:
     RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed);
+    RadioModuleConnector(const RadioModuleConnector&) = delete;
+    RadioModuleConnector& operator=(const RadioModuleConnector&) = delete;
 
     void start();
     void stop();

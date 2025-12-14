@@ -24,7 +24,7 @@
 #include "linereader.h"
 #include <stdint.h>
 
-LineReader::LineReader(std::function<void(unsigned char *buffer, uint16_t len)> processor) : _processor(processor), _buffer_pos(0)
+LineReader::LineReader(std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _processor(processor), _buffer_pos(0)
 {
 }
 

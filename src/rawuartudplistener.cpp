@@ -48,7 +48,7 @@ void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_
     }
 }
 
-RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector)
+RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
 {
     atomic_init(&_connectionStarted, false);
     atomic_init(&_remotePort, (ushort)0);
