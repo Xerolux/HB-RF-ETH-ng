@@ -197,7 +197,10 @@ export default {
       password: 'Password',
       passwordHelp: 'Optional: MQTT Password',
       topicPrefix: 'Topic Prefix',
-      topicPrefixHelp: 'Default: hb-rf-eth - Topics will be like prefix/status/...'
+      topicPrefixHelp: 'Default: hb-rf-eth - Topics will be like prefix/status/...',
+      haDiscoveryEnabled: 'Home Assistant Discovery',
+      haDiscoveryPrefix: 'Discovery Prefix',
+      haDiscoveryPrefixHelp: 'Default: homeassistant'
     },
     enable: 'Enable',
     allowedHosts: 'Allowed Hosts'

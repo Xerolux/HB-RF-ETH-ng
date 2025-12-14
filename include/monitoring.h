@@ -39,6 +39,8 @@ typedef struct {
     char user[33];
     char password[33];
     char topic_prefix[65];
+    bool ha_discovery_enabled;
+    char ha_discovery_prefix[65];
 } mqtt_config_t;
 
 // Monitoring configuration

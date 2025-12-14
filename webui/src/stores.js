@@ -190,7 +190,9 @@ export const useMonitoringStore = defineStore('monitoring', {
       port: 1883,
       user: '',
       password: '',
-      topicPrefix: 'hb-rf-eth'
+      topicPrefix: 'hb-rf-eth',
+      haDiscoveryEnabled: false,
+      haDiscoveryPrefix: 'homeassistant'
     }
   }),
   actions: {

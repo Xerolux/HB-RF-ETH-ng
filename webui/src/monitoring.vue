@@ -100,6 +100,17 @@
           <BFormInput v-model="mqttConfig.topicPrefix" />
           <BFormText>{{ t('monitoring.mqtt.topicPrefixHelp') }}</BFormText>
         </BFormGroup>
+
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.haDiscoveryEnabled')">
+          <BFormCheckbox v-model="mqttConfig.haDiscoveryEnabled" switch />
+        </BFormGroup>
+
+        <template v-if="mqttConfig.haDiscoveryEnabled">
+          <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.haDiscoveryPrefix')">
+            <BFormInput v-model="mqttConfig.haDiscoveryPrefix" />
+            <BFormText>{{ t('monitoring.mqtt.haDiscoveryPrefixHelp') }}</BFormText>
+          </BFormGroup>
+        </template>
       </template>
     </BForm>
 
