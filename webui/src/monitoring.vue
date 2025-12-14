@@ -66,6 +66,45 @@
       {{ t('monitoring.saveSuccess') }}
     </BAlert>
 
+    <hr />
+
+    <!-- MQTT Configuration -->
+    <h6 class="mt-3">{{ t('monitoring.mqtt.title') }}</h6>
+    <BForm>
+      <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.enabled')">
+        <BFormCheckbox v-model="mqttConfig.enabled" switch />
+      </BFormGroup>
+
+      <template v-if="mqttConfig.enabled">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.server')">
+          <BFormInput v-model="mqttConfig.server" required />
+          <BFormText>{{ t('monitoring.mqtt.serverHelp') }}</BFormText>
+        </BFormGroup>
+
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.port')">
+          <BFormInput v-model.number="mqttConfig.port" type="number" min="1" max="65535" />
+          <BFormText>{{ t('monitoring.mqtt.portHelp') }}</BFormText>
+        </BFormGroup>
+
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.user')">
+          <BFormInput v-model="mqttConfig.user" />
+          <BFormText>{{ t('monitoring.mqtt.userHelp') }}</BFormText>
+        </BFormGroup>
+
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.password')">
+          <BFormInput v-model="mqttConfig.password" type="password" />
+          <BFormText>{{ t('monitoring.mqtt.passwordHelp') }}</BFormText>
+        </BFormGroup>
+
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.topicPrefix')">
+          <BFormInput v-model="mqttConfig.topicPrefix" />
+          <BFormText>{{ t('monitoring.mqtt.topicPrefixHelp') }}</BFormText>
+        </BFormGroup>
+      </template>
+    </BForm>
+
+    <hr />
+
     <BAlert v-if="showError" variant="danger" dismissible @dismissed="showError = false">
       {{ t('monitoring.saveError') }}
     </BAlert>
@@ -86,7 +125,7 @@ import { storeToRefs } from 'pinia'
 const { t } = useI18n()
 
 const monitoringStore = useMonitoringStore()
-const { snmp: snmpConfig, checkmk: checkmkConfig } = storeToRefs(monitoringStore)
+const { snmp: snmpConfig, checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
 
 const showSuccess = ref(false)
 const showError = ref(false)
@@ -108,7 +147,8 @@ const saveConfig = async () => {
   try {
     await monitoringStore.save({
       snmp: snmpConfig.value,
-      checkmk: checkmkConfig.value
+      checkmk: checkmkConfig.value,
+      mqtt: mqttConfig.value
     })
     showSuccess.value = true
   } catch (error) {

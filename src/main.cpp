@@ -178,8 +178,8 @@ void app_main()
     WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
-    // Initialize monitoring (SNMP and CheckMK)
-    monitoring_init(NULL);
+    // Initialize monitoring (SNMP, CheckMK, MQTT)
+    monitoring_init(NULL, &sysInfo, &updateCheck);
 
     powerLED.setState(LED_STATE_ON);
     statusLED.setState(LED_STATE_OFF);

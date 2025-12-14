@@ -6,6 +6,7 @@
  */
 
 #include "monitoring.h"
+#include "mqtt_handler.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -42,6 +43,16 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_CHECKMK_ENABLED "cmk_en"
 #define NVS_CHECKMK_PORT "cmk_port"
 #define NVS_CHECKMK_HOSTS "cmk_hosts"
+#define NVS_MQTT_ENABLED "mqtt_en"
+#define NVS_MQTT_SERVER "mqtt_srv"
+#define NVS_MQTT_PORT "mqtt_port"
+#define NVS_MQTT_USER "mqtt_usr"
+#define NVS_MQTT_PASS "mqtt_pw"
+#define NVS_MQTT_PREFIX "mqtt_pfx"
+
+// Global pointers
+static SysInfo* g_sysInfo = NULL;
+static UpdateCheck* g_updateCheck = NULL;
 
 // Get firmware version from app descriptor
 static const char* get_firmware_version(void)
@@ -60,6 +71,15 @@ static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes
     *hours = uptime_sec / 3600;
     uptime_sec %= 3600;
     *minutes = uptime_sec / 60;
+}
+
+// Helper to access global pointers from other files (like mqtt_handler)
+SysInfo* monitoring_get_sysinfo(void) {
+    return g_sysInfo;
+}
+
+UpdateCheck* monitoring_get_updatecheck(void) {
+    return g_updateCheck;
 }
 
 // CheckMK Agent Task
@@ -276,6 +296,14 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_u16(nvs_handle, NVS_CHECKMK_PORT, config->checkmk.port);
     nvs_set_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts);
 
+    // Save MQTT config
+    nvs_set_u8(nvs_handle, NVS_MQTT_ENABLED, config->mqtt.enabled);
+    nvs_set_str(nvs_handle, NVS_MQTT_SERVER, config->mqtt.server);
+    nvs_set_u16(nvs_handle, NVS_MQTT_PORT, config->mqtt.port);
+    nvs_set_str(nvs_handle, NVS_MQTT_USER, config->mqtt.user);
+    nvs_set_str(nvs_handle, NVS_MQTT_PASS, config->mqtt.password);
+    nvs_set_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix);
+
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
@@ -299,6 +327,10 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
         strcpy(config->checkmk.allowed_hosts, "*");
+
+        config->mqtt.enabled = false;
+        config->mqtt.port = 1883;
+        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
 
         return ESP_OK;
     }
@@ -337,14 +369,51 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     str_len = sizeof(config->checkmk.allowed_hosts);
     nvs_get_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts, &str_len);
 
+    // Load MQTT config
+    if (nvs_get_u8(nvs_handle, NVS_MQTT_ENABLED, &u8_val) == ESP_OK) {
+        config->mqtt.enabled = u8_val;
+    }
+
+    str_len = sizeof(config->mqtt.server);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_SERVER, config->mqtt.server, &str_len) != ESP_OK) {
+        config->mqtt.server[0] = 0;
+    }
+
+    if (nvs_get_u16(nvs_handle, NVS_MQTT_PORT, &u16_val) == ESP_OK) {
+        config->mqtt.port = u16_val;
+    } else {
+        config->mqtt.port = 1883;
+    }
+
+    str_len = sizeof(config->mqtt.user);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_USER, config->mqtt.user, &str_len) != ESP_OK) {
+        config->mqtt.user[0] = 0;
+    }
+
+    str_len = sizeof(config->mqtt.password);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_PASS, config->mqtt.password, &str_len) != ESP_OK) {
+        config->mqtt.password[0] = 0;
+    }
+
+    str_len = sizeof(config->mqtt.topic_prefix);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
+        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+    }
+
     nvs_close(nvs_handle);
     return ESP_OK;
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config)
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
+
+    g_sysInfo = sysInfo;
+    g_updateCheck = updateCheck;
+
+    // Initialize MQTT handler
+    mqtt_handler_init();
 
     if (config == NULL) {
         // Load from NVS
@@ -364,6 +433,11 @@ esp_err_t monitoring_init(const monitoring_config_t *config)
         checkmk_start(&current_config.checkmk);
     }
 
+    // Start MQTT if enabled
+    if (current_config.mqtt.enabled) {
+        mqtt_handler_start(&current_config.mqtt);
+    }
+
     return ESP_OK;
 }
 
@@ -377,6 +451,9 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     if (current_config.checkmk.enabled) {
         checkmk_stop();
     }
+    if (current_config.mqtt.enabled) {
+        mqtt_handler_stop();
+    }
 
     // Update config
     memcpy(&current_config, config, sizeof(monitoring_config_t));
@@ -388,6 +465,9 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     }
     if (current_config.checkmk.enabled) {
         checkmk_start(&current_config.checkmk);
+    }
+    if (current_config.mqtt.enabled) {
+        mqtt_handler_start(&current_config.mqtt);
     }
 
     return ESP_OK;

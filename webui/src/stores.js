@@ -183,6 +183,14 @@ export const useMonitoringStore = defineStore('monitoring', {
       enabled: false,
       port: 6556,
       allowedHosts: '*'
+    },
+    mqtt: {
+      enabled: false,
+      server: '',
+      port: 1883,
+      user: '',
+      password: '',
+      topicPrefix: 'hb-rf-eth'
     }
   }),
   actions: {
