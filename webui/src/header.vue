@@ -58,6 +58,6 @@ const changeLocale = (newLocale) => {
 
 const logout = () => {
   loginStore.logout()
-  router.go()
+  router.push('/login')
 }
 </script>
