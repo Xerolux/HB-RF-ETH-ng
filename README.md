@@ -3,7 +3,7 @@
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
-[![License][license-shield]](LICENSE)
+[![License][license-shield]](LICENSE.md)
 
 
 [![Buy Me A Coffee][buymeacoffee-badge]][buymeacoffee]
