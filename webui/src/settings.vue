@@ -38,44 +38,19 @@
         </BFormRadioGroup>
       </BFormGroup>
       <BFormGroup :label="t('settings.ipAddress')" label-cols-sm="4" v-if="!useDHCP">
-        <BFormInput
-          type="text"
-          v-model="localIP"
-          trim
-          :state="v$.localIP.$error ? false : null"
-        />
+        <BFormInput type="text" v-model="localIP" trim :state="v$.localIP.$error ? false : null" />
       </BFormGroup>
       <BFormGroup :label="t('settings.netmask')" label-cols-sm="4" v-if="!useDHCP">
-        <BFormInput
-          type="text"
-          v-model="netmask"
-          trim
-          :state="v$.netmask.$error ? false : null"
-        />
+        <BFormInput type="text" v-model="netmask" trim :state="v$.netmask.$error ? false : null" />
       </BFormGroup>
       <BFormGroup :label="t('settings.gateway')" label-cols-sm="4" v-if="!useDHCP">
-        <BFormInput
-          type="text"
-          v-model="gateway"
-          trim
-          :state="v$.gateway.$error ? false : null"
-        />
+        <BFormInput type="text" v-model="gateway" trim :state="v$.gateway.$error ? false : null" />
       </BFormGroup>
       <BFormGroup :label="t('settings.dns1')" label-cols-sm="4" v-if="!useDHCP">
-        <BFormInput
-          type="text"
-          v-model="dns1"
-          trim
-          :state="v$.dns1.$error ? false : null"
-        />
+        <BFormInput type="text" v-model="dns1" trim :state="v$.dns1.$error ? false : null" />
       </BFormGroup>
       <BFormGroup :label="t('settings.dns2')" label-cols-sm="4" v-if="!useDHCP">
-        <BFormInput
-          type="text"
-          v-model="dns2"
-          trim
-          :state="v$.dns2.$error ? false : null"
-        />
+        <BFormInput type="text" v-model="dns2" trim :state="v$.dns2.$error ? false : null" />
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.ipv6Settings') }}</h6>
@@ -200,22 +175,21 @@
         dismissible
         fade
         @update:model-value="showSuccess = null"
-      >{{ t("settings.saveSuccess") }}</BAlert>
+        >{{ t('settings.saveSuccess') }}</BAlert
+      >
       <BAlert
         variant="danger"
         :model-value="showError"
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t("settings.saveError") }}</BAlert>
+        >{{ t('settings.saveError') }}</BAlert
+      >
 
       <BFormGroup label-cols-sm="9">
-        <BButton
-          variant="primary"
-          block
-          @click="saveSettingsClick"
-          :disabled="v$.$error"
-        >{{ t('common.save') }}</BButton>
+        <BButton variant="primary" block @click="saveSettingsClick" :disabled="v$.$error">{{
+          t('common.save')
+        }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -228,23 +202,23 @@
     class="mb-3"
   >
     <BForm @submit.stop.prevent>
-        <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
+      <p>{{ t('settings.backupInfo') }}</p>
+      <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{
+        t('settings.downloadBackup')
+      }}</BButton>
 
-        <hr/>
-        <p>{{ t('settings.restoreInfo') }}</p>
-        <BFormFile
-          v-model="restoreFile"
-          accept=".json"
-          :placeholder="t('settings.noFileChosen')"
-          :browse-text="t('settings.browse')"
-          class="mb-2"
-        />
-        <BButton
-            variant="warning"
-            :disabled="!restoreFile"
-            @click="restoreSettings"
-        >{{ t('settings.restore') }}</BButton>
+      <hr />
+      <p>{{ t('settings.restoreInfo') }}</p>
+      <BFormFile
+        v-model="restoreFile"
+        accept=".json"
+        :placeholder="t('settings.noFileChosen')"
+        :browse-text="t('settings.browse')"
+        class="mb-2"
+      />
+      <BButton variant="warning" :disabled="!restoreFile" @click="restoreSettings">{{
+        t('settings.restore')
+      }}</BButton>
     </BForm>
   </BCard>
 </template>
@@ -269,7 +243,9 @@ import { useSettingsStore } from './stores.js'
 
 const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
-const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
+const ipv6_validator = helpers.regex(
+  /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/
+)
 
 const { t } = useI18n()
 
@@ -355,8 +331,8 @@ const rules = {
   ipv6PrefixLength: {
     required: requiredIf(isIPv6Static),
     numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 128', val => val <= 128)
+    minValue: helpers.withMessage('Min 1', (val) => val >= 1),
+    maxValue: helpers.withMessage('Max 128', (val) => val <= 128)
   },
   ipv6Gateway: {
     required: requiredIf(isIPv6Static),
@@ -427,9 +403,13 @@ const loadSettings = () => {
 }
 
 // Watch store changes
-watch(() => settingsStore.$state, () => {
-  loadSettings()
-}, { deep: true })
+watch(
+  () => settingsStore.$state,
+  () => {
+    loadSettings()
+  },
+  { deep: true }
+)
 
 onMounted(async () => {
   await settingsStore.load()
@@ -494,28 +474,27 @@ const downloadBackup = async () => {
 }
 
 const restoreSettings = async () => {
-    if (!restoreFile.value) return
+  if (!restoreFile.value) return
 
-    if (!confirm(t('settings.restoreConfirm'))) return
+  if (!confirm(t('settings.restoreConfirm'))) return
 
-    try {
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-            try {
-                const json = JSON.parse(e.target.result)
-                await axios.post('/api/restore', json)
-                alert(t('settings.restoreSuccess'))
-                window.location.reload()
-            } catch (err) {
-                alert(t('settings.restoreError') + ': ' + err.message)
-            }
-        }
-        reader.readAsText(restoreFile.value)
-    } catch (e) {
-        alert(t('settings.restoreError'))
+  try {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target.result)
+        await axios.post('/api/restore', json)
+        alert(t('settings.restoreSuccess'))
+        window.location.reload()
+      } catch (err) {
+        alert(t('settings.restoreError') + ': ' + err.message)
+      }
     }
+    reader.readAsText(restoreFile.value)
+  } catch (e) {
+    alert(t('settings.restoreError'))
+  }
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

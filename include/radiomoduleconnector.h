@@ -23,23 +23,22 @@
 
 #pragma once
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include <atomic>
+
 #include "driver/uart.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 #include "led.h"
 #include "streamparser.h"
-#include <atomic>
 #define _Atomic(X) std::atomic<X>
 
-class FrameHandler
-{
+class FrameHandler {
 public:
     virtual void handleFrame(unsigned char *buffer, uint16_t len) = 0;
 };
 
-class RadioModuleConnector
-{
+class RadioModuleConnector {
 private:
     LED *_redLED;
     LED *_greenLED;

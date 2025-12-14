@@ -22,41 +22,34 @@
  */
 
 #include "linereader.h"
+
 #include <stdint.h>
 
-LineReader::LineReader(std::function<void(unsigned char *buffer, uint16_t len)> processor) : _processor(processor), _buffer_pos(0)
-{
-}
+LineReader::LineReader(std::function<void(unsigned char *buffer, uint16_t len)> processor)
+    : _processor(processor), _buffer_pos(0) {}
 
-void LineReader::Append(unsigned char chr)
-{
-    switch (chr)
-    {
-    case '\r':
-        return;
+void LineReader::Append(unsigned char chr) {
+    switch (chr) {
+        case '\r':
+            return;
 
-    case '\n':
-        _buffer[_buffer_pos++] = 0;
-        _processor(_buffer, _buffer_pos);
-        _buffer_pos = 0;
-        break;
+        case '\n':
+            _buffer[_buffer_pos++] = 0;
+            _processor(_buffer, _buffer_pos);
+            _buffer_pos = 0;
+            break;
 
-    default:
-        _buffer[_buffer_pos++] = chr;
-        break;
+        default:
+            _buffer[_buffer_pos++] = chr;
+            break;
     }
 }
 
-void LineReader::Append(unsigned char *buffer, uint16_t len)
-{
+void LineReader::Append(unsigned char *buffer, uint16_t len) {
     int i;
-    for (i = 0; i < len; i++)
-    {
+    for (i = 0; i < len; i++) {
         Append(buffer[i]);
     }
 }
 
-void LineReader::Flush()
-{
-    _buffer_pos = 0;
-}
+void LineReader::Flush() { _buffer_pos = 0; }

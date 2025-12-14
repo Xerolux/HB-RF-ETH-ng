@@ -21,22 +21,21 @@
  *
  */
 
+#include "radiomoduleconnector.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "radiomoduleconnector.h"
-#include "hmframe.h"
+
 #include "driver/gpio.h"
-#include "pins.h"
 #include "esp_log.h"
+#include "hmframe.h"
+#include "pins.h"
 
-void serialQueueHandlerTask(void *parameter)
-{
-    ((RadioModuleConnector *)parameter)->_serialQueueHandler();
-}
+void serialQueueHandlerTask(void *parameter) { ((RadioModuleConnector *)parameter)->_serialQueueHandler(); }
 
-RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed)
-{
+RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed)
+    : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed) {
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
@@ -53,9 +52,10 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .backup_before_sleep = 0,
-        },
+        .flags =
+            {
+                .backup_before_sleep = 0,
+            },
     };
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, HM_TX_PIN, HM_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -64,8 +64,7 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
     _streamParser = new StreamParser(false, std::bind(&RadioModuleConnector::_handleFrame, this, _1, _2));
 }
 
-void RadioModuleConnector::start()
-{
+void RadioModuleConnector::start() {
     setLED(false, false, false);
 
     uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2, 0, 20, &_uart_queue, 0);
@@ -74,69 +73,60 @@ void RadioModuleConnector::start()
     resetModule();
 }
 
-void RadioModuleConnector::stop()
-{
+void RadioModuleConnector::stop() {
     resetModule();
     uart_driver_delete(UART_NUM_1);
     vTaskDelete(_tHandle);
 }
 
-void RadioModuleConnector::setFrameHandler(FrameHandler *frameHandler, bool decodeEscaped)
-{
+void RadioModuleConnector::setFrameHandler(FrameHandler *frameHandler, bool decodeEscaped) {
     atomic_store(&_frameHandler, frameHandler);
     _streamParser->setDecodeEscaped(decodeEscaped);
 }
 
-void RadioModuleConnector::setLED(bool red, bool green, bool blue)
-{
+void RadioModuleConnector::setLED(bool red, bool green, bool blue) {
     _redLED->setState(red ? LED_STATE_ON : LED_STATE_OFF);
     _greenLED->setState(green ? LED_STATE_ON : LED_STATE_OFF);
     _blueLED->setState(blue ? LED_STATE_ON : LED_STATE_OFF);
 }
 
-void RadioModuleConnector::resetModule()
-{
+void RadioModuleConnector::resetModule() {
     gpio_set_level(HM_RST_PIN, 1);
     vTaskDelay(50 / portTICK_PERIOD_MS);
     gpio_set_level(HM_RST_PIN, 0);
     vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 
-void RadioModuleConnector::sendFrame(unsigned char *buffer, uint16_t len)
-{
+void RadioModuleConnector::sendFrame(unsigned char *buffer, uint16_t len) {
     uart_write_bytes(UART_NUM_1, (const char *)buffer, len);
 }
 
-void RadioModuleConnector::_serialQueueHandler()
-{
+void RadioModuleConnector::_serialQueueHandler() {
     uart_event_t event;
     uint8_t *buffer = (uint8_t *)malloc(UART_HW_FIFO_LEN(UART_NUM_1));
 
     uart_flush_input(UART_NUM_1);
 
-    for (;;)
-    {
-        if (xQueueReceive(_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY))
-        {
-            switch (event.type)
-            {
-            case UART_DATA:
-                uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
-                _streamParser->append(buffer, event.size);
-                break;
-            case UART_FIFO_OVF:
-            case UART_BUFFER_FULL:
-                uart_flush_input(UART_NUM_1);
-                xQueueReset(_uart_queue);
-                _streamParser->flush();
-                break;
-            case UART_BREAK:
-            case UART_PARITY_ERR:
-            case UART_FRAME_ERR:
-                _streamParser->flush();
-                break;
-            default:
-                break;
+    for (;;) {
+        if (xQueueReceive(_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
+            switch (event.type) {
+                case UART_DATA:
+                    uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
+                    _streamParser->append(buffer, event.size);
+                    break;
+                case UART_FIFO_OVF:
+                case UART_BUFFER_FULL:
+                    uart_flush_input(UART_NUM_1);
+                    xQueueReset(_uart_queue);
+                    _streamParser->flush();
+                    break;
+                case UART_BREAK:
+                case UART_PARITY_ERR:
+                case UART_FRAME_ERR:
+                    _streamParser->flush();
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -146,12 +136,10 @@ void RadioModuleConnector::_serialQueueHandler()
     vTaskDelete(NULL);
 }
 
-void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len)
-{
+void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len) {
     FrameHandler *frameHandler = (FrameHandler *)atomic_load(&_frameHandler);
 
-    if (frameHandler)
-    {
+    if (frameHandler) {
         frameHandler->handleFrame(buffer, len);
     }
 }

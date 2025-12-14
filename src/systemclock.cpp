@@ -22,19 +22,19 @@
  */
 
 #include "systemclock.h"
+
 #include <sys/time.h>
+
 #include "esp_log.h"
 
 static const char *TAG = "SystemClock";
 
 #define get_tzname(isdst) isdst > 0 ? *(tzname + 1) : *tzname
 
-void updateRtcTask(void *parameter)
-{
+void updateRtcTask(void *parameter) {
     Rtc *_rtc = (Rtc *)parameter;
 
-    for (;;)
-    {
+    for (;;) {
         if (ulTaskNotifyTake(pdTRUE, portMAX_DELAY) != 1)
             continue;
 
@@ -45,20 +45,17 @@ void updateRtcTask(void *parameter)
         struct tm now;
         localtime_r(&tv.tv_sec, &now);
 
-        ESP_LOGI(TAG, "Updated RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now.tm_year + 1900, now.tm_mon + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec, get_tzname(now.tm_isdst));
+        ESP_LOGI(TAG, "Updated RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now.tm_year + 1900, now.tm_mon + 1,
+                 now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec, get_tzname(now.tm_isdst));
     }
 
     vTaskDelete(NULL);
 }
 
-SystemClock::SystemClock(Rtc *rtc) : _rtc(rtc)
-{
-}
+SystemClock::SystemClock(Rtc *rtc) : _rtc(rtc) {}
 
-void SystemClock::start(void)
-{
-    if (_rtc)
-    {
+void SystemClock::start(void) {
+    if (_rtc) {
         struct timeval tv = _rtc->GetTime();
         settimeofday(&tv, NULL);
         _lastSyncTime = tv;
@@ -66,46 +63,38 @@ void SystemClock::start(void)
         time_t nowtime = tv.tv_sec;
         struct tm *now = localtime(&nowtime);
 
-        ESP_LOGI(TAG, "Updated time from RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now->tm_year + 1900, now->tm_mon + 1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec, get_tzname(now->tm_isdst));
+        ESP_LOGI(TAG, "Updated time from RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now->tm_year + 1900, now->tm_mon + 1,
+                 now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec, get_tzname(now->tm_isdst));
 
         xTaskCreate(updateRtcTask, "SystemClock_RtcUpdateTask", 4096, _rtc, 10, &_tHandle);
     }
 }
 
-void SystemClock::stop(void)
-{
-    if (_tHandle != NULL)
-    {
+void SystemClock::stop(void) {
+    if (_tHandle != NULL) {
         vTaskDelete(_tHandle);
         _tHandle = NULL;
     }
 }
 
-void SystemClock::setTime(struct timeval *tv)
-{
+void SystemClock::setTime(struct timeval *tv) {
     settimeofday(tv, NULL);
     _lastSyncTime = *tv;
 
-    if (_tHandle != NULL)
-    {
+    if (_tHandle != NULL) {
         xTaskNotifyGive(_tHandle);
     }
 }
 
-struct timeval SystemClock::getTime()
-{
+struct timeval SystemClock::getTime() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv;
 }
 
-struct timeval SystemClock::getLastSyncTime()
-{
-    return _lastSyncTime;
-}
+struct timeval SystemClock::getLastSyncTime() { return _lastSyncTime; }
 
-struct tm SystemClock::getLocalTime(void)
-{
+struct tm SystemClock::getLocalTime(void) {
     time_t now;
     time(&now);
 

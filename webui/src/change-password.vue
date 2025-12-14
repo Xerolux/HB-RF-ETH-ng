@@ -39,15 +39,13 @@
         dismissible
         fade
         @update:model-value="error = null"
-      >{{ error }}</BAlert>
+        >{{ error }}</BAlert
+      >
 
       <BFormGroup label-cols-sm="9">
-        <BButton
-          variant="primary"
-          block
-          @click="changePassword"
-          :disabled="v$.$invalid"
-        >{{ t('changePassword.changePassword') }}</BButton>
+        <BButton variant="primary" block @click="changePassword" :disabled="v$.$invalid">{{
+          t('changePassword.changePassword')
+        }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>

@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -69,7 +69,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -83,10 +83,19 @@ jobs:
           cd webui
           npm ci
 
+      - name: Lint WebUI
+        run: |
+          cd webui
+          npm run lint
+
       - name: Install C++ linters
         run: |
           sudo apt-get update
-          sudo apt-get install -y cppcheck
+          sudo apt-get install -y cppcheck clang-format
+
+      - name: Check C++ formatting
+        run: |
+          find src include -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
 
       - name: Run cppcheck
         run: |
@@ -118,7 +127,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -127,14 +136,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: webui/package-lock.json
 
-      - name: Build WebUI
-        run: |
-          cd webui
-          npm ci
-          npm run build
-
       - name: Cache PlatformIO
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: |
             ~/.platformio
@@ -144,7 +147,7 @@ jobs:
             ${{ runner.os }}-pio-
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -153,16 +156,39 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio
 
-      - name: Build and check firmware size
+      - name: Build Current Firmware
         run: |
-          pio run -e hb-rf-eth-ng --verbose
+          # WebUI
+          cd webui
+          npm ci
+          npm run build
+          cd ..
+          # Firmware
+          pio run -e hb-rf-eth-ng
+          pio run -e hb-rf-eth-ng -t size > size_current.txt
 
-      - name: Report firmware size
+      - name: Checkout Base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base_source
+          clean: false
+
+      - name: Build Base Firmware
         run: |
-          echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          pio run -e hb-rf-eth-ng -t size >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cd base_source
+          # WebUI
+          cd webui
+          npm ci
+          npm run build
+          cd ..
+          # Firmware
+          pio run -e hb-rf-eth-ng
+          pio run -e hb-rf-eth-ng -t size > ../size_base.txt
+
+      - name: Generate Size Report
+        run: |
+          python3 .github/scripts/compare_size.py size_base.txt size_current.txt >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
       - name: Check WebUI size

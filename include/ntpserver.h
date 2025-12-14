@@ -23,44 +23,43 @@
 
 #pragma once
 
-#include "lwip/opt.h"
 #include "lwip/inet.h"
-#include "lwip/udp.h"
+#include "lwip/opt.h"
 #include "lwip/priv/tcpip_priv.h"
+#include "lwip/udp.h"
 #include "systemclock.h"
 
 typedef unsigned long long tstamp;
 
-typedef struct ntp_packet
-{
-    uint8_t  flags;
-    uint8_t  stratum;
-    uint8_t  poll;
-    int8_t   precision;
+typedef struct ntp_packet {
+    uint8_t flags;
+    uint8_t stratum;
+    uint8_t poll;
+    int8_t precision;
     uint32_t delay;
     uint32_t dispersion;
-    char     ref_id[4];
-    tstamp   ref_time;
-    tstamp   orig_time;
-    tstamp   recv_time;
-    tstamp   trns_time;
+    char ref_id[4];
+    tstamp ref_time;
+    tstamp orig_time;
+    tstamp recv_time;
+    tstamp trns_time;
 } ntp_packet_t;
 
 class NtpServer {
-  private:
+private:
     SystemClock* _clk;
     udp_pcb* _pcb;
     QueueHandle_t _udp_queue;
     TaskHandle_t _tHandle = NULL;
 
-    void handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
+    void handlePacket(pbuf* pb, ip4_addr_t addr, uint16_t port);
 
-  public: 
-    NtpServer(SystemClock* clk); 
+public:
+    NtpServer(SystemClock* clk);
 
     void start();
     void stop();
 
     void _udpQueueHandler();
-    bool _udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port);
+    bool _udpReceivePacket(pbuf* pb, const ip_addr_t* addr, uint16_t port);
 };

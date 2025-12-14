@@ -23,22 +23,24 @@
 
 #pragma once
 #include <stdint.h>
-#include "settings.h"
+
+#include "esp_http_server.h"
+#include "ethernet.h"
 #include "led.h"
-#include "updatecheck.h"
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
-#include "ethernet.h"
-#include "esp_http_server.h"
+#include "settings.h"
+#include "updatecheck.h"
 
-class WebUI
-{
+class WebUI {
 private:
     httpd_handle_t _httpd_handle;
 
 public:
-    WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector);
+    WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet,
+          RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector,
+          RadioModuleDetector *radioModuleDetector);
     void start();
     void stop();
 };

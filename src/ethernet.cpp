@@ -22,22 +22,21 @@
  */
 
 #include "ethernet.h"
+
 #include "pins.h"
 
 static const char *TAG = "Ethernet";
 
-void _handleETHEvent(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
+void _handleETHEvent(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     reinterpret_cast<Ethernet *>(arg)->_handleETHEvent(event_base, event_id, event_data);
 }
 
-void _handleIPEvent(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
+void _handleIPEvent(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     reinterpret_cast<Ethernet *>(arg)->_handleIPEvent(event_base, event_id, event_data);
 }
 
-Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false), _linkSpeed(ETH_SPEED_10M), _duplexMode(ETH_DUPLEX_HALF)
-{
+Ethernet::Ethernet(Settings *settings)
+    : _settings(settings), _isConnected(false), _linkSpeed(ETH_SPEED_10M), _duplexMode(ETH_DUPLEX_HALF) {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_loop_create_default());
@@ -45,12 +44,9 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     _netif_cfg = ESP_NETIF_DEFAULT_ETH();
     _eth_netif = esp_netif_new(&_netif_cfg);
 
-    if (settings->getUseDHCP())
-    {
+    if (settings->getUseDHCP()) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcpc_start(_eth_netif));
-    }
-    else
-    {
+    } else {
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_dhcpc_stop(_eth_netif));
 
         esp_netif_ip_info_t ipInfo;
@@ -62,21 +58,21 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
         esp_netif_dns_info_t dnsInfo;
         dnsInfo.ip.type = ESP_IPADDR_TYPE_V4;
         dnsInfo.ip.u_addr.ip4.addr = settings->getDns1().addr;
-        if (dnsInfo.ip.u_addr.ip4.addr != IPADDR_ANY && dnsInfo.ip.u_addr.ip4.addr != IPADDR_NONE)
-        {
+        if (dnsInfo.ip.u_addr.ip4.addr != IPADDR_ANY && dnsInfo.ip.u_addr.ip4.addr != IPADDR_NONE) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_dns_info(_eth_netif, ESP_NETIF_DNS_MAIN, &dnsInfo));
         }
 
         dnsInfo.ip.u_addr.ip4.addr = settings->getDns2().addr;
-        if (dnsInfo.ip.u_addr.ip4.addr != IPADDR_ANY && dnsInfo.ip.u_addr.ip4.addr != IPADDR_NONE)
-        {
+        if (dnsInfo.ip.u_addr.ip4.addr != IPADDR_ANY && dnsInfo.ip.u_addr.ip4.addr != IPADDR_NONE) {
             ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_dns_info(_eth_netif, ESP_NETIF_DNS_BACKUP, &dnsInfo));
         }
     }
 
     // Register event handlers
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &::_handleETHEvent, (void *)this));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &::_handleIPEvent, (void *)this));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(
+        esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &::_handleETHEvent, (void *)this));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(
+        esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &::_handleIPEvent, (void *)this));
 
     // Configure PHY (LAN8720)
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
@@ -98,20 +94,13 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_attach(_eth_netif, esp_eth_new_netif_glue(_eth_handle)));
 }
 
-void Ethernet::start()
-{
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle));
-}
+void Ethernet::start() { ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle)); }
 
-void Ethernet::stop()
-{
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_stop(_eth_handle));
-}
+void Ethernet::stop() { ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_stop(_eth_handle)); }
 
-void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2)
-{
-    if (_isConnected)
-    {
+void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1,
+                                  ip4_addr_t *dns2) {
+    if (_isConnected) {
         esp_netif_ip_info_t ipInfo;
         esp_netif_get_ip_info(_eth_netif, &ipInfo);
         ip->addr = ipInfo.ip.addr;
@@ -123,9 +112,7 @@ void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_
         dns1->addr = dnsInfo.ip.u_addr.ip4.addr;
         esp_netif_get_dns_info(_eth_netif, ESP_NETIF_DNS_BACKUP, &dnsInfo);
         dns2->addr = dnsInfo.ip.u_addr.ip4.addr;
-    }
-    else
-    {
+    } else {
         ip->addr = 0;
         netmask->addr = 0;
         gateway->addr = 0;
@@ -134,40 +121,39 @@ void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_
     }
 }
 
-void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
+void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, void *event_data) {
     esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
     uint8_t mac_addr[6] = {0};
 
-    switch (event_id)
-    {
-    case ETHERNET_EVENT_CONNECTED:
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_SPEED, &_linkSpeed));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_DUPLEX_MODE, &_duplexMode));
-        ESP_LOGI(TAG, "Link Up");
-        ESP_LOGI(TAG, "HW Addr %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-        ESP_LOGI(TAG, "Speed %dMbps, %s duplex", _linkSpeed == ETH_SPEED_100M ? 100 : 10, _duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
-        break;
-    case ETHERNET_EVENT_DISCONNECTED:
-        _isConnected = false;
-        ESP_LOGI(TAG, "Link Down");
-        break;
-    case ETHERNET_EVENT_START:
-        ESP_LOGI(TAG, "Started");
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_hostname(_eth_netif, _settings->getHostname()));
-        break;
-    case ETHERNET_EVENT_STOP:
-        _isConnected = false;
-        ESP_LOGI(TAG, "Stopped");
-        break;
-    default:
-        break;
+    switch (event_id) {
+        case ETHERNET_EVENT_CONNECTED:
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_SPEED, &_linkSpeed));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_DUPLEX_MODE, &_duplexMode));
+            ESP_LOGI(TAG, "Link Up");
+            ESP_LOGI(TAG, "HW Addr %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
+                     mac_addr[4], mac_addr[5]);
+            ESP_LOGI(TAG, "Speed %dMbps, %s duplex", _linkSpeed == ETH_SPEED_100M ? 100 : 10,
+                     _duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
+            break;
+        case ETHERNET_EVENT_DISCONNECTED:
+            _isConnected = false;
+            ESP_LOGI(TAG, "Link Down");
+            break;
+        case ETHERNET_EVENT_START:
+            ESP_LOGI(TAG, "Started");
+            ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_hostname(_eth_netif, _settings->getHostname()));
+            break;
+        case ETHERNET_EVENT_STOP:
+            _isConnected = false;
+            ESP_LOGI(TAG, "Stopped");
+            break;
+        default:
+            break;
     }
 }
 
-void Ethernet::_handleIPEvent(esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
+void Ethernet::_handleIPEvent(esp_event_base_t event_base, int32_t event_id, void *event_data) {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     const esp_netif_ip_info_t *ip_info = &event->ip_info;
 
@@ -175,12 +161,6 @@ void Ethernet::_handleIPEvent(esp_event_base_t event_base, int32_t event_id, voi
     ESP_LOGI(TAG, "IPv4: " IPSTR, IP2STR(&ip_info->ip));
 }
 
-int Ethernet::getLinkSpeedMbps()
-{
-    return _linkSpeed == ETH_SPEED_100M ? 100 : 10;
-}
+int Ethernet::getLinkSpeedMbps() { return _linkSpeed == ETH_SPEED_100M ? 100 : 10; }
 
-const char* Ethernet::getDuplexMode()
-{
-    return _duplexMode == ETH_DUPLEX_FULL ? "Full" : "Half";
-}
+const char *Ethernet::getDuplexMode() { return _duplexMode == ETH_DUPLEX_FULL ? "Full" : "Half"; }

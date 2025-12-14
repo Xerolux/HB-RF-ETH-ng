@@ -77,7 +77,8 @@ export default {
     language: 'Język',
 
     // Messages
-    saveSuccess: 'Ustawienia zostały pomyślnie zapisane. Uruchom ponownie system, aby je zastosować.',
+    saveSuccess:
+      'Ustawienia zostały pomyślnie zapisane. Uruchom ponownie system, aby je zastosować.',
     saveError: 'Wystąpił błąd podczas zapisywania ustawień.'
   },
 

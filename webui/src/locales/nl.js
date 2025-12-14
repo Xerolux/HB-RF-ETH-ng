@@ -77,7 +77,8 @@ export default {
     language: 'Taal',
 
     // Messages
-    saveSuccess: 'Instellingen zijn succesvol opgeslagen. Start het systeem opnieuw op om ze toe te passen.',
+    saveSuccess:
+      'Instellingen zijn succesvol opgeslagen. Start het systeem opnieuw op om ze toe te passen.',
     saveError: 'Er is een fout opgetreden bij het opslaan van de instellingen.'
   },
 

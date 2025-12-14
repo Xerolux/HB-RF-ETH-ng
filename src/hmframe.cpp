@@ -22,25 +22,20 @@
  */
 
 #include "hmframe.h"
+
 #include <string.h>
 
-uint16_t HMFrame::crc(unsigned char *buffer, uint16_t len)
-{
+uint16_t HMFrame::crc(unsigned char *buffer, uint16_t len) {
     uint16_t crc = 0xd77f;
     int i;
 
-    while (len--)
-    {
+    while (len--) {
         crc ^= *buffer++ << 8;
-        for (i = 0; i < 8; i++)
-        {
-            if (crc & 0x8000)
-            {
+        for (i = 0; i < 8; i++) {
+            if (crc & 0x8000) {
                 crc <<= 1;
                 crc ^= 0x8005;
-            }
-            else
-            {
+            } else {
                 crc <<= 1;
             }
         }
@@ -49,8 +44,7 @@ uint16_t HMFrame::crc(unsigned char *buffer, uint16_t len)
     return crc;
 }
 
-bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame)
-{
+bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame) {
     uint16_t crc;
 
     if (len < 8)
@@ -75,12 +69,9 @@ bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame)
     return true;
 }
 
-HMFrame::HMFrame() : data_len(0)
-{
-}
+HMFrame::HMFrame() : data_len(0) {}
 
-uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
-{
+uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped) {
     uint16_t crc;
 
     if (data_len + 8 > len)
@@ -101,12 +92,9 @@ uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
 
     uint16_t res = data_len + 8;
 
-    if (escaped)
-    {
-        for (uint16_t i = 1; i < res; i++)
-        {
-            if (buffer[i] == 0xfc || buffer[i] == 0xfd)
-            {
+    if (escaped) {
+        for (uint16_t i = 1; i < res; i++) {
+            if (buffer[i] == 0xfc || buffer[i] == 0xfd) {
                 memmove(buffer + i + 1, buffer + i, res - i);
                 buffer[i++] = 0xfc;
                 buffer[i] &= 0x7f;

@@ -45,14 +45,17 @@ const removeIdleListeners = () => {
   if (idleTimer) clearTimeout(idleTimer)
 }
 
-watch(() => loginStore.isLoggedIn, (isLoggedIn) => {
-  if (isLoggedIn) {
-    setupIdleListeners()
-    resetTimer()
-  } else {
-    removeIdleListeners()
+watch(
+  () => loginStore.isLoggedIn,
+  (isLoggedIn) => {
+    if (isLoggedIn) {
+      setupIdleListeners()
+      resetTimer()
+    } else {
+      removeIdleListeners()
+    }
   }
-})
+)
 
 onMounted(() => {
   if (loginStore.isLoggedIn) {

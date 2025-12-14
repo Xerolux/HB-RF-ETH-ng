@@ -8,11 +8,7 @@
   >
     <BForm @submit.stop.prevent>
       <BFormGroup :label="t('login.password')" label-cols-sm="4">
-        <BFormInput
-          type="password"
-          v-model="password"
-          :state="v$.password.$error ? false : null"
-        />
+        <BFormInput type="password" v-model="password" :state="v$.password.$error ? false : null" />
       </BFormGroup>
       <BAlert
         variant="danger"
@@ -20,14 +16,16 @@
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t('login.loginError') }}</BAlert>
+        >{{ t('login.loginError') }}</BAlert
+      >
       <BFormGroup label-cols-sm="9">
         <BButton
           variant="primary"
           block
           @click="loginClick"
           :disabled="!password || password === ''"
-        >{{ t('login.login') }}</BButton>
+          >{{ t('login.login') }}</BButton
+        >
       </BFormGroup>
     </BForm>
   </BCard>
@@ -67,5 +65,4 @@ const loginClick = async () => {
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

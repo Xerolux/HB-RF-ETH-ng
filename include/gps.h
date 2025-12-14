@@ -21,16 +21,15 @@
  *
  */
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
 #include "driver/uart.h"
-#include "systemclock.h"
-#include "settings.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
 #include "linereader.h"
+#include "settings.h"
+#include "systemclock.h"
 
-class GPS
-{
+class GPS {
 private:
     Settings *_settings;
     SystemClock *_clk;

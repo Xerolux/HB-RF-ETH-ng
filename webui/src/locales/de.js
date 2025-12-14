@@ -80,18 +80,22 @@ export default {
     language: 'Sprache',
 
     // Messages
-    saveSuccess: 'Einstellungen wurden erfolgreich gespeichert. Bitte starten Sie das System neu, um sie zu übernehmen.',
+    saveSuccess:
+      'Einstellungen wurden erfolgreich gespeichert. Bitte starten Sie das System neu, um sie zu übernehmen.',
     saveError: 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten.',
 
     // Backup & Restore
     backupRestore: 'Sichern & Wiederherstellen',
-    backupInfo: 'Laden Sie eine Sicherung Ihrer Einstellungen herunter, um sie später wiederherzustellen.',
-    restoreInfo: 'Laden Sie eine Sicherungsdatei hoch, um die Einstellungen wiederherzustellen. Das System wird danach neu gestartet.',
+    backupInfo:
+      'Laden Sie eine Sicherung Ihrer Einstellungen herunter, um sie später wiederherzustellen.',
+    restoreInfo:
+      'Laden Sie eine Sicherungsdatei hoch, um die Einstellungen wiederherzustellen. Das System wird danach neu gestartet.',
     downloadBackup: 'Sicherung herunterladen',
     restore: 'Wiederherstellen',
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',
-    restoreConfirm: 'Sind Sie sicher? Die aktuellen Einstellungen werden überschrieben und das System neu gestartet.',
+    restoreConfirm:
+      'Sind Sie sicher? Die aktuellen Einstellungen werden überschrieben und das System neu gestartet.',
     restoreSuccess: 'Einstellungen erfolgreich wiederhergestellt. System startet neu...',
     restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
     backupError: 'Fehler beim Herunterladen der Sicherung'
@@ -137,11 +141,14 @@ export default {
     title: 'Firmware',
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
-    versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
+    versionInfo:
+      'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
     onlineUpdate: 'Online Update durchführen',
-    onlineUpdateConfirm: 'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
-    onlineUpdateStarted: 'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
+    onlineUpdateConfirm:
+      'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
+    onlineUpdateStarted:
+      'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
     updateFile: 'Firmware Datei',
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',
@@ -149,7 +156,8 @@ export default {
     upload: 'Hochladen',
     restart: 'System neu starten',
     uploading: 'Wird hochgeladen...',
-    uploadSuccess: 'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
+    uploadSuccess:
+      'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
     uploadError: 'Es ist ein Fehler aufgetreten.',
     updateSuccess: 'Firmware wurde erfolgreich aktualisiert',
     updateError: 'Fehler beim Aktualisieren der Firmware',
@@ -183,7 +191,8 @@ export default {
       port: 'Port',
       portHelp: 'Standard: 6556',
       allowedHosts: 'Erlaubte Client-IPs',
-      allowedHostsHelp: 'Komma-getrennte IP-Adressen (z.B. "192.168.1.10,192.168.1.20") oder "*" für alle'
+      allowedHostsHelp:
+        'Komma-getrennte IP-Adressen (z.B. "192.168.1.10,192.168.1.20") oder "*" für alle'
     },
     mqtt: {
       title: 'MQTT Client',
@@ -211,7 +220,8 @@ export default {
     title: 'Über',
     version: 'Version 2.1.0',
     fork: 'Modernisierte Fork',
-    forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
+    forkDescription:
+      'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
     original: 'Original-Autor',
     firmwareLicense: 'Die',
     hardwareLicense: 'Die',
@@ -227,8 +237,10 @@ export default {
   // Third Party
   thirdParty: {
     title: 'Software Dritter',
-    containsThirdPartySoftware: 'Diese Software enthält freie Software Dritter, die unter verschiedenen Lizenzbedingungen weitergegeben wird.',
-    providedAsIs: 'Die Veröffentlichung der freien Software erfolgt, „wie es ist", OHNE IRGENDEINE GARANTIE.'
+    containsThirdPartySoftware:
+      'Diese Software enthält freie Software Dritter, die unter verschiedenen Lizenzbedingungen weitergegeben wird.',
+    providedAsIs:
+      'Die Veröffentlichung der freien Software erfolgt, „wie es ist", OHNE IRGENDEINE GARANTIE.'
   },
 
   // Change Password
@@ -241,9 +253,11 @@ export default {
     changeSuccess: 'Passwort erfolgreich geändert',
     changeError: 'Fehler beim Ändern des Passworts',
     passwordMismatch: 'Passwörter stimmen nicht überein',
-    passwordTooShort: 'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
+    passwordTooShort:
+      'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
-    warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
+    warningMessage:
+      'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
     success: 'Passwort erfolgreich geändert'
   }
 }
