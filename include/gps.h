@@ -41,6 +41,8 @@ private:
 
 public:
     GPS(Settings *settings, SystemClock *clk);
+    GPS(const GPS&) = delete;
+    GPS& operator=(const GPS&) = delete;
 
     void start(void);
     void stop(void);

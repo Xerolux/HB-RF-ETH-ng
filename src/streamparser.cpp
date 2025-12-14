@@ -24,7 +24,7 @@
 #include "streamparser.h"
 #include <stdint.h>
 
-StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _bufferPos(0), _state(NO_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
+StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _bufferPos(0), _frameLength(0), _framePos(0), _state(NO_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
 {
 }
 
