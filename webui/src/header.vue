@@ -11,6 +11,7 @@
         <BNavItem href="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
+        <BNavItem href="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
         <BNavItemDropdown :text="currentLocaleName" size="sm" variant="outline-light" class="me-2">
           <BDropdownItem
             v-for="locale in availableLocales"
