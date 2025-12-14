@@ -27,11 +27,10 @@
 #include "freertos/task.h"
 #include "rtcdriver.h"
 
-class SystemClock
-{
+class SystemClock {
 private:
     Rtc *_rtc;
-    struct timeval _lastSyncTime = { .tv_sec = 0, .tv_usec = 0 };
+    struct timeval _lastSyncTime = {.tv_sec = 0, .tv_usec = 0};
     TaskHandle_t _tHandle = NULL;
 
 public:

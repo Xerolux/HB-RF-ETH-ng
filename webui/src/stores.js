@@ -23,27 +23,27 @@ export const useThemeStore = defineStore('theme', {
 
 export const useLoginStore = defineStore('login', {
   state: () => ({
-    isLoggedIn: sessionStorage.getItem("hb-rf-eth-ng-pw") != null,
-    token: sessionStorage.getItem("hb-rf-eth-ng-pw") || "",
+    isLoggedIn: sessionStorage.getItem('hb-rf-eth-ng-pw') != null,
+    token: sessionStorage.getItem('hb-rf-eth-ng-pw') || '',
     passwordChanged: true // Default to true to avoid blocking if unknown
   }),
   actions: {
     login(token) {
-      sessionStorage.setItem("hb-rf-eth-ng-pw", token)
+      sessionStorage.setItem('hb-rf-eth-ng-pw', token)
       this.token = token
       this.isLoggedIn = true
     },
     logout() {
       this.isLoggedIn = false
-      sessionStorage.removeItem("hb-rf-eth-ng-pw")
-      this.token = ""
+      sessionStorage.removeItem('hb-rf-eth-ng-pw')
+      this.token = ''
     },
     setPasswordChanged(status) {
       this.passwordChanged = status
     },
     async tryLogin(password) {
       try {
-        const response = await axios.post("/login.json", { password })
+        const response = await axios.post('/login.json', { password })
         if (response.data.isAuthenticated) {
           this.login(response.data.token)
           this.setPasswordChanged(response.data.passwordChanged !== false)
@@ -60,31 +60,31 @@ export const useLoginStore = defineStore('login', {
 
 export const useSysInfoStore = defineStore('sysInfo', {
   state: () => ({
-    serial: "",
-    currentVersion: "",
-    latestVersion: "",
-    rawUartRemoteAddress: "",
+    serial: '',
+    currentVersion: '',
+    latestVersion: '',
+    rawUartRemoteAddress: '',
     memoryUsage: 0.0,
     cpuUsage: 0.0,
     supplyVoltage: 0.0,
     temperature: 0.0,
     uptimeSeconds: 0,
-    boardRevision: "",
-    resetReason: "",
+    boardRevision: '',
+    resetReason: '',
     ethernetConnected: false,
     ethernetSpeed: 0,
-    ethernetDuplex: "",
-    radioModuleType: "",
-    radioModuleSerial: "",
-    radioModuleFirmwareVersion: "",
-    radioModuleBidCosRadioMAC: "",
-    radioModuleHmIPRadioMAC: "",
-    radioModuleSGTIN: ""
+    ethernetDuplex: '',
+    radioModuleType: '',
+    radioModuleSerial: '',
+    radioModuleFirmwareVersion: '',
+    radioModuleBidCosRadioMAC: '',
+    radioModuleHmIPRadioMAC: '',
+    radioModuleSGTIN: ''
   }),
   actions: {
     async update() {
       try {
-        const response = await axios.get("/sysinfo.json")
+        const response = await axios.get('/sysinfo.json')
         Object.assign(this.$state, response.data.sysInfo)
       } catch (error) {
         console.error('Failed to load system info:', error.response?.status || error.message)
@@ -96,32 +96,32 @@ export const useSysInfoStore = defineStore('sysInfo', {
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
-    hostname: "",
+    hostname: '',
     useDHCP: true,
-    localIP: "",
-    netmask: "",
-    gateway: "",
-    dns1: "",
-    dns2: "",
+    localIP: '',
+    netmask: '',
+    gateway: '',
+    dns1: '',
+    dns2: '',
     // IPv6 settings
     enableIPv6: false,
-    ipv6Mode: "auto",
-    ipv6Address: "",
+    ipv6Mode: 'auto',
+    ipv6Address: '',
     ipv6PrefixLength: 64,
-    ipv6Gateway: "",
-    ipv6Dns1: "",
-    ipv6Dns2: "",
+    ipv6Gateway: '',
+    ipv6Dns1: '',
+    ipv6Dns2: '',
     timesource: 0,
     dcfOffset: 0,
     gpsBaudrate: 9600,
-    ntpServer: "",
+    ntpServer: '',
     ledBrightness: 100,
-    checkUpdates: true,
+    checkUpdates: true
   }),
   actions: {
     async load() {
       try {
-        const response = await axios.get("/settings.json")
+        const response = await axios.get('/settings.json')
         Object.assign(this.$state, response.data.settings)
       } catch (error) {
         console.error('Failed to load settings:', error.response?.status || error.message)
@@ -130,7 +130,7 @@ export const useSettingsStore = defineStore('settings', {
     },
     async save(settings) {
       try {
-        const response = await axios.post("/settings.json", settings)
+        const response = await axios.post('/settings.json', settings)
         Object.assign(this.$state, response.data.settings)
       } catch (error) {
         console.error('Failed to save settings:', error.response?.status || error.message)
@@ -142,20 +142,20 @@ export const useSettingsStore = defineStore('settings', {
 
 export const useFirmwareUpdateStore = defineStore('firmwareUpdate', {
   state: () => ({
-    progress: 0,
+    progress: 0
   }),
   actions: {
     async update(file) {
       try {
         this.progress = 0
 
-        await axios.post("/ota_update", file, {
+        await axios.post('/ota_update', file, {
           headers: {
             'Content-Type': 'application/octet-stream'
           },
-          onUploadProgress: event => {
+          onUploadProgress: (event) => {
             if (event.lengthComputable) {
-              this.progress = Math.ceil((event.loaded || event.position) / event.total * 100)
+              this.progress = Math.ceil(((event.loaded || event.position) / event.total) * 100)
             }
           }
         })
@@ -198,7 +198,7 @@ export const useMonitoringStore = defineStore('monitoring', {
   actions: {
     async load() {
       try {
-        const response = await axios.get("/api/monitoring")
+        const response = await axios.get('/api/monitoring')
         Object.assign(this.$state, response.data)
       } catch (error) {
         console.error('Failed to load monitoring config:', error.response?.status || error.message)
@@ -207,7 +207,7 @@ export const useMonitoringStore = defineStore('monitoring', {
     },
     async save(config) {
       try {
-        await axios.post("/api/monitoring", config)
+        await axios.post('/api/monitoring', config)
         Object.assign(this.$state, config)
       } catch (error) {
         console.error('Failed to save monitoring config:', error.response?.status || error.message)

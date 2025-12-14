@@ -21,11 +21,10 @@
  *
  */
 
-#include "systemclock.h"
 #include "settings.h"
+#include "systemclock.h"
 
-class DCF
-{
+class DCF {
 public:
     DCF(Settings *settings, SystemClock *clk);
 

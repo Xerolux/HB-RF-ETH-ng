@@ -22,31 +22,24 @@
  */
 
 #include "ntpclient.h"
+
 #include "esp_sntp.h"
 
 static Settings *_settings;
 static SystemClock *_clk;
 
-static void _time_sync_notification_cb(struct timeval *tv)
-{
-    _clk->setTime(tv);
-}
+static void _time_sync_notification_cb(struct timeval *tv) { _clk->setTime(tv); }
 
-NtpClient::NtpClient(Settings *settings, SystemClock *clk)
-{
+NtpClient::NtpClient(Settings *settings, SystemClock *clk) {
     _settings = settings;
     _clk = clk;
 }
 
-void NtpClient::start()
-{
+void NtpClient::start() {
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, _settings->getNtpServer());
     sntp_set_time_sync_notification_cb(_time_sync_notification_cb);
     esp_sntp_init();
 }
 
-void NtpClient::stop()
-{
-    esp_sntp_stop();
-}
+void NtpClient::stop() { esp_sntp_stop(); }

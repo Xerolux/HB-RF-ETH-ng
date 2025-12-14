@@ -8,61 +8,61 @@
       class="mb-3"
     >
       <BForm @submit.stop.prevent>
-      <BFormGroup :label="t('sysinfo.serial')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.serial" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.boardRevision')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.boardRevision" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.uptime')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="uptimeFormatted" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.resetReason')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.resetReason" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.cpuUsage')" label-cols-sm="4">
-        <BProgress :max="100" height="2.25rem" class="form-control p-0">
-          <BProgressBar :value="sysInfoStore.cpuUsage">
-            <span class="justify-content-center d-flex position-absolute w-100 text-dark">
-              {{ sysInfoStore.cpuUsage.toFixed(2) }}%
-            </span>
-          </BProgressBar>
-        </BProgress>
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.memoryUsage')" label-cols-sm="4">
-        <BProgress :max="100" height="2.25rem" class="form-control p-0">
-          <BProgressBar :value="sysInfoStore.memoryUsage">
-            <span class="justify-content-center d-flex position-absolute w-100 text-dark">
-              {{ sysInfoStore.memoryUsage.toFixed(2) }}%
-            </span>
-          </BProgressBar>
-        </BProgress>
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.ethernetStatus')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="ethernetStatus" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.rawUartRemoteAddress')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.rawUartRemoteAddress" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleType')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleType" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleSerial')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleSerial" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleFirmware')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleFirmwareVersion" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleBidCosRadioMAC')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleBidCosRadioMAC" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleHmIPRadioMAC')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleHmIPRadioMAC" disabled />
-      </BFormGroup>
-      <BFormGroup :label="t('sysinfo.radioModuleSGTIN')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.radioModuleSGTIN" disabled />
-      </BFormGroup>
-    </BForm>
+        <BFormGroup :label="t('sysinfo.serial')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.serial" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.boardRevision')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.boardRevision" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.uptime')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="uptimeFormatted" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.resetReason')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.resetReason" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.cpuUsage')" label-cols-sm="4">
+          <BProgress :max="100" height="2.25rem" class="form-control p-0">
+            <BProgressBar :value="sysInfoStore.cpuUsage">
+              <span class="justify-content-center d-flex position-absolute w-100 text-dark">
+                {{ sysInfoStore.cpuUsage.toFixed(2) }}%
+              </span>
+            </BProgressBar>
+          </BProgress>
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.memoryUsage')" label-cols-sm="4">
+          <BProgress :max="100" height="2.25rem" class="form-control p-0">
+            <BProgressBar :value="sysInfoStore.memoryUsage">
+              <span class="justify-content-center d-flex position-absolute w-100 text-dark">
+                {{ sysInfoStore.memoryUsage.toFixed(2) }}%
+              </span>
+            </BProgressBar>
+          </BProgress>
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.ethernetStatus')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="ethernetStatus" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.rawUartRemoteAddress')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.rawUartRemoteAddress" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleType')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleType" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleSerial')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleSerial" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleFirmware')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleFirmwareVersion" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleBidCosRadioMAC')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleBidCosRadioMAC" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleHmIPRadioMAC')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleHmIPRadioMAC" disabled />
+        </BFormGroup>
+        <BFormGroup :label="t('sysinfo.radioModuleSGTIN')" label-cols-sm="4">
+          <BFormInput type="text" :model-value="sysInfoStore.radioModuleSGTIN" disabled />
+        </BFormGroup>
+      </BForm>
     </BCard>
   </div>
 </template>
@@ -137,5 +137,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

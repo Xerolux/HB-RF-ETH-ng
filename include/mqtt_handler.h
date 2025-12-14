@@ -8,8 +8,8 @@
 #ifndef MQTT_HANDLER_H
 #define MQTT_HANDLER_H
 
-#include "monitoring.h"
 #include "esp_err.h"
+#include "monitoring.h"
 
 // Initialize MQTT subsystem
 esp_err_t mqtt_handler_init(void);
@@ -23,4 +23,4 @@ esp_err_t mqtt_handler_stop(void);
 // Publish status update
 void mqtt_handler_publish_status(void);
 
-#endif // MQTT_HANDLER_H
+#endif  // MQTT_HANDLER_H

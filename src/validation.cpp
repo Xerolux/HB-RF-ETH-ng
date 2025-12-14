@@ -22,47 +22,42 @@
  */
 
 #include "validation.h"
-#include <string.h>
+
 #include <ctype.h>
+#include <string.h>
+
 #include "esp_log.h"
 
 static const char *TAG = "Validation";
 
-bool validateHostname(const char *hostname)
-{
-    if (hostname == NULL || hostname[0] == '\0')
-    {
+bool validateHostname(const char *hostname) {
+    if (hostname == NULL || hostname[0] == '\0') {
         ESP_LOGW(TAG, "Hostname is NULL or empty");
         return false;
     }
 
     size_t len = strlen(hostname);
-    if (len > MAX_HOSTNAME_LENGTH)
-    {
+    if (len > MAX_HOSTNAME_LENGTH) {
         ESP_LOGW(TAG, "Hostname too long: %zu (max %d)", len, MAX_HOSTNAME_LENGTH);
         return false;
     }
 
     // Check for valid hostname characters (alphanumeric, hyphen, dot)
     // Must start with alphanumeric
-    if (!isalnum(hostname[0]))
-    {
+    if (!isalnum(hostname[0])) {
         ESP_LOGW(TAG, "Hostname must start with alphanumeric character");
         return false;
     }
 
-    for (size_t i = 0; i < len; i++)
-    {
+    for (size_t i = 0; i < len; i++) {
         char c = hostname[i];
-        if (!isalnum(c) && c != '-' && c != '.')
-        {
+        if (!isalnum(c) && c != '-' && c != '.') {
             ESP_LOGW(TAG, "Invalid character in hostname: '%c'", c);
             return false;
         }
 
         // Hyphen cannot be first or last character of a label
-        if (c == '-' && (i == 0 || i == len - 1 || hostname[i-1] == '.' || hostname[i+1] == '.'))
-        {
+        if (c == '-' && (i == 0 || i == len - 1 || hostname[i - 1] == '.' || hostname[i + 1] == '.')) {
             ESP_LOGW(TAG, "Invalid hyphen placement in hostname");
             return false;
         }
@@ -71,8 +66,7 @@ bool validateHostname(const char *hostname)
     return true;
 }
 
-bool validateIPAddress(ip4_addr_t addr)
-{
+bool validateIPAddress(ip4_addr_t addr) {
     // IP address 0.0.0.0 is valid (IPADDR_ANY) for DHCP mode
     // Broadcast address 255.255.255.255 is also technically valid
     // Just check that it's not in the reserved ranges for invalid use
@@ -80,8 +74,7 @@ bool validateIPAddress(ip4_addr_t addr)
     uint32_t ip = addr.addr;
 
     // We allow IPADDR_ANY (0.0.0.0) as it's used for DHCP
-    if (ip == IPADDR_ANY)
-    {
+    if (ip == IPADDR_ANY) {
         return true;
     }
 
@@ -89,8 +82,7 @@ bool validateIPAddress(ip4_addr_t addr)
     uint8_t firstOctet = (ip & 0xFF);
 
     // Reject class E addresses (240-255) except for limited broadcast (255.255.255.255)
-    if (firstOctet >= 240 && ip != IPADDR_BROADCAST)
-    {
+    if (firstOctet >= 240 && ip != IPADDR_BROADCAST) {
         ESP_LOGW(TAG, "Invalid IP address: Class E address");
         return false;
     }
@@ -98,27 +90,21 @@ bool validateIPAddress(ip4_addr_t addr)
     return true;
 }
 
-bool validateLEDBrightness(int brightness)
-{
-    if (brightness < MIN_LED_BRIGHTNESS || brightness > MAX_LED_BRIGHTNESS)
-    {
-        ESP_LOGW(TAG, "Invalid LED brightness: %d (must be %d-%d)",
-                 brightness, MIN_LED_BRIGHTNESS, MAX_LED_BRIGHTNESS);
+bool validateLEDBrightness(int brightness) {
+    if (brightness < MIN_LED_BRIGHTNESS || brightness > MAX_LED_BRIGHTNESS) {
+        ESP_LOGW(TAG, "Invalid LED brightness: %d (must be %d-%d)", brightness, MIN_LED_BRIGHTNESS, MAX_LED_BRIGHTNESS);
         return false;
     }
     return true;
 }
 
-bool validateGpsBaudrate(int baudrate)
-{
+bool validateGpsBaudrate(int baudrate) {
     // Common GPS baudrates
     const int validBaudrates[] = {4800, 9600, 19200, 38400, 57600, 115200};
     const int numValidBaudrates = sizeof(validBaudrates) / sizeof(validBaudrates[0]);
 
-    for (int i = 0; i < numValidBaudrates; i++)
-    {
-        if (baudrate == validBaudrates[i])
-        {
+    for (int i = 0; i < numValidBaudrates; i++) {
+        if (baudrate == validBaudrates[i]) {
             return true;
         }
     }
@@ -127,38 +113,30 @@ bool validateGpsBaudrate(int baudrate)
     return false;
 }
 
-bool validateDcfOffset(int offset)
-{
-    if (offset < MIN_DCF_OFFSET || offset > MAX_DCF_OFFSET)
-    {
-        ESP_LOGW(TAG, "Invalid DCF offset: %d (must be %d-%d)",
-                 offset, MIN_DCF_OFFSET, MAX_DCF_OFFSET);
+bool validateDcfOffset(int offset) {
+    if (offset < MIN_DCF_OFFSET || offset > MAX_DCF_OFFSET) {
+        ESP_LOGW(TAG, "Invalid DCF offset: %d (must be %d-%d)", offset, MIN_DCF_OFFSET, MAX_DCF_OFFSET);
         return false;
     }
     return true;
 }
 
-bool validateNtpServer(const char *ntpServer)
-{
-    if (ntpServer == NULL || ntpServer[0] == '\0')
-    {
+bool validateNtpServer(const char *ntpServer) {
+    if (ntpServer == NULL || ntpServer[0] == '\0') {
         ESP_LOGW(TAG, "NTP server is NULL or empty");
         return false;
     }
 
     size_t len = strlen(ntpServer);
-    if (len > MAX_NTP_SERVER_LENGTH)
-    {
+    if (len > MAX_NTP_SERVER_LENGTH) {
         ESP_LOGW(TAG, "NTP server string too long: %zu (max %d)", len, MAX_NTP_SERVER_LENGTH);
         return false;
     }
 
     // Basic validation: check for valid hostname/IP characters
-    for (size_t i = 0; i < len; i++)
-    {
+    for (size_t i = 0; i < len; i++) {
         char c = ntpServer[i];
-        if (!isalnum(c) && c != '.' && c != '-' && c != ':')
-        {
+        if (!isalnum(c) && c != '.' && c != '-' && c != ':') {
             ESP_LOGW(TAG, "Invalid character in NTP server: '%c'", c);
             return false;
         }

@@ -22,12 +22,14 @@
  */
 
 #include "dcf.h"
+
 #include <sys/time.h>
+
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "freertos/queue.h"
-#include "driver/gpio.h"
+#include "freertos/task.h"
 #include "pins.h"
 
 static SystemClock *_clk;
@@ -44,57 +46,43 @@ static TaskHandle_t _queueHandlerTask;
 
 static const char *TAG = "DCF";
 
-typedef struct
-{
+typedef struct {
     int64_t flankTime;
     int state;
 } flank_event_t;
 
-inline uint8_t bcd2bin(uint8_t val)
-{
-    return val - 6 * (val >> 4);
-}
+inline uint8_t bcd2bin(uint8_t val) { return val - 6 * (val >> 4); }
 
-DCF::DCF(Settings *settings, SystemClock *clk)
-{
+DCF::DCF(Settings *settings, SystemClock *clk) {
     _settings = settings;
     _clk = clk;
 }
 
-bool checkParity(uint8_t start, uint8_t end)
-{
+bool checkParity(uint8_t start, uint8_t end) {
     int parity = 0;
 
-    for (int pos = start; pos <= end; pos++)
-    {
+    for (int pos = start; pos <= end; pos++) {
         parity ^= (int)((_buffer >> pos) & 1);
     }
 
     return parity == 0;
 }
 
-int is_leap(unsigned int y)
-{
-    return (y % 4) == 0 && ((y % 100) != 0 || ((y + 1900) % 400) == 0);
-}
+int is_leap(unsigned int y) { return (y % 4) == 0 && ((y % 100) != 0 || ((y + 1900) % 400) == 0); }
 
-time_t dcf2epoch(struct tm *dcf_tm, uint8_t tz)
-{
+time_t dcf2epoch(struct tm *dcf_tm, uint8_t tz) {
     static const unsigned ndays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     time_t res = 0;
     int i;
 
-    for (i = 70; i < dcf_tm->tm_year; ++i)
-    {
+    for (i = 70; i < dcf_tm->tm_year; ++i) {
         res += is_leap(i) ? 366 : 365;
     }
 
-    for (i = 0; i < dcf_tm->tm_mon; ++i)
-    {
+    for (i = 0; i < dcf_tm->tm_mon; ++i) {
         res += ndays[i];
-        if (i == 1 && is_leap(dcf_tm->tm_year))
-        {
+        if (i == 1 && is_leap(dcf_tm->tm_year)) {
             res++;
         }
     }
@@ -110,8 +98,7 @@ time_t dcf2epoch(struct tm *dcf_tm, uint8_t tz)
     return res;
 }
 
-static void IRAM_ATTR onPinChange(void *arg)
-{
+static void IRAM_ATTR onPinChange(void *arg) {
     int64_t flankTime = esp_timer_get_time();
     int state = gpio_get_level(DCF_PIN);
 
@@ -122,53 +109,40 @@ static void IRAM_ATTR onPinChange(void *arg)
     BaseType_t xHigherPriorityTaskWokenByPost = pdFALSE;
     xQueueSendFromISR(_flank_queue, &event, &xHigherPriorityTaskWokenByPost);
 
-    if (xHigherPriorityTaskWokenByPost)
-    {
+    if (xHigherPriorityTaskWokenByPost) {
         portYIELD_FROM_ISR();
     }
 }
 
-static void handlePinChange(int64_t flankTime, int state)
-{
-    if (state)
-    {
+static void handlePinChange(int64_t flankTime, int state) {
+    if (state) {
         // end of pulse
         int64_t secondLength = _secondMark - _previousSecondMark;
         int64_t pulseLength = flankTime - _secondMark;
 
         uint64_t pulseValue;
-        if (pulseLength > 80000 && pulseLength < 135000)
-        {
+        if (pulseLength > 80000 && pulseLength < 135000) {
             pulseValue = 0;
-        }
-        else if (pulseLength > 180000 && pulseLength < 235000)
-        {
+        } else if (pulseLength > 180000 && pulseLength < 235000) {
             pulseValue = 1;
-        }
-        else
-        {
+        } else {
             ESP_LOGE(TAG, "Invalid pulse: %llu %llu", secondLength / 1000ULL, pulseLength / 1000ULL);
-            return; // invalid pulse length
+            return;  // invalid pulse length
         }
 
-        if (secondLength > 970000 && secondLength < 1035000)
-        {
-            if (_bufferPos < 59)
-            {
+        if (secondLength > 970000 && secondLength < 1035000) {
+            if (_bufferPos < 59) {
                 _bufferPos++;
                 _buffer |= (pulseValue << _bufferPos);
             }
-        }
-        else if (secondLength > 1970000 && secondLength < 2035000)
-        {
+        } else if (secondLength > 1970000 && secondLength < 2035000) {
             uint8_t timezone = (uint8_t)((_buffer >> 17) & 3);
 
-            if (_bufferPos < 58 || _bufferPos > 59 || (int)(_buffer & 1) != 0 || (int)((_buffer >> 20) & 1) != 1 || timezone == 0 || timezone == 3 || !checkParity(21, 28) || !checkParity(29, 35) || !checkParity(36, 58))
-            {
+            if (_bufferPos < 58 || _bufferPos > 59 || (int)(_buffer & 1) != 0 || (int)((_buffer >> 20) & 1) != 1 ||
+                timezone == 0 || timezone == 3 || !checkParity(21, 28) || !checkParity(29, 35) ||
+                !checkParity(36, 58)) {
                 ESP_LOGE(TAG, "Received invalid frame");
-            }
-            else
-            {
+            } else {
                 struct tm dcf_tm;
                 dcf_tm.tm_year = 100 + bcd2bin((int)((_buffer >> 50) & 0xff));
                 dcf_tm.tm_mon = bcd2bin((int)((_buffer >> 45) & 0x1f)) - 1;
@@ -181,35 +155,30 @@ static void handlePinChange(int64_t flankTime, int state)
                 tv.tv_sec = dcf2epoch(&dcf_tm, timezone);
                 tv.tv_usec = esp_timer_get_time() - _secondMark + _settings->getDcfOffset();
 
-                ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900, dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, tv.tv_usec, timezone == 2 ? "CET" : "CEST");
+                ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900,
+                         dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, tv.tv_usec,
+                         timezone == 2 ? "CET" : "CEST");
                 _clk->setTime(&tv);
             }
 
             _buffer = pulseValue;
             _bufferPos = 0;
-        }
-        else
-        {
+        } else {
             ESP_LOGE(TAG, "Invalid second: %llu %llu", secondLength / 1000ULL, pulseLength / 1000ULL);
-            return; // invalid second length
+            return;  // invalid second length
         }
-    }
-    else
-    {
+    } else {
         // start of pulse
         _previousSecondMark = _secondMark;
         _secondMark = flankTime;
     }
 }
 
-static void flankEventQueueHandler(void *arg)
-{
+static void flankEventQueueHandler(void *arg) {
     flank_event_t event;
 
-    for (;;)
-    {
-        if (xQueueReceive(_flank_queue, &event, portMAX_DELAY) == pdTRUE)
-        {
+    for (;;) {
+        if (xQueueReceive(_flank_queue, &event, portMAX_DELAY) == pdTRUE) {
             handlePinChange(event.flankTime, event.state);
         }
     }
@@ -217,8 +186,7 @@ static void flankEventQueueHandler(void *arg)
     vTaskDelete(NULL);
 }
 
-void DCF::start()
-{
+void DCF::start() {
     _flank_queue = xQueueCreate(8, sizeof(flank_event_t));
     xTaskCreate(flankEventQueueHandler, "DFC_FlankEvent_QueueHandler", 4096, NULL, 17, &_queueHandlerTask);
 
@@ -234,8 +202,7 @@ void DCF::start()
     gpio_isr_handler_add(DCF_PIN, onPinChange, NULL);
 }
 
-void DCF::stop()
-{
+void DCF::stop() {
     gpio_isr_handler_remove(DCF_PIN);
     xQueueReset(_flank_queue);
     vTaskDelete(_queueHandlerTask);

@@ -22,11 +22,11 @@
  */
 
 #include "mdnsserver.h"
+
 #include "esp_system.h"
 #include "mdns.h"
 
-void MDns::start(Settings* settings)
-{
+void MDns::start(Settings* settings) {
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_init());
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_hostname_set(settings->getHostname()));
 
@@ -35,7 +35,4 @@ void MDns::start(Settings* settings)
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_service_add(NULL, "_ntp", "_udp", 123, NULL, 0));
 }
 
-void MDns::stop()
-{
-    mdns_free();
-}
+void MDns::stop() { mdns_free(); }

@@ -7,11 +7,15 @@
         <BNavItem href="/">{{ t('nav.home') }}</BNavItem>
         <BNavItem href="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
         <BNavItem href="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
-        <BNavItem href="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
+        <BNavItem href="/monitoring" v-if="loginStore.isLoggedIn">{{
+          t('nav.monitoring')
+        }}</BNavItem>
         <BNavItem href="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
-        <BNavItem href="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
+        <BNavItem href="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{
+          t('nav.login')
+        }}</BNavItem>
         <BNavItemDropdown :text="currentLocaleName" size="sm" variant="outline-light" class="me-2">
           <BDropdownItem
             v-for="locale in availableLocales"
@@ -22,11 +26,13 @@
             {{ locale.name }}
           </BDropdownItem>
         </BNavItemDropdown>
-        <BNavItem @click="themeStore.toggleTheme" class="me-2" style="cursor: pointer;">
-           {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
+        <BNavItem @click="themeStore.toggleTheme" class="me-2" style="cursor: pointer">
+          {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
         </BNavItem>
         <BNavForm v-if="loginStore.isLoggedIn">
-          <BButton size="sm" variant="outline-light" @click.prevent="logout">{{ t('nav.logout') }}</BButton>
+          <BButton size="sm" variant="outline-light" @click.prevent="logout">{{
+            t('nav.logout')
+          }}</BButton>
         </BNavForm>
       </BNavbarNav>
     </BCollapse>
@@ -47,7 +53,7 @@ const themeStore = useThemeStore()
 
 const currentLocale = computed(() => locale.value)
 const currentLocaleName = computed(() => {
-  const current = availableLocales.find(l => l.code === locale.value)
+  const current = availableLocales.find((l) => l.code === locale.value)
   return current ? current.name : 'English'
 })
 

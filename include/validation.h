@@ -23,9 +23,9 @@
 
 #pragma once
 
+#include <lwip/ip4_addr.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <lwip/ip4_addr.h>
 
 // Validation limits
 #define MAX_HOSTNAME_LENGTH 63

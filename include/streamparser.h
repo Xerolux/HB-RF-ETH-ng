@@ -24,19 +24,12 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <functional>
 
-typedef enum
-{
-    NO_DATA,
-    RECEIVE_LENGTH_HIGH_BYTE,
-    RECEIVE_LENGTH_LOW_BYTE,
-    RECEIVE_FRAME_DATA,
-    FRAME_COMPLETE
-} state_t;
+typedef enum { NO_DATA, RECEIVE_LENGTH_HIGH_BYTE, RECEIVE_LENGTH_LOW_BYTE, RECEIVE_FRAME_DATA, FRAME_COMPLETE } state_t;
 
-class StreamParser
-{
+class StreamParser {
 private:
     unsigned char _buffer[2048];
     uint16_t _bufferPos;

@@ -25,11 +25,11 @@
 
 #include "esp_log.h"
 #include "led.h"
-#include "settings.h"
 #include "pins.h"
+#include "settings.h"
 
 class PushButtonHandler {
-    public:
-        PushButtonHandler();
-        void handleStartupFactoryReset(LED *powerLED, LED *statusLED, Settings *settings);
+public:
+    PushButtonHandler();
+    void handleStartupFactoryReset(LED *powerLED, LED *statusLED, Settings *settings);
 };

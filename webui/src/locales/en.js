@@ -91,7 +91,8 @@ export default {
     restore: 'Restore',
     noFileChosen: 'No file chosen',
     browse: 'Browse',
-    restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
+    restoreConfirm:
+      'Are you sure? Current settings will be overwritten and the system will restart.',
     restoreSuccess: 'Settings successfully restored. System restarting...',
     restoreError: 'Error restoring settings',
     backupError: 'Error downloading backup'
@@ -137,10 +138,12 @@ export default {
     title: 'Firmware',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
-    versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    versionInfo:
+      'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailable: 'An update to version {latestVersion} is available.',
     onlineUpdate: 'Update Online',
-    onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
+    onlineUpdateConfirm:
+      'Do you really want to download and install the update? The system will restart automatically.',
     onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
     updateFile: 'Firmware file',
     noFileChosen: 'No file chosen',
@@ -149,7 +152,8 @@ export default {
     upload: 'Upload',
     restart: 'Restart system',
     uploading: 'Uploading...',
-    uploadSuccess: 'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
+    uploadSuccess:
+      'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
     uploadError: 'An error occured.',
     updateSuccess: 'Firmware updated successfully',
     updateError: 'Error updating firmware',
@@ -183,7 +187,8 @@ export default {
       port: 'Port',
       portHelp: 'Default: 6556',
       allowedHosts: 'Allowed Client IPs',
-      allowedHostsHelp: 'Comma-separated IP addresses (e.g. "192.168.1.10,192.168.1.20") or "*" for all'
+      allowedHostsHelp:
+        'Comma-separated IP addresses (e.g. "192.168.1.10,192.168.1.20") or "*" for all'
     },
     mqtt: {
       title: 'MQTT Client',
@@ -211,7 +216,8 @@ export default {
     title: 'About',
     version: 'Version 2.1.0',
     fork: 'Modernized Fork',
-    forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
+    forkDescription:
+      'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
     original: 'Original Author',
     firmwareLicense: 'The',
     hardwareLicense: 'The',
@@ -227,7 +233,8 @@ export default {
   // Third Party
   thirdParty: {
     title: 'Third party software',
-    containsThirdPartySoftware: 'This software contains free third party software products used under various license conditions.',
+    containsThirdPartySoftware:
+      'This software contains free third party software products used under various license conditions.',
     providedAsIs: 'The software is provided "as is" WITHOUT ANY WARRANTY.'
   },
 
@@ -241,9 +248,11 @@ export default {
     changeSuccess: 'Password changed successfully',
     changeError: 'Error changing password',
     passwordMismatch: 'Passwords do not match',
-    passwordTooShort: 'Password must be at least 6 characters long and contain letters and numbers.',
+    passwordTooShort:
+      'Password must be at least 6 characters long and contain letters and numbers.',
     passwordsDoNotMatch: 'Passwords do not match',
-    warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
+    warningMessage:
+      'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
     success: 'Password changed successfully'
   }
 }

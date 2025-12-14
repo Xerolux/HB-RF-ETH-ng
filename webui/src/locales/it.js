@@ -63,7 +63,7 @@ export default {
 
     // Time Settings
     timeSettings: 'Impostazioni ora',
-    timesource: 'Fonte dell\'ora',
+    timesource: "Fonte dell'ora",
     ntp: 'NTP',
     dcf: 'DCF',
     gps: 'GPS',
@@ -77,7 +77,8 @@ export default {
     language: 'Lingua',
 
     // Messages
-    saveSuccess: 'Le impostazioni sono state salvate con successo. Riavviare il sistema per applicarle.',
+    saveSuccess:
+      'Le impostazioni sono state salvate con successo. Riavviare il sistema per applicarle.',
     saveError: 'Si è verificato un errore durante il salvataggio delle impostazioni.'
   },
 
@@ -112,8 +113,8 @@ export default {
     upload: 'Carica',
     uploading: 'Caricamento in corso...',
     updateSuccess: 'Firmware aggiornato con successo',
-    updateError: 'Errore durante l\'aggiornamento del firmware',
-    warning: 'Attenzione: Non scollegare l\'alimentazione durante l\'aggiornamento!'
+    updateError: "Errore durante l'aggiornamento del firmware",
+    warning: "Attenzione: Non scollegare l'alimentazione durante l'aggiornamento!"
   },
 
   // Monitoring

@@ -9,13 +9,12 @@ import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 
 import App from './app.vue'
 import Home from './home.vue'
-import Settings from "./settings.vue"
-import FirmwareUpdate from "./firmwareupdate.vue"
+import Settings from './settings.vue'
+import FirmwareUpdate from './firmwareupdate.vue'
 import Login from './login.vue'
 import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
-
 
 // Router
 const router = createRouter({
@@ -27,25 +26,25 @@ const router = createRouter({
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
-    { path: '/login', component: Login },
+    { path: '/login', component: Login }
   ]
 })
 
 // Axios interceptors
 axios.interceptors.request.use(
-  request => {
+  (request) => {
     const loginStore = useLoginStore()
     if (loginStore.isLoggedIn) {
       request.headers['Authorization'] = 'Token ' + loginStore.token
     }
     return request
   },
-  error => Promise.reject(error)
+  (error) => Promise.reject(error)
 )
 
 axios.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     if (error.response && error.response.status === 401) {
       const loginStore = useLoginStore()
       loginStore.logout()
@@ -58,7 +57,7 @@ axios.interceptors.response.use(
 // Router guard
 router.beforeEach((to, from, next) => {
   const loginStore = useLoginStore()
-  if (to.matched.some(r => r.meta.requiresAuth)) {
+  if (to.matched.some((r) => r.meta.requiresAuth)) {
     if (!loginStore.isLoggedIn) {
       next({
         path: '/login',
@@ -101,10 +100,12 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
-app.use(createBootstrap({
+app.use(
+  createBootstrap({
     components: true,
-    directives: true,
-}))
+    directives: true
+  })
+)
 
 // Register all BootstrapVueNext components globally
 for (const key in BootstrapVueNext) {

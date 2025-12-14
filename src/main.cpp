@@ -21,44 +21,42 @@
  *
  */
 
-#include <stdio.h>
 #include <inttypes.h>
+#include <stdio.h>
+
+#include "dcf.h"
+#include "driver/uart.h"
+#include "esp_flash.h"
+#include "esp_log.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
+#include "ethernet.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_flash.h"
-#include "driver/uart.h"
-#include "esp_log.h"
-
-#include "pins.h"
-#include "led.h"
-#include "settings.h"
-#include "rtcdriver.h"
-#include "systemclock.h"
-#include "dcf.h"
-#include "ntpclient.h"
 #include "gps.h"
-#include "ethernet.h"
+#include "led.h"
+#include "mdnsserver.h"
+#include "monitoring.h"
+#include "ntpclient.h"
+#include "ntpserver.h"
+#include "pins.h"
 #include "pushbuttonhandler.h"
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
-#include "webui.h"
-#include "mdnsserver.h"
-#include "ntpserver.h"
-#include "esp_ota_ops.h"
+#include "rtcdriver.h"
+#include "settings.h"
+#include "systemclock.h"
 #include "updatecheck.h"
-#include "monitoring.h"
+#include "webui.h"
 
 static const char *TAG = "HB-RF-ETH";
 
-extern "C"
-{
-    void app_main(void);
+extern "C" {
+void app_main(void);
 }
 
-void app_main()
-{
+void app_main() {
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -67,9 +65,10 @@ void app_main()
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .backup_before_sleep = 0,
-        },
+        .flags =
+            {
+                .backup_before_sleep = 0,
+            },
     };
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -116,17 +115,16 @@ void app_main()
     NtpClient ntpClient(&settings, &clk);
     GPS gps(&settings, &clk);
 
-    switch (settings.getTimesource())
-    {
-    case TIMESOURCE_NTP:
-        ntpClient.start();
-        break;
-    case TIMESOURCE_GPS:
-        gps.start();
-        break;
-    case TIMESOURCE_DCF:
-        dcf.start();
-        break;
+    switch (settings.getTimesource()) {
+        case TIMESOURCE_NTP:
+            ntpClient.start();
+            break;
+        case TIMESOURCE_GPS:
+            gps.start();
+            break;
+        case TIMESOURCE_DCF:
+            dcf.start();
+            break;
     }
 
     MDns mdns;
@@ -139,19 +137,17 @@ void app_main()
     radioModuleDetector.detectRadioModule(&radioModuleConnector);
 
     radio_module_type_t radioModuleType = radioModuleDetector.getRadioModuleType();
-    if (radioModuleType != RADIO_MODULE_NONE)
-    {
-        switch (radioModuleType)
-        {
-        case RADIO_MODULE_HM_MOD_RPI_PCB:
-            ESP_LOGI(TAG, "Detected HM-MOD-RPI-PCB:");
-            break;
-        case RADIO_MODULE_RPI_RF_MOD:
-            ESP_LOGI(TAG, "Detected RPI-RF-MOD:");
-            break;
-        default:
-            ESP_LOGI(TAG, "Detected unknown radio module:");
-            break;
+    if (radioModuleType != RADIO_MODULE_NONE) {
+        switch (radioModuleType) {
+            case RADIO_MODULE_HM_MOD_RPI_PCB:
+                ESP_LOGI(TAG, "Detected HM-MOD-RPI-PCB:");
+                break;
+            case RADIO_MODULE_RPI_RF_MOD:
+                ESP_LOGI(TAG, "Detected RPI-RF-MOD:");
+                break;
+            default:
+                ESP_LOGI(TAG, "Detected unknown radio module:");
+                break;
         }
 
         ESP_LOGI(TAG, "  Serial: %s", radioModuleDetector.getSerial());
@@ -161,9 +157,7 @@ void app_main()
 
         const uint8_t *firmwareVersion = radioModuleDetector.getFirmwareVersion();
         ESP_LOGI(TAG, "  Firmware Version: %d.%d.%d", *firmwareVersion, *(firmwareVersion + 1), *(firmwareVersion + 2));
-    }
-    else
-    {
+    } else {
         ESP_LOGW(TAG, "Radio module could not be detected.");
     }
 
@@ -175,7 +169,8 @@ void app_main()
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     updateCheck.start();
 
-    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector,
+                &radioModuleDetector);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)

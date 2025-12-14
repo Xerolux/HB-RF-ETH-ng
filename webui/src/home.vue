@@ -8,5 +8,4 @@
 import SysInfo from './sysinfo.vue'
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

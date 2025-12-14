@@ -26,8 +26,7 @@
 #include "settings.h"
 #include "systemclock.h"
 
-class NtpClient
-{
+class NtpClient {
 public:
     NtpClient(Settings *settings, SystemClock *clk);
     void start();

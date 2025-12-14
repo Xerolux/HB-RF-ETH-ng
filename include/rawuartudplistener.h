@@ -23,16 +23,16 @@
 
 #pragma once
 
-#include "lwip/opt.h"
-#include "lwip/inet.h"
-#include "lwip/udp.h"
-#include "lwip/priv/tcpip_priv.h"
 #include <atomic>
+
+#include "lwip/inet.h"
+#include "lwip/opt.h"
+#include "lwip/priv/tcpip_priv.h"
+#include "lwip/udp.h"
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
 
-class RawUartUdpListener : FrameHandler
-{
+class RawUartUdpListener : FrameHandler {
 private:
     RadioModuleConnector *_radioModuleConnector;
     std::atomic<uint> _remoteAddress;

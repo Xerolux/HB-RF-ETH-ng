@@ -6,16 +6,17 @@
  */
 
 #include "mqtt_handler.h"
-#include "monitoring.h"
-#include "sysinfo.h"
-#include "updatecheck.h"
+
+#include "cJSON.h"
 #include "esp_log.h"
-#include "mqtt_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "cJSON.h"
+#include "monitoring.h"
+#include "mqtt_client.h"
+#include "sysinfo.h"
+#include "updatecheck.h"
 
-static const char *TAG = "MQTT";
+static const char* TAG = "MQTT";
 
 static esp_mqtt_client_handle_t client = NULL;
 static bool mqtt_running = false;
@@ -28,47 +29,45 @@ extern UpdateCheck* monitoring_get_updatecheck(void);
 
 void mqtt_handler_publish_ha_discovery(void);
 
-static void log_error_if_nonzero(const char *message, int error_code)
-{
+static void log_error_if_nonzero(const char* message, int error_code) {
     if (error_code != 0) {
         ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
     }
 }
 
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
-{
+static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data) {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32, base, event_id);
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
 
     switch ((esp_mqtt_event_id_t)event_id) {
-    case MQTT_EVENT_CONNECTED:
-        ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-        // Publish initial status
-        mqtt_handler_publish_status();
-        // Publish HA discovery config if enabled
-        if (current_mqtt_config.ha_discovery_enabled) {
-            mqtt_handler_publish_ha_discovery();
-        }
-        break;
-    case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-        break;
-    case MQTT_EVENT_ERROR:
-        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
-        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
-            log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
-            log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
-            log_error_if_nonzero("captured as transport's socket errno",  event->error_handle->esp_transport_sock_errno);
-            ESP_LOGI(TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
-        }
-        break;
-    default:
-        break;
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+            // Publish initial status
+            mqtt_handler_publish_status();
+            // Publish HA discovery config if enabled
+            if (current_mqtt_config.ha_discovery_enabled) {
+                mqtt_handler_publish_ha_discovery();
+            }
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+            if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+                log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
+                log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
+                log_error_if_nonzero("captured as transport's socket errno",
+                                     event->error_handle->esp_transport_sock_errno);
+                ESP_LOGI(TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
+            }
+            break;
+        default:
+            break;
     }
 }
 
-void mqtt_publish_task(void *pvParameters)
-{
+void mqtt_publish_task(void* pvParameters) {
     while (mqtt_running) {
         mqtt_handler_publish_status();
         // Publish every 60 seconds
@@ -77,8 +76,7 @@ void mqtt_publish_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void mqtt_handler_publish_status(void)
-{
+void mqtt_handler_publish_status(void) {
     if (!mqtt_running || client == NULL) {
         return;
     }
@@ -94,24 +92,23 @@ void mqtt_handler_publish_status(void)
     char topic[128];
     char payload[64];
 
-    // Helper macro to publish
-    #define PUBLISH(subtopic, value) \
-        snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic); \
-        esp_mqtt_client_publish(client, topic, value, 0, 1, 1)
+// Helper macro to publish
+#define PUBLISH(subtopic, value)                                                         \
+    snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic); \
+    esp_mqtt_client_publish(client, topic, value, 0, 1, 1)
 
-    // Helper macro to publish double
-    #define PUBLISH_DOUBLE(subtopic, value, prec) \
-        snprintf(payload, sizeof(payload), "%.*f", prec, value); \
-        PUBLISH(subtopic, payload)
+// Helper macro to publish double
+#define PUBLISH_DOUBLE(subtopic, value, prec)                \
+    snprintf(payload, sizeof(payload), "%.*f", prec, value); \
+    PUBLISH(subtopic, payload)
 
-    // Helper macro to publish int
-    #define PUBLISH_INT(subtopic, value) \
-        snprintf(payload, sizeof(payload), "%d", value); \
-        PUBLISH(subtopic, payload)
+// Helper macro to publish int
+#define PUBLISH_INT(subtopic, value)                 \
+    snprintf(payload, sizeof(payload), "%d", value); \
+    PUBLISH(subtopic, payload)
 
-    // Helper macro to publish string
-    #define PUBLISH_STR(subtopic, value) \
-        PUBLISH(subtopic, value)
+// Helper macro to publish string
+#define PUBLISH_STR(subtopic, value) PUBLISH(subtopic, value)
 
     // Status Page Topics
     PUBLISH_STR("status/serial", sysInfo->getSerialNumber());
@@ -141,13 +138,12 @@ void mqtt_handler_publish_status(void)
     uptime_s %= 3600;
     minutes = uptime_s / 60;
 
-    snprintf(payload, sizeof(payload), "%lu d, %lu h, %lu m", (unsigned long)days, (unsigned long)hours, (unsigned long)minutes);
+    snprintf(payload, sizeof(payload), "%lu d, %lu h, %lu m", (unsigned long)days, (unsigned long)hours,
+             (unsigned long)minutes);
     PUBLISH_STR("status/uptime_text", payload);
-
 }
 
-void mqtt_handler_publish_ha_discovery(void)
-{
+void mqtt_handler_publish_ha_discovery(void) {
     if (!mqtt_running || client == NULL || !current_mqtt_config.ha_discovery_enabled) {
         return;
     }
@@ -160,7 +156,7 @@ void mqtt_handler_publish_ha_discovery(void)
     ESP_LOGI(TAG, "Publishing Home Assistant discovery configs");
 
     // Device Info
-    cJSON *device = cJSON_CreateObject();
+    cJSON* device = cJSON_CreateObject();
     char identifiers[64];
     snprintf(identifiers, sizeof(identifiers), "hb-rf-eth-%s", sysInfo->getSerialNumber());
     cJSON_AddStringToObject(device, "identifiers", identifiers);
@@ -177,12 +173,10 @@ void mqtt_handler_publish_ha_discovery(void)
     // Actually we can leave it out.
 
     // Helper lambda to publish discovery config
-    auto publish_config = [&](const char* component, const char* object_id, const char* name,
-                              const char* device_class, const char* state_class,
-                              const char* unit_of_measurement, const char* value_template,
+    auto publish_config = [&](const char* component, const char* object_id, const char* name, const char* device_class,
+                              const char* state_class, const char* unit_of_measurement, const char* value_template,
                               const char* entity_category = NULL, const char* icon = NULL) {
-
-        cJSON *root = cJSON_CreateObject();
+        cJSON* root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "name", name);
 
         char unique_id[128];
@@ -198,20 +192,26 @@ void mqtt_handler_publish_ha_discovery(void)
 
         cJSON_AddStringToObject(root, "state_topic", state_topic);
 
-        if (device_class) cJSON_AddStringToObject(root, "device_class", device_class);
-        if (state_class) cJSON_AddStringToObject(root, "state_class", state_class);
-        if (unit_of_measurement) cJSON_AddStringToObject(root, "unit_of_measurement", unit_of_measurement);
-        if (value_template) cJSON_AddStringToObject(root, "value_template", value_template);
-        if (entity_category) cJSON_AddStringToObject(root, "entity_category", entity_category);
-        if (icon) cJSON_AddStringToObject(root, "icon", icon);
+        if (device_class)
+            cJSON_AddStringToObject(root, "device_class", device_class);
+        if (state_class)
+            cJSON_AddStringToObject(root, "state_class", state_class);
+        if (unit_of_measurement)
+            cJSON_AddStringToObject(root, "unit_of_measurement", unit_of_measurement);
+        if (value_template)
+            cJSON_AddStringToObject(root, "value_template", value_template);
+        if (entity_category)
+            cJSON_AddStringToObject(root, "entity_category", entity_category);
+        if (icon)
+            cJSON_AddStringToObject(root, "icon", icon);
 
         cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
 
-        char *json_str = cJSON_PrintUnformatted(root);
+        char* json_str = cJSON_PrintUnformatted(root);
 
         char topic[256];
-        snprintf(topic, sizeof(topic), "%s/%s/hb-rf-eth-%s/%s/config",
-                 current_mqtt_config.ha_discovery_prefix, component, sysInfo->getSerialNumber(), object_id);
+        snprintf(topic, sizeof(topic), "%s/%s/hb-rf-eth-%s/%s/config", current_mqtt_config.ha_discovery_prefix,
+                 component, sysInfo->getSerialNumber(), object_id);
 
         esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
 
@@ -223,16 +223,20 @@ void mqtt_handler_publish_ha_discovery(void)
     publish_config("sensor", "cpu_usage", "CPU Usage", NULL, "measurement", "%", NULL, "diagnostic", "mdi:cpu-64-bit");
 
     // Memory Usage
-    publish_config("sensor", "memory_usage", "Memory Usage", NULL, "measurement", "%", NULL, "diagnostic", "mdi:memory");
+    publish_config("sensor", "memory_usage", "Memory Usage", NULL, "measurement", "%", NULL, "diagnostic",
+                   "mdi:memory");
 
     // Supply Voltage
-    publish_config("sensor", "supply_voltage", "Supply Voltage", "voltage", "measurement", "V", NULL, "diagnostic", NULL);
+    publish_config("sensor", "supply_voltage", "Supply Voltage", "voltage", "measurement", "V", NULL, "diagnostic",
+                   NULL);
 
     // Temperature
-    publish_config("sensor", "temperature", "Temperature", "temperature", "measurement", "°C", NULL, "diagnostic", NULL);
+    publish_config("sensor", "temperature", "Temperature", "temperature", "measurement", "°C", NULL, "diagnostic",
+                   NULL);
 
     // Uptime (seconds)
-    publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");
+    publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic",
+                   "mdi:clock-outline");
 
     // Uptime (text)
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
@@ -241,7 +245,7 @@ void mqtt_handler_publish_ha_discovery(void)
     // Binary sensor for update available
     // For binary sensor, we need payload_on="true", payload_off="false"
     {
-         cJSON *root = cJSON_CreateObject();
+        cJSON* root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "name", "Update Available");
         char unique_id[128];
         snprintf(unique_id, sizeof(unique_id), "%s_update_available", identifiers);
@@ -258,7 +262,7 @@ void mqtt_handler_publish_ha_discovery(void)
 
         cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
 
-        char *json_str = cJSON_PrintUnformatted(root);
+        char* json_str = cJSON_PrintUnformatted(root);
         char topic[256];
         snprintf(topic, sizeof(topic), "%s/binary_sensor/hb-rf-eth-%s/update_available/config",
                  current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
@@ -272,22 +276,19 @@ void mqtt_handler_publish_ha_discovery(void)
     publish_config("sensor", "version", "Current Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
 
     // Latest Version
-    publish_config("sensor", "latest_version", "Latest Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "latest_version", "Latest Version", NULL, NULL, NULL, NULL, "diagnostic",
+                   "mdi:package-up");
 
     // Board Revision
-    publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");
-
+    publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic",
+                   "mdi:expansion-card");
 
     cJSON_Delete(device);
 }
 
-esp_err_t mqtt_handler_init(void)
-{
-    return ESP_OK;
-}
+esp_err_t mqtt_handler_init(void) { return ESP_OK; }
 
-esp_err_t mqtt_handler_start(const mqtt_config_t *config)
-{
+esp_err_t mqtt_handler_start(const mqtt_config_t* config) {
     if (mqtt_running) {
         ESP_LOGW(TAG, "MQTT already running");
         return ESP_OK;
@@ -307,7 +308,7 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     memcpy(&current_mqtt_config, config, sizeof(mqtt_config_t));
 
     esp_mqtt_client_config_t mqtt_cfg = {};
-    mqtt_cfg.broker.address.uri = NULL; // We construct URI or use host/port
+    mqtt_cfg.broker.address.uri = NULL;  // We construct URI or use host/port
     mqtt_cfg.broker.address.hostname = current_mqtt_config.server;
     mqtt_cfg.broker.address.port = current_mqtt_config.port;
     mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
@@ -341,8 +342,7 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     return ESP_OK;
 }
 
-esp_err_t mqtt_handler_stop(void)
-{
+esp_err_t mqtt_handler_stop(void) {
     if (!mqtt_running) {
         return ESP_OK;
     }

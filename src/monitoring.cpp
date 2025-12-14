@@ -6,17 +6,19 @@
  */
 
 #include "monitoring.h"
-#include "mqtt_handler.h"
+
+#include <string.h>
+
+#include "esp_app_format.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-#include "nvs.h"
+#include "esp_ota_ops.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/sockets.h"
-#include "esp_app_format.h"
-#include "esp_ota_ops.h"
-#include "esp_timer.h"
-#include <string.h>
+#include "mqtt_handler.h"
+#include "nvs.h"
+#include "nvs_flash.h"
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -53,19 +55,17 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
 
 // Global pointers
-static SysInfo* g_sysInfo = NULL;
-static UpdateCheck* g_updateCheck = NULL;
+static SysInfo *g_sysInfo = NULL;
+static UpdateCheck *g_updateCheck = NULL;
 
 // Get firmware version from app descriptor
-static const char* get_firmware_version(void)
-{
+static const char *get_firmware_version(void) {
     const esp_app_desc_t *app_desc = esp_app_get_description();
     return app_desc->version;
 }
 
 // Get system uptime
-static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes)
-{
+static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes) {
     uint64_t uptime_ms = esp_timer_get_time() / 1000;
     uint32_t uptime_sec = uptime_ms / 1000;
     *days = uptime_sec / 86400;
@@ -76,17 +76,12 @@ static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes
 }
 
 // Helper to access global pointers from other files (like mqtt_handler)
-SysInfo* monitoring_get_sysinfo(void) {
-    return g_sysInfo;
-}
+SysInfo *monitoring_get_sysinfo(void) { return g_sysInfo; }
 
-UpdateCheck* monitoring_get_updatecheck(void) {
-    return g_updateCheck;
-}
+UpdateCheck *monitoring_get_updatecheck(void) { return g_updateCheck; }
 
 // CheckMK Agent Task
-static void checkmk_agent_task(void *pvParameters)
-{
+static void checkmk_agent_task(void *pvParameters) {
     const checkmk_config_t *config = (const checkmk_config_t *)pvParameters;
     int listen_sock = -1;
     struct sockaddr_in server_addr;
@@ -169,14 +164,15 @@ static void checkmk_agent_task(void *pvParameters)
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
         len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        len += snprintf(output + len, sizeof(output) - len, "%lu\n",
+                        (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
         len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
         len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
-                       (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
+                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
         len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
-                       (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
         len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
@@ -195,8 +191,7 @@ static void checkmk_agent_task(void *pvParameters)
 }
 
 // SNMP Functions
-esp_err_t snmp_start(const snmp_config_t *config)
-{
+esp_err_t snmp_start(const snmp_config_t *config) {
 #if CONFIG_LWIP_SNMP
     if (snmp_running) {
         ESP_LOGW(TAG, "SNMP already running");
@@ -208,7 +203,9 @@ esp_err_t snmp_start(const snmp_config_t *config)
     }
 
     ESP_LOGW(TAG, "SNMP agent requested on port %d - Feature disabled (requires CONFIG_LWIP_SNMP=y)", config->port);
-    ESP_LOGW(TAG, "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> Enable SNMP");
+    ESP_LOGW(TAG,
+             "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> "
+             "Enable SNMP");
     return ESP_ERR_NOT_SUPPORTED;
 #else
     ESP_LOGW(TAG, "SNMP not enabled in build configuration");
@@ -216,8 +213,7 @@ esp_err_t snmp_start(const snmp_config_t *config)
 #endif
 }
 
-esp_err_t snmp_stop(void)
-{
+esp_err_t snmp_stop(void) {
     if (!snmp_running) {
         return ESP_OK;
     }
@@ -230,8 +226,7 @@ esp_err_t snmp_stop(void)
 }
 
 // CheckMK Functions
-esp_err_t checkmk_start(const checkmk_config_t *config)
-{
+esp_err_t checkmk_start(const checkmk_config_t *config) {
     if (checkmk_running) {
         ESP_LOGW(TAG, "CheckMK agent already running");
         return ESP_OK;
@@ -247,8 +242,8 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
     memcpy(&current_config.checkmk, config, sizeof(checkmk_config_t));
 
     // Create CheckMK agent task - pass pointer to current_config
-    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096,
-                                  (void *)&current_config.checkmk, 5, &checkmk_task_handle);
+    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096, (void *)&current_config.checkmk, 5,
+                                 &checkmk_task_handle);
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CheckMK agent task");
@@ -259,8 +254,7 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
     return ESP_OK;
 }
 
-esp_err_t checkmk_stop(void)
-{
+esp_err_t checkmk_stop(void) {
     if (!checkmk_running) {
         return ESP_OK;
     }
@@ -277,8 +271,7 @@ esp_err_t checkmk_stop(void)
 }
 
 // Save configuration to NVS
-static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
-{
+static esp_err_t save_config_to_nvs(const monitoring_config_t *config) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
@@ -315,8 +308,7 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
 }
 
 // Load configuration from NVS
-static esp_err_t load_config_from_nvs(monitoring_config_t *config)
-{
+static esp_err_t load_config_from_nvs(monitoring_config_t *config) {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
@@ -422,8 +414,7 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
-{
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo *sysInfo, UpdateCheck *updateCheck) {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 
     g_sysInfo = sysInfo;
@@ -459,8 +450,7 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
 }
 
 // Update configuration
-esp_err_t monitoring_update_config(const monitoring_config_t *config)
-{
+esp_err_t monitoring_update_config(const monitoring_config_t *config) {
     // Stop current services
     if (current_config.snmp.enabled) {
         snmp_stop();
@@ -491,8 +481,7 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
 }
 
 // Get current configuration
-esp_err_t monitoring_get_config(monitoring_config_t *config)
-{
+esp_err_t monitoring_get_config(monitoring_config_t *config) {
     if (config == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
