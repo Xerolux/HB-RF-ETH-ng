@@ -116,6 +116,7 @@ export const useSettingsStore = defineStore('settings', {
     gpsBaudrate: 9600,
     ntpServer: "",
     ledBrightness: 100,
+    checkUpdates: true,
   }),
   actions: {
     async load() {

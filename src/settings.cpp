@@ -121,6 +121,8 @@ void Settings::load()
     strncpy(_ntpServer, "pool.ntp.org", sizeof(_ntpServer) - 1);
   }
 
+  GET_BOOL(handle, "checkUpdates", _checkUpdates, true);
+
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
 
   // Load IPv6 settings
@@ -171,6 +173,8 @@ void Settings::save()
   SET_INT(handle, "gpsBaudrate", _gpsBaudrate);
 
   SET_STR(handle, "ntpServer", _ntpServer);
+
+  SET_BOOL(handle, "checkUpdates", _checkUpdates);
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
 
@@ -369,6 +373,16 @@ void Settings::setLEDBrightness(int ledBrightness)
     return;
   }
   _ledBrightness = ledBrightness;
+}
+
+bool Settings::getCheckUpdates()
+{
+  return _checkUpdates;
+}
+
+void Settings::setCheckUpdates(bool checkUpdates)
+{
+  _checkUpdates = checkUpdates;
 }
 
 // IPv6 Getters

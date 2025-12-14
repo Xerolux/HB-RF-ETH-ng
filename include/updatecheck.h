@@ -27,20 +27,23 @@
 #include "freertos/task.h"
 #include "sysinfo.h"
 #include "led.h"
+#include "settings.h"
 
 class UpdateCheck
 {
 private:
     SysInfo* _sysInfo;
     LED *_statusLED;
+    Settings* _settings;
     TaskHandle_t _tHandle = NULL;   
     void _updateLatestVersion();
     char _latestVersion[33] = "n/a";
 
 public:
-    UpdateCheck(SysInfo* sysInfo, LED *statusLED);
+    UpdateCheck(Settings* settings, SysInfo* sysInfo, LED *statusLED);
     void start();
     void stop();
+    void performOnlineUpdate();
 
     const char* getLatestVersion();
 

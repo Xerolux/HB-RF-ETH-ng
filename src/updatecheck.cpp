@@ -23,7 +23,9 @@
 
 #include "updatecheck.h"
 #include "esp_http_client.h"
+#include "esp_https_ota.h"
 #include "esp_log.h"
+#include "esp_crt_bundle.h"
 #include "string.h"
 #include "cJSON.h"
 
@@ -36,7 +38,7 @@ void _update_check_task_func(void *parameter)
   }
 }
 
-UpdateCheck::UpdateCheck(SysInfo* sysInfo, LED *statusLED) : _sysInfo(sysInfo), _statusLED(statusLED)
+UpdateCheck::UpdateCheck(Settings* settings, SysInfo* sysInfo, LED *statusLED) : _sysInfo(sysInfo), _statusLED(statusLED), _settings(settings)
 {
 }
 
@@ -98,21 +100,59 @@ void UpdateCheck::_taskFunc()
 
   for (;;)
   {
-    ESP_LOGI(TAG, "Start checking for the latest available firmware.");
-    _updateLatestVersion();
+    if (_settings->getCheckUpdates()) {
+      ESP_LOGI(TAG, "Start checking for the latest available firmware.");
+      _updateLatestVersion();
 
-    if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
-    {
-      ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
-      _statusLED->setState(LED_STATE_BLINK_SLOW);
-    }
-    else
-    {
-      ESP_LOGI(TAG, "There is no newer firmware available.");
+      if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+      {
+        ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
+        _statusLED->setState(LED_STATE_BLINK_SLOW);
+      }
+      else
+      {
+        ESP_LOGI(TAG, "There is no newer firmware available.");
+      }
+    } else {
+        ESP_LOGI(TAG, "Update check is disabled.");
     }
 
     vTaskDelay((8 * 60 * 60000) / portTICK_PERIOD_MS); // 8h
   }
 
   vTaskDelete(NULL);
+}
+
+void UpdateCheck::performOnlineUpdate()
+{
+    if (strcmp(_latestVersion, "n/a") == 0) {
+        ESP_LOGE(TAG, "No update version available");
+        return;
+    }
+
+    char url[256];
+    // Construct URL: https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v<version>/firmware.bin
+    // Note: We assume the tag has 'v' prefix, but version string might not.
+    // If _latestVersion is "2.1.1", tag is "v2.1.1".
+    snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware.bin", _latestVersion);
+
+    ESP_LOGI(TAG, "Starting OTA update from %s", url);
+    _statusLED->setState(LED_STATE_BLINK_FAST);
+
+    esp_http_client_config_t config = {};
+    config.url = url;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.keep_alive_enable = true;
+
+    esp_https_ota_config_t ota_config = {};
+    ota_config.http_config = &config;
+
+    esp_err_t ret = esp_https_ota(&ota_config);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "OTA Update successful, restarting...");
+        esp_restart();
+    } else {
+        ESP_LOGE(TAG, "OTA Update failed");
+        _statusLED->setState(LED_STATE_ON); // Reset LED or to previous state?
+    }
 }

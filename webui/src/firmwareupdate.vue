@@ -28,6 +28,20 @@
       >
         {{ t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}
       </BAlert>
+
+      <BFormGroup
+        v-if="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
+        label-cols-sm="9"
+        class="mb-3"
+      >
+        <BButton
+          variant="success"
+          block
+          :disabled="firmwareUpdateStore.progress > 0"
+          @click="onlineUpdateClick"
+        >{{ t('firmware.onlineUpdate') }}</BButton>
+      </BFormGroup>
+
       <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
         <BFormFile
           v-model="file"
@@ -90,6 +104,30 @@ const firmwareUpdateStore = useFirmwareUpdateStore()
 const file = ref(null)
 const showError = ref(false)
 const showSuccess = ref(false)
+
+const onlineUpdateClick = async () => {
+  if (confirm(t('firmware.onlineUpdateConfirm'))) {
+    showError.value = null
+    showSuccess.value = null
+
+    // Set a fake progress to show activity or use a different indicator
+    firmwareUpdateStore.progress = 1
+
+    try {
+        const response = await fetch('/api/online_update', { method: 'POST' })
+        if (response.ok) {
+            // The device will restart, so maybe show a message "Update started, device will restart..."
+            alert(t('firmware.onlineUpdateStarted'))
+        } else {
+            showError.value = true
+        }
+        firmwareUpdateStore.progress = 0
+    } catch (error) {
+        showError.value = true
+        firmwareUpdateStore.progress = 0
+    }
+  }
+}
 
 const firmwareUpdateClick = async () => {
   showError.value = null

@@ -288,6 +288,8 @@ void add_settings(cJSON *root)
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 
+    cJSON_AddBoolToObject(settings, "checkUpdates", _settings->getCheckUpdates());
+
     // IPv6 Settings
     cJSON_AddBoolToObject(settings, "enableIPv6", _settings->getEnableIPv6());
     cJSON_AddStringToObject(settings, "ipv6Mode", _settings->getIPv6Mode());
@@ -403,6 +405,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setGpsBaudrate(gpsBaudrate);
         _settings->setNtpServer(ntpServer);
         _settings->setLEDBrightness(ledBrightness);
+
+        cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
+        if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
+            _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
+        }
 
         // Handle IPv6 (checking for nulls)
         if (ipv6Mode) {
@@ -757,6 +764,39 @@ httpd_uri_t post_restart_handler = {
     .handler = post_restart_handler_func,
     .user_ctx = NULL};
 
+static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
+{
+  if (validate_auth(req) != ESP_OK)
+  {
+      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+  }
+
+  // Create a task to perform the update because it's blocking
+  struct TaskArgs {
+      UpdateCheck* updateCheck;
+  };
+
+  TaskArgs* args = new TaskArgs();
+  args->updateCheck = _updateCheck;
+
+  xTaskCreate([](void* p) {
+      TaskArgs* a = (TaskArgs*)p;
+      a->updateCheck->performOnlineUpdate();
+      delete a;
+      vTaskDelete(NULL);
+  }, "online_update", 8192, args, 5, NULL);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_sendstr(req, "{\"success\":true}");
+  return ESP_OK;
+}
+
+httpd_uri_t _post_firmware_online_update_handler = {
+    .uri = "/api/online_update",
+    .method = HTTP_POST,
+    .handler = _post_firmware_online_update_handler_func,
+    .user_ctx = NULL};
+
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
     if (validate_auth(req) != ESP_OK)
@@ -867,6 +907,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
+        httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
