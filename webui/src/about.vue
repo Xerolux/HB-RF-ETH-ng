@@ -42,7 +42,7 @@
       <p>{{ t('thirdParty.containsThirdPartySoftware') }}</p>
       <p>{{ t('thirdParty.providedAsIs') }}</p>
       <BListGroup>
-        <BListGroupItem v-for="(lib, index) in libs" :key="lib.name" style="cursor: pointer">
+        <BListGroupItem v-for="lib in libs" :key="lib.name" style="cursor: pointer">
           {{ lib.name }} - <a :href="lib.website" target="_new">{{ lib.website }}</a>
         </BListGroupItem>
       </BListGroup>

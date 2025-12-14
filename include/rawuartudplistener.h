@@ -31,8 +31,7 @@
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
 
-class RawUartUdpListener : FrameHandler
-{
+class RawUartUdpListener : FrameHandler {
 private:
     RadioModuleConnector *_radioModuleConnector;
     std::atomic<uint> _remoteAddress;

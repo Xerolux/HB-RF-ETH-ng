@@ -29,7 +29,7 @@
 #include "pins.h"
 
 class PushButtonHandler {
-    public:
-        PushButtonHandler();
-        void handleStartupFactoryReset(LED *powerLED, LED *statusLED, Settings *settings);
+public:
+    PushButtonHandler();
+    void handleStartupFactoryReset(LED *powerLED, LED *statusLED, Settings *settings);
 };

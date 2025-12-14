@@ -27,10 +27,7 @@
 static Settings *_settings;
 static SystemClock *_clk;
 
-static void _time_sync_notification_cb(struct timeval *tv)
-{
-    _clk->setTime(tv);
-}
+static void _time_sync_notification_cb(struct timeval *tv) { _clk->setTime(tv); }
 
 NtpClient::NtpClient(Settings *settings, SystemClock *clk)
 {
@@ -46,7 +43,4 @@ void NtpClient::start()
     esp_sntp_init();
 }
 
-void NtpClient::stop()
-{
-    esp_sntp_stop();
-}
+void NtpClient::stop() { esp_sntp_stop(); }

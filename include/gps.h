@@ -29,8 +29,7 @@
 #include "settings.h"
 #include "linereader.h"
 
-class GPS
-{
+class GPS {
 private:
     Settings *_settings;
     SystemClock *_clk;

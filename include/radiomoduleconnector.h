@@ -32,14 +32,12 @@
 #include <atomic>
 #define _Atomic(X) std::atomic<X>
 
-class FrameHandler
-{
+class FrameHandler {
 public:
     virtual void handleFrame(unsigned char *buffer, uint16_t len) = 0;
 };
 
-class RadioModuleConnector
-{
+class RadioModuleConnector {
 private:
     LED *_redLED;
     LED *_greenLED;

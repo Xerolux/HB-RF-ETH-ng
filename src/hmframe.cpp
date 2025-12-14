@@ -29,18 +29,13 @@ uint16_t HMFrame::crc(unsigned char *buffer, uint16_t len)
     uint16_t crc = 0xd77f;
     int i;
 
-    while (len--)
-    {
+    while (len--) {
         crc ^= *buffer++ << 8;
-        for (i = 0; i < 8; i++)
-        {
-            if (crc & 0x8000)
-            {
+        for (i = 0; i < 8; i++) {
+            if (crc & 0x8000) {
                 crc <<= 1;
                 crc ^= 0x8005;
-            }
-            else
-            {
+            } else {
                 crc <<= 1;
             }
         }
@@ -53,19 +48,15 @@ bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame)
 {
     uint16_t crc;
 
-    if (len < 8)
-        return false;
+    if (len < 8) return false;
 
-    if (buffer[0] != 0xfd)
-        return false;
+    if (buffer[0] != 0xfd) return false;
 
     frame->data_len = ((buffer[1] << 8) | buffer[2]) - 3;
-    if (frame->data_len + 8 != len)
-        return false;
+    if (frame->data_len + 8 != len) return false;
 
     crc = (buffer[len - 2] << 8) | buffer[len - 1];
-    if (crc != HMFrame::crc(buffer, len - 2))
-        return false;
+    if (crc != HMFrame::crc(buffer, len - 2)) return false;
 
     frame->destination = buffer[3];
     frame->counter = buffer[4];
@@ -75,16 +66,13 @@ bool HMFrame::TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame)
     return true;
 }
 
-HMFrame::HMFrame() : data_len(0)
-{
-}
+HMFrame::HMFrame() : data_len(0) {}
 
 uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
 {
     uint16_t crc;
 
-    if (data_len + 8 > len)
-        return 0;
+    if (data_len + 8 > len) return 0;
 
     buffer[0] = 0xfd;
     buffer[1] = ((data_len + 3) >> 8) & 0xff;
@@ -92,8 +80,7 @@ uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
     buffer[3] = destination;
     buffer[4] = counter;
     buffer[5] = command;
-    if (data_len > 0)
-        memcpy(&(buffer[6]), data, data_len);
+    if (data_len > 0) memcpy(&(buffer[6]), data, data_len);
 
     crc = HMFrame::crc(buffer, data_len + 6);
     buffer[data_len + 6] = (crc >> 8) & 0xff;
@@ -101,12 +88,9 @@ uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
 
     uint16_t res = data_len + 8;
 
-    if (escaped)
-    {
-        for (uint16_t i = 1; i < res; i++)
-        {
-            if (buffer[i] == 0xfc || buffer[i] == 0xfd)
-            {
+    if (escaped) {
+        for (uint16_t i = 1; i < res; i++) {
+            if (buffer[i] == 0xfc || buffer[i] == 0xfd) {
                 memmove(buffer + i + 1, buffer + i, res - i);
                 buffer[i++] = 0xfc;
                 buffer[i] &= 0x7f;

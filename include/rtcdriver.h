@@ -26,15 +26,14 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-class Rtc
-{
+class Rtc {
 protected:
     Rtc(uint8_t address, uint8_t reg_start);
     const uint8_t _address;
     const uint8_t _reg_start;
 
 public:
-    static Rtc* detect();
+    static Rtc *detect();
 
     virtual bool begin();
     virtual ~Rtc();
@@ -42,14 +41,12 @@ public:
     void SetTime(struct timeval now);
 };
 
-class RtcDS3231 : public Rtc
-{
+class RtcDS3231 : public Rtc {
 public:
     RtcDS3231();
 };
 
-class RtcRX8130 : public Rtc
-{
+class RtcRX8130 : public Rtc {
 public:
     RtcRX8130();
     bool begin();

@@ -26,16 +26,14 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector_utils.h"
 
-typedef enum
-{
+typedef enum {
     RADIO_MODULE_NONE = 0,
     RADIO_MODULE_HMIP_RFUSB = 1,
     RADIO_MODULE_HM_MOD_RPI_PCB = 3,
     RADIO_MODULE_RPI_RF_MOD = 4,
 } radio_module_type_t;
 
-typedef enum
-{
+typedef enum {
     DETECT_STATE_START_BL = 0,
     DETECT_STATE_START_APP = 10,
 
@@ -53,8 +51,7 @@ typedef enum
     DETECT_STATE_FINISHED = 255,
 } detect_radio_module_state_t;
 
-class RadioModuleDetector : private FrameHandler
-{
+class RadioModuleDetector : private FrameHandler {
 private:
     void handleFrame(unsigned char *buffer, uint16_t len);
     void sendFrame(uint8_t counter, uint8_t destination, uint8_t command, unsigned char *data, uint data_len);

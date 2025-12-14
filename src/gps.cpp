@@ -26,10 +26,7 @@
 #include "esp_log.h"
 #include "string.h"
 
-void gpsSerialQueueHandlerTask(void *parameter)
-{
-    ((GPS *)parameter)->_gpsSerialQueueHandler();
-}
+void gpsSerialQueueHandlerTask(void *parameter) { ((GPS *)parameter)->_gpsSerialQueueHandler(); }
 
 GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
 {
@@ -41,9 +38,10 @@ GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .backup_before_sleep = 0,
-        },
+        .flags =
+            {
+                .backup_before_sleep = 0,
+            },
     };
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, GPIO_NUM_0, DCF_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -71,29 +69,26 @@ void GPS::_gpsSerialQueueHandler()
 
     uart_flush_input(UART_NUM_2);
 
-    for (;;)
-    {
-        if (xQueueReceive(_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY))
-        {
-            switch (event.type)
-            {
-            case UART_DATA:
-                uart_read_bytes(UART_NUM_2, buffer, event.size, portMAX_DELAY);
-                _lineReader->Append(buffer, event.size);
-                break;
-            case UART_FIFO_OVF:
-            case UART_BUFFER_FULL:
-                uart_flush_input(UART_NUM_2);
-                xQueueReset(_uart_queue);
-                _lineReader->Flush();
-                break;
-            case UART_BREAK:
-            case UART_PARITY_ERR:
-            case UART_FRAME_ERR:
-                _lineReader->Flush();
-                break;
-            default:
-                break;
+    for (;;) {
+        if (xQueueReceive(_uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
+            switch (event.type) {
+                case UART_DATA:
+                    uart_read_bytes(UART_NUM_2, buffer, event.size, portMAX_DELAY);
+                    _lineReader->Append(buffer, event.size);
+                    break;
+                case UART_FIFO_OVF:
+                case UART_BUFFER_FULL:
+                    uart_flush_input(UART_NUM_2);
+                    xQueueReset(_uart_queue);
+                    _lineReader->Flush();
+                    break;
+                case UART_BREAK:
+                case UART_PARITY_ERR:
+                case UART_FRAME_ERR:
+                    _lineReader->Flush();
+                    break;
+                default:
+                    break;
             }
         }
     }
@@ -113,27 +108,20 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
     struct tm time = {};
     time.tm_isdst = 0;
 
-    for (int i = 0; i < len; i++)
-    {
-        if (buffer[i] == ',')
-        {
+    for (int i = 0; i < len; i++) {
+        if (buffer[i] == ',') {
             fieldLength = i - fieldStart;
 
-            if (fieldIndex == 1)
-            {
-                if (fieldLength != 9)
-                    return false;
+            if (fieldIndex == 1) {
+                if (fieldLength != 9) return false;
 
                 time.tm_sec = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0');
                 time.tm_min = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0');
                 time.tm_hour = ((buffer[fieldStart + 0] - '0') * 10) + (buffer[fieldStart + 1] - '0');
 
                 tv->tv_usec = ((buffer[fieldStart + 4] - '7') * 100000) + ((buffer[fieldStart + 8] - '0') * 10000);
-            }
-            else if (fieldIndex == 9)
-            {
-                if (fieldLength != 6)
-                    return false;
+            } else if (fieldIndex == 9) {
+                if (fieldLength != 6) return false;
 
                 time.tm_year = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0') + 100;
                 time.tm_mon = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0') - 1;
@@ -145,8 +133,7 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
         }
     }
 
-    if (fieldIndex != 12)
-        return false;
+    if (fieldIndex != 12) return false;
 
     tv->tv_sec = mktime(&time);
 
@@ -156,14 +143,11 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
 void GPS::_handleLine(unsigned char *buffer, uint16_t len)
 {
     uint64_t startTime = esp_timer_get_time();
-    if ((len > 6) && (strncmp((char *)buffer, "$GPRMC", 6) == 0))
-    {
+    if ((len > 6) && (strncmp((char *)buffer, "$GPRMC", 6) == 0)) {
         timeval tv;
-        if (parseRMCTime(buffer, len, &tv))
-        {
-            if (_nextSync < startTime)
-            {
-                _nextSync = startTime + 300 * 1000 * 1000; // every 5 minutes
+        if (parseRMCTime(buffer, len, &tv)) {
+            if (_nextSync < startTime) {
+                _nextSync = startTime + 300 * 1000 * 1000;  // every 5 minutes
 
                 tv.tv_usec += esp_timer_get_time() - startTime;
                 _clk->setTime(&tv);

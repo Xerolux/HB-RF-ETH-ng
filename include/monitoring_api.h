@@ -18,4 +18,4 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req);
 extern httpd_uri_t get_monitoring_handler;
 extern httpd_uri_t post_monitoring_handler;
 
-#endif // MONITORING_API_H
+#endif  // MONITORING_API_H

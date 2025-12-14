@@ -26,8 +26,7 @@
 #include <stdint.h>
 #include <functional>
 
-class LineReader
-{
+class LineReader {
 private:
     unsigned char _buffer[1024];
     std::function<void(unsigned char *buffer, uint16_t len)> _processor;

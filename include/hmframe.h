@@ -25,8 +25,7 @@
 
 #include <stdint.h>
 
-class HMFrame
-{
+class HMFrame {
 public:
     static bool TryParse(unsigned char *buffer, uint16_t len, HMFrame *frame);
     static uint16_t crc(unsigned char *buffer, uint16_t len);
@@ -41,8 +40,7 @@ public:
     uint16_t encode(unsigned char *buffer, uint16_t len, bool escaped);
 };
 
-typedef enum
-{
+typedef enum {
     HM_DST_HMSYSTEM = 0x00,
     HM_DST_TRX = 0x01,
     HM_DST_HMIP = 0x02,
@@ -50,8 +48,7 @@ typedef enum
     HM_DST_COMMON = 0xfe,
 } hm_dst_t;
 
-typedef enum
-{
+typedef enum {
     HM_CMD_HMSYSTEM_IDENTIFY = 0x00,
     HM_CMD_HMSYSTEM_GET_VERSION = 0x02,
     HM_CMD_HMSYSTEM_CHANGE_APP = 0x03,
@@ -59,29 +56,25 @@ typedef enum
     HM_CMD_HMSYSTEM_GET_SERIAL = 0x0b,
 } hm_cmd_hmsystem_t;
 
-typedef enum
-{
+typedef enum {
     HM_CMD_TRX_GET_VERSION = 0x02,
     HM_CMD_TRX_ACK = 0x04,
     HM_CMD_TRX_GET_MCU_TYPE = 0x09,
     HM_CMD_TRX_GET_DEFAULT_RF_ADDR = 0x10,
 } hm_cmd_trx_t;
 
-typedef enum
-{
+typedef enum {
     HM_CMD_HMIP_GET_DEFAULT_RF_ADDR = 0x01,
     HM_CMD_HMIP_ACK = 0x06,
 } hm_cmd_hmip_t;
 
-typedef enum
-{
+typedef enum {
     HM_CMD_LLMAC_ACK = 0x01,
     HM_CMD_LLMAC_GET_SERIAL = 0x07,
     HM_CMD_LLMAC_GET_DEFAULT_RF_ADDR = 0x08,
 } hm_cmd_llmac_t;
 
-typedef enum
-{
+typedef enum {
     HM_CMD_COMMON_IDENTIFY = 0x01,
     HM_CMD_COMMON_START_BL = 0x02,
     HM_CMD_COMMON_START_APP = 0x03,

@@ -56,22 +56,18 @@ void updateCPUUsageTask(void *arg)
 
     uint32_t totalRunTime = 0, idleRunTime = 0, lastTotalRunTime = 0, lastIdleRunTime = 0;
 
-    for (;;)
-    {
+    for (;;) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
 
         idleRunTime = 0;
 
-        if (totalRunTime > 0)
-        {
-            for (int i = 0; i < taskCount; i++)
-            {
+        if (totalRunTime > 0) {
+            for (int i = 0; i < taskCount; i++) {
                 TaskStatus_t ts = taskStatus[i];
 
-                if (ts.xHandle == idle0Task || ts.xHandle == idle1Task)
-                {
+                if (ts.xHandle == idle0Task || ts.xHandle == idle1Task) {
                     idleRunTime += ts.ulRunTimeCounter;
                 }
             }
@@ -137,7 +133,7 @@ uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t
         } else {
             ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(ret));
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Small delay between samples
+        vTaskDelay(pdMS_TO_TICKS(10));  // Small delay between samples
     }
     adc_raw /= num_samples;
 
@@ -148,7 +144,7 @@ uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to convert ADC to voltage: %s", esp_err_to_name(ret));
             // Fallback: use raw value with approximation
-            voltage_mv = (adc_raw * 3300) / 4095; // 12-bit ADC, 3.3V ref
+            voltage_mv = (adc_raw * 3300) / 4095;  // 12-bit ADC, 3.3V ref
         }
     } else {
         // No calibration, use raw value approximation
@@ -168,23 +164,23 @@ board_type_t detectBoard()
 {
     uint32_t voltage = get_voltage(BOARD_REV_SENSE_UNIT, BOARD_REV_SENSE_CHANNEL, ADC_ATTEN_DB_12);
 
-    switch (voltage) // R31/R32
+    switch (voltage)  // R31/R32
     {
-    case 400 ... 700: // 10K/2K
-        return BOARD_TYPE_REV_1_10_PUB;
+        case 400 ... 700:  // 10K/2K
+            return BOARD_TYPE_REV_1_10_PUB;
 
-    case 1500 ... 1800: // 10K/10K
-        return BOARD_TYPE_REV_1_8_SK;
+        case 1500 ... 1800:  // 10K/10K
+            return BOARD_TYPE_REV_1_8_SK;
 
-    case 2600 ... 2900: // 2K/10K
-        return BOARD_TYPE_REV_1_8_PUB;
+        case 2600 ... 2900:  // 2K/10K
+            return BOARD_TYPE_REV_1_8_PUB;
 
-    case 2901 ... 3200: // 1K/12K
-        return BOARD_TYPE_REV_1_10_SK;
+        case 2901 ... 3200:  // 1K/12K
+            return BOARD_TYPE_REV_1_10_SK;
 
-    default:
-        ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32, voltage);
-        return BOARD_TYPE_UNKNOWN;
+        default:
+            ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32, voltage);
+            return BOARD_TYPE_UNKNOWN;
     }
 }
 
@@ -194,15 +190,16 @@ SysInfo::SysInfo()
 
     uint8_t baseMac[6];
     esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
-    snprintf(_serial, sizeof(_serial), "%02X%02X%02X%02X%02X%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+    snprintf(_serial, sizeof(_serial), "%02X%02X%02X%02X%02X%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3],
+             baseMac[4], baseMac[5]);
 
-    const esp_app_desc_t* app_desc = esp_app_get_description();
+    const esp_app_desc_t *app_desc = esp_app_get_description();
     _currentVersion = app_desc->version;
 
     _board = detectBoard();
 
     // Store boot time for uptime calculation
-    _bootTime = esp_timer_get_time() / 1000000; // Convert to seconds
+    _bootTime = esp_timer_get_time() / 1000000;  // Convert to seconds
 
     // Initialize temperature sensor
     // Note: ESP32 (classic) does not have an internal temperature sensor
@@ -218,10 +215,7 @@ SysInfo::SysInfo()
 #endif
 }
 
-double SysInfo::getCpuUsage()
-{
-    return _cpuUsage;
-}
+double SysInfo::getCpuUsage() { return _cpuUsage; }
 
 double SysInfo::getMemoryUsage()
 {
@@ -231,20 +225,11 @@ double SysInfo::getMemoryUsage()
     return 100.0 - (info.total_free_bytes * 100.0 / (info.total_free_bytes + info.total_allocated_bytes));
 }
 
-const char *SysInfo::getSerialNumber()
-{
-    return _serial;
-}
+const char *SysInfo::getSerialNumber() { return _serial; }
 
-board_type_t SysInfo::getBoardType()
-{
-    return _board;
-}
+board_type_t SysInfo::getBoardType() { return _board; }
 
-const char *SysInfo::getCurrentVersion()
-{
-    return _currentVersion;
-}
+const char *SysInfo::getCurrentVersion() { return _currentVersion; }
 
 double SysInfo::getSupplyVoltage()
 {
@@ -258,26 +243,25 @@ double SysInfo::getSupplyVoltage()
     }
 
     // Apply 2:1 voltage divider correction
-    double actual_voltage = (voltage_mv * 2.0) / 1000.0; // Convert to volts
+    double actual_voltage = (voltage_mv * 2.0) / 1000.0;  // Convert to volts
 
     ESP_LOGD(TAG, "Supply voltage: %.2fV (ADC: %u mV)", actual_voltage, voltage_mv);
     return actual_voltage;
 }
 
-const char* SysInfo::getBoardRevisionString()
+const char *SysInfo::getBoardRevisionString()
 {
-    switch (_board)
-    {
-    case BOARD_TYPE_REV_1_8_PUB:
-        return "REV 1.8 (PUB)";
-    case BOARD_TYPE_REV_1_8_SK:
-        return "REV 1.8 (SK)";
-    case BOARD_TYPE_REV_1_10_PUB:
-        return "REV 1.10 (PUB)";
-    case BOARD_TYPE_REV_1_10_SK:
-        return "REV 1.10 (SK)";
-    default:
-        return "Unknown";
+    switch (_board) {
+        case BOARD_TYPE_REV_1_8_PUB:
+            return "REV 1.8 (PUB)";
+        case BOARD_TYPE_REV_1_8_SK:
+            return "REV 1.8 (SK)";
+        case BOARD_TYPE_REV_1_10_PUB:
+            return "REV 1.10 (PUB)";
+        case BOARD_TYPE_REV_1_10_SK:
+            return "REV 1.10 (SK)";
+        default:
+            return "Unknown";
     }
 }
 
@@ -286,14 +270,13 @@ double SysInfo::getTemperature()
 #if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
     if (_temp_sensor == NULL) {
         ESP_LOGD(TAG, "Temperature sensor not initialized");
-        return -127.0; // Return special value to indicate "not available"
+        return -127.0;  // Return special value to indicate "not available"
     }
 
     float temp_celsius = 0.0;
     esp_err_t err = temperature_sensor_get_celsius(_temp_sensor, &temp_celsius);
 
-    if (err != ESP_OK)
-    {
+    if (err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to read temperature: %s", esp_err_to_name(err));
         return -127.0;
     }
@@ -314,33 +297,32 @@ uint64_t SysInfo::getUptimeSeconds()
     return uptime;
 }
 
-const char* SysInfo::getResetReason()
+const char *SysInfo::getResetReason()
 {
     esp_reset_reason_t reason = esp_reset_reason();
 
-    switch (reason)
-    {
-    case ESP_RST_POWERON:
-        return "Power-On Reset";
-    case ESP_RST_SW:
-        return "Software Reset";
-    case ESP_RST_PANIC:
-        return "Exception/Panic";
-    case ESP_RST_INT_WDT:
-        return "Interrupt Watchdog";
-    case ESP_RST_TASK_WDT:
-        return "Task Watchdog";
-    case ESP_RST_WDT:
-        return "Other Watchdog";
-    case ESP_RST_DEEPSLEEP:
-        return "Deep Sleep Reset";
-    case ESP_RST_BROWNOUT:
-        return "Brownout Reset";
-    case ESP_RST_SDIO:
-        return "SDIO Reset";
-    case ESP_RST_EXT:
-        return "External Reset";
-    default:
-        return "Unknown";
+    switch (reason) {
+        case ESP_RST_POWERON:
+            return "Power-On Reset";
+        case ESP_RST_SW:
+            return "Software Reset";
+        case ESP_RST_PANIC:
+            return "Exception/Panic";
+        case ESP_RST_INT_WDT:
+            return "Interrupt Watchdog";
+        case ESP_RST_TASK_WDT:
+            return "Task Watchdog";
+        case ESP_RST_WDT:
+            return "Other Watchdog";
+        case ESP_RST_DEEPSLEEP:
+            return "Deep Sleep Reset";
+        case ESP_RST_BROWNOUT:
+            return "Brownout Reset";
+        case ESP_RST_SDIO:
+            return "SDIO Reset";
+        case ESP_RST_EXT:
+            return "External Reset";
+        default:
+            return "Unknown";
     }
 }

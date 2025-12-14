@@ -53,11 +53,11 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
 
 // Global pointers
-static SysInfo* g_sysInfo = NULL;
-static UpdateCheck* g_updateCheck = NULL;
+static SysInfo *g_sysInfo = NULL;
+static UpdateCheck *g_updateCheck = NULL;
 
 // Get firmware version from app descriptor
-static const char* get_firmware_version(void)
+static const char *get_firmware_version(void)
 {
     const esp_app_desc_t *app_desc = esp_app_get_description();
     return app_desc->version;
@@ -76,13 +76,9 @@ static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes
 }
 
 // Helper to access global pointers from other files (like mqtt_handler)
-SysInfo* monitoring_get_sysinfo(void) {
-    return g_sysInfo;
-}
+SysInfo *monitoring_get_sysinfo(void) { return g_sysInfo; }
 
-UpdateCheck* monitoring_get_updatecheck(void) {
-    return g_updateCheck;
-}
+UpdateCheck *monitoring_get_updatecheck(void) { return g_updateCheck; }
 
 // CheckMK Agent Task
 static void checkmk_agent_task(void *pvParameters)
@@ -169,14 +165,15 @@ static void checkmk_agent_task(void *pvParameters)
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
         len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        len += snprintf(output + len, sizeof(output) - len, "%lu\n",
+                        (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
         len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
         len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
-                       (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
+                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
         len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
-                       (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
         len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
@@ -208,7 +205,9 @@ esp_err_t snmp_start(const snmp_config_t *config)
     }
 
     ESP_LOGW(TAG, "SNMP agent requested on port %d - Feature disabled (requires CONFIG_LWIP_SNMP=y)", config->port);
-    ESP_LOGW(TAG, "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> Enable SNMP");
+    ESP_LOGW(TAG,
+             "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> "
+             "Enable SNMP");
     return ESP_ERR_NOT_SUPPORTED;
 #else
     ESP_LOGW(TAG, "SNMP not enabled in build configuration");
@@ -247,8 +246,8 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
     memcpy(&current_config.checkmk, config, sizeof(checkmk_config_t));
 
     // Create CheckMK agent task - pass pointer to current_config
-    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096,
-                                  (void *)&current_config.checkmk, 5, &checkmk_task_handle);
+    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096, (void *)&current_config.checkmk, 5,
+                                 &checkmk_task_handle);
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CheckMK agent task");
@@ -422,7 +421,7 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo *sysInfo, UpdateCheck *updateCheck)
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 

@@ -27,93 +27,89 @@
 #include <stdint.h>
 #include <lwip/ip4_addr.h>
 
-typedef enum
-{
-    TIMESOURCE_NTP = 0,
-    TIMESOURCE_DCF = 1,
-    TIMESOURCE_GPS = 2
-} timesource_t;
+typedef enum { TIMESOURCE_NTP = 0, TIMESOURCE_DCF = 1, TIMESOURCE_GPS = 2 } timesource_t;
 
-class Settings
-{
+class Settings {
 private:
-  char _adminPassword[33] = {0};
-  bool _passwordChanged;
+    char _adminPassword[33] = {0};
+    bool _passwordChanged;
 
-  char _hostname[33] = {0};
-  bool _useDHCP;
-  ip4_addr_t _localIP;
-  ip4_addr_t _netmask;
-  ip4_addr_t _gateway;
-  ip4_addr_t _dns1;
-  ip4_addr_t _dns2;
+    char _hostname[33] = {0};
+    bool _useDHCP;
+    ip4_addr_t _localIP;
+    ip4_addr_t _netmask;
+    ip4_addr_t _gateway;
+    ip4_addr_t _dns1;
+    ip4_addr_t _dns2;
 
-  int32_t _timesource;
+    int32_t _timesource;
 
-  int32_t _dcfOffset;
+    int32_t _dcfOffset;
 
-  int32_t _gpsBaudrate;
+    int32_t _gpsBaudrate;
 
-  char _ntpServer[65] = {0};
+    char _ntpServer[65] = {0};
 
-  int32_t _ledBrightness;
-  bool _checkUpdates;
+    int32_t _ledBrightness;
+    bool _checkUpdates;
 
-  bool _enableIPv6;
-  char _ipv6Mode[10] = {0};
-  char _ipv6Address[40] = {0};
-  int32_t _ipv6PrefixLength;
-  char _ipv6Gateway[40] = {0};
-  char _ipv6Dns1[40] = {0};
-  char _ipv6Dns2[40] = {0};
+    bool _enableIPv6;
+    char _ipv6Mode[10] = {0};
+    char _ipv6Address[40] = {0};
+    int32_t _ipv6PrefixLength;
+    char _ipv6Gateway[40] = {0};
+    char _ipv6Dns1[40] = {0};
+    char _ipv6Dns2[40] = {0};
 
 public:
-  Settings();
-  void load();
-  void save();
-  void clear();
+    Settings();
+    void load();
+    void save();
+    void clear();
 
-  char *getAdminPassword();
-  void setAdminPassword(char* password);
-  bool getPasswordChanged();
+    char *getAdminPassword();
+    void setAdminPassword(char *password);
+    bool getPasswordChanged();
 
-  char *getHostname();
-  bool getUseDHCP();
-  ip4_addr_t getLocalIP();
-  ip4_addr_t getNetmask();
-  ip4_addr_t getGateway();
-  ip4_addr_t getDns1();
-  ip4_addr_t getDns2();
+    char *getHostname();
+    bool getUseDHCP();
+    ip4_addr_t getLocalIP();
+    ip4_addr_t getNetmask();
+    ip4_addr_t getGateway();
+    ip4_addr_t getDns1();
+    ip4_addr_t getDns2();
 
-  void setNetworkSettings(char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2);
+    void setNetworkSettings(char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway,
+                            ip4_addr_t dns1, ip4_addr_t dns2);
 
-  timesource_t getTimesource();
-  void setTimesource(timesource_t timesource);
+    timesource_t getTimesource();
+    void setTimesource(timesource_t timesource);
 
-  int getDcfOffset();
-  void setDcfOffset(int offset);
+    int getDcfOffset();
+    void setDcfOffset(int offset);
 
-  int getGpsBaudrate();
-  void setGpsBaudrate(int baudrate);
+    int getGpsBaudrate();
+    void setGpsBaudrate(int baudrate);
 
-  char *getNtpServer();
-  void setNtpServer(char *ntpServer);
+    char *getNtpServer();
+    void setNtpServer(char *ntpServer);
 
-  int getLEDBrightness();
-  void setLEDBrightness(int brightness);
+    int getLEDBrightness();
+    void setLEDBrightness(int brightness);
 
-  bool getCheckUpdates();
-  void setCheckUpdates(bool checkUpdates);
+    bool getCheckUpdates();
+    void setCheckUpdates(bool checkUpdates);
 
-  // IPv6 getters
-  bool getEnableIPv6();
-  char *getIPv6Mode();
-  char *getIPv6Address();
-  int getIPv6PrefixLength();
-  char *getIPv6Gateway();
-  char *getIPv6Dns1();
-  char *getIPv6Dns2();
+    // IPv6 getters
+    bool getEnableIPv6();
+    char *getIPv6Mode();
+    char *getIPv6Address();
+    int getIPv6PrefixLength();
+    char *getIPv6Gateway();
+    char *getIPv6Dns1();
+    char *getIPv6Dns2();
 
-  // IPv6 setter
-  void setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway, char *ipv6Dns1, char *ipv6Dns2);
+    // IPv6 setter
+    void setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway,
+                         char *ipv6Dns1, char *ipv6Dns2);
 };

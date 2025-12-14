@@ -38,13 +38,10 @@ PushButtonHandler::PushButtonHandler()
 
 void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED, Settings *settings)
 {
-    if (gpio_get_level(HM_BTN_PIN) == 0)
-    {
+    if (gpio_get_level(HM_BTN_PIN) == 0) {
         // reset request start if button is pressed at least for 4sec
-        for (int i = 0; i < 40; i++)
-        {
-            if (gpio_get_level(HM_BTN_PIN) == 1)
-            {
+        for (int i = 0; i < 40; i++) {
+            if (gpio_get_level(HM_BTN_PIN) == 1) {
                 return;
             }
             vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -56,26 +53,21 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
         ESP_LOGI(TAG, "Factory Reset mode started.");
 
         // wait for release of button
-        while (gpio_get_level(HM_BTN_PIN) == 0)
-        {
+        while (gpio_get_level(HM_BTN_PIN) == 0) {
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
 
         // wait to be pressed again or timeout
-        for (int i = 0; i < 40; i++)
-        {
-            if (gpio_get_level(HM_BTN_PIN) == 0)
-            {
+        for (int i = 0; i < 40; i++) {
+            if (gpio_get_level(HM_BTN_PIN) == 0) {
                 break;
             }
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
 
         // reset request start if button is pressed at least for 4sec
-        for (int i = 0; i < 40; i++)
-        {
-            if (gpio_get_level(HM_BTN_PIN) == 1)
-            {
+        for (int i = 0; i < 40; i++) {
+            if (gpio_get_level(HM_BTN_PIN) == 1) {
                 statusLED->setState(LED_STATE_ON);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 powerLED->setState(LED_STATE_ON);

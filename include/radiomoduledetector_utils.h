@@ -30,4 +30,3 @@
 #define log_frame(__text, __buffer, __len) \
     ESP_LOGD(TAG, __text);                 \
     ESP_LOG_BUFFER_HEX_LEVEL(TAG, __buffer, __len, ESP_LOG_DEBUG);
-

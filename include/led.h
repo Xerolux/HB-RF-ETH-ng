@@ -30,8 +30,7 @@
 
 #define MAX_LED_COUNT 5
 
-typedef enum
-{
+typedef enum {
     LED_STATE_OFF = 0,
     LED_STATE_ON = 1,
     LED_STATE_BLINK = 2,
@@ -40,8 +39,7 @@ typedef enum
     LED_STATE_BLINK_SLOW = 5,
 } led_state_t;
 
-class LED
-{
+class LED {
 private:
     uint8_t _state;
     ledc_channel_config_t _channel_conf;

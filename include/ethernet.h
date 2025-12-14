@@ -35,35 +35,35 @@
 #include "sdkconfig.h"
 #include "settings.h"
 
-class Ethernet
-{
+class Ethernet {
 private:
-  esp_netif_config_t _netif_cfg;
-  esp_netif_t *_eth_netif;
-  esp_eth_handle_t _eth_handle;
-  eth_mac_config_t _mac_config;
-  eth_phy_config_t _phy_config;
-  esp_eth_mac_t *_mac;
-  esp_eth_phy_t *_phy;
-  esp_eth_config_t _eth_config;
+    esp_netif_config_t _netif_cfg;
+    esp_netif_t *_eth_netif;
+    esp_eth_handle_t _eth_handle;
+    eth_mac_config_t _mac_config;
+    eth_phy_config_t _phy_config;
+    esp_eth_mac_t *_mac;
+    esp_eth_phy_t *_phy;
+    esp_eth_config_t _eth_config;
 
-  Settings *_settings;
-  bool _isConnected;
-  eth_speed_t _linkSpeed;
-  eth_duplex_t _duplexMode;
+    Settings *_settings;
+    bool _isConnected;
+    eth_speed_t _linkSpeed;
+    eth_duplex_t _duplexMode;
 
 public:
-  Ethernet(Settings *settings);
+    Ethernet(Settings *settings);
 
-  void start();
-  void stop();
+    void start();
+    void stop();
 
-  void getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2);
+    void getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1,
+                            ip4_addr_t *dns2);
 
-  bool isConnected() { return _isConnected; }
-  int getLinkSpeedMbps();
-  const char* getDuplexMode();
+    bool isConnected() { return _isConnected; }
+    int getLinkSpeedMbps();
+    const char *getDuplexMode();
 
-  void _handleETHEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
-  void _handleIPEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
+    void _handleETHEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
+    void _handleIPEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
 };

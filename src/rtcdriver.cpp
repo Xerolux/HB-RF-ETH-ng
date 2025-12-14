@@ -35,15 +35,9 @@
 
 static const char *TAG = "RTC";
 
-static uint8_t bcd2bin(uint8_t val)
-{
-    return val - 6 * (val >> 4);
-}
+static uint8_t bcd2bin(uint8_t val) { return val - 6 * (val >> 4); }
 
-static uint8_t bin2bcd(uint8_t val)
-{
-    return val + 6 * (val / 10);
-}
+static uint8_t bin2bcd(uint8_t val) { return val + 6 * (val / 10); }
 
 const uint8_t daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
@@ -51,20 +45,15 @@ static bool _isDriverInstalled = false;
 
 static void i2c_master_init()
 {
-    if (_isDriverInstalled)
-        return;
+    if (_isDriverInstalled) return;
 
-    i2c_config_t i2c_config = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = HM_SDA_PIN,
-        .scl_io_num = HM_SCL_PIN,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master = {
-            .clk_speed = 100000
-        },
-        .clk_flags = 0
-    };
+    i2c_config_t i2c_config = {.mode = I2C_MODE_MASTER,
+                               .sda_io_num = HM_SDA_PIN,
+                               .scl_io_num = HM_SCL_PIN,
+                               .sda_pullup_en = GPIO_PULLUP_ENABLE,
+                               .scl_pullup_en = GPIO_PULLUP_ENABLE,
+                               .master = {.clk_speed = 100000},
+                               .clk_flags = 0};
     i2c_param_config(I2C_NUM_0, &i2c_config);
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
     _isDriverInstalled = true;
@@ -73,24 +62,18 @@ static void i2c_master_init()
 Rtc *Rtc::detect()
 {
     RtcDS3231 *ds3231 = new RtcDS3231();
-    if (ds3231->begin())
-    {
+    if (ds3231->begin()) {
         ESP_LOGI(TAG, "DS3231 RTC found and initialized.");
         return ds3231;
-    }
-    else
-    {
+    } else {
         delete ds3231;
     }
 
     RtcRX8130 *rx9130 = new RtcRX8130();
-    if (rx9130->begin())
-    {
+    if (rx9130->begin()) {
         ESP_LOGI(TAG, "RX9130 RTC found and initialized.");
         return rx9130;
-    }
-    else
-    {
+    } else {
         delete rx9130;
     }
 
@@ -98,14 +81,9 @@ Rtc *Rtc::detect()
     return NULL;
 }
 
-Rtc::Rtc(uint8_t address, uint8_t reg_start) : _address(address), _reg_start(reg_start)
-{
-    i2c_master_init();
-}
+Rtc::Rtc(uint8_t address, uint8_t reg_start) : _address(address), _reg_start(reg_start) { i2c_master_init(); }
 
-Rtc::~Rtc()
-{
-}
+Rtc::~Rtc() {}
 
 bool Rtc::begin()
 {
@@ -137,42 +115,39 @@ struct timeval Rtc::GetTime()
     esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
 
-    if (ret != ESP_OK)
-    {
+    if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Could not read time from RTC");
         res.tv_sec = 0;
         res.tv_usec = 0;
         return res;
     }
 
-    res.tv_sec = bcd2bin(rawData[0]);         // seconds
-    res.tv_sec += bcd2bin(rawData[1]) * 60;   // minutes
-    res.tv_sec += bcd2bin(rawData[2]) * 3600; // hours
+    res.tv_sec = bcd2bin(rawData[0]);          // seconds
+    res.tv_sec += bcd2bin(rawData[1]) * 60;    // minutes
+    res.tv_sec += bcd2bin(rawData[2]) * 3600;  // hours
 
     uint16_t days = bcd2bin(rawData[4]);
     uint8_t month = bcd2bin(rawData[5]);
     uint8_t year = bcd2bin(rawData[6]);
 
-    for (uint8_t i = 1; i < month; ++i)
-    {
+    for (uint8_t i = 1; i < month; ++i) {
         days += daysInMonth[i - 1];
     }
 
-    if (month > 2 && year % 4 == 0)
-        days++;
+    if (month > 2 && year % 4 == 0) days++;
 
     days += 365 * year + (year + 3) / 4 - 1;
 
     res.tv_sec += days * 86400;
 
-    res.tv_sec += 10957 * 86400; // epoch diff 1970 vs. 2000
+    res.tv_sec += 10957 * 86400;  // epoch diff 1970 vs. 2000
 
     return res;
 }
 
 void Rtc::SetTime(struct timeval now)
 {
-    now.tv_sec -= 10957 * 86400; // epoch diff 1970 vs. 2000
+    now.tv_sec -= 10957 * 86400;  // epoch diff 1970 vs. 2000
 
     uint8_t seconds = now.tv_sec % 60;
     now.tv_sec /= 60;
@@ -185,22 +160,17 @@ void Rtc::SetTime(struct timeval now)
     uint8_t leap;
     uint8_t year;
 
-    for (year = 0;; year++)
-    {
+    for (year = 0;; year++) {
         leap = year % 4 == 0;
-        if (days < 365 + leap)
-            break;
+        if (days < 365 + leap) break;
         days -= 365 + leap;
     }
 
     uint8_t month;
-    for (month = 1;; month++)
-    {
+    for (month = 1;; month++) {
         uint8_t daysPerMonth = daysInMonth[month - 1];
-        if (leap && month == 2)
-            ++daysPerMonth;
-        if (days < daysPerMonth)
-            break;
+        if (leap && month == 2) ++daysPerMonth;
+        if (days < daysPerMonth) break;
         days -= daysPerMonth;
     }
     days++;
@@ -220,24 +190,18 @@ void Rtc::SetTime(struct timeval now)
     esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
 
-    if (ret != ESP_OK)
-    {
+    if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Could not write time to RTC");
     }
 }
 
-RtcDS3231::RtcDS3231() : Rtc::Rtc(0x68, 0)
-{
-}
+RtcDS3231::RtcDS3231() : Rtc::Rtc(0x68, 0) {}
 
-RtcRX8130::RtcRX8130() : Rtc::Rtc(0x32, 0x10)
-{
-}
+RtcRX8130::RtcRX8130() : Rtc::Rtc(0x32, 0x10) {}
 
 bool RtcRX8130::begin()
 {
-    if (Rtc::begin())
-    {
+    if (Rtc::begin()) {
         i2c_cmd_handle_t cmd = i2c_cmd_link_create();
         i2c_master_start(cmd);
         i2c_master_write_byte(cmd, _address << 1 | I2C_MASTER_WRITE, true);
@@ -248,9 +212,7 @@ bool RtcRX8130::begin()
         i2c_cmd_link_delete(cmd);
 
         return ret == ESP_OK;
-    }
-    else
-    {
+    } else {
         return false;
     }
 }

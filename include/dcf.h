@@ -24,8 +24,7 @@
 #include "systemclock.h"
 #include "settings.h"
 
-class DCF
-{
+class DCF {
 public:
     DCF(Settings *settings, SystemClock *clk);
 

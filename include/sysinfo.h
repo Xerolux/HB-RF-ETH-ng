@@ -25,8 +25,7 @@
 
 #include <cstdint>
 
-typedef enum
-{
+typedef enum {
     BOARD_TYPE_REV_1_8_PUB = 0,
     BOARD_TYPE_REV_1_8_SK = 1,
     BOARD_TYPE_REV_1_10_PUB = 2,
@@ -34,18 +33,17 @@ typedef enum
     BOARD_TYPE_UNKNOWN = 255
 } board_type_t;
 
-class SysInfo
-{
+class SysInfo {
 public:
     SysInfo();
     double getCpuUsage();
     double getMemoryUsage();
-    const char* getCurrentVersion();
+    const char *getCurrentVersion();
     const char *getSerialNumber();
     board_type_t getBoardType();
-    const char* getBoardRevisionString();
+    const char *getBoardRevisionString();
     double getSupplyVoltage();
     double getTemperature();
     uint64_t getUptimeSeconds();
-    const char* getResetReason();
+    const char *getResetReason();
 };

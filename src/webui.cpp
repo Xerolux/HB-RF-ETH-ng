@@ -49,10 +49,7 @@ static const char *TAG = "WebUI";
         return ESP_OK;                                                 \
     };                                                                 \
     httpd_uri_t _resource##_handler = {                                \
-        .uri = _uri,                                                   \
-        .method = HTTP_GET,                                            \
-        .handler = _resource##_handler_func,                           \
-        .user_ctx = NULL};
+        .uri = _uri, .method = HTTP_GET, .handler = _resource##_handler_func, .user_ctx = NULL};
 
 EMBED_HANDLER("/*", index_html_gz, "text/html")
 EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
@@ -93,10 +90,8 @@ void generateToken()
 
 const char *ip2str(ip4_addr_t addr, ip4_addr_t fallback)
 {
-    if (addr.addr == IPADDR_ANY || addr.addr == IPADDR_NONE)
-    {
-        if (fallback.addr == IPADDR_ANY || fallback.addr == IPADDR_NONE)
-        {
+    if (addr.addr == IPADDR_ANY || addr.addr == IPADDR_NONE) {
+        if (fallback.addr == IPADDR_ANY || fallback.addr == IPADDR_NONE) {
             return "";
         }
         return ip4addr_ntoa(&fallback);
@@ -106,8 +101,7 @@ const char *ip2str(ip4_addr_t addr, ip4_addr_t fallback)
 
 const char *ip2str(ip4_addr_t addr)
 {
-    if (addr.addr == IPADDR_ANY || addr.addr == IPADDR_NONE)
-    {
+    if (addr.addr == IPADDR_ANY || addr.addr == IPADDR_NONE) {
         return "";
     }
     return ip4addr_ntoa(&addr);
@@ -115,12 +109,9 @@ const char *ip2str(ip4_addr_t addr)
 
 void formatRadioMAC(uint32_t radioMAC, char *buf, size_t bufSize)
 {
-    if (radioMAC == 0)
-    {
+    if (radioMAC == 0) {
         snprintf(buf, bufSize, "n/a");
-    }
-    else
-    {
+    } else {
         snprintf(buf, bufSize, "0x%06" PRIX32, radioMAC);
     }
 }
@@ -128,14 +119,11 @@ void formatRadioMAC(uint32_t radioMAC, char *buf, size_t bufSize)
 esp_err_t validate_auth(httpd_req_t *req)
 {
     char auth[60] = {0};
-    if (httpd_req_get_hdr_value_str(req, "Authorization", auth, sizeof(auth)) != ESP_OK)
-        return ESP_FAIL;
+    if (httpd_req_get_hdr_value_str(req, "Authorization", auth, sizeof(auth)) != ESP_OK) return ESP_FAIL;
 
-    if (strncmp(auth, "Token ", 6) != 0)
-        return ESP_FAIL;
+    if (strncmp(auth, "Token ", 6) != 0) return ESP_FAIL;
 
-    if (strcmp(auth + 6, _token) != 0)
-        return ESP_FAIL;
+    if (strcmp(auth + 6, _token) != 0) return ESP_FAIL;
 
     return ESP_OK;
 }
@@ -143,19 +131,18 @@ esp_err_t validate_auth(httpd_req_t *req)
 esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
     // Check rate limit
-    if (!rate_limiter_check_login(req))
-    {
+    if (!rate_limiter_check_login(req)) {
         httpd_resp_set_status(req, "429 Too Many Requests");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"isAuthenticated\":false,\"error\":\"Too many login attempts. Please try again later.\"}");
+        httpd_resp_sendstr(
+            req, "{\"isAuthenticated\":false,\"error\":\"Too many login attempts. Please try again later.\"}");
         return ESP_OK;
     }
 
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
-    {
+    if (len > 0) {
         buffer[len] = 0;
 
         cJSON *root = cJSON_Parse(buffer);
@@ -170,8 +157,7 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
         root = cJSON_CreateObject();
 
         cJSON_AddBoolToObject(root, "isAuthenticated", isAuthenticated);
-        if (isAuthenticated)
-        {
+        if (isAuthenticated) {
             // Successful login - reset rate limit for this IP
             rate_limiter_reset_ip(req);
             cJSON_AddStringToObject(root, "token", _token);
@@ -190,10 +176,7 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t post_login_json_handler = {
-    .uri = "/login.json",
-    .method = HTTP_POST,
-    .handler = post_login_json_handler_func,
-    .user_ctx = NULL};
+    .uri = "/login.json", .method = HTTP_POST, .handler = post_login_json_handler_func, .user_ctx = NULL};
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
@@ -201,20 +184,19 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 
     // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
     // This handler is called frequently (1Hz) by the frontend.
-    char buffer[1536]; // Increased buffer to be safe, ESP32 stack usually allows this
+    char buffer[1536];  // Increased buffer to be safe, ESP32 stack usually allows this
 
     // Determine Radio Module Type String
-    const char* radioModuleTypeStr = "-";
-    switch (_radioModuleDetector->getRadioModuleType())
-    {
-    case RADIO_MODULE_HM_MOD_RPI_PCB:
-        radioModuleTypeStr = "HM-MOD-RPI-PCB";
-        break;
-    case RADIO_MODULE_RPI_RF_MOD:
-        radioModuleTypeStr = "RPI-RF-MOD";
-        break;
-    default:
-        break;
+    const char *radioModuleTypeStr = "-";
+    switch (_radioModuleDetector->getRadioModuleType()) {
+        case RADIO_MODULE_HM_MOD_RPI_PCB:
+            radioModuleTypeStr = "HM-MOD-RPI-PCB";
+            break;
+        case RADIO_MODULE_RPI_RF_MOD:
+            radioModuleTypeStr = "RPI-RF-MOD";
+            break;
+        default:
+            break;
     }
 
     // Format Radio MACs
@@ -230,50 +212,37 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 
     // Format JSON
     // Note: We use "true"/"false" strings for booleans
-    int written = snprintf(buffer, sizeof(buffer),
+    int written = snprintf(
+        buffer, sizeof(buffer),
         "{\"sysInfo\":{"
-            "\"serial\":\"%s\","
-            "\"currentVersion\":\"%s\","
-            "\"latestVersion\":\"%s\","
-            "\"memoryUsage\":%.2f,"
-            "\"cpuUsage\":%.2f,"
-            "\"supplyVoltage\":%.2f,"
-            "\"temperature\":%.2f,"
-            "\"uptimeSeconds\":%" PRIu64 ","
-            "\"boardRevision\":\"%s\","
-            "\"resetReason\":\"%s\","
-            "\"ethernetConnected\":%s,"
-            "\"ethernetSpeed\":%d,"
-            "\"ethernetDuplex\":\"%s\","
-            "\"rawUartRemoteAddress\":\"%s\","
-            "\"radioModuleType\":\"%s\","
-            "\"radioModuleSerial\":\"%s\","
-            "\"radioModuleFirmwareVersion\":\"%s\","
-            "\"radioModuleBidCosRadioMAC\":\"%s\","
-            "\"radioModuleHmIPRadioMAC\":\"%s\","
-            "\"radioModuleSGTIN\":\"%s\""
+        "\"serial\":\"%s\","
+        "\"currentVersion\":\"%s\","
+        "\"latestVersion\":\"%s\","
+        "\"memoryUsage\":%.2f,"
+        "\"cpuUsage\":%.2f,"
+        "\"supplyVoltage\":%.2f,"
+        "\"temperature\":%.2f,"
+        "\"uptimeSeconds\":%" PRIu64
+        ","
+        "\"boardRevision\":\"%s\","
+        "\"resetReason\":\"%s\","
+        "\"ethernetConnected\":%s,"
+        "\"ethernetSpeed\":%d,"
+        "\"ethernetDuplex\":\"%s\","
+        "\"rawUartRemoteAddress\":\"%s\","
+        "\"radioModuleType\":\"%s\","
+        "\"radioModuleSerial\":\"%s\","
+        "\"radioModuleFirmwareVersion\":\"%s\","
+        "\"radioModuleBidCosRadioMAC\":\"%s\","
+        "\"radioModuleHmIPRadioMAC\":\"%s\","
+        "\"radioModuleSGTIN\":\"%s\""
         "}}",
-        _sysInfo->getSerialNumber(),
-        _sysInfo->getCurrentVersion(),
-        _updateCheck->getLatestVersion(),
-        _sysInfo->getMemoryUsage(),
-        _sysInfo->getCpuUsage(),
-        _sysInfo->getSupplyVoltage(),
-        _sysInfo->getTemperature(),
-        _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
-        _ethernet->isConnected() ? "true" : "false",
-        _ethernet->getLinkSpeedMbps(),
-        _ethernet->getDuplexMode(),
-        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()),
-        radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
-        fwVersionStr,
-        bidCosMAC,
-        hmIPMAC,
-        _radioModuleDetector->getSGTIN()
-    );
+        _sysInfo->getSerialNumber(), _sysInfo->getCurrentVersion(), _updateCheck->getLatestVersion(),
+        _sysInfo->getMemoryUsage(), _sysInfo->getCpuUsage(), _sysInfo->getSupplyVoltage(), _sysInfo->getTemperature(),
+        _sysInfo->getUptimeSeconds(), _sysInfo->getBoardRevisionString(), _sysInfo->getResetReason(),
+        _ethernet->isConnected() ? "true" : "false", _ethernet->getLinkSpeedMbps(), _ethernet->getDuplexMode(),
+        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()), radioModuleTypeStr, _radioModuleDetector->getSerial(),
+        fwVersionStr, bidCosMAC, hmIPMAC, _radioModuleDetector->getSGTIN());
 
     if (written < 0 || written >= sizeof(buffer)) {
         ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
@@ -285,10 +254,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t get_sysinfo_json_handler = {
-    .uri = "/sysinfo.json",
-    .method = HTTP_GET,
-    .handler = get_sysinfo_json_handler_func,
-    .user_ctx = NULL};
+    .uri = "/sysinfo.json", .method = HTTP_GET, .handler = get_sysinfo_json_handler_func, .user_ctx = NULL};
 
 void add_settings(cJSON *root)
 {
@@ -330,8 +296,7 @@ void add_settings(cJSON *root)
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
@@ -351,17 +316,13 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t get_settings_json_handler = {
-    .uri = "/settings.json",
-    .method = HTTP_GET,
-    .handler = get_settings_json_handler_func,
-    .user_ctx = NULL};
+    .uri = "/settings.json", .method = HTTP_GET, .handler = get_settings_json_handler_func, .user_ctx = NULL};
 
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
     ip4_addr_t res{.addr = IPADDR_ANY};
 
-    if (cJSON_IsString(item))
-    {
+    if (cJSON_IsString(item)) {
         ip4addr_aton(item->valuestring, &res);
     }
 
@@ -370,8 +331,7 @@ ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 
 bool cJSON_GetBoolValue(const cJSON *item)
 {
-    if (cJSON_IsBool(item))
-    {
+    if (cJSON_IsBool(item)) {
         return item->type == cJSON_True;
     }
 
@@ -380,8 +340,7 @@ bool cJSON_GetBoolValue(const cJSON *item)
 
 esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
@@ -390,8 +349,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
-    {
+    if (len > 0) {
         buffer[len] = 0;
         cJSON *root = cJSON_Parse(buffer);
 
@@ -424,8 +382,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
+        if (adminPassword && strlen(adminPassword) > 0) _settings->setAdminPassword(adminPassword);
 
         _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
         _settings->setTimesource(timesource);
@@ -441,15 +398,9 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         // Handle IPv6 (checking for nulls)
         if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
+            _settings->setIPv6Settings(enableIPv6, ipv6Mode, ipv6Address ? ipv6Address : (char *)"", ipv6PrefixLength,
+                                       ipv6Gateway ? ipv6Gateway : (char *)"", ipv6Dns1 ? ipv6Dns1 : (char *)"",
+                                       ipv6Dns2 ? ipv6Dns2 : (char *)"");
         }
 
         _settings->save();
@@ -473,15 +424,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t post_settings_json_handler = {
-    .uri = "/settings.json",
-    .method = HTTP_POST,
-    .handler = post_settings_json_handler_func,
-    .user_ctx = NULL};
+    .uri = "/settings.json", .method = HTTP_POST, .handler = post_settings_json_handler_func, .user_ctx = NULL};
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
@@ -499,9 +446,9 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
 
     // Merge settings object into root if add_settings creates a sub-object
     // NOTE: add_settings creates a "settings" object inside root.
-    // If we want a flat structure or specific structure for restore, we need to match post_settings_json_handler expectations.
-    // post_settings_json_handler expects a flat JSON object with keys like "adminPassword", "hostname", etc.
-    // But add_settings creates { "settings": { "hostname": ... } }
+    // If we want a flat structure or specific structure for restore, we need to match post_settings_json_handler
+    // expectations. post_settings_json_handler expects a flat JSON object with keys like "adminPassword", "hostname",
+    // etc. But add_settings creates { "settings": { "hostname": ... } }
 
     // We need to flatten it.
     cJSON *settingsObj = cJSON_GetObjectItem(root, "settings");
@@ -523,10 +470,7 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t get_backup_handler = {
-    .uri = "/api/backup",
-    .method = HTTP_GET,
-    .handler = get_backup_handler_func,
-    .user_ctx = NULL};
+    .uri = "/api/backup", .method = HTTP_GET, .handler = get_backup_handler_func, .user_ctx = NULL};
 
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
@@ -553,28 +497,26 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 // Actually, let's implement a dedicated restore handler that restarts.
 esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
     }
 
-    char *buffer = (char*)malloc(4096);
+    char *buffer = (char *)malloc(4096);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
     int len = httpd_req_recv(req, buffer, 4095);
 
-    if (len > 0)
-    {
+    if (len > 0) {
         buffer[len] = 0;
         cJSON *root = cJSON_Parse(buffer);
         free(buffer);
 
         if (!root) {
-             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
         }
 
         char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
@@ -606,8 +548,7 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
+        if (adminPassword && strlen(adminPassword) > 0) _settings->setAdminPassword(adminPassword);
 
         _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
         _settings->setTimesource(timesource);
@@ -617,15 +558,9 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         _settings->setLEDBrightness(ledBrightness);
 
         if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
+            _settings->setIPv6Settings(enableIPv6, ipv6Mode, ipv6Address ? ipv6Address : (char *)"", ipv6PrefixLength,
+                                       ipv6Gateway ? ipv6Gateway : (char *)"", ipv6Dns1 ? ipv6Dns1 : (char *)"",
+                                       ipv6Dns2 ? ipv6Dns2 : (char *)"");
         }
 
         _settings->save();
@@ -646,16 +581,11 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 }
 
 httpd_uri_t post_restore_handler = {
-    .uri = "/api/restore",
-    .method = HTTP_POST,
-    .handler = post_restore_handler_func_actual,
-    .user_ctx = NULL};
+    .uri = "/api/restore", .method = HTTP_POST, .handler = post_restore_handler_func_actual, .user_ctx = NULL};
 
 #define OTA_CHECK(a, str, ...)                                                    \
-    do                                                                            \
-    {                                                                             \
-        if (!(a))                                                                 \
-        {                                                                         \
+    do {                                                                          \
+        if (!(a)) {                                                               \
             ESP_LOGE(TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, str);       \
             goto err;                                                             \
@@ -664,8 +594,7 @@ httpd_uri_t post_restore_handler = {
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
@@ -680,19 +609,15 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     bool is_req_body_started = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
 
-    do
-    {
-        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length, sizeof(ota_buff)))) < 0)
-        {
-            if (recv_len != HTTPD_SOCK_ERR_TIMEOUT)
-            {
+    do {
+        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length, sizeof(ota_buff)))) < 0) {
+            if (recv_len != HTTPD_SOCK_ERR_TIMEOUT) {
                 ESP_LOGE(TAG, "OTA socket Error %d", recv_len);
                 return ESP_FAIL;
             }
         }
 
-        if (!is_req_body_started)
-        {
+        if (!is_req_body_started) {
             is_req_body_started = true;
 
             // Check content type to decide how to handle the body
@@ -716,8 +641,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
                     body_part_len = recv_len - (body_start_p - ota_buff);
                 } else {
                     // Header not found in first chunk - this is likely invalid for multipart
-                     ESP_LOGE(TAG, "Multipart header not found in first chunk");
-                     goto err;
+                    ESP_LOGE(TAG, "Multipart header not found in first chunk");
+                    goto err;
                 }
             }
 
@@ -726,9 +651,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
             _statusLED->setState(LED_STATE_BLINK_FAST);
 
             OTA_CHECK(esp_ota_write(ota_handle, body_start_p, body_part_len) == ESP_OK, "Error writing OTA");
-        }
-        else
-        {
+        } else {
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += recv_len;
         }
@@ -754,15 +677,11 @@ err:
 }
 
 httpd_uri_t post_ota_update_handler = {
-    .uri = "/ota_update",
-    .method = HTTP_POST,
-    .handler = post_ota_update_handler_func,
-    .user_ctx = NULL};
+    .uri = "/ota_update", .method = HTTP_POST, .handler = post_ota_update_handler_func, .user_ctx = NULL};
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
@@ -778,63 +697,57 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t post_restart_handler = {
-    .uri = "/api/restart",
-    .method = HTTP_POST,
-    .handler = post_restart_handler_func,
-    .user_ctx = NULL};
+    .uri = "/api/restart", .method = HTTP_POST, .handler = post_restart_handler_func, .user_ctx = NULL};
 
 static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
 {
-  if (validate_auth(req) != ESP_OK)
-  {
-      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-  }
+    if (validate_auth(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
 
-  // Create a task to perform the update because it's blocking
-  struct TaskArgs {
-      UpdateCheck* updateCheck;
-  };
+    // Create a task to perform the update because it's blocking
+    struct TaskArgs {
+        UpdateCheck *updateCheck;
+    };
 
-  TaskArgs* args = new TaskArgs();
-  args->updateCheck = _updateCheck;
+    TaskArgs *args = new TaskArgs();
+    args->updateCheck = _updateCheck;
 
-  xTaskCreate([](void* p) {
-      TaskArgs* a = (TaskArgs*)p;
-      a->updateCheck->performOnlineUpdate();
-      delete a;
-      vTaskDelete(NULL);
-  }, "online_update", 8192, args, 5, NULL);
+    xTaskCreate(
+        [](void *p) {
+            TaskArgs *a = (TaskArgs *)p;
+            a->updateCheck->performOnlineUpdate();
+            delete a;
+            vTaskDelete(NULL);
+        },
+        "online_update", 8192, args, 5, NULL);
 
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_sendstr(req, "{\"success\":true}");
-  return ESP_OK;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+    return ESP_OK;
 }
 
-httpd_uri_t _post_firmware_online_update_handler = {
-    .uri = "/api/online_update",
-    .method = HTTP_POST,
-    .handler = _post_firmware_online_update_handler_func,
-    .user_ctx = NULL};
+httpd_uri_t _post_firmware_online_update_handler = {.uri = "/api/online_update",
+                                                    .method = HTTP_POST,
+                                                    .handler = _post_firmware_online_update_handler_func,
+                                                    .user_ctx = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
     char buffer[512];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len <= 0)
-    {
+    if (len <= 0) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
     }
 
     buffer[len] = 0;
     cJSON *root = cJSON_Parse(buffer);
-    if (root == NULL)
-    {
+    if (root == NULL) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
 
@@ -855,10 +768,10 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
         }
     }
 
-    if (!is_valid_length || !has_letter || !has_digit)
-    {
+    if (!is_valid_length || !has_letter || !has_digit) {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 6 characters and contain letters and numbers");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                   "Password must be at least 6 characters and contain letters and numbers");
     }
 
     _settings->setAdminPassword(newPassword);
@@ -885,14 +798,13 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 }
 
 httpd_uri_t post_change_password_handler = {
-    .uri = "/api/change-password",
-    .method = HTTP_POST,
-    .handler = post_change_password_handler_func,
-    .user_ctx = NULL};
+    .uri = "/api/change-password", .method = HTTP_POST, .handler = post_change_password_handler_func, .user_ctx = NULL};
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
-WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
+WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet,
+             RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector,
+             RadioModuleDetector *radioModuleDetector)
 {
     _settings = settings;
     _statusLED = statusLED;
@@ -918,8 +830,7 @@ void WebUI::start()
 
     httpd_handle_t _httpd_handle = NULL;
 
-    if (httpd_start(&_httpd_handle, &config) == ESP_OK)
-    {
+    if (httpd_start(&_httpd_handle, &config) == ESP_OK) {
         httpd_register_uri_handler(_httpd_handle, &post_login_json_handler);
         httpd_register_uri_handler(_httpd_handle, &get_sysinfo_json_handler);
         httpd_register_uri_handler(_httpd_handle, &get_settings_json_handler);
@@ -941,7 +852,4 @@ void WebUI::start()
     }
 }
 
-void WebUI::stop()
-{
-    httpd_stop(_httpd_handle);
-}
+void WebUI::stop() { httpd_stop(_httpd_handle); }

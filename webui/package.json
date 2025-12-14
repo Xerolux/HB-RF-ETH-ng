@@ -4,7 +4,9 @@
   "description": "WebUI of HB-RF-ETH firmware",
   "scripts": {
     "dev": "parcel index.htm",
-    "build": "parcel build index.htm --no-source-maps --no-content-hash --dist-dir dist"
+    "build": "parcel build index.htm --no-source-maps --no-content-hash --dist-dir dist",
+    "lint": "eslint . --fix",
+    "format": "prettier --write src/"
   },
   "keywords": [],
   "author": "Alexander Reinert",
@@ -25,8 +27,14 @@
     "@parcel/compressor-gzip": "^2.16.3",
     "@parcel/transformer-vue": "^2.16.3",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/eslint-config-prettier": "10.2.0",
     "buffer": "^6.0.3",
+    "eslint": "9.39.2",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-prettier": "5.5.4",
+    "eslint-plugin-vue": "10.6.2",
     "parcel": "^2.16.3",
+    "prettier": "3.7.4",
     "process": "^0.11.10"
   }
 }

@@ -25,9 +25,8 @@
 
 #include "settings.h"
 
-class MDns
-{
+class MDns {
 public:
-    void start(Settings* settings);
+    void start(Settings *settings);
     void stop();
 };

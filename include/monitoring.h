@@ -27,7 +27,7 @@ typedef struct {
 // CheckMK Agent Configuration
 typedef struct {
     bool enabled;
-    uint16_t port;  // default 6556
+    uint16_t port;            // default 6556
     char allowed_hosts[256];  // comma-separated list of IPs
 } checkmk_config_t;
 
@@ -51,7 +51,7 @@ typedef struct {
 } monitoring_config_t;
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo *sysInfo, UpdateCheck *updateCheck);
 
 // Update configuration
 esp_err_t monitoring_update_config(const monitoring_config_t *config);
@@ -71,4 +71,4 @@ esp_err_t checkmk_stop(void);
 esp_err_t mqtt_start(const mqtt_config_t *config);
 esp_err_t mqtt_stop(void);
 
-#endif // MONITORING_H
+#endif  // MONITORING_H
