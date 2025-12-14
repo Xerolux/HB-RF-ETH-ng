@@ -243,7 +243,7 @@ export default {
     passwordMismatch: 'Passwörter stimmen nicht überein',
     passwordTooShort: 'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
-    warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin" gesetzt. Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
+    warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
     success: 'Passwort erfolgreich geändert'
   }
 }
