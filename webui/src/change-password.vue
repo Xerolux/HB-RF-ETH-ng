@@ -1,6 +1,6 @@
 <template>
   <BCard
-    :header="t('title')"
+    :header="t('changePassword.title')"
     header-tag="h6"
     header-bg-variant="danger"
     header-text-variant="white"
@@ -8,28 +8,28 @@
   >
     <BForm @submit.stop.prevent>
       <BAlert show variant="warning" class="mb-3">
-        {{ t('warningMessage') }}
+        {{ t('changePassword.warningMessage') }}
       </BAlert>
 
-      <BFormGroup :label="t('newPassword')" label-cols-sm="4">
+      <BFormGroup :label="t('changePassword.newPassword')" label-cols-sm="4">
         <BFormInput
           type="password"
           v-model="newPassword"
           :state="v$.newPassword.$error ? false : null"
         />
         <BFormInvalidFeedback v-if="v$.newPassword.minLength.$invalid">
-          {{ t('passwordTooShort') }}
+          {{ t('changePassword.passwordTooShort') }}
         </BFormInvalidFeedback>
       </BFormGroup>
 
-      <BFormGroup :label="t('confirmPassword')" label-cols-sm="4">
+      <BFormGroup :label="t('changePassword.confirmPassword')" label-cols-sm="4">
         <BFormInput
           type="password"
           v-model="confirmPassword"
           :state="v$.confirmPassword.$error ? false : null"
         />
         <BFormInvalidFeedback v-if="v$.confirmPassword.sameAs.$invalid">
-          {{ t('passwordsDoNotMatch') }}
+          {{ t('changePassword.passwordsDoNotMatch') }}
         </BFormInvalidFeedback>
       </BFormGroup>
 
@@ -47,7 +47,7 @@
           block
           @click="changePassword"
           :disabled="v$.$invalid"
-        >{{ t('changePassword') }}</BButton>
+        >{{ t('changePassword.changePassword') }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -64,30 +64,7 @@ import { useLoginStore } from './stores.js'
 
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
-const { t } = useI18n({
-  messages: {
-    de: {
-      title: 'Passwort ändern erforderlich',
-      warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin" gesetzt. Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
-      newPassword: 'Neues Passwort',
-      confirmPassword: 'Passwort bestätigen',
-      changePassword: 'Passwort ändern',
-      passwordTooShort: 'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
-      passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
-      success: 'Passwort erfolgreich geändert'
-    },
-    en: {
-      title: 'Password change required',
-      warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
-      newPassword: 'New Password',
-      confirmPassword: 'Confirm Password',
-      changePassword: 'Change Password',
-      passwordTooShort: 'Password must be at least 6 characters long and contain letters and numbers.',
-      passwordsDoNotMatch: 'Passwords do not match',
-      success: 'Password changed successfully'
-    }
-  }
-})
+const { t } = useI18n()
 
 const router = useRouter()
 const loginStore = useLoginStore()

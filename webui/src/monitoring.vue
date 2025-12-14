@@ -1,39 +1,39 @@
 <template>
   <BCard>
     <template #header>
-      <h5>{{ t('title') }}</h5>
+      <h5>{{ t('monitoring.title') }}</h5>
     </template>
 
     <BAlert variant="info" :model-value="true" class="mb-3">
-      {{ t('description') }}
+      {{ t('monitoring.description') }}
     </BAlert>
 
     <!-- SNMP Configuration -->
-    <h6 class="mt-3">{{ t('snmp.title') }}</h6>
+    <h6 class="mt-3">{{ t('monitoring.snmp.title') }}</h6>
     <BForm>
-      <BFormGroup label-cols-sm="4" :label="t('snmp.enabled')">
+      <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.enabled')">
         <BFormCheckbox v-model="snmpConfig.enabled" switch />
       </BFormGroup>
 
       <template v-if="snmpConfig.enabled">
-        <BFormGroup label-cols-sm="4" :label="t('snmp.port')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.port')">
           <BFormInput v-model.number="snmpConfig.port" type="number" min="1" max="65535" />
-          <BFormText>{{ t('snmp.portHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.snmp.portHelp') }}</BFormText>
         </BFormGroup>
 
-        <BFormGroup label-cols-sm="4" :label="t('snmp.community')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.community')">
           <BFormInput v-model="snmpConfig.community" />
-          <BFormText>{{ t('snmp.communityHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.snmp.communityHelp') }}</BFormText>
         </BFormGroup>
 
-        <BFormGroup label-cols-sm="4" :label="t('snmp.location')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.location')">
           <BFormInput v-model="snmpConfig.location" />
-          <BFormText>{{ t('snmp.locationHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.snmp.locationHelp') }}</BFormText>
         </BFormGroup>
 
-        <BFormGroup label-cols-sm="4" :label="t('snmp.contact')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.contact')">
           <BFormInput v-model="snmpConfig.contact" />
-          <BFormText>{{ t('snmp.contactHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.snmp.contactHelp') }}</BFormText>
         </BFormGroup>
       </template>
     </BForm>
@@ -41,21 +41,21 @@
     <hr />
 
     <!-- CheckMK Configuration -->
-    <h6 class="mt-3">{{ t('checkmk.title') }}</h6>
+    <h6 class="mt-3">{{ t('monitoring.checkmk.title') }}</h6>
     <BForm>
-      <BFormGroup label-cols-sm="4" :label="t('checkmk.enabled')">
+      <BFormGroup label-cols-sm="4" :label="t('monitoring.checkmk.enabled')">
         <BFormCheckbox v-model="checkmkConfig.enabled" switch />
       </BFormGroup>
 
       <template v-if="checkmkConfig.enabled">
-        <BFormGroup label-cols-sm="4" :label="t('checkmk.port')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.checkmk.port')">
           <BFormInput v-model.number="checkmkConfig.port" type="number" min="1" max="65535" />
-          <BFormText>{{ t('checkmk.portHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.checkmk.portHelp') }}</BFormText>
         </BFormGroup>
 
-        <BFormGroup label-cols-sm="4" :label="t('checkmk.allowedHosts')">
+        <BFormGroup label-cols-sm="4" :label="t('monitoring.checkmk.allowedHosts')">
           <BFormInput v-model="checkmkConfig.allowedHosts" />
-          <BFormText>{{ t('checkmk.allowedHostsHelp') }}</BFormText>
+          <BFormText>{{ t('monitoring.checkmk.allowedHostsHelp') }}</BFormText>
         </BFormGroup>
       </template>
     </BForm>
@@ -63,16 +63,16 @@
     <hr />
 
     <BAlert v-if="showSuccess" variant="success" dismissible @dismissed="showSuccess = false">
-      {{ t('saveSuccess') }}
+      {{ t('monitoring.saveSuccess') }}
     </BAlert>
 
     <BAlert v-if="showError" variant="danger" dismissible @dismissed="showError = false">
-      {{ t('saveError') }}
+      {{ t('monitoring.saveError') }}
     </BAlert>
 
     <BButton variant="primary" @click="saveConfig" :disabled="saving">
-      <span v-if="saving">{{ t('saving') }}</span>
-      <span v-else>{{ t('save') }}</span>
+      <span v-if="saving">{{ t('monitoring.saving') }}</span>
+      <span v-else>{{ t('monitoring.save') }}</span>
     </BButton>
   </BCard>
 </template>
@@ -83,68 +83,7 @@ import { useI18n } from 'vue-i18n'
 import { useMonitoringStore } from './stores.js'
 import { storeToRefs } from 'pinia'
 
-const { t } = useI18n({
-  locale: navigator.language,
-  fallbackLocale: 'en',
-  messages: {
-    de: {
-      title: 'Monitoring',
-      description: 'Konfigurieren Sie SNMP und CheckMK Monitoring für das HB-RF-ETH Gateway.',
-      save: 'Speichern',
-      saving: 'Speichern...',
-      saveSuccess: 'Konfiguration erfolgreich gespeichert!',
-      saveError: 'Fehler beim Speichern der Konfiguration!',
-      snmp: {
-        title: 'SNMP Agent',
-        enabled: 'SNMP aktivieren',
-        port: 'Port',
-        portHelp: 'Standard: 161',
-        community: 'Community String',
-        communityHelp: 'Standard: "public" - Bitte ändern für Produktivumgebung!',
-        location: 'Standort (Location)',
-        locationHelp: 'Optional: z.B. "Serverraum, Gebäude A"',
-        contact: 'Kontakt',
-        contactHelp: 'Optional: z.B. "admin@example.com"'
-      },
-      checkmk: {
-        title: 'CheckMK Agent',
-        enabled: 'CheckMK aktivieren',
-        port: 'Port',
-        portHelp: 'Standard: 6556',
-        allowedHosts: 'Erlaubte Client-IPs',
-        allowedHostsHelp: 'Komma-getrennte IP-Adressen (z.B. "192.168.1.10,192.168.1.20") oder "*" für alle'
-      }
-    },
-    en: {
-      title: 'Monitoring',
-      description: 'Configure SNMP and CheckMK monitoring for the HB-RF-ETH gateway.',
-      save: 'Save',
-      saving: 'Saving...',
-      saveSuccess: 'Configuration saved successfully!',
-      saveError: 'Error saving configuration!',
-      snmp: {
-        title: 'SNMP Agent',
-        enabled: 'Enable SNMP',
-        port: 'Port',
-        portHelp: 'Default: 161',
-        community: 'Community String',
-        communityHelp: 'Default: "public" - Please change for production!',
-        location: 'Location',
-        locationHelp: 'Optional: e.g. "Server room, Building A"',
-        contact: 'Contact',
-        contactHelp: 'Optional: e.g. "admin@example.com"'
-      },
-      checkmk: {
-        title: 'CheckMK Agent',
-        enabled: 'Enable CheckMK',
-        port: 'Port',
-        portHelp: 'Default: 6556',
-        allowedHosts: 'Allowed Client IPs',
-        allowedHostsHelp: 'Comma-separated IP addresses (e.g. "192.168.1.10,192.168.1.20") or "*" for all'
-      }
-    }
-  }
-})
+const { t } = useI18n()
 
 const monitoringStore = useMonitoringStore()
 const { snmp: snmpConfig, checkmk: checkmkConfig } = storeToRefs(monitoringStore)

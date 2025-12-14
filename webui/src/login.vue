@@ -1,13 +1,13 @@
 <template>
   <BCard
-    :header="t('title')"
+    :header="t('login.title')"
     header-tag="h6"
     header-bg-variant="secondary"
     header-text-variant="white"
     class="mb-3"
   >
     <BForm @submit.stop.prevent>
-      <BFormGroup :label="t('password')" label-cols-sm="4">
+      <BFormGroup :label="t('login.password')" label-cols-sm="4">
         <BFormInput
           type="password"
           v-model="password"
@@ -20,14 +20,14 @@
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t('loginError') }}</BAlert>
+      >{{ t('login.loginError') }}</BAlert>
       <BFormGroup label-cols-sm="9">
         <BButton
           variant="primary"
           block
           @click="loginClick"
           :disabled="!password || password === ''"
-        >{{ t('login') }}</BButton>
+        >{{ t('login.login') }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -41,24 +41,7 @@ import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useLoginStore } from './stores.js'
 
-const { t } = useI18n({
-  locale: navigator.language,
-  fallbackLocale: 'en',
-  messages: {
-    de: {
-      title: 'Bitte anmelden',
-      password: 'Passwort',
-      login: 'Anmelden',
-      loginError: 'Anmelden war nicht erfolgreich.'
-    },
-    en: {
-      title: 'Please log in',
-      password: 'Password',
-      login: 'Login',
-      loginError: 'Login was not successful.'
-    }
-  }
-})
+const { t } = useI18n()
 
 const router = useRouter()
 const route = useRoute()

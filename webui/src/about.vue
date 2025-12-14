@@ -54,46 +54,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { t } = useI18n({
-  locale: navigator.language,
-  fallbackLocale: 'en',
-  messages: {
-    de: {
-      about: {
-        title: 'Über',
-        version: 'Version 2.1',
-        fork: 'Modernisierte Fork',
-        forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
-        original: 'Original-Autor',
-        firmwareLicense: 'Die',
-        hardwareLicense: 'Die',
-        under: 'ist veröffentlicht unter'
-      },
-      thirdParty: {
-        title: 'Software Dritter',
-        containsThirdPartySoftware: 'Diese Software enthält freie Software Dritter, die unter verschiedenen Lizenzbedingungen weitergegeben wird.',
-        providedAsIs: 'Die Veröffentlichung der freien Software erfolgt, „wie es ist", OHNE IRGENDEINE GARANTIE.'
-      }
-    },
-    en: {
-      about: {
-        title: 'About',
-        version: 'Version 2.1',
-        fork: 'Modernized Fork',
-        forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
-        original: 'Original Author',
-        firmwareLicense: 'The',
-        hardwareLicense: 'The',
-        under: 'is released under'
-      },
-      thirdParty: {
-        title: 'Third party software',
-        containsThirdPartySoftware: 'This software contains free third party software products used under various license conditions.',
-        providedAsIs: 'The software is provided "as is" WITHOUT ANY WARRANTY.'
-      }
-    }
-  }
-})
+const { t } = useI18n()
 
 const libs = ref([
   { name: 'Bootstrap 5', copyright: 'Copyright (c) 2011-2025 The Bootstrap Authors', license: 'MIT', website: 'https://www.getbootstrap.com/' },

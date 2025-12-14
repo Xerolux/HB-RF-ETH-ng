@@ -25,12 +25,13 @@ export default {
 
   // Login Page
   login: {
-    title: 'Anmeldung',
+    title: 'Bitte anmelden',
     username: 'Benutzername',
     password: 'Passwort',
     login: 'Anmelden',
     loginFailed: 'Anmeldung fehlgeschlagen',
-    invalidCredentials: 'Ungültige Anmeldedaten'
+    invalidCredentials: 'Ungültige Anmeldedaten',
+    loginError: 'Anmelden war nicht erfolgreich.'
   },
 
   // Settings Page
@@ -97,9 +98,21 @@ export default {
   sysinfo: {
     title: 'Systeminformationen',
     serial: 'Seriennummer',
+    boardRevision: 'Board-Revision',
+    uptime: 'Laufzeit',
+    resetReason: 'Letzter Neustart',
+    cpuUsage: 'CPU Auslastung',
+    memoryUsage: 'Speicherauslastung',
+    ethernetStatus: 'Ethernet-Verbindung',
+    rawUartRemoteAddress: 'Verbunden mit',
+    radioModuleType: 'Funkmodultyp',
+    radioModuleSerial: 'Seriennummer',
+    radioModuleFirmware: 'Firmware-Version',
+    radioModuleBidCosRadioMAC: 'Funkadresse (BidCoS)',
+    radioModuleHmIPRadioMAC: 'Funkadresse (HmIP)',
+    radioModuleSGTIN: 'SGTIN',
     version: 'Version',
     latestVersion: 'Neueste Version',
-    uptime: 'Betriebszeit',
     memory: 'Speichernutzung',
     cpu: 'CPU Auslastung',
     temperature: 'Temperatur',
@@ -118,36 +131,69 @@ export default {
 
   // Firmware Update
   firmware: {
-    title: 'Firmware Update',
+    title: 'Firmware',
     currentVersion: 'Aktuelle Version',
+    installedVersion: 'Installierte Version',
+    versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
+    updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
+    updateFile: 'Firmware Datei',
+    noFileChosen: 'Keine Datei ausgewählt',
+    browse: 'Datei auswählen',
     selectFile: 'Datei auswählen',
     upload: 'Hochladen',
+    restart: 'System neu starten',
     uploading: 'Wird hochgeladen...',
+    uploadSuccess: 'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
+    uploadError: 'Es ist ein Fehler aufgetreten.',
     updateSuccess: 'Firmware wurde erfolgreich aktualisiert',
     updateError: 'Fehler beim Aktualisieren der Firmware',
-    warning: 'Warnung: Unterbrechen Sie nicht die Stromversorgung während des Updates!'
+    warning: 'Warnung: Unterbrechen Sie nicht die Stromversorgung während des Updates!',
+    restartConfirm: 'Möchten Sie das System wirklich neu starten?'
   },
 
   // Monitoring
   monitoring: {
     title: 'Monitoring',
-    snmp: 'SNMP',
-    checkmk: 'Check_MK',
+    description: 'Konfigurieren Sie SNMP und CheckMK Monitoring für das HB-RF-ETH Gateway.',
+    save: 'Speichern',
+    saving: 'Speichern...',
+    saveSuccess: 'Konfiguration erfolgreich gespeichert!',
+    saveError: 'Fehler beim Speichern der Konfiguration!',
+    snmp: {
+      title: 'SNMP Agent',
+      enabled: 'SNMP aktivieren',
+      port: 'Port',
+      portHelp: 'Standard: 161',
+      community: 'Community String',
+      communityHelp: 'Standard: "public" - Bitte ändern für Produktivumgebung!',
+      location: 'Standort (Location)',
+      locationHelp: 'Optional: z.B. "Serverraum, Gebäude A"',
+      contact: 'Kontakt',
+      contactHelp: 'Optional: z.B. "admin@example.com"'
+    },
+    checkmk: {
+      title: 'CheckMK Agent',
+      enabled: 'CheckMK aktivieren',
+      port: 'Port',
+      portHelp: 'Standard: 6556',
+      allowedHosts: 'Erlaubte Client-IPs',
+      allowedHostsHelp: 'Komma-getrennte IP-Adressen (z.B. "192.168.1.10,192.168.1.20") oder "*" für alle'
+    },
     enable: 'Aktivieren',
-    port: 'Port',
-    community: 'Community',
-    location: 'Standort',
-    contact: 'Kontakt',
-    allowedHosts: 'Erlaubte Hosts',
-    saveSuccess: 'Monitoring-Einstellungen erfolgreich gespeichert',
-    saveError: 'Fehler beim Speichern der Monitoring-Einstellungen'
+    allowedHosts: 'Erlaubte Hosts'
   },
 
   // About Page
   about: {
-    title: 'Über HB-RF-ETH-ng',
+    title: 'Über',
+    version: 'Version 2.1',
+    fork: 'Modernisierte Fork',
+    forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
+    original: 'Original-Autor',
+    firmwareLicense: 'Die',
+    hardwareLicense: 'Die',
+    under: 'ist veröffentlicht unter',
     description: 'HomeMatic BidCoS/HmIP LAN Gateway',
-    version: 'Version',
     author: 'Autor',
     license: 'Lizenz',
     website: 'Webseite',
@@ -155,15 +201,26 @@ export default {
     support: 'Support'
   },
 
+  // Third Party
+  thirdParty: {
+    title: 'Software Dritter',
+    containsThirdPartySoftware: 'Diese Software enthält freie Software Dritter, die unter verschiedenen Lizenzbedingungen weitergegeben wird.',
+    providedAsIs: 'Die Veröffentlichung der freien Software erfolgt, „wie es ist", OHNE IRGENDEINE GARANTIE.'
+  },
+
   // Change Password
   changePassword: {
-    title: 'Passwort ändern',
+    title: 'Passwort ändern erforderlich',
     currentPassword: 'Aktuelles Passwort',
     newPassword: 'Neues Passwort',
     confirmPassword: 'Passwort bestätigen',
+    changePassword: 'Passwort ändern',
     changeSuccess: 'Passwort erfolgreich geändert',
     changeError: 'Fehler beim Ändern des Passworts',
     passwordMismatch: 'Passwörter stimmen nicht überein',
-    passwordTooShort: 'Passwort ist zu kurz (mindestens 5 Zeichen)'
+    passwordTooShort: 'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
+    passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
+    warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin" gesetzt. Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
+    success: 'Passwort erfolgreich geändert'
   }
 }

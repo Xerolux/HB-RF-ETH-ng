@@ -1,13 +1,13 @@
 <template>
   <BCard
-    :header="t('title')"
+    :header="t('firmware.title')"
     header-tag="h6"
     header-bg-variant="secondary"
     header-text-variant="white"
     class="mb-3"
   >
     <BForm @submit.stop.prevent>
-      <BFormGroup :label="t('installedVersion')" label-cols-sm="4">
+      <BFormGroup :label="t('firmware.installedVersion')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.currentVersion" disabled />
       </BFormGroup>
       <BAlert
@@ -15,7 +15,7 @@
         :model-value="true"
         class="mb-3"
       >
-        {{ t('versionInfo') }}
+        {{ t('firmware.versionInfo') }}
         <a
           href="https://github.com/Xerolux/HB-RF-ETH-ng"
           class="alert-link"
@@ -26,14 +26,14 @@
         variant="warning"
         :model-value="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
       >
-        {{ t('updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}
+        {{ t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}
       </BAlert>
-      <BFormGroup :label="t('updateFile')" label-cols-sm="4">
+      <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
         <BFormFile
           v-model="file"
           accept=".bin"
-          :placeholder="t('noFileChosen')"
-          :browse-text="t('browse')"
+          :placeholder="t('firmware.noFileChosen')"
+          :browse-text="t('firmware.browse')"
         />
       </BFormGroup>
       <BProgress
@@ -49,21 +49,21 @@
         dismissible
         fade
         @update:model-value="showSuccess = null"
-      >{{ t("uploadSuccess") }}</BAlert>
+      >{{ t("firmware.uploadSuccess") }}</BAlert>
       <BAlert
         variant="danger"
         :model-value="showError"
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t("uploadError") }}</BAlert>
+      >{{ t("firmware.uploadError") }}</BAlert>
       <BFormGroup label-cols-sm="9">
         <BButton
           variant="primary"
           block
           :disabled="file == null || firmwareUpdateStore.progress > 0"
           @click="firmwareUpdateClick"
-        >{{ t('upload') }}</BButton>
+        >{{ t('firmware.upload') }}</BButton>
       </BFormGroup>
       <BFormGroup label-cols-sm="9">
         <BButton
@@ -71,7 +71,7 @@
           block
           :disabled="firmwareUpdateStore.progress > 0"
           @click="restartClick"
-        >{{ t('restart') }}</BButton>
+        >{{ t('firmware.restart') }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -82,40 +82,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
 
-const { t } = useI18n({
-  locale: navigator.language,
-  fallbackLocale: 'en',
-  messages: {
-    de: {
-      title: 'Firmware',
-      installedVersion: 'Installierte Version',
-      versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
-      updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
-      updateFile: 'Firmware Datei',
-      noFileChosen: 'Keine Datei ausgewählt',
-      browse: 'Datei auswählen',
-      upload: 'Hochladen',
-      restart: 'System neu starten',
-      uploadSuccess: 'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
-      uploadError: 'Es ist ein Fehler aufgetreten.',
-      restartConfirm: 'Möchten Sie das System wirklich neu starten?'
-    },
-    en: {
-      title: 'Firmware',
-      installedVersion: 'Installed version',
-      versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
-      updateAvailable: 'An update to version {latestVersion} is available.',
-      updateFile: 'Firmware file',
-      noFileChosen: 'No file chosen',
-      browse: 'Browse',
-      upload: 'Upload',
-      restart: 'Restart system',
-      uploadSuccess: 'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
-      uploadError: 'An error occured.',
-      restartConfirm: 'Do you really want to restart the system?'
-    }
-  }
-})
+const { t } = useI18n()
 
 const sysInfoStore = useSysInfoStore()
 const firmwareUpdateStore = useFirmwareUpdateStore()
@@ -138,7 +105,7 @@ const firmwareUpdateClick = async () => {
 }
 
 const restartClick = async () => {
-  if (confirm(t('restartConfirm'))) {
+  if (confirm(t('firmware.restartConfirm'))) {
     try {
       await fetch('/api/restart', { method: 'POST' })
     } catch (error) {

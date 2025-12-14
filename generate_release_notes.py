@@ -195,6 +195,7 @@ def generate_release_notes(version: str) -> str:
     notes.append("**Compatible Systems:**")
     notes.append("- piVCCU3 (≥ v3.51.6-41)")
     notes.append("- debmatic (≥ v3.51.6-46)")
+    notes.append("- openCCU")
     notes.append("")
 
     # Support & Funding

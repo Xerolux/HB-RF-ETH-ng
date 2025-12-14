@@ -25,12 +25,13 @@ export default {
 
   // Login Page
   login: {
-    title: 'Login',
+    title: 'Please log in',
     username: 'Username',
     password: 'Password',
     login: 'Login',
     loginFailed: 'Login failed',
-    invalidCredentials: 'Invalid credentials'
+    invalidCredentials: 'Invalid credentials',
+    loginError: 'Login was not successful.'
   },
 
   // Settings Page
@@ -95,11 +96,23 @@ export default {
 
   // System Info
   sysinfo: {
-    title: 'System Information',
-    serial: 'Serial Number',
+    title: 'System information',
+    serial: 'Serial number',
+    boardRevision: 'Board revision',
+    uptime: 'Uptime',
+    resetReason: 'Last reboot',
+    cpuUsage: 'CPU usage',
+    memoryUsage: 'Memory usage',
+    ethernetStatus: 'Ethernet connection',
+    rawUartRemoteAddress: 'Connected with',
+    radioModuleType: 'Radio module type',
+    radioModuleSerial: 'Serial number',
+    radioModuleFirmware: 'Firmware version',
+    radioModuleBidCosRadioMAC: 'Radio address (BidCoS)',
+    radioModuleHmIPRadioMAC: 'Radio address (HmIP)',
+    radioModuleSGTIN: 'SGTIN',
     version: 'Version',
     latestVersion: 'Latest Version',
-    uptime: 'Uptime',
     memory: 'Memory Usage',
     cpu: 'CPU Usage',
     temperature: 'Temperature',
@@ -118,36 +131,69 @@ export default {
 
   // Firmware Update
   firmware: {
-    title: 'Firmware Update',
+    title: 'Firmware',
     currentVersion: 'Current Version',
+    installedVersion: 'Installed version',
+    versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    updateAvailable: 'An update to version {latestVersion} is available.',
+    updateFile: 'Firmware file',
+    noFileChosen: 'No file chosen',
+    browse: 'Browse',
     selectFile: 'Select File',
     upload: 'Upload',
+    restart: 'Restart system',
     uploading: 'Uploading...',
+    uploadSuccess: 'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
+    uploadError: 'An error occured.',
     updateSuccess: 'Firmware updated successfully',
     updateError: 'Error updating firmware',
-    warning: 'Warning: Do not disconnect power during update!'
+    warning: 'Warning: Do not disconnect power during update!',
+    restartConfirm: 'Do you really want to restart the system?'
   },
 
   // Monitoring
   monitoring: {
     title: 'Monitoring',
-    snmp: 'SNMP',
-    checkmk: 'Check_MK',
+    description: 'Configure SNMP and CheckMK monitoring for the HB-RF-ETH gateway.',
+    save: 'Save',
+    saving: 'Saving...',
+    saveSuccess: 'Configuration saved successfully!',
+    saveError: 'Error saving configuration!',
+    snmp: {
+      title: 'SNMP Agent',
+      enabled: 'Enable SNMP',
+      port: 'Port',
+      portHelp: 'Default: 161',
+      community: 'Community String',
+      communityHelp: 'Default: "public" - Please change for production!',
+      location: 'Location',
+      locationHelp: 'Optional: e.g. "Server room, Building A"',
+      contact: 'Contact',
+      contactHelp: 'Optional: e.g. "admin@example.com"'
+    },
+    checkmk: {
+      title: 'CheckMK Agent',
+      enabled: 'Enable CheckMK',
+      port: 'Port',
+      portHelp: 'Default: 6556',
+      allowedHosts: 'Allowed Client IPs',
+      allowedHostsHelp: 'Comma-separated IP addresses (e.g. "192.168.1.10,192.168.1.20") or "*" for all'
+    },
     enable: 'Enable',
-    port: 'Port',
-    community: 'Community',
-    location: 'Location',
-    contact: 'Contact',
-    allowedHosts: 'Allowed Hosts',
-    saveSuccess: 'Monitoring settings saved successfully',
-    saveError: 'Error saving monitoring settings'
+    allowedHosts: 'Allowed Hosts'
   },
 
   // About Page
   about: {
-    title: 'About HB-RF-ETH-ng',
+    title: 'About',
+    version: 'Version 2.1',
+    fork: 'Modernized Fork',
+    forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
+    original: 'Original Author',
+    firmwareLicense: 'The',
+    hardwareLicense: 'The',
+    under: 'is released under',
     description: 'HomeMatic BidCoS/HmIP LAN Gateway',
-    version: 'Version',
     author: 'Author',
     license: 'License',
     website: 'Website',
@@ -155,15 +201,26 @@ export default {
     support: 'Support'
   },
 
+  // Third Party
+  thirdParty: {
+    title: 'Third party software',
+    containsThirdPartySoftware: 'This software contains free third party software products used under various license conditions.',
+    providedAsIs: 'The software is provided "as is" WITHOUT ANY WARRANTY.'
+  },
+
   // Change Password
   changePassword: {
-    title: 'Change Password',
+    title: 'Password change required',
     currentPassword: 'Current Password',
     newPassword: 'New Password',
     confirmPassword: 'Confirm Password',
+    changePassword: 'Change Password',
     changeSuccess: 'Password changed successfully',
     changeError: 'Error changing password',
     passwordMismatch: 'Passwords do not match',
-    passwordTooShort: 'Password is too short (minimum 5 characters)'
+    passwordTooShort: 'Password must be at least 6 characters long and contain letters and numbers.',
+    passwordsDoNotMatch: 'Passwords do not match',
+    warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
+    success: 'Password changed successfully'
   }
 }

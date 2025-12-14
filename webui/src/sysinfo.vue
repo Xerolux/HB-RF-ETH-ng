@@ -1,26 +1,26 @@
 <template>
   <div>
     <BCard
-      :header="t('title')"
+      :header="t('sysinfo.title')"
       header-tag="h6"
       header-bg-variant="secondary"
       header-text-variant="white"
       class="mb-3"
     >
       <BForm @submit.stop.prevent>
-      <BFormGroup :label="t('serial')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.serial')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.serial" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('boardRevision')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.boardRevision')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.boardRevision" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('uptime')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.uptime')" label-cols-sm="4">
         <BFormInput type="text" :model-value="uptimeFormatted" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('resetReason')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.resetReason')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.resetReason" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('cpuUsage')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.cpuUsage')" label-cols-sm="4">
         <BProgress :max="100" height="2.25rem" class="form-control p-0">
           <BProgressBar :value="sysInfoStore.cpuUsage">
             <span class="justify-content-center d-flex position-absolute w-100 text-dark">
@@ -29,7 +29,7 @@
           </BProgressBar>
         </BProgress>
       </BFormGroup>
-      <BFormGroup :label="t('memoryUsage')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.memoryUsage')" label-cols-sm="4">
         <BProgress :max="100" height="2.25rem" class="form-control p-0">
           <BProgressBar :value="sysInfoStore.memoryUsage">
             <span class="justify-content-center d-flex position-absolute w-100 text-dark">
@@ -38,28 +38,28 @@
           </BProgressBar>
         </BProgress>
       </BFormGroup>
-      <BFormGroup :label="t('ethernetStatus')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.ethernetStatus')" label-cols-sm="4">
         <BFormInput type="text" :model-value="ethernetStatus" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('rawUartRemoteAddress')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.rawUartRemoteAddress')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.rawUartRemoteAddress" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleType')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleType')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleType" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleSerial')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleSerial')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleSerial" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleFirmware')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleFirmware')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleFirmwareVersion" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleBidCosRadioMAC')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleBidCosRadioMAC')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleBidCosRadioMAC" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleHmIPRadioMAC')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleHmIPRadioMAC')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleHmIPRadioMAC" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('radioModuleSGTIN')" label-cols-sm="4">
+      <BFormGroup :label="t('sysinfo.radioModuleSGTIN')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.radioModuleSGTIN" disabled />
       </BFormGroup>
     </BForm>
@@ -68,50 +68,11 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, computed, ref, watch } from 'vue'
+import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore } from './stores.js'
 
-const { t } = useI18n({
-  locale: navigator.language,
-  fallbackLocale: 'en',
-  messages: {
-    de: {
-      title: 'Systeminformationen',
-      serial: 'Seriennummer',
-      boardRevision: 'Board-Revision',
-      uptime: 'Laufzeit',
-      resetReason: 'Letzter Neustart',
-      cpuUsage: 'CPU Auslastung',
-      memoryUsage: 'Speicherauslastung',
-      ethernetStatus: 'Ethernet-Verbindung',
-      rawUartRemoteAddress: 'Verbunden mit',
-      radioModuleType: 'Funkmodultyp',
-      radioModuleSerial: 'Seriennummer',
-      radioModuleFirmware: 'Firmware-Version',
-      radioModuleBidCosRadioMAC: 'Funkadresse (BidCos)',
-      radioModuleHmIPRadioMAC: 'Funkadresse (HmIP)',
-      radioModuleSGTIN: 'SGTIN'
-    },
-    en: {
-      title: 'System information',
-      serial: 'Serial number',
-      boardRevision: 'Board revision',
-      uptime: 'Uptime',
-      resetReason: 'Last reboot',
-      cpuUsage: 'CPU usage',
-      memoryUsage: 'Memory usage',
-      ethernetStatus: 'Ethernet connection',
-      rawUartRemoteAddress: 'Connected with',
-      radioModuleType: 'Radio module type',
-      radioModuleSerial: 'Serial number',
-      radioModuleFirmware: 'Firmware version',
-      radioModuleBidCosRadioMAC: 'Radio address (BidCos)',
-      radioModuleHmIPRadioMAC: 'Radio address (HmIP)',
-      radioModuleSGTIN: 'SGTIN'
-    }
-  }
-})
+const { t } = useI18n()
 
 const sysInfoStore = useSysInfoStore()
 
