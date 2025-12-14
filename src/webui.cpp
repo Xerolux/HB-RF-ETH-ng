@@ -125,6 +125,29 @@ void formatRadioMAC(uint32_t radioMAC, char *buf, size_t bufSize)
     }
 }
 
+/**
+ * Constant-time string comparison to prevent timing attacks.
+ * Returns 0 if strings match, non-zero otherwise.
+ */
+int secure_strcmp(const char *s1, const char *s2) {
+    if (!s1 || !s2) return 1;
+
+    size_t len1 = strlen(s1);
+    size_t len2 = strlen(s2);
+    size_t min_len = (len1 < len2) ? len1 : len2;
+    int result = 0;
+
+    if (len1 != len2) {
+        result = 1;
+    }
+
+    for (size_t i = 0; i < min_len; i++) {
+        result |= (s1[i] ^ s2[i]);
+    }
+
+    return result;
+}
+
 esp_err_t validate_auth(httpd_req_t *req)
 {
     char auth[60] = {0};
@@ -134,7 +157,7 @@ esp_err_t validate_auth(httpd_req_t *req)
     if (strncmp(auth, "Token ", 6) != 0)
         return ESP_FAIL;
 
-    if (strcmp(auth + 6, _token) != 0)
+    if (secure_strcmp(auth + 6, _token) != 0)
         return ESP_FAIL;
 
     return ESP_OK;
@@ -162,7 +185,7 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 
         char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
 
-        bool isAuthenticated = (password != NULL) && (strcmp(password, _settings->getAdminPassword()) == 0);
+        bool isAuthenticated = (password != NULL) && (secure_strcmp(password, _settings->getAdminPassword()) == 0);
 
         cJSON_Delete(root);
 
