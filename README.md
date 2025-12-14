@@ -1,4 +1,4 @@
-# HB-RF-ETH-ng Firmware v2.1
+# HB-RF-ETH-ng Firmware v2.1.0
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
@@ -16,7 +16,7 @@
 
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
 
-**Version 2.1 Änderungen:**
+**Version 2.1.0 Änderungen:**
 * Aktualisierung auf ESP-IDF 5.x
 * Kompatibilität mit modernen Toolchains (GCC 14.2.0)
 * Aktualisierte WebUI mit Vue 3.5 und Parcel 2
