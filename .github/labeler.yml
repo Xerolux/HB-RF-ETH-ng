@@ -1,0 +1,33 @@
+# Configuration for .github/workflows/labeler.yml
+
+# Label WebUI changes
+webui:
+- changed-files:
+  - any-glob-to-any-file: 'webui/**/*'
+
+# Label Firmware changes
+firmware:
+- changed-files:
+  - any-glob-to-any-file: 'src/**/*'
+  - any-glob-to-any-file: 'include/**/*'
+  - any-glob-to-any-file: 'platformio.ini'
+
+# Label Documentation changes
+documentation:
+- changed-files:
+  - any-glob-to-any-file: 'docs/**/*'
+  - any-glob-to-any-file: '*.md'
+  - any-glob-to-any-file: 'LICENSE'
+
+# Label CI/CD changes
+ci:
+- changed-files:
+  - any-glob-to-any-file: '.github/**/*'
+
+# Label Dependencies changes
+dependencies:
+- changed-files:
+  - any-glob-to-any-file: 'package.json'
+  - any-glob-to-any-file: 'package-lock.json'
+  - any-glob-to-any-file: 'webui/package.json'
+  - any-glob-to-any-file: 'webui/package-lock.json'
