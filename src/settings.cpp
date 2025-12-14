@@ -123,6 +123,8 @@ void Settings::load()
 
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
 
+  GET_INT(handle, "checkUpdateInterval", _checkUpdateInterval, 7);
+
   // Load IPv6 settings
   GET_BOOL(handle, "enableIPv6", _enableIPv6, false);
 
@@ -173,6 +175,8 @@ void Settings::save()
   SET_STR(handle, "ntpServer", _ntpServer);
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
+
+  SET_INT(handle, "checkUpdateInterval", _checkUpdateInterval);
 
   // Save IPv6 settings
   SET_BOOL(handle, "enableIPv6", _enableIPv6);
@@ -369,6 +373,17 @@ void Settings::setLEDBrightness(int ledBrightness)
     return;
   }
   _ledBrightness = ledBrightness;
+}
+
+int Settings::getCheckUpdateInterval()
+{
+  return _checkUpdateInterval;
+}
+
+void Settings::setCheckUpdateInterval(int interval)
+{
+  if (interval < 0) interval = 0;
+  _checkUpdateInterval = interval;
 }
 
 // IPv6 Getters

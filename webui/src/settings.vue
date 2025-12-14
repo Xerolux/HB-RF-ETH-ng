@@ -177,6 +177,15 @@
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.systemSettings') }}</h6>
+      <BFormGroup :label="t('settings.checkUpdateInterval')" label-cols-sm="4">
+        <BInputGroup>
+          <BFormInput
+            type="number"
+            v-model.number="checkUpdateInterval"
+            min="0"
+          />
+        </BInputGroup>
+      </BFormGroup>
       <BFormGroup :label="t('settings.ledBrightness')" label-cols-sm="4">
         <BInputGroup append="%">
           <BFormSelect v-model.number="ledBrightness">
@@ -226,7 +235,7 @@
   >
     <BForm @submit.stop.prevent>
         <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" href="/api/backup" target="_blank">{{ t('settings.downloadBackup') }}</BButton>
+        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
 
         <hr/>
         <p>{{ t('settings.restoreInfo') }}</p>
@@ -297,6 +306,7 @@ const timesource = ref(0)
 const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
+const checkUpdateInterval = ref(0)
 const ledBrightness = ref(100)
 
 const showSuccess = ref(null)
@@ -373,6 +383,9 @@ const rules = {
   dcfOffset: {
     required: requiredIf(isDcfActivated),
     numeric
+  },
+  checkUpdateInterval: {
+    numeric
   }
 }
 
@@ -391,7 +404,8 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
-  dcfOffset
+  dcfOffset,
+  checkUpdateInterval
 })
 
 // Load settings from store
@@ -407,6 +421,7 @@ const loadSettings = () => {
   dcfOffset.value = settingsStore.dcfOffset
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
+  checkUpdateInterval.value = settingsStore.checkUpdateInterval
   ledBrightness.value = settingsStore.ledBrightness
 
   // Load IPv6 settings if available
@@ -452,6 +467,7 @@ const saveSettingsClick = async () => {
       dcfOffset: dcfOffset.value,
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
+      checkUpdateInterval: checkUpdateInterval.value,
       ledBrightness: ledBrightness.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
@@ -467,6 +483,23 @@ const saveSettingsClick = async () => {
     showSuccess.value = true
   } catch (error) {
     showError.value = true
+  }
+}
+
+const downloadBackup = async () => {
+  try {
+    const response = await axios.get('/api/backup', { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'settings.json')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Backup download failed:', error)
+    alert(t('settings.backupError'))
   }
 }
 

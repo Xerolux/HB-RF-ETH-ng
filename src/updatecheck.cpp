@@ -23,6 +23,9 @@
 
 #include "updatecheck.h"
 #include "esp_http_client.h"
+#include "esp_ota_ops.h"
+#include "esp_https_ota.h"
+#include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "string.h"
 #include "cJSON.h"
@@ -36,7 +39,7 @@ void _update_check_task_func(void *parameter)
   }
 }
 
-UpdateCheck::UpdateCheck(SysInfo* sysInfo, LED *statusLED) : _sysInfo(sysInfo), _statusLED(statusLED)
+UpdateCheck::UpdateCheck(SysInfo* sysInfo, LED *statusLED, Settings *settings) : _sysInfo(sysInfo), _statusLED(statusLED), _settings(settings)
 {
 }
 
@@ -98,21 +101,81 @@ void UpdateCheck::_taskFunc()
 
   for (;;)
   {
-    ESP_LOGI(TAG, "Start checking for the latest available firmware.");
-    _updateLatestVersion();
+    int intervalDays = _settings->getCheckUpdateInterval();
 
-    if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+    if (intervalDays > 0)
     {
-      ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
-      _statusLED->setState(LED_STATE_BLINK_SLOW);
+      ESP_LOGI(TAG, "Start checking for the latest available firmware.");
+      _updateLatestVersion();
+
+      if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+      {
+        ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
+        _statusLED->setState(LED_STATE_BLINK_SLOW);
+      }
+      else
+      {
+        ESP_LOGI(TAG, "There is no newer firmware available.");
+        _statusLED->setState(LED_STATE_OFF);
+      }
+
+      // Sleep for the interval period, checking every hour to allow reacting to configuration changes
+      uint32_t intervalHours = intervalDays * 24;
+      for (uint32_t i = 0; i < intervalHours; i++) {
+          if (_settings->getCheckUpdateInterval() != intervalDays) break; // Setting changed
+          vTaskDelay((60 * 60 * 1000) / portTICK_PERIOD_MS); // Sleep 1h
+      }
     }
     else
     {
-      ESP_LOGI(TAG, "There is no newer firmware available.");
+      ESP_LOGI(TAG, "Update check disabled.");
+      // Check again in 1 hour if setting changed
+      vTaskDelay((60 * 60 * 1000) / portTICK_PERIOD_MS);
     }
-
-    vTaskDelay((8 * 60 * 60000) / portTICK_PERIOD_MS); // 8h
   }
 
   vTaskDelete(NULL);
+}
+
+esp_err_t UpdateCheck::performOnlineUpdate()
+{
+  if (strcmp(_latestVersion, "n/a") == 0)
+  {
+     _updateLatestVersion();
+     if (strcmp(_latestVersion, "n/a") == 0) {
+         ESP_LOGE(TAG, "Could not determine latest version for update.");
+         return ESP_FAIL;
+     }
+  }
+
+  char url[256];
+  snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/%s/HB-RF-ETH-ng.bin", _latestVersion);
+
+  ESP_LOGI(TAG, "Starting online update from %s", url);
+
+  esp_http_client_config_t config = {};
+  config.url = url;
+  config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+  config.cert_pem = NULL; // We might need a cert bundle here or skip verify
+  config.crt_bundle_attach = esp_crt_bundle_attach; // Use ESP-IDF default bundle
+  config.keep_alive_enable = true;
+  config.buffer_size_tx = 4096; // Increase buffer size for OTA
+  config.timeout_ms = 30000;
+
+  _statusLED->setState(LED_STATE_BLINK_FAST);
+
+  esp_err_t ret = esp_https_ota(&config);
+
+  if (ret == ESP_OK)
+  {
+      ESP_LOGI(TAG, "OTA Update successful");
+      _statusLED->setState(LED_STATE_OFF);
+      return ESP_OK;
+  }
+  else
+  {
+      ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+      _statusLED->setState(LED_STATE_OFF);
+      return ret;
+  }
 }

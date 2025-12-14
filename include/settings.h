@@ -58,6 +58,8 @@ private:
 
   int32_t _ledBrightness;
 
+  int32_t _checkUpdateInterval;
+
   bool _enableIPv6;
   char _ipv6Mode[10] = {0};
   char _ipv6Address[40] = {0};
@@ -100,6 +102,9 @@ public:
 
   int getLEDBrightness();
   void setLEDBrightness(int brightness);
+
+  int getCheckUpdateInterval();
+  void setCheckUpdateInterval(int interval);
 
   // IPv6 getters
   bool getEnableIPv6();

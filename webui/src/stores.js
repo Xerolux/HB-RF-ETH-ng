@@ -115,6 +115,7 @@ export const useSettingsStore = defineStore('settings', {
     dcfOffset: 0,
     gpsBaudrate: 9600,
     ntpServer: "",
+    checkUpdateInterval: 0,
     ledBrightness: 100,
   }),
   actions: {

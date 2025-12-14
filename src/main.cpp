@@ -172,7 +172,7 @@ void app_main()
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
 
-    UpdateCheck updateCheck(&sysInfo, &statusLED);
+    UpdateCheck updateCheck(&sysInfo, &statusLED, &settings);
     updateCheck.start();
 
     WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);

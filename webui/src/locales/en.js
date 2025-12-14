@@ -76,6 +76,7 @@ export default {
     // System Settings
     systemSettings: 'System Settings',
     ledBrightness: 'LED Brightness',
+    checkUpdateInterval: 'Check for Updates (Days, 0=Disabled)',
     language: 'Language',
 
     // Messages
@@ -92,7 +93,8 @@ export default {
     browse: 'Browse',
     restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
     restoreSuccess: 'Settings successfully restored. System restarting...',
-    restoreError: 'Error restoring settings'
+    restoreError: 'Error restoring settings',
+    backupError: 'Error downloading backup'
   },
 
   // System Info
@@ -149,7 +151,11 @@ export default {
     updateSuccess: 'Firmware updated successfully',
     updateError: 'Error updating firmware',
     warning: 'Warning: Do not disconnect power during update!',
-    restartConfirm: 'Do you really want to restart the system?'
+    restartConfirm: 'Do you really want to restart the system?',
+    updateNow: 'Update Now',
+    onlineUpdateSuccess: 'Online update initiated. System will restart shortly.',
+    onlineUpdateError: 'Error performing online update.',
+    newVersionAvailable: 'New version {version} available!'
   },
 
   // Monitoring

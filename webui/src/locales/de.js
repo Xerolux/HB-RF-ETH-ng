@@ -76,6 +76,7 @@ export default {
     // System Settings
     systemSettings: 'Systemeinstellungen',
     ledBrightness: 'LED Helligkeit',
+    checkUpdateInterval: 'Auf Updates prüfen (Tage, 0=Deaktiviert)',
     language: 'Sprache',
 
     // Messages
@@ -92,7 +93,8 @@ export default {
     browse: 'Datei auswählen',
     restoreConfirm: 'Sind Sie sicher? Die aktuellen Einstellungen werden überschrieben und das System neu gestartet.',
     restoreSuccess: 'Einstellungen erfolgreich wiederhergestellt. System startet neu...',
-    restoreError: 'Fehler beim Wiederherstellen der Einstellungen'
+    restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
+    backupError: 'Fehler beim Herunterladen der Sicherung'
   },
 
   // System Info
@@ -149,7 +151,11 @@ export default {
     updateSuccess: 'Firmware wurde erfolgreich aktualisiert',
     updateError: 'Fehler beim Aktualisieren der Firmware',
     warning: 'Warnung: Unterbrechen Sie nicht die Stromversorgung während des Updates!',
-    restartConfirm: 'Möchten Sie das System wirklich neu starten?'
+    restartConfirm: 'Möchten Sie das System wirklich neu starten?',
+    updateNow: 'Jetzt aktualisieren',
+    onlineUpdateSuccess: 'Online-Update gestartet. Das System startet in Kürze neu.',
+    onlineUpdateError: 'Fehler beim Online-Update.',
+    newVersionAvailable: 'Neue Version {version} verfügbar!'
   },
 
   // Monitoring

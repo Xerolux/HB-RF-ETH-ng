@@ -286,6 +286,8 @@ void add_settings(cJSON *root)
 
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
 
+    cJSON_AddNumberToObject(settings, "checkUpdateInterval", _settings->getCheckUpdateInterval());
+
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 
     // IPv6 Settings
@@ -383,6 +385,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
+        int checkUpdateInterval = cJSON_GetObjectItem(root, "checkUpdateInterval")->valueint;
+
         int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
 
         // IPv6
@@ -402,6 +406,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setDcfOffset(dcfOffset);
         _settings->setGpsBaudrate(gpsBaudrate);
         _settings->setNtpServer(ntpServer);
+        _settings->setCheckUpdateInterval(checkUpdateInterval);
         _settings->setLEDBrightness(ledBrightness);
 
         // Handle IPv6 (checking for nulls)
@@ -733,6 +738,40 @@ httpd_uri_t post_ota_update_handler = {
     .handler = post_ota_update_handler_func,
     .user_ctx = NULL};
 
+esp_err_t post_online_update_handler_func(httpd_req_t *req)
+{
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    esp_err_t res = _updateCheck->performOnlineUpdate();
+
+    if (res == ESP_OK)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":true}");
+
+        // Automatic restart after successful OTA update
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        esp_restart();
+        return ESP_OK;
+    }
+    else
+    {
+         httpd_resp_set_status(req, "500 Internal Server Error");
+         httpd_resp_set_type(req, "application/json");
+         httpd_resp_sendstr(req, "{\"success\":false}");
+         return ESP_OK;
+    }
+}
+
+httpd_uri_t post_online_update_handler = {
+    .uri = "/api/firmware/update-online",
+    .method = HTTP_POST,
+    .handler = post_online_update_handler_func,
+    .user_ctx = NULL};
+
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
     if (validate_auth(req) != ESP_OK)
@@ -867,6 +906,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_online_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
