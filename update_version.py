@@ -43,6 +43,23 @@ def update_readme(version: str):
     readme_file.write_text(content)
     print(f"✓ Updated README.md to version {version}")
 
+def update_locales(version: str):
+    """Update version in locale files"""
+    # Use full version for display (e.g. "Version 2.1.0")
+
+    for locale in ["de.js", "en.js"]:
+        file_path = Path(f"webui/src/locales/{locale}")
+        if file_path.exists():
+            content = file_path.read_text()
+            # Update version: 'Version X.X'
+            content = re.sub(
+                r"version: 'Version [\d.]+',",
+                f"version: 'Version {version}',",
+                content
+            )
+            file_path.write_text(content)
+            print(f"✓ Updated {locale} to version {version}")
+
 def update_about_vue(version: str):
     """Update about.vue with new version"""
     about_file = Path("webui/src/about.vue")
@@ -51,14 +68,7 @@ def update_about_vue(version: str):
     # Extract major.minor version (e.g., "2.1" from "2.1.0")
     major_minor = '.'.join(version.split('.')[:2])
 
-    # Update German version
-    content = re.sub(
-        r"version: 'Version [\d.]+',",
-        f"version: 'Version {major_minor}',",
-        content
-    )
-
-    # Update English version (appears twice in the file)
+    # Update GitHub link (Fork vX.X)
     content = re.sub(
         r'<a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_new">GitHub Repository \(Fork v[\d.]+\)</a>',
         f'<a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_new">GitHub Repository (Fork v{major_minor})</a>',
@@ -66,7 +76,7 @@ def update_about_vue(version: str):
     )
 
     about_file.write_text(content)
-    print(f"✓ Updated about.vue to version {major_minor}")
+    print(f"✓ Updated about.vue link to fork version {major_minor}")
 
 def update_package_json(version: str):
     """Update webui/package.json with new version"""
@@ -141,19 +151,13 @@ def main():
     try:
         update_version_txt(version)
         update_readme(version)
+        update_locales(version)
         update_about_vue(version)
         update_package_json(version)
         update_openapi_yaml(version)
         update_troubleshooting(version)
 
         print(f"\n✅ Successfully updated all files to version {version}")
-        print("\nFiles modified:")
-        print("  - version.txt")
-        print("  - README.md")
-        print("  - webui/src/about.vue")
-        print("  - webui/package.json")
-        print("  - docs/openapi.yaml")
-        print("  - docs/TROUBLESHOOTING.md")
 
     except Exception as e:
         print(f"\n❌ Error updating version: {e}")
