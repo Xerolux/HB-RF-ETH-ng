@@ -1,0 +1,405 @@
+/*
+ *  monitoring.cpp is part of the HB-RF-ETH firmware v2.0
+ *
+ *  Copyright 2025 Xerolux
+ *  SNMP and CheckMK monitoring support
+ */
+
+#include "monitoring.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "lwip/sockets.h"
+#include "esp_app_format.h"
+#include "esp_ota_ops.h"
+#include "esp_timer.h"
+#include <string.h>
+
+// SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
+#if CONFIG_LWIP_SNMP
+#include "lwip/apps/snmp.h"
+#include "lwip/apps/snmp_mib2.h"
+#include "lwip/apps/snmp_snmpv2_framework.h"
+#include "lwip/apps/snmp_snmpv2_usm.h"
+#endif
+
+static const char *TAG = "MONITORING";
+
+static monitoring_config_t current_config = {};
+static bool snmp_running = false;
+static bool checkmk_running = false;
+static TaskHandle_t checkmk_task_handle = NULL;
+
+// NVS keys
+#define NVS_NAMESPACE "monitoring"
+#define NVS_SNMP_ENABLED "snmp_en"
+#define NVS_SNMP_COMMUNITY "snmp_comm"
+#define NVS_SNMP_LOCATION "snmp_loc"
+#define NVS_SNMP_CONTACT "snmp_cont"
+#define NVS_SNMP_PORT "snmp_port"
+#define NVS_CHECKMK_ENABLED "cmk_en"
+#define NVS_CHECKMK_PORT "cmk_port"
+#define NVS_CHECKMK_HOSTS "cmk_hosts"
+
+// Get firmware version from app descriptor
+static const char* get_firmware_version(void)
+{
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+    return app_desc->version;
+}
+
+// Get system uptime
+static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes)
+{
+    uint64_t uptime_ms = esp_timer_get_time() / 1000;
+    uint32_t uptime_sec = uptime_ms / 1000;
+    *days = uptime_sec / 86400;
+    uptime_sec %= 86400;
+    *hours = uptime_sec / 3600;
+    uptime_sec %= 3600;
+    *minutes = uptime_sec / 60;
+}
+
+// CheckMK Agent Task
+static void checkmk_agent_task(void *pvParameters)
+{
+    const checkmk_config_t *config = (const checkmk_config_t *)pvParameters;
+    int listen_sock = -1;
+    struct sockaddr_in server_addr;
+
+    ESP_LOGI(TAG, "CheckMK Agent starting on port %d", config->port);
+
+    listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listen_sock < 0) {
+        ESP_LOGE(TAG, "Unable to create socket");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    int opt = 1;
+    setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_port = htons(config->port);
+
+    if (bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        ESP_LOGE(TAG, "Socket bind failed");
+        close(listen_sock);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (listen(listen_sock, 5) < 0) {
+        ESP_LOGE(TAG, "Socket listen failed");
+        close(listen_sock);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGI(TAG, "CheckMK Agent listening on port %d", config->port);
+
+    while (checkmk_running) {
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
+
+        int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
+        if (client_sock < 0) {
+            if (checkmk_running) {
+                ESP_LOGE(TAG, "Accept failed");
+            }
+            continue;
+        }
+
+        char client_ip[16];
+        inet_ntoa_r(client_addr.sin_addr, client_ip, sizeof(client_ip));
+        ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
+
+        // Check if client IP is allowed
+        bool allowed = false;
+        if (strlen(config->allowed_hosts) == 0 || strcmp(config->allowed_hosts, "*") == 0) {
+            allowed = true;
+        } else {
+            // Simple IP matching (can be improved)
+            if (strstr(config->allowed_hosts, client_ip) != NULL) {
+                allowed = true;
+            }
+        }
+
+        if (!allowed) {
+            ESP_LOGW(TAG, "Client %s not in allowed hosts list", client_ip);
+            close(client_sock);
+            continue;
+        }
+
+        // Send CheckMK agent output
+        char output[2048];
+        int len = 0;
+
+        // Version section
+        len += snprintf(output + len, sizeof(output) - len, "<<<check_mk>>>\n");
+        len += snprintf(output + len, sizeof(output) - len, "Version: HB-RF-ETH-%s\n", get_firmware_version());
+        len += snprintf(output + len, sizeof(output) - len, "AgentOS: ESP-IDF\n");
+
+        // Uptime section
+        uint32_t days, hours, minutes;
+        get_system_uptime(&days, &hours, &minutes);
+        len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
+        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+
+        // Memory section
+        len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
+        len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
+                       (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
+        len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
+                       (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+
+        // CPU section
+        len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
+        len += snprintf(output + len, sizeof(output) - len, "esp32 0 0 0\n");
+
+        // Send data
+        send(client_sock, output, len, 0);
+
+        close(client_sock);
+        ESP_LOGI(TAG, "CheckMK client disconnected");
+    }
+
+    close(listen_sock);
+    ESP_LOGI(TAG, "CheckMK Agent stopped");
+    vTaskDelete(NULL);
+}
+
+// SNMP Functions
+esp_err_t snmp_start(const snmp_config_t *config)
+{
+#if CONFIG_LWIP_SNMP
+    if (snmp_running) {
+        ESP_LOGW(TAG, "SNMP already running");
+        return ESP_OK;
+    }
+
+    if (!config->enabled) {
+        return ESP_OK;
+    }
+
+    ESP_LOGW(TAG, "SNMP agent requested on port %d - Feature disabled (requires CONFIG_LWIP_SNMP=y)", config->port);
+    ESP_LOGW(TAG, "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> Enable SNMP");
+    return ESP_ERR_NOT_SUPPORTED;
+#else
+    ESP_LOGW(TAG, "SNMP not enabled in build configuration");
+    return ESP_ERR_NOT_SUPPORTED;
+#endif
+}
+
+esp_err_t snmp_stop(void)
+{
+    if (!snmp_running) {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping SNMP agent");
+    // Note: lwIP SNMP doesn't have a clean shutdown function
+    snmp_running = false;
+
+    return ESP_OK;
+}
+
+// CheckMK Functions
+esp_err_t checkmk_start(const checkmk_config_t *config)
+{
+    if (checkmk_running) {
+        ESP_LOGW(TAG, "CheckMK agent already running");
+        return ESP_OK;
+    }
+
+    if (!config->enabled) {
+        return ESP_OK;
+    }
+
+    checkmk_running = true;
+
+    // Copy config to current_config to avoid dangling pointer
+    memcpy(&current_config.checkmk, config, sizeof(checkmk_config_t));
+
+    // Create CheckMK agent task - pass pointer to current_config
+    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096,
+                                  (void *)&current_config.checkmk, 5, &checkmk_task_handle);
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create CheckMK agent task");
+        checkmk_running = false;
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t checkmk_stop(void)
+{
+    if (!checkmk_running) {
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping CheckMK agent");
+    checkmk_running = false;
+
+    if (checkmk_task_handle != NULL) {
+        vTaskDelete(checkmk_task_handle);
+        checkmk_task_handle = NULL;
+    }
+
+    return ESP_OK;
+}
+
+// Save configuration to NVS
+static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Save SNMP config
+    nvs_set_u8(nvs_handle, NVS_SNMP_ENABLED, config->snmp.enabled);
+    nvs_set_str(nvs_handle, NVS_SNMP_COMMUNITY, config->snmp.community);
+    nvs_set_str(nvs_handle, NVS_SNMP_LOCATION, config->snmp.location);
+    nvs_set_str(nvs_handle, NVS_SNMP_CONTACT, config->snmp.contact);
+    nvs_set_u16(nvs_handle, NVS_SNMP_PORT, config->snmp.port);
+
+    // Save CheckMK config
+    nvs_set_u8(nvs_handle, NVS_CHECKMK_ENABLED, config->checkmk.enabled);
+    nvs_set_u16(nvs_handle, NVS_CHECKMK_PORT, config->checkmk.port);
+    nvs_set_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts);
+
+    err = nvs_commit(nvs_handle);
+    nvs_close(nvs_handle);
+
+    return err;
+}
+
+// Load configuration from NVS
+static esp_err_t load_config_from_nvs(monitoring_config_t *config)
+{
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "No saved configuration found, using defaults");
+        // Set defaults
+        config->snmp.enabled = false;
+        strcpy(config->snmp.community, "public");
+        strcpy(config->snmp.location, "");
+        strcpy(config->snmp.contact, "");
+        config->snmp.port = 161;
+
+        config->checkmk.enabled = false;
+        config->checkmk.port = 6556;
+        strcpy(config->checkmk.allowed_hosts, "*");
+
+        return ESP_OK;
+    }
+
+    // Load SNMP config
+    uint8_t u8_val;
+    uint16_t u16_val;
+    size_t str_len;
+
+    if (nvs_get_u8(nvs_handle, NVS_SNMP_ENABLED, &u8_val) == ESP_OK) {
+        config->snmp.enabled = u8_val;
+    }
+
+    str_len = sizeof(config->snmp.community);
+    nvs_get_str(nvs_handle, NVS_SNMP_COMMUNITY, config->snmp.community, &str_len);
+
+    str_len = sizeof(config->snmp.location);
+    nvs_get_str(nvs_handle, NVS_SNMP_LOCATION, config->snmp.location, &str_len);
+
+    str_len = sizeof(config->snmp.contact);
+    nvs_get_str(nvs_handle, NVS_SNMP_CONTACT, config->snmp.contact, &str_len);
+
+    if (nvs_get_u16(nvs_handle, NVS_SNMP_PORT, &u16_val) == ESP_OK) {
+        config->snmp.port = u16_val;
+    }
+
+    // Load CheckMK config
+    if (nvs_get_u8(nvs_handle, NVS_CHECKMK_ENABLED, &u8_val) == ESP_OK) {
+        config->checkmk.enabled = u8_val;
+    }
+
+    if (nvs_get_u16(nvs_handle, NVS_CHECKMK_PORT, &u16_val) == ESP_OK) {
+        config->checkmk.port = u16_val;
+    }
+
+    str_len = sizeof(config->checkmk.allowed_hosts);
+    nvs_get_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts, &str_len);
+
+    nvs_close(nvs_handle);
+    return ESP_OK;
+}
+
+// Initialize monitoring subsystem
+esp_err_t monitoring_init(const monitoring_config_t *config)
+{
+    ESP_LOGI(TAG, "Initializing monitoring subsystem");
+
+    if (config == NULL) {
+        // Load from NVS
+        load_config_from_nvs(&current_config);
+    } else {
+        memcpy(&current_config, config, sizeof(monitoring_config_t));
+        save_config_to_nvs(&current_config);
+    }
+
+    // Start SNMP if enabled
+    if (current_config.snmp.enabled) {
+        snmp_start(&current_config.snmp);
+    }
+
+    // Start CheckMK if enabled
+    if (current_config.checkmk.enabled) {
+        checkmk_start(&current_config.checkmk);
+    }
+
+    return ESP_OK;
+}
+
+// Update configuration
+esp_err_t monitoring_update_config(const monitoring_config_t *config)
+{
+    // Stop current services
+    if (current_config.snmp.enabled) {
+        snmp_stop();
+    }
+    if (current_config.checkmk.enabled) {
+        checkmk_stop();
+    }
+
+    // Update config
+    memcpy(&current_config, config, sizeof(monitoring_config_t));
+    save_config_to_nvs(&current_config);
+
+    // Restart services with new config
+    if (current_config.snmp.enabled) {
+        snmp_start(&current_config.snmp);
+    }
+    if (current_config.checkmk.enabled) {
+        checkmk_start(&current_config.checkmk);
+    }
+
+    return ESP_OK;
+}
+
+// Get current configuration
+esp_err_t monitoring_get_config(monitoring_config_t *config)
+{
+    if (config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    memcpy(config, &current_config, sizeof(monitoring_config_t));
+    return ESP_OK;
+}

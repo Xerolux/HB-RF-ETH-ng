@@ -1,0 +1,99 @@
+name: Build Firmware
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-webui:
+    name: Build WebUI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Install WebUI dependencies
+        run: |
+          cd webui
+          npm ci
+
+      - name: Build WebUI
+        run: |
+          cd webui
+          npm run build
+
+      - name: Upload WebUI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-dist
+          path: webui/dist/
+          retention-days: 7
+
+  build-firmware:
+    name: Build Firmware
+    needs: build-webui
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download WebUI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: webui-dist
+          path: webui/dist/
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: |
+          pio run -e hb-rf-eth-ng
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            .pio/build/hb-rf-eth-ng/firmware*.bin
+            .pio/build/hb-rf-eth-ng/bootloader.bin
+            .pio/build/hb-rf-eth-ng/partitions.bin
+          retention-days: 30
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: |
+            version.txt
+            CHANGELOG.md
+          retention-days: 30
