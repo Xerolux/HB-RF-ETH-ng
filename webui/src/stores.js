@@ -1,64 +1,64 @@
-import { defineStore } from 'pinia'
-import axios from 'axios'
+import { defineStore } from "pinia";
+import axios from "axios";
 
-export const useThemeStore = defineStore('theme', {
+export const useThemeStore = defineStore("theme", {
   state: () => ({
-    theme: localStorage.getItem('theme') || 'light'
+    theme: localStorage.getItem("theme") || "light",
   }),
   actions: {
     setTheme(newTheme) {
-      this.theme = newTheme
-      localStorage.setItem('theme', newTheme)
-      document.documentElement.setAttribute('data-bs-theme', newTheme)
+      this.theme = newTheme;
+      localStorage.setItem("theme", newTheme);
+      document.documentElement.setAttribute("data-bs-theme", newTheme);
     },
     toggleTheme() {
-      const newTheme = this.theme === 'light' ? 'dark' : 'light'
-      this.setTheme(newTheme)
+      const newTheme = this.theme === "light" ? "dark" : "light";
+      this.setTheme(newTheme);
     },
     init() {
-      document.documentElement.setAttribute('data-bs-theme', this.theme)
-    }
-  }
-})
+      document.documentElement.setAttribute("data-bs-theme", this.theme);
+    },
+  },
+});
 
-export const useLoginStore = defineStore('login', {
+export const useLoginStore = defineStore("login", {
   state: () => ({
     isLoggedIn: sessionStorage.getItem("hb-rf-eth-ng-pw") != null,
     token: sessionStorage.getItem("hb-rf-eth-ng-pw") || "",
-    passwordChanged: true // Default to true to avoid blocking if unknown
+    passwordChanged: true, // Default to true to avoid blocking if unknown
   }),
   actions: {
     login(token) {
-      sessionStorage.setItem("hb-rf-eth-ng-pw", token)
-      this.token = token
-      this.isLoggedIn = true
+      sessionStorage.setItem("hb-rf-eth-ng-pw", token);
+      this.token = token;
+      this.isLoggedIn = true;
     },
     logout() {
-      this.isLoggedIn = false
-      sessionStorage.removeItem("hb-rf-eth-ng-pw")
-      this.token = ""
+      this.isLoggedIn = false;
+      sessionStorage.removeItem("hb-rf-eth-ng-pw");
+      this.token = "";
     },
     setPasswordChanged(status) {
-      this.passwordChanged = status
+      this.passwordChanged = status;
     },
     async tryLogin(password) {
       try {
-        const response = await axios.post("/login.json", { password })
+        const response = await axios.post("/login.json", { password });
         if (response.data.isAuthenticated) {
-          this.login(response.data.token)
-          this.setPasswordChanged(response.data.passwordChanged !== false)
-          return true
+          this.login(response.data.token);
+          this.setPasswordChanged(response.data.passwordChanged !== false);
+          return true;
         }
-        return false
+        return false;
       } catch (error) {
-        console.error('Login failed:', error.response?.status || error.message)
-        return false
+        console.error("Login failed:", error.response?.status || error.message);
+        return false;
       }
-    }
-  }
-})
+    },
+  },
+});
 
-export const useSysInfoStore = defineStore('sysInfo', {
+export const useSysInfoStore = defineStore("sysInfo", {
   state: () => ({
     serial: "",
     currentVersion: "",
@@ -79,22 +79,25 @@ export const useSysInfoStore = defineStore('sysInfo', {
     radioModuleFirmwareVersion: "",
     radioModuleBidCosRadioMAC: "",
     radioModuleHmIPRadioMAC: "",
-    radioModuleSGTIN: ""
+    radioModuleSGTIN: "",
   }),
   actions: {
     async update() {
       try {
-        const response = await axios.get("/sysinfo.json")
-        Object.assign(this.$state, response.data.sysInfo)
+        const response = await axios.get("/sysinfo.json");
+        Object.assign(this.$state, response.data.sysInfo);
       } catch (error) {
-        console.error('Failed to load system info:', error.response?.status || error.message)
-        throw error
+        console.error(
+          "Failed to load system info:",
+          error.response?.status || error.message,
+        );
+        throw error;
       }
-    }
-  }
-})
+    },
+  },
+});
 
-export const useSettingsStore = defineStore('settings', {
+export const useSettingsStore = defineStore("settings", {
   state: () => ({
     hostname: "",
     useDHCP: true,
@@ -121,98 +124,115 @@ export const useSettingsStore = defineStore('settings', {
   actions: {
     async load() {
       try {
-        const response = await axios.get("/settings.json")
-        Object.assign(this.$state, response.data.settings)
+        const response = await axios.get("/settings.json");
+        Object.assign(this.$state, response.data.settings);
       } catch (error) {
-        console.error('Failed to load settings:', error.response?.status || error.message)
-        throw error
+        console.error(
+          "Failed to load settings:",
+          error.response?.status || error.message,
+        );
+        throw error;
       }
     },
     async save(settings) {
       try {
-        const response = await axios.post("/settings.json", settings)
-        Object.assign(this.$state, response.data.settings)
+        const response = await axios.post("/settings.json", settings);
+        Object.assign(this.$state, response.data.settings);
       } catch (error) {
-        console.error('Failed to save settings:', error.response?.status || error.message)
-        throw error
+        console.error(
+          "Failed to save settings:",
+          error.response?.status || error.message,
+        );
+        throw error;
       }
-    }
-  }
-})
+    },
+  },
+});
 
-export const useFirmwareUpdateStore = defineStore('firmwareUpdate', {
+export const useFirmwareUpdateStore = defineStore("firmwareUpdate", {
   state: () => ({
     progress: 0,
   }),
   actions: {
     async update(file) {
       try {
-        this.progress = 0
+        this.progress = 0;
 
         await axios.post("/ota_update", file, {
           headers: {
-            'Content-Type': 'application/octet-stream'
+            "Content-Type": "application/octet-stream",
           },
-          onUploadProgress: event => {
+          onUploadProgress: (event) => {
             if (event.lengthComputable) {
-              this.progress = Math.ceil((event.loaded || event.position) / event.total * 100)
+              this.progress = Math.ceil(
+                ((event.loaded || event.position) / event.total) * 100,
+              );
             }
-          }
-        })
+          },
+        });
 
-        this.progress = 0
+        this.progress = 0;
       } catch (error) {
-        console.error('Firmware update failed:', error.response?.status || error.message)
-        this.progress = 0
-        throw error
+        console.error(
+          "Firmware update failed:",
+          error.response?.status || error.message,
+        );
+        this.progress = 0;
+        throw error;
       }
-    }
-  }
-})
+    },
+  },
+});
 
-export const useMonitoringStore = defineStore('monitoring', {
+export const useMonitoringStore = defineStore("monitoring", {
   state: () => ({
     snmp: {
       enabled: false,
       port: 161,
-      community: 'public',
-      location: '',
-      contact: ''
+      community: "public",
+      location: "",
+      contact: "",
     },
     checkmk: {
       enabled: false,
       port: 6556,
-      allowedHosts: '*'
+      allowedHosts: "*",
     },
     mqtt: {
       enabled: false,
-      server: '',
+      server: "",
       port: 1883,
-      user: '',
-      password: '',
-      topicPrefix: 'hb-rf-eth',
+      user: "",
+      password: "",
+      topicPrefix: "hb-rf-eth",
       haDiscoveryEnabled: false,
-      haDiscoveryPrefix: 'homeassistant'
-    }
+      haDiscoveryPrefix: "homeassistant",
+    },
   }),
   actions: {
     async load() {
       try {
-        const response = await axios.get("/api/monitoring")
-        Object.assign(this.$state, response.data)
+        const response = await axios.get("/api/monitoring");
+        Object.assign(this.$state, response.data);
       } catch (error) {
-        console.error('Failed to load monitoring config:', error.response?.status || error.message)
-        throw error
+        console.error(
+          "Failed to load monitoring config:",
+          error.response?.status || error.message,
+        );
+        throw error;
       }
     },
     async save(config) {
       try {
-        await axios.post("/api/monitoring", config)
-        Object.assign(this.$state, config)
+        await axios.post("/api/monitoring", config);
+        Object.assign(this.$state, config);
       } catch (error) {
-        console.error('Failed to save monitoring config:', error.response?.status || error.message)
-        throw error
+        console.error(
+          "Failed to save monitoring config:",
+          error.response?.status || error.message,
+        );
+        throw error;
       }
-    }
-  }
-})
+    },
+  },
+});

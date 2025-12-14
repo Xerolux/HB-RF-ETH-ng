@@ -22,7 +22,7 @@
         />
       </BFormGroup>
       <hr />
-      <h6 class="text-secondary">{{ t('settings.networkSettings') }}</h6>
+      <h6 class="text-secondary">{{ t("settings.networkSettings") }}</h6>
       <BFormGroup :label="t('settings.hostname')" label-cols-sm="4">
         <BFormInput
           type="text"
@@ -33,11 +33,15 @@
       </BFormGroup>
       <BFormGroup :label="t('settings.dhcp')" label-cols-sm="4">
         <BFormRadioGroup buttons v-model="useDHCP" required>
-          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
-          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          <BFormRadio :value="true">{{ t("common.enabled") }}</BFormRadio>
+          <BFormRadio :value="false">{{ t("common.disabled") }}</BFormRadio>
         </BFormRadioGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.ipAddress')" label-cols-sm="4" v-if="!useDHCP">
+      <BFormGroup
+        :label="t('settings.ipAddress')"
+        label-cols-sm="4"
+        v-if="!useDHCP"
+      >
         <BFormInput
           type="text"
           v-model="localIP"
@@ -45,7 +49,11 @@
           :state="v$.localIP.$error ? false : null"
         />
       </BFormGroup>
-      <BFormGroup :label="t('settings.netmask')" label-cols-sm="4" v-if="!useDHCP">
+      <BFormGroup
+        :label="t('settings.netmask')"
+        label-cols-sm="4"
+        v-if="!useDHCP"
+      >
         <BFormInput
           type="text"
           v-model="netmask"
@@ -53,7 +61,11 @@
           :state="v$.netmask.$error ? false : null"
         />
       </BFormGroup>
-      <BFormGroup :label="t('settings.gateway')" label-cols-sm="4" v-if="!useDHCP">
+      <BFormGroup
+        :label="t('settings.gateway')"
+        label-cols-sm="4"
+        v-if="!useDHCP"
+      >
         <BFormInput
           type="text"
           v-model="gateway"
@@ -78,15 +90,17 @@
         />
       </BFormGroup>
       <hr />
-      <h6 class="text-secondary">{{ t('settings.ipv6Settings') }}</h6>
+      <h6 class="text-secondary">{{ t("settings.ipv6Settings") }}</h6>
       <BFormGroup :label="t('settings.enableIPv6')" label-cols-sm="4">
         <BFormCheckbox v-model="enableIPv6" switch />
       </BFormGroup>
       <template v-if="enableIPv6">
         <BFormGroup :label="t('settings.ipv6Mode')" label-cols-sm="4">
           <BFormRadioGroup buttons v-model="ipv6Mode" required>
-            <BFormRadio value="auto">{{ t('settings.ipv6Auto') }}</BFormRadio>
-            <BFormRadio value="static">{{ t('settings.ipv6Static') }}</BFormRadio>
+            <BFormRadio value="auto">{{ t("settings.ipv6Auto") }}</BFormRadio>
+            <BFormRadio value="static">{{
+              t("settings.ipv6Static")
+            }}</BFormRadio>
           </BFormRadioGroup>
         </BFormGroup>
         <template v-if="ipv6Mode === 'static'">
@@ -139,15 +153,19 @@
         </template>
       </template>
       <hr />
-      <h6 class="text-secondary">{{ t('settings.timeSettings') }}</h6>
+      <h6 class="text-secondary">{{ t("settings.timeSettings") }}</h6>
       <BFormGroup :label="t('settings.timesource')" label-cols-sm="4">
         <BFormRadioGroup buttons v-model="timesource" required>
-          <BFormRadio :value="0">{{ t('settings.ntp') }}</BFormRadio>
-          <BFormRadio :value="1">{{ t('settings.dcf') }}</BFormRadio>
-          <BFormRadio :value="2">{{ t('settings.gps') }}</BFormRadio>
+          <BFormRadio :value="0">{{ t("settings.ntp") }}</BFormRadio>
+          <BFormRadio :value="1">{{ t("settings.dcf") }}</BFormRadio>
+          <BFormRadio :value="2">{{ t("settings.gps") }}</BFormRadio>
         </BFormRadioGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.ntpServer')" label-cols-sm="4" v-if="isNtpActivated">
+      <BFormGroup
+        :label="t('settings.ntpServer')"
+        label-cols-sm="4"
+        v-if="isNtpActivated"
+      >
         <BFormInput
           type="text"
           v-model="ntpServer"
@@ -155,7 +173,11 @@
           :state="v$.ntpServer.$error ? false : null"
         />
       </BFormGroup>
-      <BFormGroup :label="t('settings.dcfOffset')" label-cols-sm="4" v-if="isDcfActivated">
+      <BFormGroup
+        :label="t('settings.dcfOffset')"
+        label-cols-sm="4"
+        v-if="isDcfActivated"
+      >
         <BInputGroup append="µs">
           <BFormInput
             type="number"
@@ -165,7 +187,11 @@
           />
         </BInputGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.gpsBaudrate')" label-cols-sm="4" v-if="isGpsActivated">
+      <BFormGroup
+        :label="t('settings.gpsBaudrate')"
+        label-cols-sm="4"
+        v-if="isGpsActivated"
+      >
         <BFormSelect v-model.number="gpsBaudrate">
           <BFormSelectOption :value="4800">4800</BFormSelectOption>
           <BFormSelectOption :value="9600">9600</BFormSelectOption>
@@ -176,7 +202,7 @@
         </BFormSelect>
       </BFormGroup>
       <hr />
-      <h6 class="text-secondary">{{ t('settings.systemSettings') }}</h6>
+      <h6 class="text-secondary">{{ t("settings.systemSettings") }}</h6>
       <BFormGroup :label="t('settings.ledBrightness')" label-cols-sm="4">
         <BInputGroup append="%">
           <BFormSelect v-model.number="ledBrightness">
@@ -200,14 +226,16 @@
         dismissible
         fade
         @update:model-value="showSuccess = null"
-      >{{ t("settings.saveSuccess") }}</BAlert>
+        >{{ t("settings.saveSuccess") }}</BAlert
+      >
       <BAlert
         variant="danger"
         :model-value="showError"
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t("settings.saveError") }}</BAlert>
+        >{{ t("settings.saveError") }}</BAlert
+      >
 
       <BFormGroup label-cols-sm="9">
         <BButton
@@ -215,7 +243,8 @@
           block
           @click="saveSettingsClick"
           :disabled="v$.$error"
-        >{{ t('common.save') }}</BButton>
+          >{{ t("common.save") }}</BButton
+        >
       </BFormGroup>
     </BForm>
   </BCard>
@@ -228,32 +257,35 @@
     class="mb-3"
   >
     <BForm @submit.stop.prevent>
-        <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
+      <p>{{ t("settings.backupInfo") }}</p>
+      <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{
+        t("settings.downloadBackup")
+      }}</BButton>
 
-        <hr/>
-        <p>{{ t('settings.restoreInfo') }}</p>
-        <BFormFile
-          v-model="restoreFile"
-          accept=".json"
-          :placeholder="t('settings.noFileChosen')"
-          :browse-text="t('settings.browse')"
-          class="mb-2"
-        />
-        <BButton
-            variant="warning"
-            :disabled="!restoreFile"
-            @click="restoreSettings"
-        >{{ t('settings.restore') }}</BButton>
+      <hr />
+      <p>{{ t("settings.restoreInfo") }}</p>
+      <BFormFile
+        v-model="restoreFile"
+        accept=".json"
+        :placeholder="t('settings.noFileChosen')"
+        :browse-text="t('settings.browse')"
+        class="mb-2"
+      />
+      <BButton
+        variant="warning"
+        :disabled="!restoreFile"
+        @click="restoreSettings"
+        >{{ t("settings.restore") }}</BButton
+      >
     </BForm>
   </BCard>
 </template>
 
 <script setup>
-import axios from 'axios'
-import { ref, computed, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useVuelidate } from '@vuelidate/core'
+import axios from "axios";
+import { ref, computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useVuelidate } from "@vuelidate/core";
 import {
   required,
   minLength,
@@ -263,122 +295,131 @@ import {
   sameAs,
   helpers,
   requiredIf,
-  requiredUnless
-} from '@vuelidate/validators'
-import { useSettingsStore } from './stores.js'
+  requiredUnless,
+} from "@vuelidate/validators";
+import { useSettingsStore } from "./stores.js";
 
-const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
-const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
-const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
+const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/);
+const domainname_validator = helpers.regex(
+  /^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/,
+);
+const ipv6_validator = helpers.regex(
+  /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/,
+);
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const settingsStore = useSettingsStore()
+const settingsStore = useSettingsStore();
 
 // Local form state
-const restoreFile = ref(null)
-const adminPassword = ref('')
-const adminPasswordRepeat = ref('')
-const hostname = ref('')
-const useDHCP = ref(true)
-const localIP = ref('')
-const netmask = ref('')
-const gateway = ref('')
-const dns1 = ref('')
-const dns2 = ref('')
+const restoreFile = ref(null);
+const adminPassword = ref("");
+const adminPasswordRepeat = ref("");
+const hostname = ref("");
+const useDHCP = ref(true);
+const localIP = ref("");
+const netmask = ref("");
+const gateway = ref("");
+const dns1 = ref("");
+const dns2 = ref("");
 
 // IPv6 settings
-const enableIPv6 = ref(false)
-const ipv6Mode = ref('auto')
-const ipv6Address = ref('')
-const ipv6PrefixLength = ref(64)
-const ipv6Gateway = ref('')
-const ipv6Dns1 = ref('')
-const ipv6Dns2 = ref('')
+const enableIPv6 = ref(false);
+const ipv6Mode = ref("auto");
+const ipv6Address = ref("");
+const ipv6PrefixLength = ref(64);
+const ipv6Gateway = ref("");
+const ipv6Dns1 = ref("");
+const ipv6Dns2 = ref("");
 
-const timesource = ref(0)
-const dcfOffset = ref(0)
-const gpsBaudrate = ref(9600)
-const ntpServer = ref('')
-const ledBrightness = ref(100)
-const checkUpdates = ref(true)
+const timesource = ref(0);
+const dcfOffset = ref(0);
+const gpsBaudrate = ref(9600);
+const ntpServer = ref("");
+const ledBrightness = ref(100);
+const checkUpdates = ref(true);
 
-const showSuccess = ref(null)
-const showError = ref(null)
+const showSuccess = ref(null);
+const showError = ref(null);
 
 // Computed flags
-const isNtpActivated = computed(() => timesource.value === 0)
-const isDcfActivated = computed(() => timesource.value === 1)
-const isGpsActivated = computed(() => timesource.value === 2)
-const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'static')
+const isNtpActivated = computed(() => timesource.value === 0);
+const isDcfActivated = computed(() => timesource.value === 1);
+const isGpsActivated = computed(() => timesource.value === 2);
+const isIPv6Static = computed(
+  () => enableIPv6.value && ipv6Mode.value === "static",
+);
 
-const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
+const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/);
 
 // Validation rules
 const rules = {
   adminPassword: {
     minLength: minLength(6),
     maxLength: maxLength(32),
-    password_validator: helpers.withMessage('Must contain letters and numbers', password_validator)
+    password_validator: helpers.withMessage(
+      "Must contain letters and numbers",
+      password_validator,
+    ),
   },
   adminPasswordRepeat: {
-    sameAsPassword: sameAs(adminPassword)
+    sameAsPassword: sameAs(adminPassword),
   },
   hostname: {
     required,
     hostname_validator,
-    maxLength: maxLength(32)
+    maxLength: maxLength(32),
   },
   localIP: {
     required: requiredUnless(useDHCP),
-    ipAddress
+    ipAddress,
   },
   netmask: {
     required: requiredUnless(useDHCP),
-    ipAddress
+    ipAddress,
   },
   gateway: {
     required: requiredUnless(useDHCP),
-    ipAddress
+    ipAddress,
   },
   dns1: {
     required: requiredUnless(useDHCP),
-    ipAddress
+    ipAddress,
   },
   dns2: {
-    ipAddress
+    ipAddress,
   },
   ipv6Address: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage("Invalid IPv6 address", ipv6_validator),
   },
   ipv6PrefixLength: {
     required: requiredIf(isIPv6Static),
     numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 128', val => val <= 128)
+    minValue: helpers.withMessage("Min 1", (val) => val >= 1),
+    maxValue: helpers.withMessage("Max 128", (val) => val <= 128),
   },
   ipv6Gateway: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage("Invalid IPv6 address", ipv6_validator),
   },
   ipv6Dns1: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage("Invalid IPv6 address", ipv6_validator),
   },
   ipv6Dns2: {
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage("Invalid IPv6 address", ipv6_validator),
   },
   ntpServer: {
     required: requiredIf(isNtpActivated),
     domainname_validator,
-    maxLength: maxLength(64)
+    maxLength: maxLength(64),
   },
   dcfOffset: {
     required: requiredIf(isDcfActivated),
-    numeric
-  }
-}
+    numeric,
+  },
+};
 
 const v$ = useVuelidate(rules, {
   adminPassword,
@@ -395,53 +436,57 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
-  dcfOffset
-})
+  dcfOffset,
+});
 
 // Load settings from store
 const loadSettings = () => {
-  hostname.value = settingsStore.hostname
-  useDHCP.value = settingsStore.useDHCP
-  localIP.value = settingsStore.localIP
-  netmask.value = settingsStore.netmask
-  gateway.value = settingsStore.gateway
-  dns1.value = settingsStore.dns1
-  dns2.value = settingsStore.dns2
-  timesource.value = settingsStore.timesource
-  dcfOffset.value = settingsStore.dcfOffset
-  gpsBaudrate.value = settingsStore.gpsBaudrate
-  ntpServer.value = settingsStore.ntpServer
-  ledBrightness.value = settingsStore.ledBrightness
-  checkUpdates.value = settingsStore.checkUpdates
+  hostname.value = settingsStore.hostname;
+  useDHCP.value = settingsStore.useDHCP;
+  localIP.value = settingsStore.localIP;
+  netmask.value = settingsStore.netmask;
+  gateway.value = settingsStore.gateway;
+  dns1.value = settingsStore.dns1;
+  dns2.value = settingsStore.dns2;
+  timesource.value = settingsStore.timesource;
+  dcfOffset.value = settingsStore.dcfOffset;
+  gpsBaudrate.value = settingsStore.gpsBaudrate;
+  ntpServer.value = settingsStore.ntpServer;
+  ledBrightness.value = settingsStore.ledBrightness;
+  checkUpdates.value = settingsStore.checkUpdates;
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
-    enableIPv6.value = settingsStore.enableIPv6
-    ipv6Mode.value = settingsStore.ipv6Mode || 'auto'
-    ipv6Address.value = settingsStore.ipv6Address || ''
-    ipv6PrefixLength.value = settingsStore.ipv6PrefixLength || 64
-    ipv6Gateway.value = settingsStore.ipv6Gateway || ''
-    ipv6Dns1.value = settingsStore.ipv6Dns1 || ''
-    ipv6Dns2.value = settingsStore.ipv6Dns2 || ''
+    enableIPv6.value = settingsStore.enableIPv6;
+    ipv6Mode.value = settingsStore.ipv6Mode || "auto";
+    ipv6Address.value = settingsStore.ipv6Address || "";
+    ipv6PrefixLength.value = settingsStore.ipv6PrefixLength || 64;
+    ipv6Gateway.value = settingsStore.ipv6Gateway || "";
+    ipv6Dns1.value = settingsStore.ipv6Dns1 || "";
+    ipv6Dns2.value = settingsStore.ipv6Dns2 || "";
   }
-}
+};
 
 // Watch store changes
-watch(() => settingsStore.$state, () => {
-  loadSettings()
-}, { deep: true })
+watch(
+  () => settingsStore.$state,
+  () => {
+    loadSettings();
+  },
+  { deep: true },
+);
 
 onMounted(async () => {
-  await settingsStore.load()
-  loadSettings()
-})
+  await settingsStore.load();
+  loadSettings();
+});
 
 const saveSettingsClick = async () => {
-  v$.value.$touch()
-  if (v$.value.$error) return
+  v$.value.$touch();
+  if (v$.value.$error) return;
 
-  showError.value = false
-  showSuccess.value = false
+  showError.value = false;
+  showSuccess.value = false;
 
   try {
     const settings = {
@@ -466,56 +511,55 @@ const saveSettingsClick = async () => {
       ipv6PrefixLength: ipv6PrefixLength.value,
       ipv6Gateway: ipv6Gateway.value,
       ipv6Dns1: ipv6Dns1.value,
-      ipv6Dns2: ipv6Dns2.value
-    }
+      ipv6Dns2: ipv6Dns2.value,
+    };
 
-    await settingsStore.save(settings)
-    showSuccess.value = true
+    await settingsStore.save(settings);
+    showSuccess.value = true;
   } catch (error) {
-    showError.value = true
+    showError.value = true;
   }
-}
+};
 
 const downloadBackup = async () => {
   try {
-    const response = await axios.get('/api/backup', { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', 'settings.json')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    const response = await axios.get("/api/backup", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "settings.json");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Backup download failed:', error)
-    alert(t('settings.backupError'))
+    console.error("Backup download failed:", error);
+    alert(t("settings.backupError"));
   }
-}
+};
 
 const restoreSettings = async () => {
-    if (!restoreFile.value) return
+  if (!restoreFile.value) return;
 
-    if (!confirm(t('settings.restoreConfirm'))) return
+  if (!confirm(t("settings.restoreConfirm"))) return;
 
-    try {
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-            try {
-                const json = JSON.parse(e.target.result)
-                await axios.post('/api/restore', json)
-                alert(t('settings.restoreSuccess'))
-                window.location.reload()
-            } catch (err) {
-                alert(t('settings.restoreError') + ': ' + err.message)
-            }
-        }
-        reader.readAsText(restoreFile.value)
-    } catch (e) {
-        alert(t('settings.restoreError'))
-    }
-}
+  try {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+        await axios.post("/api/restore", json);
+        alert(t("settings.restoreSuccess"));
+        window.location.reload();
+      } catch (err) {
+        alert(t("settings.restoreError") + ": " + err.message);
+      }
+    };
+    reader.readAsText(restoreFile.value);
+  } catch (e) {
+    alert(t("settings.restoreError"));
+  }
+};
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

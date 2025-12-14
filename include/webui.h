@@ -39,6 +39,9 @@ private:
 
 public:
     WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector);
+    WebUI(const WebUI&) = delete;
+    WebUI& operator=(const WebUI&) = delete;
+
     void start();
     void stop();
 };

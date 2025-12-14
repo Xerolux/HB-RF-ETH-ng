@@ -1,120 +1,133 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
-import axios from 'axios'
-import { useLoginStore, useThemeStore } from './stores.js'
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import { createRouter, createWebHistory } from "vue-router";
+import axios from "axios";
+import { useLoginStore, useThemeStore } from "./stores.js";
 
-import 'bootstrap/dist/css/bootstrap.css'
-import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
+import "bootstrap/dist/css/bootstrap.css";
+import "bootstrap-vue-next/dist/bootstrap-vue-next.css";
 
-import App from './app.vue'
-import Home from './home.vue'
-import Settings from "./settings.vue"
-import FirmwareUpdate from "./firmwareupdate.vue"
-import Login from './login.vue'
-import ChangePassword from './change-password.vue'
-import About from './about.vue'
-import Monitoring from './monitoring.vue'
-
+import App from "./app.vue";
+import Home from "./home.vue";
+import Settings from "./settings.vue";
+import FirmwareUpdate from "./firmwareupdate.vue";
+import Login from "./login.vue";
+import ChangePassword from "./change-password.vue";
+import About from "./about.vue";
+import Monitoring from "./monitoring.vue";
 
 // Router
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: Home },
-    { path: '/settings', component: Settings, meta: { requiresAuth: true } },
-    { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
-    { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
-    { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
-    { path: '/about', component: About },
-    { path: '/login', component: Login },
-  ]
-})
+    { path: "/", component: Home },
+    { path: "/settings", component: Settings, meta: { requiresAuth: true } },
+    {
+      path: "/firmware",
+      component: FirmwareUpdate,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/monitoring",
+      component: Monitoring,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/change-password",
+      component: ChangePassword,
+      meta: { requiresAuth: true },
+    },
+    { path: "/about", component: About },
+    { path: "/login", component: Login },
+  ],
+});
 
 // Axios interceptors
 axios.interceptors.request.use(
-  request => {
-    const loginStore = useLoginStore()
+  (request) => {
+    const loginStore = useLoginStore();
     if (loginStore.isLoggedIn) {
-      request.headers['Authorization'] = 'Token ' + loginStore.token
+      request.headers["Authorization"] = "Token " + loginStore.token;
     }
-    return request
+    return request;
   },
-  error => Promise.reject(error)
-)
+  (error) => Promise.reject(error),
+);
 
 axios.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     if (error.response && error.response.status === 401) {
-      const loginStore = useLoginStore()
-      loginStore.logout()
-      router.go()
+      const loginStore = useLoginStore();
+      loginStore.logout();
+      router.go();
     }
-    return Promise.reject(error)
-  }
-)
+    return Promise.reject(error);
+  },
+);
 
 // Router guard
 router.beforeEach((to, from, next) => {
-  const loginStore = useLoginStore()
-  if (to.matched.some(r => r.meta.requiresAuth)) {
+  const loginStore = useLoginStore();
+  if (to.matched.some((r) => r.meta.requiresAuth)) {
     if (!loginStore.isLoggedIn) {
       next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-      return
+        path: "/login",
+        query: { redirect: to.fullPath },
+      });
+      return;
     }
 
     // Force password change if required
-    if (!loginStore.passwordChanged && to.path !== '/change-password') {
-      next({ path: '/change-password' })
-      return
+    if (!loginStore.passwordChanged && to.path !== "/change-password") {
+      next({ path: "/change-password" });
+      return;
     }
   }
-  next()
-})
+  next();
+});
 
 // Create I18n instance
-import { createI18n } from 'vue-i18n'
-import { messages, getBrowserLocale } from './locales/index.js'
+import { createI18n } from "vue-i18n";
+import { messages, getBrowserLocale } from "./locales/index.js";
 
 // Get stored locale or use browser locale
-const storedLocale = localStorage.getItem('locale') || getBrowserLocale()
+const storedLocale = localStorage.getItem("locale") || getBrowserLocale();
 
 const i18n = createI18n({
   legacy: false,
   locale: storedLocale,
-  fallbackLocale: 'en',
-  messages: messages
-})
+  fallbackLocale: "en",
+  messages: messages,
+});
 
 // Create Bootstrap Vue Next
-import { createBootstrap } from 'bootstrap-vue-next'
-import * as BootstrapVueNext from 'bootstrap-vue-next'
+import { createBootstrap } from "bootstrap-vue-next";
+import * as BootstrapVueNext from "bootstrap-vue-next";
 
 // Create and mount app
-const app = createApp(App)
-const pinia = createPinia()
+const app = createApp(App);
+const pinia = createPinia();
 
-app.use(pinia)
-app.use(router)
-app.use(i18n)
-app.use(createBootstrap({
+app.use(pinia);
+app.use(router);
+app.use(i18n);
+app.use(
+  createBootstrap({
     components: true,
     directives: true,
-}))
+  }),
+);
 
 // Register all BootstrapVueNext components globally
 for (const key in BootstrapVueNext) {
-  if (key.startsWith('B')) {
-    app.component(key, BootstrapVueNext[key])
+  if (key.startsWith("B")) {
+    app.component(key, BootstrapVueNext[key]);
   }
 }
 
 // Initialize theme
-const themeStore = useThemeStore()
-themeStore.init()
+const themeStore = useThemeStore();
+themeStore.init();
 
-app.mount('#app')
+app.mount("#app");

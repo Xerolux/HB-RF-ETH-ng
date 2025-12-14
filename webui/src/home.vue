@@ -5,8 +5,7 @@
 </template>
 
 <script setup>
-import SysInfo from './sysinfo.vue'
+import SysInfo from "./sysinfo.vue";
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

@@ -20,52 +20,53 @@
         dismissible
         fade
         @update:model-value="showError = null"
-      >{{ t('login.loginError') }}</BAlert>
+        >{{ t("login.loginError") }}</BAlert
+      >
       <BFormGroup label-cols-sm="9">
         <BButton
           variant="primary"
           block
           @click="loginClick"
           :disabled="!password || password === ''"
-        >{{ t('login.login') }}</BButton>
+          >{{ t("login.login") }}</BButton
+        >
       </BFormGroup>
     </BForm>
   </BCard>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { useVuelidate } from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
-import { useLoginStore } from './stores.js'
+import { ref } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+import { useVuelidate } from "@vuelidate/core";
+import { required } from "@vuelidate/validators";
+import { useLoginStore } from "./stores.js";
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-const router = useRouter()
-const route = useRoute()
-const loginStore = useLoginStore()
+const router = useRouter();
+const route = useRoute();
+const loginStore = useLoginStore();
 
-const password = ref('')
-const showError = ref(null)
+const password = ref("");
+const showError = ref(null);
 
 const rules = {
-  password: { required }
-}
+  password: { required },
+};
 
-const v$ = useVuelidate(rules, { password })
+const v$ = useVuelidate(rules, { password });
 
 const loginClick = async () => {
-  showError.value = null
-  const success = await loginStore.tryLogin(password.value)
+  showError.value = null;
+  const success = await loginStore.tryLogin(password.value);
   if (success) {
-    router.push(route.query.redirect || '/')
+    router.push(route.query.redirect || "/");
   } else {
-    showError.value = 10
+    showError.value = 10;
   }
-}
+};
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>
