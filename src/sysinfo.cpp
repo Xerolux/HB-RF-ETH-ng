@@ -41,11 +41,15 @@
 static const char *TAG = "SysInfo";
 
 static double _cpuUsage;
+static volatile uint32_t _supplyVoltageMv = 0;
 static char _serial[13];
 static const char *_currentVersion;
 static board_type_t _board;
 static uint64_t _bootTime;
 static temperature_sensor_handle_t _temp_sensor = NULL;
+
+// Forward declaration
+uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten);
 
 void updateCPUUsageTask(void *arg)
 {
@@ -81,6 +85,15 @@ void updateCPUUsageTask(void *arg)
 
         lastIdleRunTime = idleRunTime;
         lastTotalRunTime = totalRunTime;
+
+        // Update supply voltage in background to avoid blocking API requests
+        // Measure supply voltage with 2:1 voltage divider
+        // GPIO37 (ADC1_CH1) measures half of the actual supply voltage
+        uint32_t voltage_mv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
+
+        if (voltage_mv > 0) {
+            _supplyVoltageMv = voltage_mv;
+        }
     }
 
     free(taskStatus);
@@ -190,6 +203,9 @@ board_type_t detectBoard()
 
 SysInfo::SysInfo()
 {
+    // Initial voltage read to avoid startup delay/zero value
+    _supplyVoltageMv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
+
     xTaskCreate(updateCPUUsageTask, "UpdateCPUUsage", 4096, NULL, 3, NULL);
 
     uint8_t baseMac[6];
@@ -248,20 +264,9 @@ const char *SysInfo::getCurrentVersion()
 
 double SysInfo::getSupplyVoltage()
 {
-    // Measure supply voltage with 2:1 voltage divider
-    // GPIO37 (ADC1_CH1) measures half of the actual supply voltage
-    uint32_t voltage_mv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
-    if (voltage_mv == 0) {
-        ESP_LOGW(TAG, "Failed to read supply voltage, returning 0.0V");
-        return 0.0;
-    }
-
-    // Apply 2:1 voltage divider correction
-    double actual_voltage = (voltage_mv * 2.0) / 1000.0; // Convert to volts
-
-    ESP_LOGD(TAG, "Supply voltage: %.2fV (ADC: %u mV)", actual_voltage, voltage_mv);
-    return actual_voltage;
+    // Return cached value updated by background task
+    // Apply 2:1 voltage divider correction and convert to volts
+    return (_supplyVoltageMv * 2.0) / 1000.0;
 }
 
 const char* SysInfo::getBoardRevisionString()
