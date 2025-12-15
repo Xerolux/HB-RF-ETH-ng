@@ -118,6 +118,10 @@ export const useSettingsStore = defineStore('settings', {
     ledBrightness: 100,
     checkUpdates: true,
     allowPrerelease: false,
+    // Proxy Settings
+    experimentalFeaturesEnabled: false,
+    proxyMode: 0,
+    masterIP: "",
   }),
   actions: {
     async load() {

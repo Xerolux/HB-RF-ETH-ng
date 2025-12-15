@@ -196,6 +196,28 @@
       <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
         <BFormCheckbox v-model="allowPrerelease" switch />
       </BFormGroup>
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.proxySettings') }}</h6>
+      <BFormGroup :label="t('settings.experimentalFeaturesEnabled')" label-cols-sm="4">
+        <BFormCheckbox v-model="experimentalFeaturesEnabled" switch />
+      </BFormGroup>
+      <template v-if="experimentalFeaturesEnabled">
+        <BFormGroup :label="t('settings.proxyMode')" label-cols-sm="4">
+          <BFormSelect v-model.number="proxyMode">
+            <BFormSelectOption :value="0">{{ t('settings.proxyModeStandalone') }}</BFormSelectOption>
+            <BFormSelectOption :value="1">{{ t('settings.proxyModeMaster') }}</BFormSelectOption>
+            <BFormSelectOption :value="2">{{ t('settings.proxyModeSlave') }}</BFormSelectOption>
+          </BFormSelect>
+        </BFormGroup>
+        <BFormGroup :label="t('settings.masterIP')" label-cols-sm="4" v-if="proxyMode === 2">
+          <BFormInput
+            type="text"
+            v-model="masterIP"
+            trim
+            :state="v$.masterIP.$error ? false : null"
+          />
+        </BFormGroup>
+      </template>
 
       <BAlert
         variant="success"
@@ -307,6 +329,11 @@ const ledBrightness = ref(100)
 const checkUpdates = ref(true)
 const allowPrerelease = ref(false)
 
+// Proxy Settings
+const experimentalFeaturesEnabled = ref(false)
+const proxyMode = ref(0)
+const masterIP = ref('')
+
 const showSuccess = ref(null)
 const showError = ref(null)
 
@@ -381,6 +408,10 @@ const rules = {
   dcfOffset: {
     required: requiredIf(isDcfActivated),
     numeric
+  },
+  masterIP: {
+    required: requiredIf(() => experimentalFeaturesEnabled.value && proxyMode.value === 2),
+    ipAddress
   }
 }
 
@@ -399,7 +430,8 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
-  dcfOffset
+  dcfOffset,
+  masterIP
 })
 
 // Load settings from store
@@ -418,6 +450,9 @@ const loadSettings = () => {
   ledBrightness.value = settingsStore.ledBrightness
   checkUpdates.value = settingsStore.checkUpdates
   allowPrerelease.value = settingsStore.allowPrerelease
+  experimentalFeaturesEnabled.value = settingsStore.experimentalFeaturesEnabled
+  proxyMode.value = settingsStore.proxyMode
+  masterIP.value = settingsStore.masterIP
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -465,6 +500,9 @@ const saveSettingsClick = async () => {
       ledBrightness: ledBrightness.value,
       checkUpdates: checkUpdates.value,
       allowPrerelease: allowPrerelease.value,
+      experimentalFeaturesEnabled: experimentalFeaturesEnabled.value,
+      proxyMode: proxyMode.value,
+      masterIP: masterIP.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,

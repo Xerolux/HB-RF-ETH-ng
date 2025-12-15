@@ -81,6 +81,15 @@ export default {
     allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
 
+    // Proxy Settings
+    proxySettings: 'Proxy Einstellungen (Experimentell)',
+    experimentalFeaturesEnabled: 'Experimentelle Funktionen aktivieren',
+    proxyMode: 'Proxy Modus',
+    proxyModeStandalone: 'Standalone (Standard)',
+    proxyModeMaster: 'Master (Koordinator)',
+    proxyModeSlave: 'Slave (Funkkopf)',
+    masterIP: 'Master IP-Adresse',
+
     // Messages
     saveSuccess: 'Einstellungen wurden erfolgreich gespeichert. Bitte starten Sie das System neu, um sie zu übernehmen.',
     saveError: 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten.',

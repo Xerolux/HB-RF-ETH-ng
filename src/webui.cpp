@@ -350,6 +350,11 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ipv6Gateway", _settings->getIPv6Gateway());
     cJSON_AddStringToObject(settings, "ipv6Dns1", _settings->getIPv6Dns1());
     cJSON_AddStringToObject(settings, "ipv6Dns2", _settings->getIPv6Dns2());
+
+    // Proxy Settings
+    cJSON_AddBoolToObject(settings, "experimentalFeaturesEnabled", _settings->getExperimentalFeaturesEnabled());
+    cJSON_AddNumberToObject(settings, "proxyMode", (int)_settings->getProxyMode());
+    cJSON_AddStringToObject(settings, "masterIP", ip2str(_settings->getMasterIP()));
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -439,6 +444,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
 
+        // Proxy Settings
+        bool experimentalFeaturesEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "experimentalFeaturesEnabled"));
+        int proxyMode = cJSON_GetObjectItem(root, "proxyMode")->valueint;
+        ip4_addr_t masterIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "masterIP"));
+
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
         char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
@@ -457,6 +467,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setGpsBaudrate(gpsBaudrate);
         _settings->setNtpServer(ntpServer);
         _settings->setLEDBrightness(ledBrightness);
+
+        _settings->setExperimentalFeaturesEnabled(experimentalFeaturesEnabled);
+        _settings->setProxyMode((proxy_mode_t)proxyMode);
+        _settings->setMasterIP(masterIP);
 
         cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
         if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {

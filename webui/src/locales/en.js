@@ -81,6 +81,15 @@ export default {
     allowPrerelease: 'Allow Early Updates (Beta/Alpha)',
     language: 'Language',
 
+    // Proxy Settings
+    proxySettings: 'Proxy Settings (Experimental)',
+    experimentalFeaturesEnabled: 'Enable Experimental Features',
+    proxyMode: 'Proxy Mode',
+    proxyModeStandalone: 'Standalone (Default)',
+    proxyModeMaster: 'Master (Coordinator)',
+    proxyModeSlave: 'Slave (Remote Radio)',
+    masterIP: 'Master IP Address',
+
     // Messages
     saveSuccess: 'Settings were successfully saved. Please restart to take them effect.',
     saveError: 'An error occurred while saving the settings.',
