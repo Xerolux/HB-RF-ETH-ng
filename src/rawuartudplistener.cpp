@@ -22,6 +22,7 @@
  */
 
 #include "rawuartudplistener.h"
+#include "proxymanager.h"
 #include "hmframe.h"
 #include "esp_log.h"
 #include <string.h>
@@ -48,7 +49,7 @@ void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_
     }
 }
 
-RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
+RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _proxyManager(NULL), _radioModuleConnector(radioModuleConnector), _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
 {
     atomic_init(&_connectionStarted, false);
     atomic_init(&_remotePort, (ushort)0);
@@ -185,7 +186,13 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             return;
         }
 
-        _radioModuleConnector->sendFrame(&data[2], length - 4);
+        // Hook for Proxy Master (TX Path: CCU -> Proxy -> Slave/Radio)
+        if (_proxyManager && _proxyManager->handleCCUTX(&data[2], length - 4)) {
+            // Handled by ProxyManager (routed to a slave)
+        } else {
+            // Default: Send to local radio module
+            _radioModuleConnector->sendFrame(&data[2], length - 4);
+        }
         break;
 
     default:
@@ -239,6 +246,12 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
 
 void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 {
+    // Hook for Proxy Slave/Master (RX Path: Radio -> Proxy)
+    if (_proxyManager && _proxyManager->isActive()) {
+        _proxyManager->handleFrame(buffer, len);
+        return; // ProxyManager took ownership
+    }
+
     if (!atomic_load(&_connectionStarted))
         return;
 

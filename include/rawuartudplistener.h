@@ -31,9 +31,12 @@
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
 
+class ProxyManager; // Forward declaration
+
 class RawUartUdpListener : FrameHandler
 {
 private:
+    ProxyManager* _proxyManager;
     RadioModuleConnector *_radioModuleConnector;
     std::atomic<uint> _remoteAddress;
     std::atomic<ushort> _remotePort;
@@ -46,9 +49,11 @@ private:
     TaskHandle_t _tHandle = NULL;
 
     void handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
-    void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
 
 public:
+    void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
+    void setProxyManager(ProxyManager* proxyManager) { _proxyManager = proxyManager; }
+
     RawUartUdpListener(RadioModuleConnector *radioModuleConnector);
 
     void handleFrame(unsigned char *buffer, uint16_t len);

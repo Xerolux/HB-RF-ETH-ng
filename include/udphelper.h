@@ -53,7 +53,7 @@ static err_t _udp_remove_api(struct tcpip_api_call_data *api_call_msg)
   return msg->err;
 }
 
-static void _udp_remove(struct udp_pcb *pcb)
+inline void _udp_remove(struct udp_pcb *pcb)
 {
   udp_api_call_t msg;
   msg.pcb = pcb;
@@ -67,7 +67,7 @@ static err_t _udp_bind_api(struct tcpip_api_call_data *api_call_msg)
   return msg->err;
 }
 
-static err_t _udp_bind(struct udp_pcb *pcb, const ip_addr_t *addr, u16_t port)
+inline err_t _udp_bind(struct udp_pcb *pcb, const ip_addr_t *addr, u16_t port)
 {
   udp_api_call_t msg;
   msg.pcb = pcb;
@@ -85,7 +85,7 @@ static err_t _udp_disconnect_api(struct tcpip_api_call_data *api_call_msg)
   return msg->err;
 }
 
-static void _udp_disconnect(struct udp_pcb *pcb)
+inline void _udp_disconnect(struct udp_pcb *pcb)
 {
   udp_api_call_t msg;
   msg.pcb = pcb;
@@ -99,7 +99,7 @@ static err_t _udp_sendto_api(struct tcpip_api_call_data *api_call_msg)
   return msg->err;
 }
 
-static err_t _udp_sendto(struct udp_pcb *pcb, struct pbuf *pb, const ip_addr_t *addr, u16_t port)
+inline err_t _udp_sendto(struct udp_pcb *pcb, struct pbuf *pb, const ip_addr_t *addr, u16_t port)
 {
   udp_api_call_t msg;
   msg.pcb = pcb;

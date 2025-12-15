@@ -34,6 +34,13 @@ typedef enum
     TIMESOURCE_GPS = 2
 } timesource_t;
 
+typedef enum
+{
+    PROXY_MODE_STANDALONE = 0,
+    PROXY_MODE_MASTER = 1,
+    PROXY_MODE_SLAVE = 2
+} proxy_mode_t;
+
 class Settings
 {
 private:
@@ -59,6 +66,10 @@ private:
   int32_t _ledBrightness;
   bool _checkUpdates;
   bool _allowPrerelease;
+
+  bool _experimentalFeaturesEnabled;
+  int32_t _proxyMode;
+  ip4_addr_t _masterIP;
 
   bool _enableIPv6;
   char _ipv6Mode[10] = {0};
@@ -108,6 +119,15 @@ public:
 
   bool getAllowPrerelease();
   void setAllowPrerelease(bool allowPrerelease);
+
+  bool getExperimentalFeaturesEnabled();
+  void setExperimentalFeaturesEnabled(bool enabled);
+
+  proxy_mode_t getProxyMode();
+  void setProxyMode(proxy_mode_t mode);
+
+  ip4_addr_t getMasterIP();
+  void setMasterIP(ip4_addr_t ip);
 
   // IPv6 getters
   bool getEnableIPv6();

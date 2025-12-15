@@ -43,6 +43,7 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
+#include "proxymanager.h"
 #include "webui.h"
 #include "mdnsserver.h"
 #include "ntpserver.h"
@@ -171,6 +172,12 @@ void app_main()
     radioModuleConnector.resetModule();
 
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
+    ProxyManager proxyManager(&settings, &radioModuleConnector, &rawUartUdpLister);
+
+    // Inject ProxyManager into RawUartUdpListener
+    rawUartUdpLister.setProxyManager(&proxyManager);
+
+    proxyManager.start();
     rawUartUdpLister.start();
 
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);

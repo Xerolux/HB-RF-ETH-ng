@@ -128,6 +128,10 @@ void Settings::load()
   GET_BOOL(handle, "checkUpdates", _checkUpdates, true);
   GET_BOOL(handle, "allowPrerelease", _allowPrerelease, false);
 
+  GET_BOOL(handle, "experimentalFeaturesEnabled", _experimentalFeaturesEnabled, false);
+  GET_INT(handle, "proxyMode", _proxyMode, PROXY_MODE_STANDALONE);
+  GET_IP_ADDR(handle, "masterIP", _masterIP, IPADDR_ANY);
+
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
 
   // Load IPv6 settings
@@ -181,6 +185,10 @@ void Settings::save()
 
   SET_BOOL(handle, "checkUpdates", _checkUpdates);
   SET_BOOL(handle, "allowPrerelease", _allowPrerelease);
+
+  SET_BOOL(handle, "experimentalFeaturesEnabled", _experimentalFeaturesEnabled);
+  SET_INT(handle, "proxyMode", _proxyMode);
+  SET_IP_ADDR(handle, "masterIP", _masterIP);
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
 
@@ -399,6 +407,36 @@ bool Settings::getAllowPrerelease()
 void Settings::setAllowPrerelease(bool allowPrerelease)
 {
   _allowPrerelease = allowPrerelease;
+}
+
+bool Settings::getExperimentalFeaturesEnabled()
+{
+  return _experimentalFeaturesEnabled;
+}
+
+void Settings::setExperimentalFeaturesEnabled(bool enabled)
+{
+  _experimentalFeaturesEnabled = enabled;
+}
+
+proxy_mode_t Settings::getProxyMode()
+{
+  return (proxy_mode_t)_proxyMode;
+}
+
+void Settings::setProxyMode(proxy_mode_t mode)
+{
+  _proxyMode = mode;
+}
+
+ip4_addr_t Settings::getMasterIP()
+{
+  return _masterIP;
+}
+
+void Settings::setMasterIP(ip4_addr_t ip)
+{
+  _masterIP = ip;
 }
 
 // IPv6 Getters
