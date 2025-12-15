@@ -54,6 +54,7 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
         .flags = {
+            .allow_pd = 0,
             .backup_before_sleep = 0,
         },
     };

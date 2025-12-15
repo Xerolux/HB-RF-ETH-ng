@@ -42,6 +42,7 @@ GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
         .flags = {
+            .allow_pd = 0,
             .backup_before_sleep = 0,
         },
     };
