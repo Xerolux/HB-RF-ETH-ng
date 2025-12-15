@@ -25,7 +25,8 @@ def extract_changelog(version: str) -> str:
     content = changelog_file.read_text()
 
     # Try to find the version section
-    pattern = rf"## \[?{re.escape(version)}\]?"
+    # Matches: "## 2.1.0", "## [2.1.0]", "## Version 2.1.0", "## Version [2.1.0]"
+    pattern = rf"##\s+(?:Version\s+)?\[?{re.escape(version)}\]?"
     lines = content.split('\n')
 
     changelog_lines = []
