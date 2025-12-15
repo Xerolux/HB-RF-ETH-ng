@@ -29,6 +29,7 @@
 
 // Validation limits
 #define MAX_HOSTNAME_LENGTH 63
+#define MAX_PASSWORD_LENGTH 32
 #define MIN_LED_BRIGHTNESS 0
 #define MAX_LED_BRIGHTNESS 100
 #define MIN_DCF_OFFSET -60000
