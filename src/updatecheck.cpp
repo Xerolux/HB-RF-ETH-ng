@@ -59,35 +59,95 @@ const char *UpdateCheck::getLatestVersion()
 
 void UpdateCheck::_updateLatestVersion()
 {
-  const char* url = "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/master/webui/package.json";
+  char url[256];
+  if (_settings->getAllowPrerelease()) {
+      // Get the latest release (which can be a prerelease) by listing 1 per page
+      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=1");
+  } else {
+      // Get the latest stable release
+      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/latest");
+  }
 
   esp_http_client_config_t config = {};
   config.url = url;
+  config.crt_bundle_attach = esp_crt_bundle_attach; // Important for GitHub API
   config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+  // Increase buffer size for API response
+  config.buffer_size = 4096;
+  config.buffer_size_tx = 1024;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
 
+  // Set headers
+  esp_http_client_set_header(client, "Accept", "application/vnd.github.v3+json");
+  esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
+
   if (esp_http_client_perform(client) == ESP_OK)
   {
-    char buffer[2048];
+    // We read into a buffer. Note: Release API response can be large.
+    // We only need the tag_name.
+    // If it's a list (allowPrerelease=true), it starts with '['.
+    // If it's a single object (allowPrerelease=false), it starts with '{'.
+
+    // Using cJSON to parse might be memory intensive if the JSON is huge.
+    // Let's try to read enough to find "tag_name".
+
+    char buffer[4096]; // 4KB should cover the first part of the JSON where tag_name usually resides
     int len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
 
     if (len > 0)
     {
       buffer[len] = 0;
+
+      // Simple string search to avoid full JSON parsing overhead if possible,
+      // but cJSON is safer. Let's try cJSON. If it fails, we might need a stream parser.
       cJSON *json = cJSON_Parse(buffer);
 
       if (json)
       {
-        char *latestVersion = cJSON_GetStringValue(cJSON_GetObjectItem(json, "version"));
-        if (latestVersion != NULL)
-        {
-          strncpy(_latestVersion, latestVersion, sizeof(_latestVersion) - 1);
-          _latestVersion[sizeof(_latestVersion) - 1] = 0;
-        }
-        cJSON_Delete(json);
+          cJSON *targetObj = json;
+
+          if (cJSON_IsArray(json)) {
+              targetObj = cJSON_GetArrayItem(json, 0);
+          }
+
+          if (targetObj) {
+              char *tagName = cJSON_GetStringValue(cJSON_GetObjectItem(targetObj, "tag_name"));
+              if (tagName != NULL)
+              {
+                  // Tag name usually starts with 'v', e.g. "v2.1.0".
+                  // Our system expects "2.1.0".
+                  if (tagName[0] == 'v') {
+                      strncpy(_latestVersion, tagName + 1, sizeof(_latestVersion) - 1);
+                  } else {
+                      strncpy(_latestVersion, tagName, sizeof(_latestVersion) - 1);
+                  }
+                  _latestVersion[sizeof(_latestVersion) - 1] = 0;
+              }
+          }
+          cJSON_Delete(json);
+      } else {
+          ESP_LOGW(TAG, "Failed to parse JSON from GitHub API (might be incomplete)");
+          // Fallback manual parsing if cJSON failed due to incomplete JSON in buffer
+          const char* tagKey = "\"tag_name\":\"";
+          char* pos = strstr(buffer, tagKey);
+          if (pos) {
+              pos += strlen(tagKey);
+              char* end = strchr(pos, '"');
+              if (end) {
+                  *end = 0;
+                   if (pos[0] == 'v') {
+                      strncpy(_latestVersion, pos + 1, sizeof(_latestVersion) - 1);
+                  } else {
+                      strncpy(_latestVersion, pos, sizeof(_latestVersion) - 1);
+                  }
+                   _latestVersion[sizeof(_latestVersion) - 1] = 0;
+              }
+          }
       }
     }
+  } else {
+      ESP_LOGE(TAG, "Failed to check for updates");
   }
 
   esp_http_client_cleanup(client);

@@ -78,6 +78,7 @@ export default {
     systemSettings: 'System Settings',
     ledBrightness: 'LED Brightness',
     checkUpdates: 'Check for updates',
+    allowPrerelease: 'Allow Early Updates (Beta/Alpha)',
     language: 'Language',
 
     // Messages
@@ -143,6 +144,9 @@ export default {
     onlineUpdate: 'Update Online',
     onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
     onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
+    showReleaseNotes: 'Show Release Notes',
+    releaseNotesTitle: 'Release Notes for v{version}',
+    releaseNotesError: 'Failed to load release notes from GitHub.',
     updateFile: 'Firmware file',
     noFileChosen: 'No file chosen',
     browse: 'Browse',

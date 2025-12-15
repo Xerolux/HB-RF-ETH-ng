@@ -58,6 +58,7 @@ private:
 
   int32_t _ledBrightness;
   bool _checkUpdates;
+  bool _allowPrerelease;
 
   bool _enableIPv6;
   char _ipv6Mode[10] = {0};
@@ -104,6 +105,9 @@ public:
 
   bool getCheckUpdates();
   void setCheckUpdates(bool checkUpdates);
+
+  bool getAllowPrerelease();
+  void setAllowPrerelease(bool allowPrerelease);
 
   // IPv6 getters
   bool getEnableIPv6();

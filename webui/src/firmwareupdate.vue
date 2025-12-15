@@ -35,6 +35,12 @@
         class="mb-3"
       >
         <BButton
+          variant="info"
+          block
+          class="mb-2"
+          @click="showReleaseNotes = true"
+        >{{ t('firmware.showReleaseNotes') }}</BButton>
+        <BButton
           variant="success"
           block
           :disabled="firmwareUpdateStore.progress > 0"
@@ -50,6 +56,34 @@
           :browse-text="t('firmware.browse')"
         />
       </BFormGroup>
+
+    <BModal
+      v-model="showReleaseNotes"
+      :title="t('firmware.releaseNotesTitle', { version: sysInfoStore.latestVersion })"
+      size="lg"
+      scrollable
+      ok-only
+      :ok-title="t('common.close')"
+      @show="fetchReleaseNotes"
+    >
+      <div v-if="loadingNotes" class="text-center p-4">
+        <BSpinner label="Loading..." />
+      </div>
+      <div v-else-if="releaseNotesError" class="text-danger">
+        {{ t('firmware.releaseNotesError') }}
+      </div>
+      <div v-else>
+        <!-- Use v-html carefully, ideally use a markdown renderer but for now pre-wrap -->
+        <pre class="release-notes-content">{{ releaseNotes }}</pre>
+        <BButton
+          variant="success"
+          block
+          class="mt-3"
+          :disabled="firmwareUpdateStore.progress > 0"
+          @click="onlineUpdateClickFromModal"
+        >{{ t('firmware.onlineUpdate') }}</BButton>
+      </div>
+    </BModal>
       <BProgress
         :value="firmwareUpdateStore.progress"
         :max="100"
@@ -95,6 +129,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
+import axios from 'axios'
 
 const { t } = useI18n()
 
@@ -104,6 +139,33 @@ const firmwareUpdateStore = useFirmwareUpdateStore()
 const file = ref(null)
 const showError = ref(false)
 const showSuccess = ref(false)
+
+const showReleaseNotes = ref(false)
+const releaseNotes = ref('')
+const loadingNotes = ref(false)
+const releaseNotesError = ref(false)
+
+const fetchReleaseNotes = async () => {
+  loadingNotes.value = true
+  releaseNotesError.value = false
+  releaseNotes.value = ''
+  try {
+    // GitHub API to get release notes
+    // Note: This relies on client-side internet access
+    const response = await axios.get(`https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/tags/v${sysInfoStore.latestVersion}`)
+    releaseNotes.value = response.data.body
+  } catch (error) {
+    console.error('Failed to fetch release notes:', error)
+    releaseNotesError.value = true
+  } finally {
+    loadingNotes.value = false
+  }
+}
+
+const onlineUpdateClickFromModal = () => {
+    showReleaseNotes.value = false
+    onlineUpdateClick()
+}
 
 const onlineUpdateClick = async () => {
   if (confirm(t('firmware.onlineUpdateConfirm'))) {
@@ -158,4 +220,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.release-notes-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+}
 </style>

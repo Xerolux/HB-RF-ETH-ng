@@ -340,6 +340,7 @@ void add_settings(cJSON *root)
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 
     cJSON_AddBoolToObject(settings, "checkUpdates", _settings->getCheckUpdates());
+    cJSON_AddBoolToObject(settings, "allowPrerelease", _settings->getAllowPrerelease());
 
     // IPv6 Settings
     cJSON_AddBoolToObject(settings, "enableIPv6", _settings->getEnableIPv6());
@@ -460,6 +461,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
         if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
             _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
+        }
+
+        cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
+        if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
+            _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
         }
 
         // Handle IPv6 (checking for nulls)
