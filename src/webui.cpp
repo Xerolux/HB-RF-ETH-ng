@@ -939,7 +939,7 @@ void WebUI::start()
     config.max_uri_handlers = 20;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-    httpd_handle_t _httpd_handle = NULL;
+    _httpd_handle = NULL;
 
     if (httpd_start(&_httpd_handle, &config) == ESP_OK)
     {

@@ -171,7 +171,6 @@ void mqtt_handler_publish_ha_discovery(void)
     // Use board revision as hardware version
     cJSON_AddStringToObject(device, "hw_version", sysInfo->getBoardRevisionString());
     // configuration_url
-    char config_url[64];
     // Since we don't know the IP/hostname easily here without including settings/ethernet,
     // we skip config_url or use a generic one if possible.
     // Actually we can leave it out.
