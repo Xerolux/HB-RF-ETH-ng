@@ -1,6 +1,6 @@
 # HB-RF-ETH-ng Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.1.0
+This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.1.1
 
 ## Table of Contents
 
