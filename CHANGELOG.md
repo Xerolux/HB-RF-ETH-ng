@@ -1,5 +1,12 @@
 # Changelog - HB-RF-ETH Firmware
 
+## Version 2.1.1 Beta (2025)
+
+### Änderungen
+- Automatische Changelog-Generierung vorbereitet
+- GitHub Actions Release Workflow Optimierungen
+- Beta Release
+
 ## Version 2.0.0 (2025) - Modernisierte Fork von Xerolux
 
 Diese Version stellt eine umfassende Modernisierung der HB-RF-ETH Firmware dar.

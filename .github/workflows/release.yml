@@ -30,9 +30,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Get version
         id: get_version
@@ -50,12 +51,13 @@ jobs:
       - name: Update version numbers
         run: |
           python3 update_version.py ${{ steps.get_version.outputs.VERSION }}
+          python3 update_changelog.py ${{ steps.get_version.outputs.VERSION }}
 
       - name: Commit version updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.txt README.md webui/src/about.vue webui/package.json docs/openapi.yaml docs/TROUBLESHOOTING.md
+          git add version.txt README.md webui/src/about.vue webui/package.json docs/openapi.yaml docs/TROUBLESHOOTING.md CHANGELOG.md
           git diff --staged --quiet || git commit -m "chore: Update version to ${{ steps.get_version.outputs.VERSION }}"
           git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "No changes to push or already on tag"
 
