@@ -78,6 +78,7 @@ export default {
     systemSettings: 'Systemeinstellungen',
     ledBrightness: 'LED Helligkeit',
     checkUpdates: 'Nach Updates suchen',
+    allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
 
     // Messages
@@ -143,6 +144,9 @@ export default {
     onlineUpdate: 'Online Update durchführen',
     onlineUpdateConfirm: 'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
     onlineUpdateStarted: 'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
+    showReleaseNotes: 'Release Notes anzeigen',
+    releaseNotesTitle: 'Release Notes für v{version}',
+    releaseNotesError: 'Release Notes konnten nicht von GitHub geladen werden.',
     updateFile: 'Firmware Datei',
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',

@@ -193,6 +193,9 @@
       <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
         <BFormCheckbox v-model="checkUpdates" switch />
       </BFormGroup>
+      <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
+        <BFormCheckbox v-model="allowPrerelease" switch />
+      </BFormGroup>
 
       <BAlert
         variant="success"
@@ -302,6 +305,7 @@ const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
 const checkUpdates = ref(true)
+const allowPrerelease = ref(false)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -413,6 +417,7 @@ const loadSettings = () => {
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
   checkUpdates.value = settingsStore.checkUpdates
+  allowPrerelease.value = settingsStore.allowPrerelease
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -459,6 +464,7 @@ const saveSettingsClick = async () => {
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
       checkUpdates: checkUpdates.value,
+      allowPrerelease: allowPrerelease.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
