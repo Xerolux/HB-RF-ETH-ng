@@ -118,6 +118,9 @@ export const useSettingsStore = defineStore('settings', {
     ledBrightness: 100,
     checkUpdates: true,
     allowPrerelease: false,
+    hmlgwEnabled: false,
+    hmlgwPort: 2000,
+    hmlgwKeepAlivePort: 2001,
   }),
   actions: {
     async load() {

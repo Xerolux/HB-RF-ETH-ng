@@ -120,4 +120,16 @@ public:
 
   // IPv6 setter
   void setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway, char *ipv6Dns1, char *ipv6Dns2);
+
+  bool getHmlgwEnabled();
+  void setHmlgwEnabled(bool enabled);
+  uint16_t getHmlgwPort();
+  void setHmlgwPort(uint16_t port);
+  uint16_t getHmlgwKeepAlivePort();
+  void setHmlgwKeepAlivePort(uint16_t port);
+
+private:
+  bool _hmlgwEnabled;
+  uint16_t _hmlgwPort;
+  uint16_t _hmlgwKeepAlivePort;
 };
