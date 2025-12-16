@@ -121,6 +121,7 @@ export const useSettingsStore = defineStore('settings', {
     hmlgwEnabled: false,
     hmlgwPort: 2000,
     hmlgwKeepAlivePort: 2001,
+    analyzerEnabled: false,
   }),
   actions: {
     async load() {

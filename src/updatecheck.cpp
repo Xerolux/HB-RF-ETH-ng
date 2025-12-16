@@ -52,6 +52,11 @@ void UpdateCheck::stop()
   vTaskDelete(_tHandle);
 }
 
+void UpdateCheck::checkNow()
+{
+  _updateLatestVersion();
+}
+
 const char *UpdateCheck::getLatestVersion()
 {
   return _latestVersion;

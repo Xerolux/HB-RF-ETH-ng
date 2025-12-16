@@ -367,6 +367,8 @@ void add_settings(cJSON *root)
     cJSON_AddBoolToObject(settings, "hmlgwEnabled", _settings->getHmlgwEnabled());
     cJSON_AddNumberToObject(settings, "hmlgwPort", _settings->getHmlgwPort());
     cJSON_AddNumberToObject(settings, "hmlgwKeepAlivePort", _settings->getHmlgwKeepAlivePort());
+
+    cJSON_AddBoolToObject(settings, "analyzerEnabled", _settings->getAnalyzerEnabled());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -485,6 +487,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
              hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
         }
 
+        bool analyzerEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "analyzerEnabled"));
+
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
 
@@ -521,6 +525,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setHmlgwEnabled(hmlgwEnabled);
         _settings->setHmlgwPort(hmlgwPort);
         _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
+
+        _settings->setAnalyzerEnabled(analyzerEnabled);
 
         _settings->save();
 
@@ -902,6 +908,67 @@ httpd_uri_t _post_firmware_online_update_handler = {
     .handle_ws_control_frames = false,
     .supported_subprotocol = NULL};
 
+esp_err_t post_check_update_handler_func(httpd_req_t *req)
+{
+  if (validate_auth(req) != ESP_OK)
+  {
+      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+  }
+
+  // Perform check in this task (it might block for a few seconds)
+  _updateCheck->checkNow();
+
+  httpd_resp_set_type(req, "application/json");
+
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddStringToObject(root, "latestVersion", _updateCheck->getLatestVersion());
+
+  const char *json = cJSON_PrintUnformatted(root);
+  httpd_resp_sendstr(req, json);
+  free((void *)json);
+  cJSON_Delete(root);
+
+  return ESP_OK;
+}
+
+httpd_uri_t post_check_update_handler = {
+    .uri = "/api/check_update",
+    .method = HTTP_POST,
+    .handler = post_check_update_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
+{
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    // Reset settings
+    _settings->clear();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    // Restart after a short delay
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
+
+    return ESP_OK;
+}
+
+httpd_uri_t post_factory_reset_handler = {
+    .uri = "/api/factory_reset",
+    .method = HTTP_POST,
+    .handler = post_factory_reset_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
     if (validate_auth(req) != ESP_OK)
@@ -1026,6 +1093,8 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
         httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);

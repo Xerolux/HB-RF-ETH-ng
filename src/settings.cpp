@@ -162,6 +162,8 @@ void Settings::load()
   GET_UINT16(handle, "hmlgwPort", _hmlgwPort, 2000);
   GET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort, 2001);
 
+  GET_BOOL(handle, "analyzerEnabled", _analyzerEnabled, false);
+
   nvs_close(handle);
 }
 
@@ -207,6 +209,8 @@ void Settings::save()
   SET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled);
   SET_UINT16(handle, "hmlgwPort", _hmlgwPort);
   SET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort);
+
+  SET_BOOL(handle, "analyzerEnabled", _analyzerEnabled);
 
   nvs_close(handle);
 }
@@ -454,3 +458,6 @@ void Settings::setHmlgwPort(uint16_t port) { _hmlgwPort = port; }
 
 uint16_t Settings::getHmlgwKeepAlivePort() { return _hmlgwKeepAlivePort; }
 void Settings::setHmlgwKeepAlivePort(uint16_t port) { _hmlgwKeepAlivePort = port; }
+
+bool Settings::getAnalyzerEnabled() { return _analyzerEnabled; }
+void Settings::setAnalyzerEnabled(bool enabled) { _analyzerEnabled = enabled; }

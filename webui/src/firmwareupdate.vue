@@ -48,6 +48,18 @@
         >{{ t('firmware.onlineUpdate') }}</BButton>
       </BFormGroup>
 
+      <BFormGroup
+        v-if="sysInfoStore.currentVersion >= sysInfoStore.latestVersion || sysInfoStore.latestVersion == 'n/a'"
+        label-cols-sm="9"
+        class="mb-3"
+      >
+        <BButton
+            variant="primary"
+            block
+            @click="checkUpdateClick"
+        >{{ t('firmware.checkUpdate') }}</BButton>
+      </BFormGroup>
+
       <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
         <BFormFile
           v-model="file"
@@ -208,10 +220,31 @@ const restartClick = async () => {
   if (confirm(t('firmware.restartConfirm'))) {
     try {
       await fetch('/api/restart', { method: 'POST' })
+      alert(t('common.rebootingWait'))
+      setTimeout(() => {
+          window.location.reload()
+      }, 10000)
     } catch (error) {
       // Expected - device will restart and connection will be lost
     }
   }
+}
+
+const checkUpdateClick = async () => {
+    try {
+        const response = await axios.post('/api/check_update')
+        if (response.data && response.data.latestVersion) {
+            sysInfoStore.latestVersion = response.data.latestVersion
+            if (sysInfoStore.currentVersion < sysInfoStore.latestVersion) {
+                alert(t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }))
+            } else {
+                alert(t('firmware.noUpdateAvailable'))
+            }
+        }
+    } catch (e) {
+        console.error(e)
+        alert('Failed to check updates')
+    }
 }
 
 onMounted(() => {

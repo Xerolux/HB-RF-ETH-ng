@@ -128,8 +128,13 @@ public:
   uint16_t getHmlgwKeepAlivePort();
   void setHmlgwKeepAlivePort(uint16_t port);
 
+  bool getAnalyzerEnabled();
+  void setAnalyzerEnabled(bool enabled);
+
 private:
   bool _hmlgwEnabled;
   uint16_t _hmlgwPort;
   uint16_t _hmlgwKeepAlivePort;
+
+  bool _analyzerEnabled;
 };

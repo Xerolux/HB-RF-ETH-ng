@@ -221,6 +221,11 @@
           />
         </BFormGroup>
       </template>
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
+      <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
+        <BFormCheckbox v-model="analyzerEnabled" switch />
+      </BFormGroup>
 
       <BAlert
         variant="success"
@@ -274,6 +279,17 @@
             @click="restoreSettings"
         >{{ t('settings.restore') }}</BButton>
     </BForm>
+  </BCard>
+
+  <BCard
+    :header="t('settings.systemMaintenance')"
+    header-tag="h6"
+    header-bg-variant="danger"
+    header-text-variant="white"
+    class="mb-3"
+  >
+    <BButton variant="warning" block class="me-2" @click="rebootClick">{{ t('settings.reboot') }}</BButton>
+    <BButton variant="danger" block @click="factoryResetClick">{{ t('settings.factoryReset') }}</BButton>
   </BCard>
 </template>
 
@@ -335,6 +351,8 @@ const allowPrerelease = ref(false)
 const hmlgwEnabled = ref(false)
 const hmlgwPort = ref(2000)
 const hmlgwKeepAlivePort = ref(2001)
+
+const analyzerEnabled = ref(false)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -468,6 +486,10 @@ const loadSettings = () => {
       hmlgwKeepAlivePort.value = settingsStore.hmlgwKeepAlivePort || 2001
   }
 
+  if (settingsStore.analyzerEnabled !== undefined) {
+      analyzerEnabled.value = settingsStore.analyzerEnabled
+  }
+
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
     enableIPv6.value = settingsStore.enableIPv6
@@ -518,6 +540,7 @@ const saveSettingsClick = async () => {
       hmlgwEnabled: hmlgwEnabled.value,
       hmlgwPort: hmlgwPort.value,
       hmlgwKeepAlivePort: hmlgwKeepAlivePort.value,
+      analyzerEnabled: analyzerEnabled.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
@@ -572,6 +595,37 @@ const restoreSettings = async () => {
         reader.readAsText(restoreFile.value)
     } catch (e) {
         alert(t('settings.restoreError'))
+    }
+}
+
+const rebootClick = async () => {
+    if (confirm(t('common.confirmReboot'))) {
+        try {
+            await axios.post('/api/restart')
+            // Show wait message
+            alert(t('common.rebootingWait'))
+            setTimeout(() => {
+                window.location.reload()
+            }, 10000)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+}
+
+const factoryResetClick = async () => {
+    if (confirm(t('common.confirmFactoryReset'))) {
+        try {
+            await axios.post('/api/factory_reset')
+             // Show wait message
+            alert(t('common.factoryResettingWait'))
+            setTimeout(() => {
+                window.location.reload()
+            }, 10000)
+        } catch (e) {
+            console.error(e)
+            alert('Factory Reset failed')
+        }
     }
 }
 </script>
