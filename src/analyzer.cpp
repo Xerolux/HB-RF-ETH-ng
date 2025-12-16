@@ -57,7 +57,7 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
         ws_pkt.payload = (uint8_t *)json_str;
         ws_pkt.len = strlen(json_str);
-        ws_pkt.type = HTTPD_WS_TEXT;
+        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
         if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
             // Iterate backwards to allow safe removal
@@ -152,7 +152,7 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
     httpd_ws_frame_t ws_pkt;
     uint8_t *buf = NULL;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.type = HTTPD_WS_TEXT;
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
     // Set max length
     esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
@@ -178,7 +178,7 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
     }
 
     // Triggered when close
-    if (ws_pkt.type == HTTPD_WS_CLOSE) {
+    if (ws_pkt.type == HTTPD_WS_TYPE_CLOSE) {
          ESP_LOGI(TAG, "Websocket close");
          if (_instance) {
              _instance->removeClient(req->handle, httpd_req_to_sockfd(req));
@@ -197,13 +197,13 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
         _instance->addClient(req->handle, httpd_req_to_sockfd(req));
     }
 
-    if (ws_pkt.type == HTTPD_WS_TEXT && strcmp((char*)ws_pkt.payload, "ping") == 0) {
+    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char*)ws_pkt.payload, "ping") == 0) {
         // Pong
          httpd_ws_frame_t response;
          memset(&response, 0, sizeof(httpd_ws_frame_t));
          response.payload = (uint8_t*)"pong";
          response.len = 4;
-         response.type = HTTPD_WS_TEXT;
+         response.type = HTTPD_WS_TYPE_TEXT;
          httpd_ws_send_frame(req, &response);
     }
 
