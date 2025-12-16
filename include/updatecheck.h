@@ -44,6 +44,7 @@ public:
     void start();
     void stop();
     void performOnlineUpdate();
+    void checkNow();
 
     const char* getLatestVersion();
 

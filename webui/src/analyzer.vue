@@ -100,10 +100,13 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore } from './stores.js'
+import { useLoginStore, useSettingsStore } from './stores.js'
+import { useRouter } from 'vue-router'
 
 const { t } = useI18n()
 const loginStore = useLoginStore()
+const settingsStore = useSettingsStore()
+const router = useRouter()
 
 const frames = ref([])
 const isConnected = ref(false)
@@ -326,7 +329,13 @@ const getRssiClass = (rssi) => {
     return 'text-danger'
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await settingsStore.load()
+  if (!settingsStore.analyzerEnabled) {
+      alert(t('analyzer.disabled'))
+      router.push('/')
+      return
+  }
   loadNames()
   connect()
 })

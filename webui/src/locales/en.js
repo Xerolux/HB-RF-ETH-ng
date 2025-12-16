@@ -10,7 +10,11 @@ export default {
     error: 'Error',
     success: 'Success',
     yes: 'Yes',
-    no: 'No'
+    no: 'No',
+    rebootingWait: 'System is rebooting. Please wait approx. 10 seconds...',
+    factoryResettingWait: 'System is resetting to factory defaults and rebooting. Please wait...',
+    confirmReboot: 'Are you sure you want to reboot the system?',
+    confirmFactoryReset: 'Are you sure? All settings will be lost!'
   },
 
   // Header Navigation
@@ -78,9 +82,14 @@ export default {
     // System Settings
     systemSettings: 'System Settings',
     ledBrightness: 'LED Brightness',
-    checkUpdates: 'Check for updates',
+    checkUpdates: 'Automatically check for updates',
     allowPrerelease: 'Allow Early Updates (Beta/Alpha)',
     language: 'Language',
+    analyzerSettings: 'Analyzer Light Settings',
+    enableAnalyzer: 'Enable Analyzer Light',
+    systemMaintenance: 'System Maintenance',
+    reboot: 'Reboot',
+    factoryReset: 'Factory Reset',
 
     // HMLGW
     hmlgwSettings: 'HomeMatic LAN Gateway (HMLGW) Settings',
@@ -149,6 +158,8 @@ export default {
     versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailable: 'An update to version {latestVersion} is available.',
     onlineUpdate: 'Update Online',
+    checkUpdate: 'Check for Updates Now',
+    noUpdateAvailable: 'No update available',
     onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
     onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
     showReleaseNotes: 'Show Release Notes',
@@ -221,6 +232,7 @@ export default {
   // Analyzer
   analyzer: {
     title: 'Analyzer Light',
+    disabled: 'Analyzer Light feature is disabled. Please enable it in Settings.',
     connected: 'Connected',
     disconnected: 'Disconnected',
     clear: 'Clear',

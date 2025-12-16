@@ -8,7 +8,7 @@
         <BNavItem to="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
         <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
         <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn">{{ t('nav.analyzer') }}</BNavItem>
+        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BNavItem>
         <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
@@ -33,25 +33,32 @@
         >
           {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
         </BNavItem>
-        <BNavForm v-if="loginStore.isLoggedIn">
-          <BButton size="sm" variant="outline-light" @click.prevent="logout">{{ t('nav.logout') }}</BButton>
-        </BNavForm>
+        <BNavItem v-if="loginStore.isLoggedIn" @click.prevent="logout" href="#" class="me-2 text-warning font-weight-bold">
+            {{ t('nav.logout') }}
+        </BNavItem>
       </BNavbarNav>
     </BCollapse>
   </BNavbar>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore } from './stores.js'
+import { useLoginStore, useThemeStore, useSettingsStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const loginStore = useLoginStore()
 const themeStore = useThemeStore()
+const settingsStore = useSettingsStore()
+
+onMounted(async () => {
+    if (loginStore.isLoggedIn) {
+        await settingsStore.load()
+    }
+})
 
 const currentLocale = computed(() => locale.value)
 const currentLocaleName = computed(() => {
