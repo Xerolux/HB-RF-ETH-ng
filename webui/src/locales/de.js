@@ -225,7 +225,12 @@ export default {
     type: 'Typ',
     src: 'Quelle',
     dst: 'Ziel',
-    payload: 'Daten'
+    payload: 'Daten',
+    rssi: 'RSSI',
+    deviceNames: 'Gerätenamen',
+    address: 'Adresse',
+    name: 'Name',
+    storedNames: 'Gespeicherte Namen'
   },
 
   // About Page
