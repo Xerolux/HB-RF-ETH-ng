@@ -68,10 +68,6 @@ void app_main()
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .allow_pd = 0,
-            .backup_before_sleep = 0,
-        },
     };
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
