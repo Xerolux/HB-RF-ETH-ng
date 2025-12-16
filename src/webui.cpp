@@ -45,6 +45,20 @@ static const char *TAG = "WebUI";
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
+        if (_sysInfo) {                                                \
+            char etag[32];                                             \
+            snprintf(etag, sizeof(etag), "\"%s\"", _sysInfo->getCurrentVersion()); \
+            httpd_resp_set_hdr(req, "ETag", etag);                     \
+            httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=0, must-revalidate"); \
+            char if_none_match[64];                                    \
+            if (httpd_req_get_hdr_value_str(req, "If-None-Match", if_none_match, sizeof(if_none_match)) == ESP_OK) { \
+                if (strstr(if_none_match, etag)) {                     \
+                    httpd_resp_set_status(req, "304 Not Modified");    \
+                    httpd_resp_send(req, NULL, 0);                     \
+                    return ESP_OK;                                     \
+                }                                                      \
+            }                                                          \
+        }                                                              \
         httpd_resp_set_type(req, _contentType);                        \
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");           \
         httpd_resp_send(req, _resource, _resource##_length);           \
