@@ -109,8 +109,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                ESP_LOGE(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d", data[3], endpointConnectionIdentifier);
-                return;
+                ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
             atomic_store(&_remotePort, (ushort)0);
