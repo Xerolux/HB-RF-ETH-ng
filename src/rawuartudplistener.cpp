@@ -323,16 +323,8 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
 
     e->pb = pb;
 
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpointer-arith"
-
-    ip_hdr *iphdr = reinterpret_cast<ip_hdr *>(pb->payload - UDP_HLEN - IP_HLEN);
-    e->addr.addr = iphdr->src.addr;
-
-    udp_hdr *udphdr = reinterpret_cast<udp_hdr *>(pb->payload - UDP_HLEN);
-    e->port = ntohs(udphdr->src);
-
-    #pragma GCC diagnostic pop
+    e->addr.addr = ip_addr_get_ip4_u32(addr);
+    e->port = port;
 
     if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
