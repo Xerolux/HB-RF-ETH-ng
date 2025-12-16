@@ -82,6 +82,12 @@ export default {
     allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
 
+    // HMLGW
+    hmlgwSettings: 'HomeMatic LAN Gateway (HMLGW) Einstellungen',
+    enableHmlgw: 'HMLGW-Modus aktivieren',
+    hmlgwPort: 'Daten-Port (Standard: 2000)',
+    hmlgwKeepAlivePort: 'KeepAlive-Port (Standard: 2001)',
+
     // Messages
     saveSuccess: 'Einstellungen wurden erfolgreich gespeichert. Bitte starten Sie das System neu, um sie zu übernehmen.',
     saveError: 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten.',

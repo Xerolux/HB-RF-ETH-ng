@@ -60,10 +60,17 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
     var = (__##var##_temp != 0);                           \
   }
 
+#define GET_UINT16(handle, name, var, defaultValue) \
+  if (nvs_get_u16(handle, name, &var) != ESP_OK) \
+  {                                              \
+    var = defaultValue;                          \
+  }
+
 #define SET_IP_ADDR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, name, var.addr));
 #define SET_INT(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i32(handle, name, var));
 #define SET_STR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_str(handle, name, var));
 #define SET_BOOL(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i8(handle, name, var ? 1 : 0));
+#define SET_UINT16(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u16(handle, name, var));
 
 void Settings::load()
 {
@@ -151,6 +158,10 @@ void Settings::load()
   len = sizeof(_ipv6Dns2);
   if (nvs_get_str(handle, "ipv6Dns2", _ipv6Dns2, &len) != ESP_OK) _ipv6Dns2[0] = 0;
 
+  GET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled, false);
+  GET_UINT16(handle, "hmlgwPort", _hmlgwPort, 2000);
+  GET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort, 2001);
+
   nvs_close(handle);
 }
 
@@ -192,6 +203,10 @@ void Settings::save()
   SET_STR(handle, "ipv6Gateway", _ipv6Gateway);
   SET_STR(handle, "ipv6Dns1", _ipv6Dns1);
   SET_STR(handle, "ipv6Dns2", _ipv6Dns2);
+
+  SET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled);
+  SET_UINT16(handle, "hmlgwPort", _hmlgwPort);
+  SET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort);
 
   nvs_close(handle);
 }
@@ -430,3 +445,12 @@ void Settings::setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Addres
     strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
     strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
 }
+
+bool Settings::getHmlgwEnabled() { return _hmlgwEnabled; }
+void Settings::setHmlgwEnabled(bool enabled) { _hmlgwEnabled = enabled; }
+
+uint16_t Settings::getHmlgwPort() { return _hmlgwPort; }
+void Settings::setHmlgwPort(uint16_t port) { _hmlgwPort = port; }
+
+uint16_t Settings::getHmlgwKeepAlivePort() { return _hmlgwKeepAlivePort; }
+void Settings::setHmlgwKeepAlivePort(uint16_t port) { _hmlgwKeepAlivePort = port; }

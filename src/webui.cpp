@@ -298,7 +298,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         _ethernet->isConnected() ? "true" : "false",
         _ethernet->getLinkSpeedMbps(),
         _ethernet->getDuplexMode(),
-        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()),
+        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
         radioModuleTypeStr,
         _radioModuleDetector->getSerial(),
         fwVersionStr,
@@ -362,6 +362,11 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ipv6Gateway", _settings->getIPv6Gateway());
     cJSON_AddStringToObject(settings, "ipv6Dns1", _settings->getIPv6Dns1());
     cJSON_AddStringToObject(settings, "ipv6Dns2", _settings->getIPv6Dns2());
+
+    // HMLGW
+    cJSON_AddBoolToObject(settings, "hmlgwEnabled", _settings->getHmlgwEnabled());
+    cJSON_AddNumberToObject(settings, "hmlgwPort", _settings->getHmlgwPort());
+    cJSON_AddNumberToObject(settings, "hmlgwKeepAlivePort", _settings->getHmlgwKeepAlivePort());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -469,6 +474,17 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
+        // HMLGW
+        bool hmlgwEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "hmlgwEnabled"));
+        int hmlgwPort = 2000;
+        if (cJSON_GetObjectItem(root, "hmlgwPort")) {
+             hmlgwPort = cJSON_GetObjectItem(root, "hmlgwPort")->valueint;
+        }
+        int hmlgwKeepAlivePort = 2001;
+        if (cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")) {
+             hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
+        }
+
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
 
@@ -501,6 +517,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
                 ipv6Dns2 ? ipv6Dns2 : (char*)""
             );
         }
+
+        _settings->setHmlgwEnabled(hmlgwEnabled);
+        _settings->setHmlgwPort(hmlgwPort);
+        _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
 
         _settings->save();
 

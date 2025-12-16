@@ -43,6 +43,7 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
+#include "hmlgw.h"
 #include "webui.h"
 #include "mdnsserver.h"
 #include "ntpserver.h"
@@ -170,13 +171,23 @@ void app_main()
 
     radioModuleConnector.resetModule();
 
-    RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
-    rawUartUdpLister.start();
+    RawUartUdpListener* rawUartUdpLister = NULL;
+    Hmlgw* hmlgw = NULL;
+
+    if (settings.getHmlgwEnabled()) {
+        ESP_LOGI(TAG, "Starting HMLGW mode");
+        hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
+        hmlgw->start();
+    } else {
+        ESP_LOGI(TAG, "Starting Raw UART UDP mode");
+        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector);
+        rawUartUdpLister->start();
+    }
 
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     updateCheck.start();
 
-    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
