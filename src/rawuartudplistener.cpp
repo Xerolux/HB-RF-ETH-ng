@@ -261,7 +261,8 @@ void RawUartUdpListener::start()
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
 
-    _radioModuleConnector->setFrameHandler(this, false);
+    _radioModuleConnector->addFrameHandler(this);
+    _radioModuleConnector->setDecodeEscaped(false);
 }
 
 void RawUartUdpListener::stop()
@@ -271,7 +272,7 @@ void RawUartUdpListener::stop()
     _udp_remove(_pcb);
     _pcb = NULL;
 
-    _radioModuleConnector->setFrameHandler(NULL, false);
+    _radioModuleConnector->removeFrameHandler(this);
     vTaskDelete(_tHandle);
 }
 

@@ -35,6 +35,7 @@
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
 #include "rate_limiter.h"
+#include "analyzer.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -53,7 +54,10 @@ static const char *TAG = "WebUI";
         .uri = _uri,                                                   \
         .method = HTTP_GET,                                            \
         .handler = _resource##_handler_func,                           \
-        .user_ctx = NULL};
+        .user_ctx = NULL,                                              \
+        .is_websocket = false,                                         \
+        .handle_ws_control_frames = false,                             \
+        .supported_subprotocol = NULL};
 
 EMBED_HANDLER("/*", index_html_gz, "text/html")
 EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
@@ -68,6 +72,7 @@ static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
+static Analyzer *_analyzer;
 static char _token[46];
 
 void generateToken()
@@ -217,7 +222,10 @@ httpd_uri_t post_login_json_handler = {
     .uri = "/login.json",
     .method = HTTP_POST,
     .handler = post_login_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
@@ -312,7 +320,10 @@ httpd_uri_t get_sysinfo_json_handler = {
     .uri = "/sysinfo.json",
     .method = HTTP_GET,
     .handler = get_sysinfo_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 void add_settings(cJSON *root)
 {
@@ -379,7 +390,10 @@ httpd_uri_t get_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_GET,
     .handler = get_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
@@ -512,7 +526,10 @@ httpd_uri_t post_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_POST,
     .handler = post_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
@@ -562,7 +579,10 @@ httpd_uri_t get_backup_handler = {
     .uri = "/api/backup",
     .method = HTTP_GET,
     .handler = get_backup_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
@@ -685,7 +705,10 @@ httpd_uri_t post_restore_handler = {
     .uri = "/api/restore",
     .method = HTTP_POST,
     .handler = post_restore_handler_func_actual,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
@@ -793,7 +816,10 @@ httpd_uri_t post_ota_update_handler = {
     .uri = "/ota_update",
     .method = HTTP_POST,
     .handler = post_ota_update_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
@@ -817,7 +843,10 @@ httpd_uri_t post_restart_handler = {
     .uri = "/api/restart",
     .method = HTTP_POST,
     .handler = post_restart_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
 {
@@ -850,7 +879,10 @@ httpd_uri_t _post_firmware_online_update_handler = {
     .uri = "/api/online_update",
     .method = HTTP_POST,
     .handler = _post_firmware_online_update_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
@@ -924,7 +956,19 @@ httpd_uri_t post_change_password_handler = {
     .uri = "/api/change-password",
     .method = HTTP_POST,
     .handler = post_change_password_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+httpd_uri_t get_analyzer_ws_handler = {
+    .uri = "/api/analyzer/ws",
+    .method = HTTP_GET,
+    .handler = Analyzer::ws_handler,
+    .user_ctx = NULL,
+    .is_websocket = true,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
@@ -938,6 +982,7 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
+    _analyzer = new Analyzer(_radioModuleConnector);
 
     generateToken();
 }
@@ -969,6 +1014,8 @@ void WebUI::start()
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+
+        httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);

@@ -19,6 +19,7 @@ export default {
     settings: 'Einstellungen',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    analyzer: 'Analyzer',
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
@@ -209,6 +210,27 @@ export default {
     },
     enable: 'Aktivieren',
     allowedHosts: 'Erlaubte Hosts'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    connected: 'Verbunden',
+    disconnected: 'Getrennt',
+    clear: 'Leeren',
+    autoScroll: 'Auto-Scroll',
+    time: 'Zeit',
+    len: 'Länge',
+    cnt: 'Zähler',
+    type: 'Typ',
+    src: 'Quelle',
+    dst: 'Ziel',
+    payload: 'Daten',
+    rssi: 'RSSI',
+    deviceNames: 'Gerätenamen',
+    address: 'Adresse',
+    name: 'Name',
+    storedNames: 'Gespeicherte Namen'
   },
 
   // About Page
