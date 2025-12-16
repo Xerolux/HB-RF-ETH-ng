@@ -565,9 +565,7 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
 
-    // Add all settings including admin password (for full restore)
-    cJSON_AddStringToObject(root, "adminPassword", _settings->getAdminPassword());
-
+    // Add all settings (password is excluded for security reasons)
     add_settings(root);
 
     // Merge settings object into root if add_settings creates a sub-object
