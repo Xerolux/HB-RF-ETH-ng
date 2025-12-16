@@ -1,9 +1,31 @@
+/*
+ *  hmlgw.cpp - HomeMatic LAN Gateway Emulation
+ *
+ *  This class implements the LAN Gateway protocol to be compatible with
+ *  software that expects a HomeMatic LAN Gateway (HM-LGW-O-TW-W-EU) or
+ *  compatible daemon (hmlangw).
+ *
+ *  The protocol implementation is based on public information about the
+ *  HomeMatic LAN Gateway protocol and is compatible with the hmlangw project.
+ *
+ *  Protocol overview:
+ *  - Port 2000 (Data): Handles data stream.
+ *    - 'H': Hello/Identification.
+ *    - 'K': KeepAlive.
+ *    - 'S': Serial data encapsulation.
+ *  - Port 2001 (KeepAlive): Optional KeepAlive channel (echo).
+ *
+ *  This code was written for HB-RF-ETH-ng and is not a copy of other projects.
+ */
+
 #include "hmlgw.h"
 #include "esp_log.h"
 #include <string.h>
+#include <cstdio>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
+#include <vector>
 
 static const char* TAG = "HMLGW";
 
@@ -188,11 +210,16 @@ void Hmlgw::runKeepAlive() {
 }
 
 void Hmlgw::handleClient() {
+    std::vector<uint8_t> buffer;
     uint8_t rx_buffer[1024];
 
     while (_running) {
         int len = recv(_clientSocket, rx_buffer, sizeof(rx_buffer), 0);
         if (len < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+                continue;
+            }
             ESP_LOGE(TAG, "Error occurred during recv: errno %d", errno);
             break;
         } else if (len == 0) {
@@ -200,56 +227,48 @@ void Hmlgw::handleClient() {
             break;
         }
 
-        // Process received data
-        // Simple state machine or direct parsing
-        // We expect:
-        // 'H' -> Hello
-        // 'K' -> Keepalive
-        // 'S' + Len(2 bytes) + Data -> Serial
-        // Note: recv might return partial commands or multiple commands.
-        // For simplicity, we handle byte by byte or basic checking.
+        // Append new data to buffer
+        buffer.insert(buffer.end(), rx_buffer, rx_buffer + len);
 
-        // This is a naive implementation assuming commands come in packets or at least start of buffer.
-        // A proper implementation needs a ring buffer.
-
+        // Process buffer
         size_t processed = 0;
-        while(processed < len) {
-            char cmd = rx_buffer[processed];
+        while(processed < buffer.size()) {
+            char cmd = buffer[processed];
             if (cmd == CMD_HELLO) { // 'H'
-                // Send Identification
                  char resp[32];
                  int rlen = snprintf(resp, sizeof(resp), "H%s", IDENTIFIER);
                  sendDataToClient((uint8_t*)resp, rlen);
                  processed++;
             } else if (cmd == CMD_KEEPALIVE) { // 'K'
-                 // Send 'K' back
                  char resp = 'K';
                  sendDataToClient((uint8_t*)&resp, 1);
                  processed++;
             } else if (cmd == CMD_SERIAL) { // 'S'
-                 // Next 2 bytes are length? Or 1 byte?
-                 // hmlangw uses High Low for length (big endian)
-                 if (processed + 3 <= len) {
-                     uint16_t dataLen = (rx_buffer[processed+1] << 8) | rx_buffer[processed+2];
-                     if (processed + 3 + dataLen <= len) {
+                 // Need at least 3 bytes for header (S + LenHigh + LenLow)
+                 if (processed + 3 <= buffer.size()) {
+                     uint16_t dataLen = (buffer[processed+1] << 8) | buffer[processed+2];
+                     if (processed + 3 + dataLen <= buffer.size()) {
                          // We have the full frame
-                         _connector->sendFrame(&rx_buffer[processed+3], dataLen);
+                         _connector->sendFrame(&buffer[processed+3], dataLen);
                          processed += 3 + dataLen;
                      } else {
-                         // Partial frame... we should buffer this.
-                         // For now, abort/break and hope for next packet.
-                         // WARNING: This naive implementation fails if packet is split.
+                         // Partial frame... wait for more data
                          break;
                      }
                  } else {
+                     // Partial header... wait for more data
                      break;
                  }
             } else {
-                // Unknown, just ignore or forward?
-                // Maybe it's raw data?
-                // Some implementations might just send raw data.
+                // Unknown command or sync lost?
+                // Just skip byte
                 processed++;
             }
+        }
+
+        // Remove processed data from buffer
+        if (processed > 0) {
+            buffer.erase(buffer.begin(), buffer.begin() + processed);
         }
     }
 }
