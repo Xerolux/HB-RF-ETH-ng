@@ -29,6 +29,7 @@
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
+#include "validation.h"
 #include "esp_ota_ops.h"
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
@@ -420,6 +421,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         cJSON *root = cJSON_Parse(buffer);
 
         char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    // Check for password length to prevent truncation/lockout
+    if (adminPassword && strlen(adminPassword) > MAX_PASSWORD_LENGTH) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password too long");
+    }
 
         char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
         bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
@@ -872,7 +879,7 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
     // Regex: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$ - approximated with manual checks
     bool has_letter = false;
     bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6);
+    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6) && (strlen(newPassword) <= MAX_PASSWORD_LENGTH);
 
     if (is_valid_length) {
         for (int i = 0; newPassword[i] != 0; i++) {
