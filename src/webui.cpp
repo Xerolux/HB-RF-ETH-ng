@@ -73,11 +73,6 @@ static const char *TAG = "WebUI";
         .handle_ws_control_frames = false,                             \
         .supported_subprotocol = NULL};
 
-EMBED_HANDLER("/*", index_html_gz, "text/html")
-EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
-EMBED_HANDLER("/main.css", main_css_gz, "text/css")
-EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
-
 static Settings *_settings;
 static LED *_statusLED;
 static SysInfo *_sysInfo;
@@ -88,6 +83,11 @@ static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
 static Analyzer *_analyzer;
 static char _token[46];
+
+EMBED_HANDLER("/*", index_html_gz, "text/html")
+EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
+EMBED_HANDLER("/main.css", main_css_gz, "text/css")
+EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
 
 void generateToken()
 {
