@@ -238,12 +238,16 @@ httpd_uri_t get_monitoring_handler = {
     .uri = "/api/monitoring",
     .method = HTTP_GET,
     .handler = get_monitoring_handler_func,
-    .user_ctx = NULL
-};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 httpd_uri_t post_monitoring_handler = {
     .uri = "/api/monitoring",
     .method = HTTP_POST,
     .handler = post_monitoring_handler_func,
-    .user_ctx = NULL
-};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
