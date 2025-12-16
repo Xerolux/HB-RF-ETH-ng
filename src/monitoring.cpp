@@ -84,6 +84,29 @@ UpdateCheck* monitoring_get_updatecheck(void) {
     return g_updateCheck;
 }
 
+static bool is_ip_allowed(const char* allowed_hosts, const char* client_ip) {
+    if (strlen(allowed_hosts) == 0 || strcmp(allowed_hosts, "*") == 0) {
+        return true;
+    }
+
+    char* hosts_copy = strdup(allowed_hosts);
+    if (!hosts_copy) return false; // Allocation failure -> deny
+
+    bool match = false;
+    // Delimiters: comma, semicolon, space
+    char* token = strtok(hosts_copy, ",; ");
+    while (token != NULL) {
+        if (strcmp(token, client_ip) == 0) {
+            match = true;
+            break;
+        }
+        token = strtok(NULL, ",; ");
+    }
+
+    free(hosts_copy);
+    return match;
+}
+
 // CheckMK Agent Task
 static void checkmk_agent_task(void *pvParameters)
 {
@@ -140,17 +163,7 @@ static void checkmk_agent_task(void *pvParameters)
         ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
 
         // Check if client IP is allowed
-        bool allowed = false;
-        if (strlen(config->allowed_hosts) == 0 || strcmp(config->allowed_hosts, "*") == 0) {
-            allowed = true;
-        } else {
-            // Simple IP matching (can be improved)
-            if (strstr(config->allowed_hosts, client_ip) != NULL) {
-                allowed = true;
-            }
-        }
-
-        if (!allowed) {
+        if (!is_ip_allowed(config->allowed_hosts, client_ip)) {
             ESP_LOGW(TAG, "Client %s not in allowed hosts list", client_ip);
             close(client_sock);
             continue;

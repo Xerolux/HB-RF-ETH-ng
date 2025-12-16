@@ -7,3 +7,8 @@
 **Vulnerability:** The `validate_auth` function uses `strcmp` to compare the authentication token. `strcmp` returns early upon mismatch, allowing a timing attack to guess the token byte-by-byte.
 **Learning:** Security-sensitive comparisons must be constant-time to avoid side-channel attacks.
 **Prevention:** Use a constant-time comparison function (e.g., `sodium_memcmp` or a custom implementation) for secrets.
+
+## 2025-05-18 - [IP Whitelist Bypass in Monitoring]
+**Vulnerability:** The CheckMK agent used `strstr` to validate client IPs against the allowed hosts list. This allowed unauthorized IPs (e.g., "192.168.1.1") to bypass the check if they were a substring of an allowed IP (e.g., "192.168.1.100").
+**Learning:** Partial string matching is insufficient for security controls. Access control lists must rely on exact matches or proper tokenization.
+**Prevention:** Parse delimiters and perform strict equality checks for each token in access control lists.
