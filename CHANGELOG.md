@@ -1,5 +1,36 @@
 # Changelog - HB-RF-ETH Firmware
 
+## Version 2.1.2 (2025)
+
+### Änderungen
+
+- fix-udp-reconnect (6bc961b)
+- Fix: Correctly extract UDP source address in RawUartUdpListener (d86d357)
+- remove-password-backup (9e2c8f3)
+- security: remove plain text password from backup JSON (9b717e5)
+- uart-config-init-and-ui-check (1600617)
+- fix(firmware): remove missing flags from uart_config_t for ESP-IDF 5.x compatibility (4d3e70d)
+- hmlgw-mode (2a6f96c)
+- Add HomeMatic LAN Gateway (HMLGW) Emulation Mode (5092396)
+- Add HomeMatic LAN Gateway (HMLGW) Emulation Mode (e256a80)
+- feature/analyzer-light (318b06f)
+- feat: update Analyzer Light translations for all languages (cbbab81)
+- fix: cleanup warnings and verify translations for Analyzer (0c686fb)
+- feat: enhance Analyzer Light with RSSI, Naming and fix build (983e86b)
+- feat: enhance Analyzer Light with RSSI and Naming (9e437bb)
+- feat: add Analyzer Light feature to WebUI (927e77f)
+- login-ux-improvement (38e1845)
+- password-validation (7d5e29a)
+- feat(webui): Improve login form UX with loading state and keyboard support (8461e7d)
+- feat(security): enforce password length validation to prevent silent truncation (3e4fbbd)
+- fix-pylance-errors (e0cca76)
+- fix: suppress Pylance errors for SCons globals (3f0315b)
+- sysinfo-voltage-opt (75f7dde)
+- feat: Optimize supply voltage reading with background caching (d12c0f7)
+- Merge pull request #32 from Xerolux/update-changelog-automation-6799761342686045634 (c2e1467)
+- feat: Automate changelog updates in release workflow (aaf0adc)
+
+
 ## Version 2.1.1 Beta (2025)
 
 ### Änderungen
