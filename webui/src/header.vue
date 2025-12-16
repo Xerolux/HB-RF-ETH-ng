@@ -4,14 +4,15 @@
     <BNavbarToggle target="nav-collapse" />
     <BCollapse id="nav-collapse" is-nav>
       <BNavbarNav>
-        <BNavItem href="/">{{ t('nav.home') }}</BNavItem>
-        <BNavItem href="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
-        <BNavItem href="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
-        <BNavItem href="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-        <BNavItem href="/about">{{ t('nav.about') }}</BNavItem>
+        <BNavItem to="/">{{ t('nav.home') }}</BNavItem>
+        <BNavItem to="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
+        <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
+        <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
+        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn">{{ t('nav.analyzer') }}</BNavItem>
+        <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
-        <BNavItem href="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
+        <BNavItem to="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
         <BNavItemDropdown :text="currentLocaleName" size="sm" variant="outline-light" class="me-2">
           <BDropdownItem
             v-for="locale in availableLocales"

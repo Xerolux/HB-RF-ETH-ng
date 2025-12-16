@@ -37,6 +37,8 @@ void serialQueueHandlerTask(void *parameter)
 
 RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed)
 {
+    _handlersMutex = xSemaphoreCreateMutex();
+
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
@@ -82,9 +84,29 @@ void RadioModuleConnector::stop()
     vTaskDelete(_tHandle);
 }
 
-void RadioModuleConnector::setFrameHandler(FrameHandler *frameHandler, bool decodeEscaped)
+void RadioModuleConnector::addFrameHandler(FrameHandler *handler)
 {
-    atomic_store(&_frameHandler, frameHandler);
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        if (std::find(_frameHandlers.begin(), _frameHandlers.end(), handler) == _frameHandlers.end()) {
+            _frameHandlers.push_back(handler);
+        }
+        xSemaphoreGive(_handlersMutex);
+    }
+}
+
+void RadioModuleConnector::removeFrameHandler(FrameHandler *handler)
+{
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        auto it = std::find(_frameHandlers.begin(), _frameHandlers.end(), handler);
+        if (it != _frameHandlers.end()) {
+            _frameHandlers.erase(it);
+        }
+        xSemaphoreGive(_handlersMutex);
+    }
+}
+
+void RadioModuleConnector::setDecodeEscaped(bool decodeEscaped)
+{
     _streamParser->setDecodeEscaped(decodeEscaped);
 }
 
@@ -149,10 +171,12 @@ void RadioModuleConnector::_serialQueueHandler()
 
 void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len)
 {
-    FrameHandler *frameHandler = (FrameHandler *)atomic_load(&_frameHandler);
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        std::vector<FrameHandler *> handlers = _frameHandlers;
+        xSemaphoreGive(_handlersMutex);
 
-    if (frameHandler)
-    {
-        frameHandler->handleFrame(buffer, len);
+        for (auto handler : handlers) {
+            handler->handleFrame(buffer, len);
+        }
     }
 }

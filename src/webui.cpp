@@ -35,6 +35,7 @@
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
 #include "rate_limiter.h"
+#include "analyzer.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -68,6 +69,7 @@ static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
+static Analyzer *_analyzer;
 static char _token[46];
 
 void generateToken()
@@ -926,6 +928,14 @@ httpd_uri_t post_change_password_handler = {
     .handler = post_change_password_handler_func,
     .user_ctx = NULL};
 
+httpd_uri_t get_analyzer_ws_handler = {
+    .uri = "/api/analyzer/ws",
+    .method = HTTP_GET,
+    .handler = Analyzer::ws_handler,
+    .user_ctx = NULL,
+    .is_websocket = true
+};
+
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
 WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
@@ -938,6 +948,7 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
+    _analyzer = new Analyzer(_radioModuleConnector);
 
     generateToken();
 }
@@ -969,6 +980,8 @@ void WebUI::start()
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+
+        httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);
