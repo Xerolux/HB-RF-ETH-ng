@@ -4,6 +4,18 @@
 
 ### Änderungen
 
+#### Framework Update auf ESP-IDF 5.5.1
+- **ESP-IDF 5.5.1**: Aktualisierung von ESP-IDF 5.1.0 auf 5.5.1
+  - Platform espressif32@6.12.0 mit ESP-IDF 5.5.1 Support
+  - mbedTLS 3.6.4 für verbesserte Sicherheit
+  - Log v2 mit zentralisiertem Logging-System
+  - std::filesystem Support (C++17 Dateisystem-API)
+  - Verbesserte NVS-Unterstützung
+  - OpenSSL 3.x Kompatibilität
+- **Python 3.9+**: Mindestanforderung erhöht (Python 3.8 nicht mehr unterstützt)
+- **Dokumentation**: README und technische Spezifikationen aktualisiert
+
+#### Features & Verbesserungen
 - fix-udp-reconnect (6bc961b)
 - Fix: Correctly extract UDP source address in RawUartUdpListener (d86d357)
 - remove-password-backup (9e2c8f3)
@@ -86,10 +98,16 @@ Diese Version stellt eine umfassende Modernisierung der HB-RF-ETH Firmware dar.
 - RAM: 18.924 von 327.680 Bytes (5.8%)
 - Flash: 918.177 von 1.900.544 Bytes (48.3%)
 
-**Framework-Versionen:**
+**Framework-Versionen (Version 2.0.0):**
 - ESP-IDF: 5.1.0 (framework-espidf ~3.50100.0)
 - Platform: espressif32 ^6.9.0
 - Toolchain: xtensa-esp-elf 14.2.0
+
+**Aktuelle Framework-Versionen (Version 2.1.2):**
+- ESP-IDF: 5.5.1 (framework-espidf ~3.50501.0)
+- Platform: espressif32 6.12.0
+- Toolchain: xtensa-esp-elf 14.2.0
+- mbedTLS: 3.6.4
 
 ### Bekannte Einschränkungen
 
