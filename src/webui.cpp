@@ -42,6 +42,13 @@
 
 static const char *TAG = "WebUI";
 
+// Buffer size constants - prevent magic numbers
+#define TOKEN_BASE_SIZE 21
+#define ETAG_BUFFER_SIZE 32
+#define TOKEN_BUFFER_SIZE 46
+#define SYSINFO_BUFFER_SIZE 1536
+#define IF_NONE_MATCH_SIZE 64
+
 #define EMBED_HANDLER(_uri, _resource, _contentType)                   \
     extern const char _resource[] asm("_binary_" #_resource "_start"); \
     extern const size_t _resource##_length asm(#_resource "_length");  \
@@ -97,7 +104,9 @@ void generateToken()
     char tokenBase[21];
     *((uint32_t *)tokenBase) = esp_random();
     *((uint32_t *)(tokenBase + sizeof(uint32_t))) = esp_random();
-    strcpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber());
+    // Safe copy with bounds check (13 chars max for serial + 8 bytes random = 21 total)
+    strncpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber(), sizeof(tokenBase) - 2 * sizeof(uint32_t) - 1);
+    tokenBase[sizeof(tokenBase) - 1] = '\0'; // Ensure null termination
 
     unsigned char shaResult[32];
 
@@ -484,21 +493,38 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
         ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
+        // Safely extract timesource with null check
+        timesource_t timesource = TIMESOURCE_NTP; // Default
+        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+        if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
 
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
+        // Safely extract dcfOffset with null check
+        int dcfOffset = 0; // Default
+        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+        if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
 
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
+        // Safely extract gpsBaudrate with null check
+        int gpsBaudrate = 9600; // Default
+        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+        if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
 
         char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
+        // Safely extract ledBrightness with null check
+        int ledBrightness = 100; // Default
+        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+        if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
 
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
         char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
         char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
+
+        // Safely extract ipv6PrefixLength with null check
+        int ipv6PrefixLength = 64; // Default
+        cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+        if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+
         char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -739,21 +765,38 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
         ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
+        // Safely extract timesource with null check
+        timesource_t timesource = TIMESOURCE_NTP; // Default
+        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+        if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
 
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
+        // Safely extract dcfOffset with null check
+        int dcfOffset = 0; // Default
+        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+        if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
 
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
+        // Safely extract gpsBaudrate with null check
+        int gpsBaudrate = 9600; // Default
+        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+        if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
 
         char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
+        // Safely extract ledBrightness with null check
+        int ledBrightness = 100; // Default
+        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+        if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
 
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
         char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
         char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
+
+        // Safely extract ipv6PrefixLength with null check
+        int ipv6PrefixLength = 64; // Default
+        cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+        if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+
         char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -1267,4 +1310,13 @@ void WebUI::start()
 void WebUI::stop()
 {
     httpd_stop(_httpd_handle);
+}
+
+WebUI::~WebUI()
+{
+    extern Analyzer *_analyzer;
+    if (_analyzer) {
+        delete _analyzer;
+        _analyzer = nullptr;
+    }
 }

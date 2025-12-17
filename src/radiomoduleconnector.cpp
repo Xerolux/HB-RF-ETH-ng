@@ -63,6 +63,18 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
     _streamParser = new StreamParser(false, std::bind(&RadioModuleConnector::_handleFrame, this, _1, _2));
 }
 
+RadioModuleConnector::~RadioModuleConnector()
+{
+    if (_streamParser) {
+        delete _streamParser;
+        _streamParser = nullptr;
+    }
+    if (_handlersMutex) {
+        vSemaphoreDelete(_handlersMutex);
+        _handlersMutex = nullptr;
+    }
+}
+
 void RadioModuleConnector::start()
 {
     setLED(false, false, false);

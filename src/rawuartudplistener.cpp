@@ -283,6 +283,12 @@ void RawUartUdpListener::stop()
 
     _radioModuleConnector->removeFrameHandler(this);
     vTaskDelete(_tHandle);
+
+    // Clean up queue
+    if (_udp_queue) {
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()
