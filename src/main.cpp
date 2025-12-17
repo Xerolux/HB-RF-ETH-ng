@@ -50,7 +50,7 @@
 #include "esp_ota_ops.h"
 #include "updatecheck.h"
 #include "monitoring.h"
-// #include "dtls_encryption.h" // Temporarily disabled - needs porting to ESP-IDF 5.x mbedTLS API
+#include "dtls_encryption.h"
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -168,23 +168,50 @@ void app_main()
 
     radioModuleConnector.resetModule();
 
+    // Initialize DTLS encryption (works only in Raw UART mode)
+    DTLSEncryption dtlsEncryption;
+    dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
+    dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
+
     RawUartUdpListener* rawUartUdpLister = NULL;
     Hmlgw* hmlgw = NULL;
 
     if (settings.getHmlgwEnabled()) {
-        ESP_LOGI(TAG, "Starting HMLGW mode");
+        ESP_LOGI(TAG, "Starting HMLGW mode (DTLS not supported in HM-LGW)");
         hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
         hmlgw->start();
     } else {
         ESP_LOGI(TAG, "Starting Raw UART UDP mode");
-        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector);
+
+        // DTLS only works in Raw UART mode (not compatible with HM-LGW or Analyzer)
+        if (settings.getAnalyzerEnabled() && dtls_mode != DTLS_MODE_DISABLED)
+        {
+            ESP_LOGW(TAG, "DTLS disabled: Analyzer requires unencrypted data");
+            dtls_mode = DTLS_MODE_DISABLED;
+        }
+
+        if (dtls_mode != DTLS_MODE_DISABLED)
+        {
+            if (dtlsEncryption.init(dtls_mode, dtls_cipher))
+            {
+                dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
+                dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
+                ESP_LOGI(TAG, "DTLS encryption initialized successfully");
+            }
+            else
+            {
+                ESP_LOGW(TAG, "DTLS initialization failed, continuing without encryption");
+            }
+        }
+
+        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector, &settings, &dtlsEncryption);
         rawUartUdpLister->start();
     }
 
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     updateCheck.start();
 
-    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector, &dtlsEncryption);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)

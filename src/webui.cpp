@@ -36,6 +36,7 @@
 #include "monitoring_api.h"
 #include "rate_limiter.h"
 #include "analyzer.h"
+#include "dtls_api.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -82,6 +83,7 @@ static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
 static Analyzer *_analyzer;
+static DTLSEncryption *_dtlsEncryption;
 static char _token[46];
 
 EMBED_HANDLER("/*", index_html_gz, "text/html")
@@ -1071,7 +1073,7 @@ httpd_uri_t get_analyzer_ws_handler = {
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
-WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
+WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector, DTLSEncryption *dtlsEncryption)
 {
     _settings = settings;
     _statusLED = statusLED;
@@ -1082,6 +1084,7 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
     _analyzer = new Analyzer(_radioModuleConnector);
+    _dtlsEncryption = dtlsEncryption;
 
     generateToken();
 }
@@ -1117,6 +1120,9 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
+
+        // Register DTLS API handlers
+        register_dtls_api_handlers(_httpd_handle, _settings, _dtlsEncryption);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);

@@ -30,13 +30,15 @@
 #include <atomic>
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
-// #include "settings.h"  // Temporarily disabled along with DTLS
-// #include "dtls_encryption.h"  // Temporarily disabled - needs porting to ESP-IDF 5.x
+#include "settings.h"
+#include "dtls_encryption.h"
 
 class RawUartUdpListener : FrameHandler
 {
 private:
     RadioModuleConnector *_radioModuleConnector;
+    Settings *_settings;
+    DTLSEncryption *_dtls;
 
     std::atomic<uint> _remoteAddress;
     std::atomic<ushort> _remotePort;
@@ -55,7 +57,7 @@ private:
     void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
 
 public:
-    RawUartUdpListener(RadioModuleConnector *radioModuleConnector);
+    RawUartUdpListener(RadioModuleConnector *radioModuleConnector, Settings *settings, DTLSEncryption *dtls);
 
     void handleFrame(unsigned char *buffer, uint16_t len);
     void handleEvent();
