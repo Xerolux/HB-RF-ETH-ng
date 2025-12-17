@@ -153,7 +153,9 @@ bool DTLSEncryption::getPSK(unsigned char *key_out, size_t *key_len_out, char *i
 
     memcpy(key_out, psk_key, psk_key_len);
     *key_len_out = psk_key_len;
-    strcpy(identity_out, psk_identity);
+    // Buffer for identity must be at least 64 bytes
+    strncpy(identity_out, psk_identity, 63);
+    identity_out[63] = '\0';
 
     return true;
 }

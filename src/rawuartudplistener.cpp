@@ -224,15 +224,19 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t port = atomic_load(&_remotePort);
     uint32_t address = atomic_load(&_remoteAddress);
 
+    if (!port)
+        return;
+
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
+    if (!pb) {
+        ESP_LOGE("RawUartUdpListener", "Failed to allocate pbuf");
+        return;
+    }
     unsigned char *sendBuffer = (unsigned char *)pb->payload;
 
     ip_addr_t addr;
     addr.type = IPADDR_TYPE_V4;
     addr.u_addr.ip4.addr = address;
-
-    if (!port)
-        return;
 
     sendBuffer[0] = command;
     sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);
@@ -263,9 +267,19 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 void RawUartUdpListener::start()
 {
     _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    if (!_udp_queue) {
+        ESP_LOGE(TAG, "Failed to create UDP queue");
+        return;
+    }
+
     xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 
     _pcb = udp_new();
+    if (!_pcb) {
+        ESP_LOGE(TAG, "Failed to create UDP PCB");
+        return;
+    }
+
     udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);

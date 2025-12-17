@@ -96,7 +96,9 @@ void generateToken()
     char tokenBase[21];
     *((uint32_t *)tokenBase) = esp_random();
     *((uint32_t *)(tokenBase + sizeof(uint32_t))) = esp_random();
-    strcpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber());
+    // Serial number is 12 chars + null terminator, buffer has 13 bytes remaining
+    strncpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber(), 12);
+    tokenBase[20] = '\0';
 
     unsigned char shaResult[32];
 
@@ -1134,4 +1136,13 @@ void WebUI::start()
 void WebUI::stop()
 {
     httpd_stop(_httpd_handle);
+    if (_analyzer) {
+        delete _analyzer;
+        _analyzer = NULL;
+    }
+}
+
+WebUI::~WebUI()
+{
+    stop();
 }

@@ -31,11 +31,11 @@ static esp_err_t api_dtls_config_handler(httpd_req_t *req);
 static esp_err_t api_dtls_stats_handler(httpd_req_t *req);
 
 // Helper: Convert bytes to hex string
-static void bytes_to_hex(const unsigned char *bytes, size_t len, char *hex_out)
+static void bytes_to_hex(const unsigned char *bytes, size_t len, char *hex_out, size_t hex_out_size)
 {
-    for (size_t i = 0; i < len; i++)
+    for (size_t i = 0; i < len && (i * 2 + 2) < hex_out_size; i++)
     {
-        sprintf(hex_out + (i * 2), "%02X", bytes[i]);
+        snprintf(hex_out + (i * 2), 3, "%02X", bytes[i]);
     }
     hex_out[len * 2] = '\0';
 }
@@ -134,7 +134,7 @@ static esp_err_t api_dtls_generate_psk_handler(httpd_req_t *req)
 
     // Convert to hex for transmission
     char psk_hex[129];
-    bytes_to_hex(psk_key, psk_len, psk_hex);
+    bytes_to_hex(psk_key, psk_len, psk_hex, sizeof(psk_hex));
 
     // Store in NVS
     esp_err_t err = DTLSKeyStorage::storePSK(psk_key, psk_len, psk_identity);

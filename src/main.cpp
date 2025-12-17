@@ -173,6 +173,7 @@ void app_main()
     dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
     dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
 
+    // Note: These pointers are intentionally not deleted as they persist for device lifetime
     RawUartUdpListener* rawUartUdpLister = NULL;
     Hmlgw* hmlgw = NULL;
 

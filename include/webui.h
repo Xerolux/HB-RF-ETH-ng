@@ -40,6 +40,7 @@ private:
 
 public:
     WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector, DTLSEncryption *dtlsEncryption);
+    ~WebUI();
     void start();
     void stop();
 };

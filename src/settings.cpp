@@ -74,7 +74,7 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
 
 void Settings::load()
 {
-  uint32_t handle;
+  uint32_t handle = 0;
 
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -84,7 +84,12 @@ void Settings::load()
   }
   ESP_ERROR_CHECK(err);
 
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
+  err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+  if (err != ESP_OK)
+  {
+    ESP_LOGE("Settings", "Failed to open NVS namespace: %s", esp_err_to_name(err));
+    return;
+  }
 
   size_t adminPasswordLength = sizeof(_adminPassword);
   if (nvs_get_str(handle, "adminPassword", _adminPassword, &adminPasswordLength) != ESP_OK)
