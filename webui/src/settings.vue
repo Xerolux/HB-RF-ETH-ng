@@ -227,6 +227,36 @@
         <BFormCheckbox v-model="analyzerEnabled" switch />
       </BFormGroup>
 
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.dtls.title') }}</h6>
+      <BFormGroup :label="t('settings.dtls.mode')" label-cols-sm="4">
+        <BFormRadioGroup buttons v-model="dtlsMode" required>
+          <BFormRadio :value="0">{{ t('common.disabled') }}</BFormRadio>
+          <BFormRadio :value="1">{{ t('settings.dtls.modePSK') }}</BFormRadio>
+          <BFormRadio :value="2">{{ t('settings.dtls.modeCert') }}</BFormRadio>
+        </BFormRadioGroup>
+      </BFormGroup>
+      <template v-if="dtlsMode > 0">
+        <BFormGroup :label="t('settings.dtls.cipherSuite')" label-cols-sm="4">
+          <BFormSelect v-model="dtlsCipherSuite">
+            <BFormSelectOption :value="0">AES-128-GCM</BFormSelectOption>
+            <BFormSelectOption :value="1">AES-256-GCM</BFormSelectOption>
+            <BFormSelectOption :value="2">ChaCha20-Poly1305</BFormSelectOption>
+          </BFormSelect>
+        </BFormGroup>
+        <BFormGroup :label="t('settings.dtls.sessionResumption')" label-cols-sm="4">
+          <BFormCheckbox v-model="dtlsSessionResumption" switch />
+        </BFormGroup>
+        <template v-if="dtlsMode === 2">
+          <BFormGroup :label="t('settings.dtls.requireClientCert')" label-cols-sm="4">
+            <BFormCheckbox v-model="dtlsRequireClientCert" switch />
+          </BFormGroup>
+        </template>
+        <BAlert variant="info" :model-value="true" class="mt-2">
+            {{ t('settings.dtls.restartNote') }}
+        </BAlert>
+      </template>
+
       <BAlert
         variant="success"
         :model-value="showSuccess"
@@ -353,6 +383,12 @@ const hmlgwPort = ref(2000)
 const hmlgwKeepAlivePort = ref(2001)
 
 const analyzerEnabled = ref(false)
+
+// DTLS
+const dtlsMode = ref(0)
+const dtlsCipherSuite = ref(1)
+const dtlsRequireClientCert = ref(false)
+const dtlsSessionResumption = ref(true)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -490,6 +526,14 @@ const loadSettings = () => {
       analyzerEnabled.value = settingsStore.analyzerEnabled
   }
 
+  // Load DTLS settings
+  if (settingsStore.dtlsMode !== undefined) {
+    dtlsMode.value = settingsStore.dtlsMode
+    dtlsCipherSuite.value = settingsStore.dtlsCipherSuite
+    dtlsRequireClientCert.value = settingsStore.dtlsRequireClientCert
+    dtlsSessionResumption.value = settingsStore.dtlsSessionResumption
+  }
+
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
     enableIPv6.value = settingsStore.enableIPv6
@@ -541,6 +585,11 @@ const saveSettingsClick = async () => {
       hmlgwPort: hmlgwPort.value,
       hmlgwKeepAlivePort: hmlgwKeepAlivePort.value,
       analyzerEnabled: analyzerEnabled.value,
+      // DTLS
+      dtlsMode: dtlsMode.value,
+      dtlsCipherSuite: dtlsCipherSuite.value,
+      dtlsRequireClientCert: dtlsRequireClientCert.value,
+      dtlsSessionResumption: dtlsSessionResumption.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,

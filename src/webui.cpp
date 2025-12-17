@@ -37,6 +37,7 @@
 #include "rate_limiter.h"
 #include "analyzer.h"
 #include "dtls_api.h"
+#include "monitoring.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -385,6 +386,12 @@ void add_settings(cJSON *root)
     cJSON_AddNumberToObject(settings, "hmlgwKeepAlivePort", _settings->getHmlgwKeepAlivePort());
 
     cJSON_AddBoolToObject(settings, "analyzerEnabled", _settings->getAnalyzerEnabled());
+
+    // DTLS
+    cJSON_AddNumberToObject(settings, "dtlsMode", _settings->getDTLSMode());
+    cJSON_AddNumberToObject(settings, "dtlsCipherSuite", _settings->getDTLSCipherSuite());
+    cJSON_AddBoolToObject(settings, "dtlsRequireClientCert", _settings->getDTLSRequireClientCert());
+    cJSON_AddBoolToObject(settings, "dtlsSessionResumption", _settings->getDTLSSessionResumption());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -544,6 +551,15 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         _settings->setAnalyzerEnabled(analyzerEnabled);
 
+        // DTLS
+        if (cJSON_HasObjectItem(root, "dtlsMode")) {
+            int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+            int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+            bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+            bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+            _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+        }
+
         _settings->save();
 
         cJSON_Delete(root);
@@ -605,6 +621,40 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
             child = child->next;
         }
         cJSON_DeleteItemFromObject(root, "settings");
+    }
+
+    // Add Monitoring settings (separately, but included in backup)
+    monitoring_config_t monConfig;
+    if (monitoring_get_config(&monConfig) == ESP_OK) {
+        cJSON *mon = cJSON_CreateObject();
+
+        // SNMP
+        cJSON *snmp = cJSON_AddObjectToObject(mon, "snmp");
+        cJSON_AddBoolToObject(snmp, "enabled", monConfig.snmp.enabled);
+        cJSON_AddStringToObject(snmp, "community", monConfig.snmp.community);
+        cJSON_AddStringToObject(snmp, "location", monConfig.snmp.location);
+        cJSON_AddStringToObject(snmp, "contact", monConfig.snmp.contact);
+        cJSON_AddNumberToObject(snmp, "port", monConfig.snmp.port);
+
+        // CheckMK
+        cJSON *cmk = cJSON_AddObjectToObject(mon, "checkmk");
+        cJSON_AddBoolToObject(cmk, "enabled", monConfig.checkmk.enabled);
+        cJSON_AddNumberToObject(cmk, "port", monConfig.checkmk.port);
+        cJSON_AddStringToObject(cmk, "allowed_hosts", monConfig.checkmk.allowed_hosts);
+
+        // MQTT
+        cJSON *mqtt = cJSON_AddObjectToObject(mon, "mqtt");
+        cJSON_AddBoolToObject(mqtt, "enabled", monConfig.mqtt.enabled);
+        cJSON_AddStringToObject(mqtt, "server", monConfig.mqtt.server);
+        cJSON_AddNumberToObject(mqtt, "port", monConfig.mqtt.port);
+        cJSON_AddStringToObject(mqtt, "user", monConfig.mqtt.user);
+        // SECURITY: Do not export MQTT password!
+        cJSON_AddStringToObject(mqtt, "password", "");
+        cJSON_AddStringToObject(mqtt, "topic_prefix", monConfig.mqtt.topic_prefix);
+        cJSON_AddBoolToObject(mqtt, "ha_discovery_enabled", monConfig.mqtt.ha_discovery_enabled);
+        cJSON_AddStringToObject(mqtt, "ha_discovery_prefix", monConfig.mqtt.ha_discovery_prefix);
+
+        cJSON_AddItemToObject(root, "monitoring", mon);
     }
 
     const char *json = cJSON_PrintUnformatted(root);
@@ -724,7 +774,84 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
             );
         }
 
+        // DTLS (Restore)
+        if (cJSON_HasObjectItem(root, "dtlsMode")) {
+            int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+            int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+            bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+            bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+            _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+        }
+
         _settings->save();
+
+        // Restore Monitoring Settings
+        cJSON *monJson = cJSON_GetObjectItem(root, "monitoring");
+        if (monJson) {
+            monitoring_config_t monConfig;
+            // Load current config first to preserve password if not overwritten
+            monitoring_get_config(&monConfig);
+
+            cJSON *snmp = cJSON_GetObjectItem(monJson, "snmp");
+            if (snmp) {
+                monConfig.snmp.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(snmp, "enabled"));
+
+                cJSON* item = cJSON_GetObjectItem(snmp, "community");
+                if (item && item->valuestring) strncpy(monConfig.snmp.community, item->valuestring, sizeof(monConfig.snmp.community)-1);
+
+                item = cJSON_GetObjectItem(snmp, "location");
+                if (item && item->valuestring) strncpy(monConfig.snmp.location, item->valuestring, sizeof(monConfig.snmp.location)-1);
+
+                item = cJSON_GetObjectItem(snmp, "contact");
+                if (item && item->valuestring) strncpy(monConfig.snmp.contact, item->valuestring, sizeof(monConfig.snmp.contact)-1);
+
+                item = cJSON_GetObjectItem(snmp, "port");
+                if (item) monConfig.snmp.port = item->valueint;
+            }
+
+            cJSON *cmk = cJSON_GetObjectItem(monJson, "checkmk");
+            if (cmk) {
+                monConfig.checkmk.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(cmk, "enabled"));
+
+                cJSON* item = cJSON_GetObjectItem(cmk, "port");
+                if (item) monConfig.checkmk.port = item->valueint;
+
+                item = cJSON_GetObjectItem(cmk, "allowed_hosts");
+                if (item && item->valuestring) strncpy(monConfig.checkmk.allowed_hosts, item->valuestring, sizeof(monConfig.checkmk.allowed_hosts)-1);
+            }
+
+            cJSON *mqtt = cJSON_GetObjectItem(monJson, "mqtt");
+            if (mqtt) {
+                monConfig.mqtt.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "enabled"));
+
+                cJSON* item = cJSON_GetObjectItem(mqtt, "server");
+                if (item && item->valuestring) strncpy(monConfig.mqtt.server, item->valuestring, sizeof(monConfig.mqtt.server)-1);
+
+                item = cJSON_GetObjectItem(mqtt, "port");
+                if (item) monConfig.mqtt.port = item->valueint;
+
+                item = cJSON_GetObjectItem(mqtt, "user");
+                if (item && item->valuestring) strncpy(monConfig.mqtt.user, item->valuestring, sizeof(monConfig.mqtt.user)-1);
+
+                item = cJSON_GetObjectItem(mqtt, "password");
+                // Only update password if provided and not empty (since backup has empty password)
+                // However, backup has "", so if user restores backup, password becomes "".
+                // If user wants to keep existing password, we should check if empty.
+                if (item && item->valuestring && strlen(item->valuestring) > 0) {
+                     strncpy(monConfig.mqtt.password, item->valuestring, sizeof(monConfig.mqtt.password)-1);
+                }
+
+                item = cJSON_GetObjectItem(mqtt, "topic_prefix");
+                if (item && item->valuestring) strncpy(monConfig.mqtt.topic_prefix, item->valuestring, sizeof(monConfig.mqtt.topic_prefix)-1);
+
+                monConfig.mqtt.ha_discovery_enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "ha_discovery_enabled"));
+
+                item = cJSON_GetObjectItem(mqtt, "ha_discovery_prefix");
+                if (item && item->valuestring) strncpy(monConfig.mqtt.ha_discovery_prefix, item->valuestring, sizeof(monConfig.mqtt.ha_discovery_prefix)-1);
+            }
+
+            monitoring_update_config(&monConfig);
+        }
 
         cJSON_Delete(root);
 

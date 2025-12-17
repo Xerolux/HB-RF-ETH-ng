@@ -122,6 +122,11 @@ export const useSettingsStore = defineStore('settings', {
     hmlgwPort: 2000,
     hmlgwKeepAlivePort: 2001,
     analyzerEnabled: false,
+    // DTLS settings
+    dtlsMode: 0,
+    dtlsCipherSuite: 1,
+    dtlsRequireClientCert: false,
+    dtlsSessionResumption: true
   }),
   actions: {
     async load() {
