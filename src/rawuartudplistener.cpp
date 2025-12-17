@@ -48,8 +48,8 @@ void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_
     }
 }
 
-RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector, Settings *settings, DTLSEncryption *dtls)
-    : _radioModuleConnector(radioModuleConnector), _settings(settings), _dtls(dtls),
+RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector)
+    : _radioModuleConnector(radioModuleConnector),
       _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
 {
     atomic_init(&_connectionStarted, false);
@@ -57,18 +57,6 @@ RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnecto
     atomic_init(&_remoteAddress, 0u);
     atomic_init(&_counter, 0);
     atomic_init(&_endpointConnectionIdentifier, 1);
-    atomic_init(&_dtlsEnabled, false);
-
-    // Check if DTLS is enabled
-    if (_settings && _dtls)
-    {
-        int dtls_mode = _settings->getDTLSMode();
-        if (dtls_mode != 0) // 0 = Disabled
-        {
-            atomic_store(&_dtlsEnabled, true);
-            ESP_LOGI(TAG, "DTLS encryption enabled (mode %d)", dtls_mode);
-        }
-    }
 }
 
 void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)

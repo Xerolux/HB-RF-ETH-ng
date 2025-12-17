@@ -50,7 +50,7 @@
 #include "esp_ota_ops.h"
 #include "updatecheck.h"
 #include "monitoring.h"
-#include "dtls_encryption.h"
+// #include "dtls_encryption.h" // Temporarily disabled - needs porting to ESP-IDF 5.x mbedTLS API
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -172,39 +172,12 @@ void app_main()
     Hmlgw* hmlgw = NULL;
 
     if (settings.getHmlgwEnabled()) {
-        ESP_LOGI(TAG, "Starting HMLGW mode (DTLS encryption not supported in HM-LGW mode)");
+        ESP_LOGI(TAG, "Starting HMLGW mode");
         hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
         hmlgw->start();
     } else {
         ESP_LOGI(TAG, "Starting Raw UART UDP mode");
-
-        // DTLS encryption only available in Raw UART mode (not compatible with HM-LGW or Analyzer)
-        DTLSEncryption dtlsEncryption;
-        dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
-        dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
-
-        // Disable DTLS if Analyzer is enabled (Analyzer needs unencrypted data)
-        if (settings.getAnalyzerEnabled() && dtls_mode != DTLS_MODE_DISABLED)
-        {
-            ESP_LOGW(TAG, "DTLS encryption disabled: Analyzer requires unencrypted data");
-            dtls_mode = DTLS_MODE_DISABLED;
-        }
-
-        if (dtls_mode != DTLS_MODE_DISABLED)
-        {
-            if (dtlsEncryption.init(dtls_mode, dtls_cipher))
-            {
-                dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
-                dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
-                ESP_LOGI(TAG, "DTLS encryption initialized successfully");
-            }
-            else
-            {
-                ESP_LOGW(TAG, "DTLS encryption initialization failed, continuing without encryption");
-            }
-        }
-
-        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector, &settings, &dtlsEncryption);
+        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector);
         rawUartUdpLister->start();
     }
 
