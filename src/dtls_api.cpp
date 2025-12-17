@@ -122,7 +122,7 @@ esp_err_t api_dtls_generate_psk_handler(httpd_req_t *req)
     if (ret <= 0)
     {
         ESP_LOGE(TAG, "Failed to receive request body");
-        httpd_resp_send_400(req);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
         return ESP_FAIL;
     }
     content[ret] = '\0';
@@ -131,7 +131,7 @@ esp_err_t api_dtls_generate_psk_handler(httpd_req_t *req)
     if (!json)
     {
         ESP_LOGE(TAG, "Invalid JSON");
-        httpd_resp_send_400(req);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
         return ESP_FAIL;
     }
 
@@ -217,7 +217,7 @@ esp_err_t api_dtls_config_handler(httpd_req_t *req)
     if (ret <= 0)
     {
         ESP_LOGE(TAG, "Failed to receive request body");
-        httpd_resp_send_400(req);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
         return ESP_FAIL;
     }
     content[ret] = '\0';
@@ -226,7 +226,7 @@ esp_err_t api_dtls_config_handler(httpd_req_t *req)
     if (!json)
     {
         ESP_LOGE(TAG, "Invalid JSON");
-        httpd_resp_send_400(req);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Bad Request");
         return ESP_FAIL;
     }
 
@@ -338,7 +338,10 @@ void register_dtls_api_handlers(httpd_handle_t server, Settings *settings, DTLSE
         .uri = "/api/dtls/status",
         .method = HTTP_GET,
         .handler = api_dtls_status_handler,
-        .user_ctx = nullptr
+        .user_ctx = nullptr,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = nullptr
     };
     httpd_register_uri_handler(server, &uri_dtls_status);
 
@@ -346,7 +349,10 @@ void register_dtls_api_handlers(httpd_handle_t server, Settings *settings, DTLSE
         .uri = "/api/dtls/generate-psk",
         .method = HTTP_POST,
         .handler = api_dtls_generate_psk_handler,
-        .user_ctx = nullptr
+        .user_ctx = nullptr,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = nullptr
     };
     httpd_register_uri_handler(server, &uri_dtls_generate_psk);
 
@@ -354,7 +360,10 @@ void register_dtls_api_handlers(httpd_handle_t server, Settings *settings, DTLSE
         .uri = "/api/dtls/config",
         .method = HTTP_POST,
         .handler = api_dtls_config_handler,
-        .user_ctx = nullptr
+        .user_ctx = nullptr,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = nullptr
     };
     httpd_register_uri_handler(server, &uri_dtls_config);
 
@@ -362,7 +371,10 @@ void register_dtls_api_handlers(httpd_handle_t server, Settings *settings, DTLSE
         .uri = "/api/dtls/stats",
         .method = HTTP_GET,
         .handler = api_dtls_stats_handler,
-        .user_ctx = nullptr
+        .user_ctx = nullptr,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = nullptr
     };
     httpd_register_uri_handler(server, &uri_dtls_stats);
 

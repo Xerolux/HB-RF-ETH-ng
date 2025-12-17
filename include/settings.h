@@ -68,12 +68,6 @@ private:
   char _ipv6Dns1[40] = {0};
   char _ipv6Dns2[40] = {0};
 
-  // DTLS encryption settings
-  int32_t _dtlsMode;              // 0=Disabled, 1=PSK, 2=Certificate
-  int32_t _dtlsCipherSuite;       // 0=AES-128-GCM, 1=AES-256-GCM, 2=ChaCha20-Poly1305
-  bool _dtlsRequireClientCert;    // Require client certificate in cert mode
-  bool _dtlsSessionResumption;    // Enable session resumption
-
 public:
   Settings();
   void load();
