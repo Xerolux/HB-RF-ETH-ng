@@ -261,7 +261,16 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 
     // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
     // This handler is called frequently (1Hz) by the frontend.
-    char buffer[1536]; // Increased buffer to be safe, ESP32 stack usually allows this
+    char buffer[SYSINFO_BUFFER_SIZE];
+
+    // Stack overflow protection: Log high water mark periodically
+    static uint32_t check_counter = 0;
+    if (++check_counter % 100 == 0) { // Check every 100 calls
+        UBaseType_t stack_remaining = uxTaskGetStackHighWaterMark(NULL);
+        if (stack_remaining < 512) {
+            ESP_LOGW(TAG, "Low stack space in sysinfo handler: %u bytes remaining", stack_remaining);
+        }
+    }
 
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";

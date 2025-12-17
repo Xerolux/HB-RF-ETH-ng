@@ -145,6 +145,13 @@ bool DTLSEncryption::generatePSK(size_t key_bits)
 
 bool DTLSEncryption::getPSK(unsigned char *key_out, size_t *key_len_out, char *identity_out)
 {
+    // Validate input parameters
+    if (!key_out || !key_len_out || !identity_out)
+    {
+        ESP_LOGE(TAG, "getPSK: Invalid null parameters");
+        return false;
+    }
+
     if (psk_key_len == 0)
     {
         ESP_LOGW(TAG, "No PSK available");
