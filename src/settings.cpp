@@ -142,6 +142,12 @@ void Settings::load()
 
   GET_INT(handle, "ipv6Prefix", _ipv6PrefixLength, 64);
 
+  // Load DTLS encryption settings
+  GET_INT(handle, "dtlsMode", _dtlsMode, 0);  // Default: Disabled
+  GET_INT(handle, "dtlsCipherSuite", _dtlsCipherSuite, 1);  // Default: AES-256-GCM
+  GET_BOOL(handle, "dtlsRequireClientCert", _dtlsRequireClientCert, false);
+  GET_BOOL(handle, "dtlsSessionResumption", _dtlsSessionResumption, true);
+
   len = sizeof(_ipv6Gateway);
   if (nvs_get_str(handle, "ipv6Gateway", _ipv6Gateway, &len) != ESP_OK) _ipv6Gateway[0] = 0;
 
@@ -192,6 +198,12 @@ void Settings::save()
   SET_STR(handle, "ipv6Gateway", _ipv6Gateway);
   SET_STR(handle, "ipv6Dns1", _ipv6Dns1);
   SET_STR(handle, "ipv6Dns2", _ipv6Dns2);
+
+  // Save DTLS encryption settings
+  SET_INT(handle, "dtlsMode", _dtlsMode);
+  SET_INT(handle, "dtlsCipherSuite", _dtlsCipherSuite);
+  SET_BOOL(handle, "dtlsRequireClientCert", _dtlsRequireClientCert);
+  SET_BOOL(handle, "dtlsSessionResumption", _dtlsSessionResumption);
 
   nvs_close(handle);
 }
@@ -429,4 +441,36 @@ void Settings::setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Addres
     strncpy(_ipv6Gateway, ipv6Gateway, sizeof(_ipv6Gateway) - 1);
     strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
     strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
+}
+
+// DTLS Getters
+int Settings::getDTLSMode() { return _dtlsMode; }
+int Settings::getDTLSCipherSuite() { return _dtlsCipherSuite; }
+bool Settings::getDTLSRequireClientCert() { return _dtlsRequireClientCert; }
+bool Settings::getDTLSSessionResumption() { return _dtlsSessionResumption; }
+
+// DTLS Setter
+void Settings::setDTLSSettings(int dtlsMode, int dtlsCipherSuite, bool requireClientCert, bool sessionResumption)
+{
+    // Validate DTLS mode (0=Disabled, 1=PSK, 2=Certificate)
+    if (dtlsMode < 0 || dtlsMode > 2)
+    {
+        ESP_LOGE(TAG, "Invalid DTLS mode %d, keeping current value", dtlsMode);
+        return;
+    }
+
+    // Validate cipher suite (0=AES-128-GCM, 1=AES-256-GCM, 2=ChaCha20-Poly1305)
+    if (dtlsCipherSuite < 0 || dtlsCipherSuite > 2)
+    {
+        ESP_LOGE(TAG, "Invalid DTLS cipher suite %d, keeping current value", dtlsCipherSuite);
+        return;
+    }
+
+    _dtlsMode = dtlsMode;
+    _dtlsCipherSuite = dtlsCipherSuite;
+    _dtlsRequireClientCert = requireClientCert;
+    _dtlsSessionResumption = sessionResumption;
+
+    ESP_LOGI(TAG, "DTLS settings updated: mode=%d, cipher=%d, requireClientCert=%d, sessionResumption=%d",
+             dtlsMode, dtlsCipherSuite, requireClientCert, sessionResumption);
 }

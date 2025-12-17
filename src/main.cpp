@@ -49,6 +49,7 @@
 #include "esp_ota_ops.h"
 #include "updatecheck.h"
 #include "monitoring.h"
+#include "dtls_encryption.h"
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -170,7 +171,26 @@ void app_main()
 
     radioModuleConnector.resetModule();
 
-    RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
+    // Initialize DTLS encryption
+    DTLSEncryption dtlsEncryption;
+    dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
+    dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
+
+    if (dtls_mode != DTLS_MODE_DISABLED)
+    {
+        if (dtlsEncryption.init(dtls_mode, dtls_cipher))
+        {
+            dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
+            dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
+            ESP_LOGI(TAG, "DTLS encryption initialized successfully");
+        }
+        else
+        {
+            ESP_LOGW(TAG, "DTLS encryption initialization failed, continuing without encryption");
+        }
+    }
+
+    RawUartUdpListener rawUartUdpLister(&radioModuleConnector, &settings, &dtlsEncryption);
     rawUartUdpLister.start();
 
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
