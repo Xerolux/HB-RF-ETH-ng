@@ -17,12 +17,12 @@
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
 
 **Version 2.1.2 Highlights:**
-* **Framework**: ESP-IDF 5.1.0 mit GCC 14.2.0 Toolchain
+* **Framework**: ESP-IDF 5.5.1 (Platform espressif32@6.12.0) mit GCC 14.2.0 Toolchain
 * **WebUI**: Vue 3.5.25, Parcel 2.16.3, Bootstrap 5.3.8
 * **Sicherheit**: DTLS 1.2 Verschlüsselung, erzwungene Passwortänderung, Rate Limiting
 * **Monitoring**: SNMP, Check_MK, MQTT Integration
 * **Features**: HMLGW-Modus, Analyzer Light, IPv6 Support
-* **Stabilität**: Optimierte Performance, Supply Voltage Monitoring
+* **Stabilität**: Optimierte Performance, Supply Voltage Monitoring, mbedTLS 3.6.4
 
 ### Worum es geht
 Dieses Repository enhält die Firmware für die HB-RF-ETH Platine, welches es ermöglicht, ein Homematic Funkmodul HM-MOD-RPI-PCB oder RPI-RF-MOD per Netzwerk an eine debmatic oder piVCCU3 Installation anzubinden.
@@ -130,11 +130,12 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * **Board Revisionen**: REV 1.8, REV 1.10 (Public/SK Varianten)
 
 #### Software
-* **Framework**: ESP-IDF 5.1.0 (framework-espidf ~3.50100.0)
-* **Platform**: espressif32 ^6.12.0
+* **Framework**: ESP-IDF 5.5.1 (framework-espidf ~3.50501.0)
+* **Platform**: espressif32 6.12.0
 * **Toolchain**: xtensa-esp-elf 14.2.0
 * **Build System**: PlatformIO + CMake
 * **WebUI**: Vue 3.5.25, Parcel 2.16.3, Bootstrap 5.3.8
+* **Security**: mbedTLS 3.6.4, OpenSSL 3.x compatible
 
 #### Speicher
 * **RAM-Nutzung**: ~18.9 KB von 327.7 KB (5.8%)
