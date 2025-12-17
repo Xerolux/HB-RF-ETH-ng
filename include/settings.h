@@ -135,4 +135,29 @@ public:
 
   // DTLS setter
   void setDTLSSettings(int dtlsMode, int dtlsCipherSuite, bool requireClientCert, bool sessionResumption);
+
+  // HM-LGW getters/setters
+  bool getHmlgwEnabled();
+  void setHmlgwEnabled(bool enabled);
+  uint16_t getHmlgwPort();
+  void setHmlgwPort(uint16_t port);
+  uint16_t getHmlgwKeepAlivePort();
+  void setHmlgwKeepAlivePort(uint16_t port);
+
+  // Analyzer getters/setters
+  bool getAnalyzerEnabled();
+  void setAnalyzerEnabled(bool enabled);
+
+private:
+  // DTLS encryption settings
+  int32_t _dtlsMode;              // 0=Disabled, 1=PSK, 2=Certificate
+  int32_t _dtlsCipherSuite;       // 0=AES-128-GCM, 1=AES-256-GCM, 2=ChaCha20-Poly1305
+  bool _dtlsRequireClientCert;    // Require client certificate in cert mode
+  bool _dtlsSessionResumption;    // Enable session resumption
+
+  bool _hmlgwEnabled;
+  uint16_t _hmlgwPort;
+  uint16_t _hmlgwKeepAlivePort;
+
+  bool _analyzerEnabled;
 };

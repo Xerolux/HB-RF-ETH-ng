@@ -60,10 +60,17 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
     var = (__##var##_temp != 0);                           \
   }
 
+#define GET_UINT16(handle, name, var, defaultValue) \
+  if (nvs_get_u16(handle, name, &var) != ESP_OK) \
+  {                                              \
+    var = defaultValue;                          \
+  }
+
 #define SET_IP_ADDR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, name, var.addr));
 #define SET_INT(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i32(handle, name, var));
 #define SET_STR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_str(handle, name, var));
 #define SET_BOOL(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i8(handle, name, var ? 1 : 0));
+#define SET_UINT16(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u16(handle, name, var));
 
 void Settings::load()
 {
@@ -157,6 +164,12 @@ void Settings::load()
   len = sizeof(_ipv6Dns2);
   if (nvs_get_str(handle, "ipv6Dns2", _ipv6Dns2, &len) != ESP_OK) _ipv6Dns2[0] = 0;
 
+  GET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled, false);
+  GET_UINT16(handle, "hmlgwPort", _hmlgwPort, 2000);
+  GET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort, 2001);
+
+  GET_BOOL(handle, "analyzerEnabled", _analyzerEnabled, false);
+
   nvs_close(handle);
 }
 
@@ -204,6 +217,12 @@ void Settings::save()
   SET_INT(handle, "dtlsCipherSuite", _dtlsCipherSuite);
   SET_BOOL(handle, "dtlsRequireClientCert", _dtlsRequireClientCert);
   SET_BOOL(handle, "dtlsSessionResumption", _dtlsSessionResumption);
+
+  SET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled);
+  SET_UINT16(handle, "hmlgwPort", _hmlgwPort);
+  SET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort);
+
+  SET_BOOL(handle, "analyzerEnabled", _analyzerEnabled);
 
   nvs_close(handle);
 }
@@ -474,3 +493,15 @@ void Settings::setDTLSSettings(int dtlsMode, int dtlsCipherSuite, bool requireCl
     ESP_LOGI(TAG, "DTLS settings updated: mode=%d, cipher=%d, requireClientCert=%d, sessionResumption=%d",
              dtlsMode, dtlsCipherSuite, requireClientCert, sessionResumption);
 }
+
+bool Settings::getHmlgwEnabled() { return _hmlgwEnabled; }
+void Settings::setHmlgwEnabled(bool enabled) { _hmlgwEnabled = enabled; }
+
+uint16_t Settings::getHmlgwPort() { return _hmlgwPort; }
+void Settings::setHmlgwPort(uint16_t port) { _hmlgwPort = port; }
+
+uint16_t Settings::getHmlgwKeepAlivePort() { return _hmlgwKeepAlivePort; }
+void Settings::setHmlgwKeepAlivePort(uint16_t port) { _hmlgwKeepAlivePort = port; }
+
+bool Settings::getAnalyzerEnabled() { return _analyzerEnabled; }
+void Settings::setAnalyzerEnabled(bool enabled) { _analyzerEnabled = enabled; }

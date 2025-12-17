@@ -19,6 +19,7 @@ export default {
     settings: 'Inställningar',
     firmware: 'Firmware',
     monitoring: 'Övervakning',
+    analyzer: 'Analyzer',
     about: 'Om',
     logout: 'Logga ut'
   },
@@ -164,6 +165,27 @@ export default {
     allowedHosts: 'Tillåtna värdar',
     saveSuccess: 'Övervakningsinställningar sparade',
     saveError: 'Fel vid sparande av övervakningsinställningar'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    clear: 'Clear',
+    autoScroll: 'Auto Scroll',
+    time: 'Time',
+    len: 'Len',
+    cnt: 'Cnt',
+    type: 'Type',
+    src: 'Source',
+    dst: 'Destination',
+    payload: 'Payload',
+    rssi: 'RSSI',
+    deviceNames: 'Device Names',
+    address: 'Address',
+    name: 'Name',
+    storedNames: 'Stored Names'
   },
 
   // About Page

@@ -196,6 +196,36 @@
       <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
         <BFormCheckbox v-model="allowPrerelease" switch />
       </BFormGroup>
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
+      <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
+        <BFormCheckbox v-model="hmlgwEnabled" switch />
+      </BFormGroup>
+      <template v-if="hmlgwEnabled">
+        <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
+          <BFormInput
+            type="number"
+            v-model.number="hmlgwPort"
+            min="1"
+            max="65535"
+            :state="v$.hmlgwPort.$error ? false : null"
+          />
+        </BFormGroup>
+        <BFormGroup :label="t('settings.hmlgwKeepAlivePort')" label-cols-sm="4">
+          <BFormInput
+            type="number"
+            v-model.number="hmlgwKeepAlivePort"
+            min="1"
+            max="65535"
+            :state="v$.hmlgwKeepAlivePort.$error ? false : null"
+          />
+        </BFormGroup>
+      </template>
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
+      <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
+        <BFormCheckbox v-model="analyzerEnabled" switch />
+      </BFormGroup>
 
       <BAlert
         variant="success"
@@ -249,6 +279,17 @@
             @click="restoreSettings"
         >{{ t('settings.restore') }}</BButton>
     </BForm>
+  </BCard>
+
+  <BCard
+    :header="t('settings.systemMaintenance')"
+    header-tag="h6"
+    header-bg-variant="danger"
+    header-text-variant="white"
+    class="mb-3"
+  >
+    <BButton variant="warning" block class="me-2" @click="rebootClick">{{ t('settings.reboot') }}</BButton>
+    <BButton variant="danger" block @click="factoryResetClick">{{ t('settings.factoryReset') }}</BButton>
   </BCard>
 </template>
 
@@ -306,6 +347,12 @@ const ntpServer = ref('')
 const ledBrightness = ref(100)
 const checkUpdates = ref(true)
 const allowPrerelease = ref(false)
+
+const hmlgwEnabled = ref(false)
+const hmlgwPort = ref(2000)
+const hmlgwKeepAlivePort = ref(2001)
+
+const analyzerEnabled = ref(false)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -381,6 +428,18 @@ const rules = {
   dcfOffset: {
     required: requiredIf(isDcfActivated),
     numeric
+  },
+  hmlgwPort: {
+    required: requiredIf(hmlgwEnabled),
+    numeric,
+    minValue: helpers.withMessage('Min 1', val => val >= 1),
+    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
+  },
+  hmlgwKeepAlivePort: {
+    required: requiredIf(hmlgwEnabled),
+    numeric,
+    minValue: helpers.withMessage('Min 1', val => val >= 1),
+    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
   }
 }
 
@@ -399,7 +458,9 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
-  dcfOffset
+  dcfOffset,
+  hmlgwPort,
+  hmlgwKeepAlivePort
 })
 
 // Load settings from store
@@ -418,6 +479,16 @@ const loadSettings = () => {
   ledBrightness.value = settingsStore.ledBrightness
   checkUpdates.value = settingsStore.checkUpdates
   allowPrerelease.value = settingsStore.allowPrerelease
+
+  if (settingsStore.hmlgwEnabled !== undefined) {
+      hmlgwEnabled.value = settingsStore.hmlgwEnabled
+      hmlgwPort.value = settingsStore.hmlgwPort || 2000
+      hmlgwKeepAlivePort.value = settingsStore.hmlgwKeepAlivePort || 2001
+  }
+
+  if (settingsStore.analyzerEnabled !== undefined) {
+      analyzerEnabled.value = settingsStore.analyzerEnabled
+  }
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -465,6 +536,11 @@ const saveSettingsClick = async () => {
       ledBrightness: ledBrightness.value,
       checkUpdates: checkUpdates.value,
       allowPrerelease: allowPrerelease.value,
+      // HMLGW
+      hmlgwEnabled: hmlgwEnabled.value,
+      hmlgwPort: hmlgwPort.value,
+      hmlgwKeepAlivePort: hmlgwKeepAlivePort.value,
+      analyzerEnabled: analyzerEnabled.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
@@ -519,6 +595,37 @@ const restoreSettings = async () => {
         reader.readAsText(restoreFile.value)
     } catch (e) {
         alert(t('settings.restoreError'))
+    }
+}
+
+const rebootClick = async () => {
+    if (confirm(t('common.confirmReboot'))) {
+        try {
+            await axios.post('/api/restart')
+            // Show wait message
+            alert(t('common.rebootingWait'))
+            setTimeout(() => {
+                window.location.reload()
+            }, 10000)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+}
+
+const factoryResetClick = async () => {
+    if (confirm(t('common.confirmFactoryReset'))) {
+        try {
+            await axios.post('/api/factory_reset')
+             // Show wait message
+            alert(t('common.factoryResettingWait'))
+            setTimeout(() => {
+                window.location.reload()
+            }, 10000)
+        } catch (e) {
+            console.error(e)
+            alert('Factory Reset failed')
+        }
     }
 }
 </script>

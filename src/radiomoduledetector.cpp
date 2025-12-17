@@ -41,7 +41,8 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
 
     sem_init(_detectWaitFrameDataSemaphore);
 
-    _radioModuleConnector->setFrameHandler(this, true);
+    _radioModuleConnector->addFrameHandler(this);
+    _radioModuleConnector->setDecodeEscaped(true);
 
     while (_detectState == DETECT_STATE_START_BL && _detectRetryCount < 3)
     {
@@ -125,7 +126,8 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
         }
     }
 
-    _radioModuleConnector->setFrameHandler(NULL, false);
+    _radioModuleConnector->removeFrameHandler(this);
+    _radioModuleConnector->setDecodeEscaped(false);
 }
 
 void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)

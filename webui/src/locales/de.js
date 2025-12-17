@@ -10,7 +10,11 @@ export default {
     error: 'Fehler',
     success: 'Erfolgreich',
     yes: 'Ja',
-    no: 'Nein'
+    no: 'Nein',
+    rebootingWait: 'Das System wird neu gestartet. Bitte warten Sie ca. 10 Sekunden...',
+    factoryResettingWait: 'Das System wird auf Werkseinstellungen zurückgesetzt und neu gestartet. Bitte warten...',
+    confirmReboot: 'Sind Sie sicher, dass Sie das System neu starten möchten?',
+    confirmFactoryReset: 'Sind Sie sicher? Alle Einstellungen gehen verloren!'
   },
 
   // Header Navigation
@@ -19,6 +23,7 @@ export default {
     settings: 'Einstellungen',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    analyzer: 'Analyzer',
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
@@ -77,9 +82,20 @@ export default {
     // System Settings
     systemSettings: 'Systemeinstellungen',
     ledBrightness: 'LED Helligkeit',
-    checkUpdates: 'Nach Updates suchen',
+    checkUpdates: 'Automatisch nach Updates suchen',
     allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
+    analyzerSettings: 'Analyzer Light Einstellungen',
+    enableAnalyzer: 'Analyzer Light aktivieren',
+    systemMaintenance: 'Systemwartung',
+    reboot: 'Neu starten',
+    factoryReset: 'Werkseinstellungen',
+
+    // HMLGW
+    hmlgwSettings: 'HomeMatic LAN Gateway (HMLGW) Einstellungen',
+    enableHmlgw: 'HMLGW-Modus aktivieren',
+    hmlgwPort: 'Daten-Port (Standard: 2000)',
+    hmlgwKeepAlivePort: 'KeepAlive-Port (Standard: 2001)',
 
     // DTLS Security Settings
     dtlsSettings: 'DTLS Verschlüsselung',
@@ -176,6 +192,8 @@ export default {
     versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
     onlineUpdate: 'Online Update durchführen',
+    checkUpdate: 'Jetzt nach Updates suchen',
+    noUpdateAvailable: 'Kein Update verfügbar',
     onlineUpdateConfirm: 'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
     onlineUpdateStarted: 'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
     showReleaseNotes: 'Release Notes anzeigen',
@@ -243,6 +261,28 @@ export default {
     },
     enable: 'Aktivieren',
     allowedHosts: 'Erlaubte Hosts'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    disabled: 'Die Analyzer Light Funktion ist deaktiviert. Bitte in den Einstellungen aktivieren.',
+    connected: 'Verbunden',
+    disconnected: 'Getrennt',
+    clear: 'Leeren',
+    autoScroll: 'Auto-Scroll',
+    time: 'Zeit',
+    len: 'Länge',
+    cnt: 'Zähler',
+    type: 'Typ',
+    src: 'Quelle',
+    dst: 'Ziel',
+    payload: 'Daten',
+    rssi: 'RSSI',
+    deviceNames: 'Gerätenamen',
+    address: 'Adresse',
+    name: 'Name',
+    storedNames: 'Gespeicherte Namen'
   },
 
   // About Page

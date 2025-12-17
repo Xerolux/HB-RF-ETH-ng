@@ -19,6 +19,7 @@ export default {
     settings: 'Ustawienia',
     firmware: 'Oprogramowanie',
     monitoring: 'Monitorowanie',
+    analyzer: 'Analyzer',
     about: 'O programie',
     logout: 'Wyloguj'
   },
@@ -164,6 +165,27 @@ export default {
     allowedHosts: 'Dozwolone hosty',
     saveSuccess: 'Ustawienia monitorowania zapisane pomyślnie',
     saveError: 'Błąd podczas zapisywania ustawień monitorowania'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    clear: 'Clear',
+    autoScroll: 'Auto Scroll',
+    time: 'Time',
+    len: 'Len',
+    cnt: 'Cnt',
+    type: 'Type',
+    src: 'Source',
+    dst: 'Destination',
+    payload: 'Payload',
+    rssi: 'RSSI',
+    deviceNames: 'Device Names',
+    address: 'Address',
+    name: 'Name',
+    storedNames: 'Stored Names'
   },
 
   // About Page

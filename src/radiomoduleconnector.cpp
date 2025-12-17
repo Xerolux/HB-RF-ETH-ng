@@ -37,6 +37,8 @@ void serialQueueHandlerTask(void *parameter)
 
 RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed)
 {
+    _handlersMutex = xSemaphoreCreateMutex();
+
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
@@ -53,10 +55,6 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .allow_pd = 0,
-            .backup_before_sleep = 0,
-        },
     };
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, HM_TX_PIN, HM_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -82,9 +80,29 @@ void RadioModuleConnector::stop()
     vTaskDelete(_tHandle);
 }
 
-void RadioModuleConnector::setFrameHandler(FrameHandler *frameHandler, bool decodeEscaped)
+void RadioModuleConnector::addFrameHandler(FrameHandler *handler)
 {
-    atomic_store(&_frameHandler, frameHandler);
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        if (std::find(_frameHandlers.begin(), _frameHandlers.end(), handler) == _frameHandlers.end()) {
+            _frameHandlers.push_back(handler);
+        }
+        xSemaphoreGive(_handlersMutex);
+    }
+}
+
+void RadioModuleConnector::removeFrameHandler(FrameHandler *handler)
+{
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        auto it = std::find(_frameHandlers.begin(), _frameHandlers.end(), handler);
+        if (it != _frameHandlers.end()) {
+            _frameHandlers.erase(it);
+        }
+        xSemaphoreGive(_handlersMutex);
+    }
+}
+
+void RadioModuleConnector::setDecodeEscaped(bool decodeEscaped)
+{
     _streamParser->setDecodeEscaped(decodeEscaped);
 }
 
@@ -149,10 +167,12 @@ void RadioModuleConnector::_serialQueueHandler()
 
 void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len)
 {
-    FrameHandler *frameHandler = (FrameHandler *)atomic_load(&_frameHandler);
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+        std::vector<FrameHandler *> handlers = _frameHandlers;
+        xSemaphoreGive(_handlersMutex);
 
-    if (frameHandler)
-    {
-        frameHandler->handleFrame(buffer, len);
+        for (auto handler : handlers) {
+            handler->handleFrame(buffer, len);
+        }
     }
 }

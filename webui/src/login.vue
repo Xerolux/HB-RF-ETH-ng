@@ -6,12 +6,13 @@
     header-text-variant="white"
     class="mb-3"
   >
-    <BForm @submit.stop.prevent>
+    <BForm @submit.stop.prevent="loginClick">
       <BFormGroup :label="t('login.password')" label-cols-sm="4">
         <BFormInput
           type="password"
           v-model="password"
           :state="v$.password.$error ? false : null"
+          autofocus
         />
       </BFormGroup>
       <BAlert
@@ -23,11 +24,14 @@
       >{{ t('login.loginError') }}</BAlert>
       <BFormGroup label-cols-sm="9">
         <BButton
+          type="submit"
           variant="primary"
           block
-          @click="loginClick"
-          :disabled="!password || password === ''"
-        >{{ t('login.login') }}</BButton>
+          :disabled="!password || password === '' || loading"
+        >
+          <BSpinner small v-if="loading" class="me-2" />
+          {{ t('login.login') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -49,6 +53,7 @@ const loginStore = useLoginStore()
 
 const password = ref('')
 const showError = ref(null)
+const loading = ref(false)
 
 const rules = {
   password: { required }
@@ -57,12 +62,19 @@ const rules = {
 const v$ = useVuelidate(rules, { password })
 
 const loginClick = async () => {
+  loading.value = true
   showError.value = null
-  const success = await loginStore.tryLogin(password.value)
-  if (success) {
-    router.push(route.query.redirect || '/')
-  } else {
+  try {
+    const success = await loginStore.tryLogin(password.value)
+    if (success) {
+      router.push(route.query.redirect || '/')
+    } else {
+      showError.value = 10
+      loading.value = false
+    }
+  } catch (error) {
     showError.value = 10
+    loading.value = false
   }
 }
 </script>

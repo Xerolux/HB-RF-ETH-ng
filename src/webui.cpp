@@ -29,11 +29,13 @@
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
+#include "validation.h"
 #include "esp_ota_ops.h"
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
 #include "rate_limiter.h"
+#include "analyzer.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -43,6 +45,20 @@ static const char *TAG = "WebUI";
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
+        if (_sysInfo) {                                                \
+            char etag[32];                                             \
+            snprintf(etag, sizeof(etag), "\"%s\"", _sysInfo->getCurrentVersion()); \
+            httpd_resp_set_hdr(req, "ETag", etag);                     \
+            httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=0, must-revalidate"); \
+            char if_none_match[64];                                    \
+            if (httpd_req_get_hdr_value_str(req, "If-None-Match", if_none_match, sizeof(if_none_match)) == ESP_OK) { \
+                if (strstr(if_none_match, etag)) {                     \
+                    httpd_resp_set_status(req, "304 Not Modified");    \
+                    httpd_resp_send(req, NULL, 0);                     \
+                    return ESP_OK;                                     \
+                }                                                      \
+            }                                                          \
+        }                                                              \
         httpd_resp_set_type(req, _contentType);                        \
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");           \
         httpd_resp_send(req, _resource, _resource##_length);           \
@@ -52,12 +68,10 @@ static const char *TAG = "WebUI";
         .uri = _uri,                                                   \
         .method = HTTP_GET,                                            \
         .handler = _resource##_handler_func,                           \
-        .user_ctx = NULL};
-
-EMBED_HANDLER("/*", index_html_gz, "text/html")
-EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
-EMBED_HANDLER("/main.css", main_css_gz, "text/css")
-EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
+        .user_ctx = NULL,                                              \
+        .is_websocket = false,                                         \
+        .handle_ws_control_frames = false,                             \
+        .supported_subprotocol = NULL};
 
 static Settings *_settings;
 static LED *_statusLED;
@@ -67,7 +81,13 @@ static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
+static Analyzer *_analyzer;
 static char _token[46];
+
+EMBED_HANDLER("/*", index_html_gz, "text/html")
+EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
+EMBED_HANDLER("/main.css", main_css_gz, "text/css")
+EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
 
 void generateToken()
 {
@@ -216,7 +236,10 @@ httpd_uri_t post_login_json_handler = {
     .uri = "/login.json",
     .method = HTTP_POST,
     .handler = post_login_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
@@ -289,7 +312,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         _ethernet->isConnected() ? "true" : "false",
         _ethernet->getLinkSpeedMbps(),
         _ethernet->getDuplexMode(),
-        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()),
+        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
         radioModuleTypeStr,
         _radioModuleDetector->getSerial(),
         fwVersionStr,
@@ -311,7 +334,10 @@ httpd_uri_t get_sysinfo_json_handler = {
     .uri = "/sysinfo.json",
     .method = HTTP_GET,
     .handler = get_sysinfo_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 void add_settings(cJSON *root)
 {
@@ -350,6 +376,13 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ipv6Gateway", _settings->getIPv6Gateway());
     cJSON_AddStringToObject(settings, "ipv6Dns1", _settings->getIPv6Dns1());
     cJSON_AddStringToObject(settings, "ipv6Dns2", _settings->getIPv6Dns2());
+
+    // HMLGW
+    cJSON_AddBoolToObject(settings, "hmlgwEnabled", _settings->getHmlgwEnabled());
+    cJSON_AddNumberToObject(settings, "hmlgwPort", _settings->getHmlgwPort());
+    cJSON_AddNumberToObject(settings, "hmlgwKeepAlivePort", _settings->getHmlgwKeepAlivePort());
+
+    cJSON_AddBoolToObject(settings, "analyzerEnabled", _settings->getAnalyzerEnabled());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -378,7 +411,10 @@ httpd_uri_t get_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_GET,
     .handler = get_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
@@ -421,6 +457,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
+    // Check for password length to prevent truncation/lockout
+    if (adminPassword && strlen(adminPassword) > MAX_PASSWORD_LENGTH) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password too long");
+    }
+
         char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
         bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
         ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
@@ -447,6 +489,19 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+        // HMLGW
+        bool hmlgwEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "hmlgwEnabled"));
+        int hmlgwPort = 2000;
+        if (cJSON_GetObjectItem(root, "hmlgwPort")) {
+             hmlgwPort = cJSON_GetObjectItem(root, "hmlgwPort")->valueint;
+        }
+        int hmlgwKeepAlivePort = 2001;
+        if (cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")) {
+             hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
+        }
+
+        bool analyzerEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "analyzerEnabled"));
 
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
@@ -481,6 +536,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
             );
         }
 
+        _settings->setHmlgwEnabled(hmlgwEnabled);
+        _settings->setHmlgwPort(hmlgwPort);
+        _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
+
+        _settings->setAnalyzerEnabled(analyzerEnabled);
+
         _settings->save();
 
         cJSON_Delete(root);
@@ -505,7 +566,10 @@ httpd_uri_t post_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_POST,
     .handler = post_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
@@ -521,9 +585,7 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
 
-    // Add all settings including admin password (for full restore)
-    cJSON_AddStringToObject(root, "adminPassword", _settings->getAdminPassword());
-
+    // Add all settings (password is excluded for security reasons)
     add_settings(root);
 
     // Merge settings object into root if add_settings creates a sub-object
@@ -555,7 +617,10 @@ httpd_uri_t get_backup_handler = {
     .uri = "/api/backup",
     .method = HTTP_GET,
     .handler = get_backup_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
@@ -678,7 +743,10 @@ httpd_uri_t post_restore_handler = {
     .uri = "/api/restore",
     .method = HTTP_POST,
     .handler = post_restore_handler_func_actual,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
@@ -786,7 +854,10 @@ httpd_uri_t post_ota_update_handler = {
     .uri = "/ota_update",
     .method = HTTP_POST,
     .handler = post_ota_update_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
@@ -810,7 +881,10 @@ httpd_uri_t post_restart_handler = {
     .uri = "/api/restart",
     .method = HTTP_POST,
     .handler = post_restart_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
 {
@@ -843,7 +917,71 @@ httpd_uri_t _post_firmware_online_update_handler = {
     .uri = "/api/online_update",
     .method = HTTP_POST,
     .handler = _post_firmware_online_update_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+esp_err_t post_check_update_handler_func(httpd_req_t *req)
+{
+  if (validate_auth(req) != ESP_OK)
+  {
+      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+  }
+
+  // Perform check in this task (it might block for a few seconds)
+  _updateCheck->checkNow();
+
+  httpd_resp_set_type(req, "application/json");
+
+  cJSON *root = cJSON_CreateObject();
+  cJSON_AddStringToObject(root, "latestVersion", _updateCheck->getLatestVersion());
+
+  const char *json = cJSON_PrintUnformatted(root);
+  httpd_resp_sendstr(req, json);
+  free((void *)json);
+  cJSON_Delete(root);
+
+  return ESP_OK;
+}
+
+httpd_uri_t post_check_update_handler = {
+    .uri = "/api/check_update",
+    .method = HTTP_POST,
+    .handler = post_check_update_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
+{
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    // Reset settings
+    _settings->clear();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    // Restart after a short delay
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
+
+    return ESP_OK;
+}
+
+httpd_uri_t post_factory_reset_handler = {
+    .uri = "/api/factory_reset",
+    .method = HTTP_POST,
+    .handler = post_factory_reset_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
@@ -872,7 +1010,7 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
     // Regex: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$ - approximated with manual checks
     bool has_letter = false;
     bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6);
+    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6) && (strlen(newPassword) <= MAX_PASSWORD_LENGTH);
 
     if (is_valid_length) {
         for (int i = 0; newPassword[i] != 0; i++) {
@@ -917,7 +1055,19 @@ httpd_uri_t post_change_password_handler = {
     .uri = "/api/change-password",
     .method = HTTP_POST,
     .handler = post_change_password_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+httpd_uri_t get_analyzer_ws_handler = {
+    .uri = "/api/analyzer/ws",
+    .method = HTTP_GET,
+    .handler = Analyzer::ws_handler,
+    .user_ctx = NULL,
+    .is_websocket = true,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
@@ -931,6 +1081,7 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
+    _analyzer = new Analyzer(_radioModuleConnector);
 
     generateToken();
 }
@@ -956,12 +1107,16 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
         httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+
+        httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);

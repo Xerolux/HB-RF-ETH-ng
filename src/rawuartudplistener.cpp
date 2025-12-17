@@ -123,8 +123,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                ESP_LOGE(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d", data[3], endpointConnectionIdentifier);
-                return;
+                ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
             atomic_store(&_remotePort, (ushort)0);
@@ -275,7 +274,8 @@ void RawUartUdpListener::start()
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
 
-    _radioModuleConnector->setFrameHandler(this, false);
+    _radioModuleConnector->addFrameHandler(this);
+    _radioModuleConnector->setDecodeEscaped(false);
 }
 
 void RawUartUdpListener::stop()
@@ -285,7 +285,7 @@ void RawUartUdpListener::stop()
     _udp_remove(_pcb);
     _pcb = NULL;
 
-    _radioModuleConnector->setFrameHandler(NULL, false);
+    _radioModuleConnector->removeFrameHandler(this);
     vTaskDelete(_tHandle);
 }
 
@@ -336,16 +336,8 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
 
     e->pb = pb;
 
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpointer-arith"
-
-    ip_hdr *iphdr = reinterpret_cast<ip_hdr *>(pb->payload - UDP_HLEN - IP_HLEN);
-    e->addr.addr = iphdr->src.addr;
-
-    udp_hdr *udphdr = reinterpret_cast<udp_hdr *>(pb->payload - UDP_HLEN);
-    e->port = ntohs(udphdr->src);
-
-    #pragma GCC diagnostic pop
+    e->addr.addr = ip_addr_get_ip4_u32(addr);
+    e->port = port;
 
     if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {

@@ -19,6 +19,7 @@ export default {
     settings: 'Nastavení',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    analyzer: 'Analyzer',
     about: 'O aplikaci',
     logout: 'Odhlásit'
   },
@@ -164,6 +165,27 @@ export default {
     allowedHosts: 'Povolení hostitelé',
     saveSuccess: 'Nastavení monitoringu úspěšně uloženo',
     saveError: 'Chyba při ukládání nastavení monitoringu'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    clear: 'Clear',
+    autoScroll: 'Auto Scroll',
+    time: 'Time',
+    len: 'Len',
+    cnt: 'Cnt',
+    type: 'Type',
+    src: 'Source',
+    dst: 'Destination',
+    payload: 'Payload',
+    rssi: 'RSSI',
+    deviceNames: 'Device Names',
+    address: 'Address',
+    name: 'Name',
+    storedNames: 'Stored Names'
   },
 
   // About Page

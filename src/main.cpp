@@ -43,6 +43,7 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
+#include "hmlgw.h"
 #include "webui.h"
 #include "mdnsserver.h"
 #include "ntpserver.h"
@@ -68,10 +69,6 @@ void app_main()
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .allow_pd = 0,
-            .backup_before_sleep = 0,
-        },
     };
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -190,13 +187,23 @@ void app_main()
         }
     }
 
-    RawUartUdpListener rawUartUdpLister(&radioModuleConnector, &settings, &dtlsEncryption);
-    rawUartUdpLister.start();
+    RawUartUdpListener* rawUartUdpLister = NULL;
+    Hmlgw* hmlgw = NULL;
+
+    if (settings.getHmlgwEnabled()) {
+        ESP_LOGI(TAG, "Starting HMLGW mode");
+        hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
+        hmlgw->start();
+    } else {
+        ESP_LOGI(TAG, "Starting Raw UART UDP mode");
+        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector, &settings, &dtlsEncryption);
+        rawUartUdpLister->start();
+    }
 
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     updateCheck.start();
 
-    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
