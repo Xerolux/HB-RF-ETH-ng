@@ -4,6 +4,16 @@
 
 Dieses Dokument beschreibt die DTLS/TLS-Verschlüsselung für die Raw-UART UDP Kommunikation zwischen der HB-RF-ETH Platine und der CCU (Homematic Central Unit). Die Verschlüsselung ist **optional** und kann über die WebUI aktiviert werden.
 
+## ⚠️ Wichtige Einschränkungen
+
+**DTLS Verschlüsselung funktioniert NUR im Raw-UART UDP Modus!**
+
+**NICHT kompatibel mit:**
+- **HM-LGW Modus** - HM-LGW verwendet TCP und benötigt unverschlüsselte Raw-UART Daten für die Protokollverarbeitung
+- **Analyzer Modus** - Der Analyzer muss die HomeMatic-Frames vor der Verschlüsselung analysieren können
+
+Die Firmware deaktiviert DTLS automatisch, wenn HM-LGW oder Analyzer aktiviert sind.
+
 ## Sicherheitsziele
 
 - **Vertraulichkeit**: Niemand kann die Funkdaten zwischen Platine und CCU mitlesen

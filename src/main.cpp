@@ -168,34 +168,42 @@ void app_main()
 
     radioModuleConnector.resetModule();
 
-    // Initialize DTLS encryption
-    DTLSEncryption dtlsEncryption;
-    dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
-    dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
-
-    if (dtls_mode != DTLS_MODE_DISABLED)
-    {
-        if (dtlsEncryption.init(dtls_mode, dtls_cipher))
-        {
-            dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
-            dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
-            ESP_LOGI(TAG, "DTLS encryption initialized successfully");
-        }
-        else
-        {
-            ESP_LOGW(TAG, "DTLS encryption initialization failed, continuing without encryption");
-        }
-    }
-
     RawUartUdpListener* rawUartUdpLister = NULL;
     Hmlgw* hmlgw = NULL;
 
     if (settings.getHmlgwEnabled()) {
-        ESP_LOGI(TAG, "Starting HMLGW mode");
+        ESP_LOGI(TAG, "Starting HMLGW mode (DTLS encryption not supported in HM-LGW mode)");
         hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
         hmlgw->start();
     } else {
         ESP_LOGI(TAG, "Starting Raw UART UDP mode");
+
+        // DTLS encryption only available in Raw UART mode (not compatible with HM-LGW or Analyzer)
+        DTLSEncryption dtlsEncryption;
+        dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
+        dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
+
+        // Disable DTLS if Analyzer is enabled (Analyzer needs unencrypted data)
+        if (settings.getAnalyzerEnabled() && dtls_mode != DTLS_MODE_DISABLED)
+        {
+            ESP_LOGW(TAG, "DTLS encryption disabled: Analyzer requires unencrypted data");
+            dtls_mode = DTLS_MODE_DISABLED;
+        }
+
+        if (dtls_mode != DTLS_MODE_DISABLED)
+        {
+            if (dtlsEncryption.init(dtls_mode, dtls_cipher))
+            {
+                dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
+                dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
+                ESP_LOGI(TAG, "DTLS encryption initialized successfully");
+            }
+            else
+            {
+                ESP_LOGW(TAG, "DTLS encryption initialization failed, continuing without encryption");
+            }
+        }
+
         rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector, &settings, &dtlsEncryption);
         rawUartUdpLister->start();
     }

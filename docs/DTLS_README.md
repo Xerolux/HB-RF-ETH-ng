@@ -4,6 +4,16 @@
 
 Eine optionale, hochsichere Transportverschlüsselung für die Netzwerkverbindung (RJ45/Ethernet) zwischen der **HB-RF-ETH Platine** und der **CCU** (HomeMatic Central Control Unit).
 
+## ⚠️ Wichtige Einschränkungen
+
+**DTLS Verschlüsselung ist NICHT kompatibel mit:**
+- **HM-LGW Modus** - HM-LGW arbeitet mit TCP und benötigt unverschlüsselte Daten
+- **Analyzer Modus** - Der Analyzer muss die Rohdaten vor der Verschlüsselung analysieren können
+
+**DTLS funktioniert NUR im Raw-UART UDP Modus** (Standard-Modus).
+
+Wenn HM-LGW oder Analyzer aktiviert sind, wird DTLS automatisch deaktiviert, auch wenn in den Einstellungen aktiviert.
+
 ## Warum Verschlüsselung?
 
 **Problem**: Die Raw-UART UDP Kommunikation auf Port 3008 ist standardmäßig **unverschlüsselt**. Das bedeutet:

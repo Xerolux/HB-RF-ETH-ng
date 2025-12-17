@@ -9,6 +9,7 @@ Die HB-RF-ETH Platine kann optional DTLS 1.2 Verschlüsselung für die Raw-UART 
 - **Modus**: Pre-Shared Key (PSK)
 - **Cipher**: `PSK-AES256-GCM-SHA384` (Standard)
 - **Abwärtskompatibel**: Ja (wenn DTLS deaktiviert)
+- **⚠️ NUR für Raw-UART UDP Modus** - NICHT kompatibel mit HM-LGW oder Analyzer!
 
 ## Minimal-Implementierung (OpenSSL C)
 
