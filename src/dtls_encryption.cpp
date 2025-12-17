@@ -145,6 +145,13 @@ bool DTLSEncryption::generatePSK(size_t key_bits)
 
 bool DTLSEncryption::getPSK(unsigned char *key_out, size_t *key_len_out, char *identity_out)
 {
+    // Validate input parameters
+    if (!key_out || !key_len_out || !identity_out)
+    {
+        ESP_LOGE(TAG, "getPSK: Invalid null parameters");
+        return false;
+    }
+
     if (psk_key_len == 0)
     {
         ESP_LOGW(TAG, "No PSK available");
@@ -153,7 +160,9 @@ bool DTLSEncryption::getPSK(unsigned char *key_out, size_t *key_len_out, char *i
 
     memcpy(key_out, psk_key, psk_key_len);
     *key_len_out = psk_key_len;
-    strcpy(identity_out, psk_identity);
+    // Safe copy with size limit (identity_out buffer must be min 64 bytes as per API contract)
+    strncpy(identity_out, psk_identity, 63);
+    identity_out[63] = '\0'; // Ensure null termination
 
     return true;
 }

@@ -199,7 +199,7 @@ void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)
         {
             // Legacy CoPro in app
             _detectState = DETECT_STATE_LEGACY_GET_VERSION;
-            sprintf(_sgtin, "n/a");
+            snprintf(_sgtin, sizeof(_sgtin), "n/a");
             _hmIPRadioMAC = 0;
             _radioModuleType = RADIO_MODULE_HM_MOD_RPI_PCB;
             sem_give(_detectWaitFrameDataSemaphore);
@@ -236,7 +236,7 @@ void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)
     case DETECT_STATE_GET_SGTIN:
         if (frame.destination == HM_DST_COMMON && frame.command == HM_CMD_COMMON_ACK && frame.data_len == 13 && frame.data[0] == 1)
         {
-            sprintf(_sgtin, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X", frame.data[1], frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6], frame.data[7], frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
+            snprintf(_sgtin, sizeof(_sgtin), "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X", frame.data[1], frame.data[2], frame.data[3], frame.data[4], frame.data[5], frame.data[6], frame.data[7], frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
 
             switch (_radioModuleType)
             {
@@ -244,13 +244,13 @@ void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)
                 _bidCosRadioMAC = 0xff0000 | (frame.data[11] << 8) | frame.data[12];
                 if (_bidCosRadioMAC == 0xffffff)
                     _bidCosRadioMAC = 0xfffffe;
-                sprintf(_serial, "%02X%02X%02X%02X%02X", frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
+                snprintf(_serial, sizeof(_serial), "%02X%02X%02X%02X%02X", frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
                 _detectState = DETECT_STATE_GET_BIDCOS_RF_ADDRESS;
                 break;
 
             case RADIO_MODULE_HMIP_RFUSB:
                 _bidCosRadioMAC = 0;
-                sprintf(_serial, "%02X%02X%02X%02X%02X", frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
+                snprintf(_serial, sizeof(_serial), "%02X%02X%02X%02X%02X", frame.data[8], frame.data[9], frame.data[10], frame.data[11], frame.data[12]);
                 _detectState = DETECT_STATE_FINISHED;
                 break;
 

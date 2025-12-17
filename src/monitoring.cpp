@@ -28,6 +28,10 @@
 
 static const char *TAG = "MONITORING";
 
+// Buffer size constants
+#define CHECKMK_OUTPUT_BUFFER_SIZE 2048
+#define CHECKMK_ALLOWED_HOSTS_SIZE 256
+
 static monitoring_config_t current_config = {};
 static bool snmp_running = false;
 static bool checkmk_running = false;
@@ -170,7 +174,7 @@ static void checkmk_agent_task(void *pvParameters)
         }
 
         // Send CheckMK agent output
-        char output[2048];
+        char output[CHECKMK_OUTPUT_BUFFER_SIZE];
         int len = 0;
 
         // Version section
