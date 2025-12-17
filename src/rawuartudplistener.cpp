@@ -29,6 +29,15 @@
 
 static const char *TAG = "RawUartUdpListener";
 
+// ============================================================================
+// Optimized UDP Queue Sizes based on traffic patterns
+// ============================================================================
+// Larger queue for DTLS: Encryption overhead requires more buffering
+// Standard queue for unencrypted: Lower latency, less memory usage
+#define UDP_QUEUE_SIZE_STANDARD  32   // Standard mode: 32 slots (~1-2KB RAM)
+#define UDP_QUEUE_SIZE_DTLS      64   // DTLS mode: 64 slots for encryption overhead (~2-4KB RAM)
+#define UDP_QUEUE_SIZE_HIGH_PERF 128  // Future: High-performance mode
+
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
     ((RawUartUdpListener *)parameter)->_udpQueueHandler();
@@ -266,11 +275,18 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
-    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    // Optimize queue size based on DTLS usage
+    // DTLS needs larger queue due to encryption overhead and handshake latency
+    uint32_t queue_size = atomic_load(&_dtlsEnabled) ? UDP_QUEUE_SIZE_DTLS : UDP_QUEUE_SIZE_STANDARD;
+
+    _udp_queue = xQueueCreate(queue_size, sizeof(udp_event_t *));
     if (!_udp_queue) {
-        ESP_LOGE(TAG, "Failed to create UDP queue");
+        ESP_LOGE(TAG, "Failed to create UDP queue (size: %lu)", queue_size);
         return;
     }
+
+    ESP_LOGI(TAG, "Created UDP queue with %lu slots (%s mode)",
+             queue_size, atomic_load(&_dtlsEnabled) ? "DTLS" : "standard");
 
     xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 

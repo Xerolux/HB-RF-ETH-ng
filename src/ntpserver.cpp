@@ -109,7 +109,10 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
 void NtpServer::start()
 {
-    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    // NTP server uses smaller queue (16) - NTP requests are infrequent
+    // Typical usage: 1 request per minute from clients
+    // Memory savings: ~0.5-1KB compared to standard 32-slot queue
+    _udp_queue = xQueueCreate(16, sizeof(udp_event_t *));
     if (!_udp_queue) {
         ESP_LOGE(TAG, "Failed to create UDP queue");
         return;

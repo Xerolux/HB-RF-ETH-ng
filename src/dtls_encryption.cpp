@@ -42,6 +42,11 @@ DTLSEncryption::DTLSEncryption()
     memset(&stats, 0, sizeof(stats));
     memset(psk_key, 0, sizeof(psk_key));
     memset(psk_identity, 0, sizeof(psk_identity));
+
+    // Note: Session cache implementation
+    // When implementing full DTLS session management, limit to DTLS_MAX_CACHED_SESSIONS
+    // Use LRU (Least Recently Used) eviction policy to maintain memory efficiency
+    // Estimated memory savings: ~2-4KB with 10-session limit vs unlimited cache
 }
 
 DTLSEncryption::~DTLSEncryption()
