@@ -1,8 +1,8 @@
 #include "analyzer.h"
 #include "esp_log.h"
 #include <cstring>
-#include <iomanip>
-#include <sstream>
+#include <stdio.h>
+#include <inttypes.h>
 
 static const char *TAG = "Analyzer";
 static Analyzer *_instance = NULL;
@@ -30,47 +30,59 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 
     // Convert frame to JSON
     // Format: { "ts": <timestamp_ms>, "rssi": <rssi>, "len": <len>, "data": "<hex_string>" }
-    // Note: RSSI is not directly available in the raw UART stream unless parsing specific frames.
-    // For now, we send raw data and let the frontend parse it.
+    // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
+    // Buffer size calculation:
+    // {"ts": (5 chars) + 20 chars (int64) + ",\"len\": (7) + 5 (uint16) + ",\"data\":\"" (9) + len*2 + "\"}" (2) + null (1)
+    // = ~50 + len * 2
+    // We use a safe stack buffer for small frames, and heap for large ones.
 
-    // We'll use a simple JSON construction to avoid heap overhead of cJSON for every frame if possible,
-    // but cJSON is safer.
+    char stack_buffer[2048];
+    char* json_str = stack_buffer;
+    bool heap_allocated = false;
+    size_t required_size = 64 + len * 2;
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "ts", esp_timer_get_time() / 1000); // ms since boot
-    cJSON_AddNumberToObject(root, "len", len);
-
-    char *hex = (char*)malloc(len * 2 + 1);
-    if (hex) {
-        for (int i = 0; i < len; i++) {
-            sprintf(hex + i * 2, "%02X", buffer[i]);
+    if (required_size > sizeof(stack_buffer)) {
+        json_str = (char*)malloc(required_size);
+        if (!json_str) {
+            ESP_LOGE(TAG, "Failed to allocate memory for frame JSON");
+            return;
         }
-        cJSON_AddStringToObject(root, "data", hex);
-        free(hex);
+        heap_allocated = true;
     }
 
-    char *json_str = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
+    // Header
+    int offset = snprintf(json_str, required_size, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", esp_timer_get_time() / 1000, len);
 
-    if (json_str) {
-        httpd_ws_frame_t ws_pkt;
-        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-        ws_pkt.payload = (uint8_t *)json_str;
-        ws_pkt.len = strlen(json_str);
-        ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    // Fast Hex Conversion
+    static const char hex_map[] = "0123456789ABCDEF";
+    for (int i = 0; i < len; i++) {
+        json_str[offset++] = hex_map[(buffer[i] >> 4) & 0xF];
+        json_str[offset++] = hex_map[buffer[i] & 0xF];
+    }
 
-        if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
-            // Iterate backwards to allow safe removal
-            for (int i = _client_fds.size() - 1; i >= 0; i--) {
-                esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
-                if (ret != ESP_OK) {
-                    ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
-                    // If send fails, we might want to remove the client, but usually httpd handles disconnects.
-                    // However, async send might fail if socket is closed.
-                }
+    // Footer
+    json_str[offset++] = '"';
+    json_str[offset++] = '}';
+    json_str[offset] = 0;
+
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = (uint8_t *)json_str;
+    ws_pkt.len = offset;
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
+        // Iterate backwards to allow safe removal
+        for (int i = _client_fds.size() - 1; i >= 0; i--) {
+            esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
+            if (ret != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
             }
-            xSemaphoreGive(_mutex);
         }
+        xSemaphoreGive(_mutex);
+    }
+
+    if (heap_allocated) {
         free(json_str);
     }
 }
@@ -132,20 +144,6 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
     if (req->method == HTTP_GET) {
         // Handshake
         ESP_LOGI(TAG, "Handshake done, the new connection was opened");
-
-        // Verify authentication?
-        // Typically ws connections don't easily support Authorization header in browser API,
-        // but cookies or query params work. Or we can rely on the fact that the page is protected
-        // (but WS endpoint should be too).
-        // For simplicity, let's assume if they can connect they are authorized or we check cookie/token in handshake.
-        // But req->headers might not have it if using standard WS API.
-        // Let's check query param ?token=... or similar if needed.
-        // For now, let's allow it but maybe we should check.
-
-        // Note: The main WebUI uses Token auth. The WS client should probably send it.
-        // Since we can't easily add headers in standard WebSocket JS API, query param is best.
-        // But let's see.
-
         return ESP_OK;
     }
 
@@ -174,7 +172,6 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
             free(buf);
             return ret;
         }
-        // ESP_LOGI(TAG, "Got packet with message: %s", ws_pkt.payload);
     }
 
     // Triggered when close
@@ -186,12 +183,6 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
          free(buf);
          return ESP_OK;
     }
-
-    // If it's a new connection (first frame or just opened), we need to track it.
-    // Actually httpd doesn't explicitly tell us "Opened" except via GET handshake.
-    // But we can't get sockfd easily in GET.
-    // So usually we rely on "first message" or we check on every message.
-    // Wait, `httpd_req_to_sockfd(req)` works.
 
     if (_instance) {
         _instance->addClient(req->handle, httpd_req_to_sockfd(req));
