@@ -247,6 +247,8 @@ httpd_uri_t post_login_json_handler = {
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
 
     // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
     // This handler is called frequently (1Hz) by the frontend.
@@ -404,6 +406,8 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
     cJSON *root = cJSON_CreateObject();
 
     add_settings(root);
@@ -599,6 +603,8 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"settings.json\"");
 
     cJSON *root = cJSON_CreateObject();
