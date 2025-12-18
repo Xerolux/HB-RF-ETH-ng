@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <stdarg.h>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -175,29 +176,49 @@ static void checkmk_agent_task(void *pvParameters)
 
         // Send CheckMK agent output
         char output[CHECKMK_OUTPUT_BUFFER_SIZE];
-        int len = 0;
+        size_t len = 0;
+
+        // Helper for safe appending to buffer
+        auto safe_append = [&](const char* format, ...) {
+            if (len >= sizeof(output) - 1) return; // Buffer full
+
+            va_list args;
+            va_start(args, format);
+            int ret = vsnprintf(output + len, sizeof(output) - len, format, args);
+            va_end(args);
+
+            if (ret > 0) {
+                if (len + ret < sizeof(output)) {
+                    len += ret;
+                } else {
+                    // Truncated - saturate to max
+                    len = sizeof(output) - 1;
+                    output[len] = '\0';
+                }
+            }
+        };
 
         // Version section
-        len += snprintf(output + len, sizeof(output) - len, "<<<check_mk>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "Version: HB-RF-ETH-%s\n", get_firmware_version());
-        len += snprintf(output + len, sizeof(output) - len, "AgentOS: ESP-IDF\n");
+        safe_append("<<<check_mk>>>\n");
+        safe_append("Version: HB-RF-ETH-%s\n", get_firmware_version());
+        safe_append("AgentOS: ESP-IDF\n");
 
         // Uptime section
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
-        len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        safe_append("<<<uptime>>>\n");
+        safe_append("%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
-        len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
+        safe_append("<<<mem>>>\n");
+        safe_append("MemTotal: %lu kB\n",
                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
-        len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
+        safe_append("MemFree: %lu kB\n",
                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
-        len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "esp32 0 0 0\n");
+        safe_append("<<<cpu>>>\n");
+        safe_append("esp32 0 0 0\n");
 
         // Send data
         send(client_sock, output, len, 0);

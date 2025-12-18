@@ -12,3 +12,8 @@
 **Vulnerability:** The CheckMK agent used `strstr` to validate client IPs against the allowed hosts list. This allowed unauthorized IPs (e.g., "192.168.1.1") to bypass the check if they were a substring of an allowed IP (e.g., "192.168.1.100").
 **Learning:** Partial string matching is insufficient for security controls. Access control lists must rely on exact matches or proper tokenization.
 **Prevention:** Parse delimiters and perform strict equality checks for each token in access control lists.
+
+## 2025-12-12 - [Unchecked snprintf Buffer Overflow]
+**Vulnerability:** The monitoring agent used `len += snprintf(...)` to append to a fixed-size stack buffer without checking if `snprintf` truncated the output. This caused `sizeof(buf) - len` to underflow when the buffer filled up, allowing subsequent writes to overflow the stack.
+**Learning:** `snprintf` returns the size *needed*, not the size *written*. Unchecked arithmetic on the return value is dangerous.
+**Prevention:** Always verify `snprintf` return values against remaining buffer space. Use a helper function for safe string building.
