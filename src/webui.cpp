@@ -26,6 +26,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/param.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
