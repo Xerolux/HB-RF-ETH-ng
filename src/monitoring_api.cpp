@@ -7,6 +7,7 @@
 
 #include "monitoring_api.h"
 #include "monitoring.h"
+#include "security_headers.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -19,6 +20,7 @@ extern esp_err_t validate_auth(httpd_req_t *req);
 // GET /api/monitoring - Get monitoring configuration
 esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -80,6 +82,7 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 // POST /api/monitoring - Update monitoring configuration
 esp_err_t post_monitoring_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
