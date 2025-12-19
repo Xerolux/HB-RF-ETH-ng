@@ -49,7 +49,11 @@ typedef struct {
     uint32_t decryption_errors;
     uint32_t handshake_successes;
     uint32_t handshake_failures;
+    uint32_t active_sessions;
+    uint32_t session_cache_evictions;
 } dtls_stats_t;
+
+#define DTLS_MAX_CACHED_SESSIONS 10
 
 /**
  * Simplified DTLS Encryption Class for ESP-IDF 5.x
