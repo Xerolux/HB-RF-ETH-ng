@@ -74,7 +74,7 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
 
 void Settings::load()
 {
-  uint32_t handle;
+  nvs_handle_t handle = 0;
 
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -84,7 +84,11 @@ void Settings::load()
   }
   ESP_ERROR_CHECK(err);
 
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
+  err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+  if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+      return;
+  }
 
   size_t adminPasswordLength = sizeof(_adminPassword);
   if (nvs_get_str(handle, "adminPassword", _adminPassword, &adminPasswordLength) != ESP_OK)
@@ -175,9 +179,13 @@ void Settings::load()
 
 void Settings::save()
 {
-  uint32_t handle;
+  nvs_handle_t handle = 0;
 
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
+  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+  if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+      return;
+  }
 
   SET_STR(handle, "adminPassword", _adminPassword);
   SET_BOOL(handle, "passwordChanged", _passwordChanged);
@@ -229,9 +237,14 @@ void Settings::save()
 
 void Settings::clear()
 {
-  uint32_t handle;
+  nvs_handle_t handle = 0;
 
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
+  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+  if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
+      return;
+  }
+
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_erase_all(handle));
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
