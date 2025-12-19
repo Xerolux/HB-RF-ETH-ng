@@ -36,11 +36,11 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="frame in frames" :key="frame.id" :class="getRowClass(frame)">
+            <tr v-for="frame in frames" :key="frame.id" :class="frame.rowClass">
               <td>{{ frame.id }}</td>
-              <td>{{ formatTime(frame.ts) }}</td>
+              <td>{{ frame.formattedTime }}</td>
               <td>
-                <span v-if="frame.rssi !== undefined" :class="getRssiClass(frame.rssi)">
+                <span v-if="frame.rssi !== undefined" :class="frame.rssiClass">
                   {{ frame.rssi }} dBm
                 </span>
               </td>
@@ -283,14 +283,36 @@ const processBidCosFrame = (ts, data, rssi) => {
     frames.value.shift()
   }
 
+  // Pre-calculate display values to avoid re-calculation in render loop
+  // Format Time
+  const sec = Math.floor(ts / 1000)
+  const ms = ts % 1000
+  const formattedTime = `${sec}.${ms.toString().padStart(3, '0')}`
+
+  // Row Class
+  let rowClass = ''
+  if (typeHex === '02') rowClass = 'table-success' // Ack
+  else if (typeHex === '10') rowClass = 'table-info' // Info
+
+  // RSSI Class
+  let rssiClass = 'text-danger'
+  if (rssi !== undefined) {
+      if (rssi > -50) rssiClass = 'text-success'
+      else if (rssi > -70) rssiClass = 'text-primary'
+      else if (rssi > -90) rssiClass = 'text-warning'
+  }
+
   frames.value.push({
     id: frameCounter,
     ts: ts,
+    formattedTime: formattedTime,
     rssi: rssi,
+    rssiClass: rssiClass,
     len: len,
     cnt: cnt.toString(16).toUpperCase().padStart(2, '0'),
     type: typeName,
     rawType: typeHex,
+    rowClass: rowClass,
     srcRaw: srcRaw,
     dstRaw: dstRaw,
     src: deviceNames[srcRaw] || srcRaw,
@@ -307,26 +329,6 @@ const processBidCosFrame = (ts, data, rssi) => {
 
 const clear = () => {
   frames.value = []
-}
-
-const formatTime = (ts) => {
-    const sec = Math.floor(ts / 1000)
-    const ms = ts % 1000
-    return `${sec}.${ms.toString().padStart(3, '0')}`
-}
-
-const getRowClass = (frame) => {
-    // Highlight based on type?
-    if (frame.rawType === '02') return 'table-success' // Ack
-    if (frame.rawType === '10') return 'table-info' // Info
-    return ''
-}
-
-const getRssiClass = (rssi) => {
-    if (rssi > -50) return 'text-success'
-    if (rssi > -70) return 'text-primary'
-    if (rssi > -90) return 'text-warning'
-    return 'text-danger'
 }
 
 onMounted(async () => {
