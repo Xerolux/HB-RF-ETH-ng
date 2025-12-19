@@ -277,8 +277,11 @@
           variant="primary"
           block
           @click="saveSettingsClick"
-          :disabled="v$.$error"
-        >{{ t('common.save') }}</BButton>
+          :disabled="v$.$error || loading"
+        >
+          <BSpinner small v-if="loading" class="me-2" />
+          {{ t('common.save') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -392,6 +395,7 @@ const dtlsSessionResumption = ref(true)
 
 const showSuccess = ref(null)
 const showError = ref(null)
+const loading = ref(false)
 
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
@@ -560,6 +564,7 @@ const saveSettingsClick = async () => {
   v$.value.$touch()
   if (v$.value.$error) return
 
+  loading.value = true
   showError.value = false
   showSuccess.value = false
 
@@ -604,6 +609,8 @@ const saveSettingsClick = async () => {
     showSuccess.value = true
   } catch (error) {
     showError.value = true
+  } finally {
+    loading.value = false
   }
 }
 
