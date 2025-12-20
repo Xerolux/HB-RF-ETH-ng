@@ -82,14 +82,17 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         // Iterate backwards to allow safe removal
         std::vector<int> failed_clients;
 
-        for (int i = _client_fds.size() - 1; i >= 0; i--) {
-            esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
-            if (ret != ESP_OK) {
-                ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
+        // Check if list is not empty before iterating to prevent underflow
+        if (!_client_fds.empty()) {
+            for (int i = _client_fds.size() - 1; i >= 0; i--) {
+                esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
+                if (ret != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
 
-                // Mark for removal if connection is broken
-                if (ret == ESP_ERR_INVALID_STATE || ret == ESP_ERR_NOT_FOUND) {
-                    failed_clients.push_back(_client_fds[i]);
+                    // Mark for removal if connection is broken
+                    if (ret == ESP_ERR_INVALID_STATE || ret == ESP_ERR_NOT_FOUND) {
+                        failed_clients.push_back(_client_fds[i]);
+                    }
                 }
             }
         }
