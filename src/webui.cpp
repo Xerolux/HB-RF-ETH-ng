@@ -455,6 +455,24 @@ httpd_uri_t get_settings_json_handler = {
     .handle_ws_control_frames = false,
     .supported_subprotocol = NULL};
 
+esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (!_settings->getAnalyzerEnabled() || _settings->getHmlgwEnabled()) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Analyzer feature is disabled");
+        return ESP_OK;
+    }
+
+    // Lazily create analyzer only when feature is enabled to reduce background load
+    if (_analyzer == nullptr) {
+        _analyzer = new Analyzer(_radioModuleConnector);
+    }
+
+    return Analyzer::ws_handler(req);
+}
+
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
     ip4_addr_t res{.addr = IPADDR_ANY};
@@ -597,18 +615,45 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setHmlgwPort(hmlgwPort);
         _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
 
+        if (hmlgwEnabled && analyzerEnabled) {
+            ESP_LOGW(TAG, "Disabling Analyzer because HMLGW mode is enabled");
+            analyzerEnabled = false;
+        }
         _settings->setAnalyzerEnabled(analyzerEnabled);
 
         // DTLS
+        int dtlsMode = _settings->getDTLSMode();
+        int dtlsCipherSuite = _settings->getDTLSCipherSuite();
+        bool dtlsRequireClientCert = _settings->getDTLSRequireClientCert();
+        bool dtlsSessionResumption = _settings->getDTLSSessionResumption();
         if (cJSON_HasObjectItem(root, "dtlsMode")) {
-            int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
-            int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
-            bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
-            bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
-            _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+            dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+            dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+            dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+            dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
         }
 
+        // Enforce compatibility: DTLS cannot run together with Analyzer or HMLGW
+        if (analyzerEnabled || hmlgwEnabled) {
+            if (dtlsMode != DTLS_MODE_DISABLED) {
+                ESP_LOGW(TAG, "Disabling DTLS because %s is enabled", analyzerEnabled ? "Analyzer" : "HMLGW");
+            }
+            dtlsMode = DTLS_MODE_DISABLED;
+        }
+
+        _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+
         _settings->save();
+
+        // Start or stop Analyzer task based on new configuration
+        if (analyzerEnabled && !hmlgwEnabled) {
+            if (_analyzer == nullptr) {
+                _analyzer = new Analyzer(_radioModuleConnector);
+            }
+        } else if (_analyzer) {
+            delete _analyzer;
+            _analyzer = nullptr;
+        }
 
         cJSON_Delete(root);
 
@@ -1267,7 +1312,7 @@ httpd_uri_t post_change_password_handler = {
 httpd_uri_t get_analyzer_ws_handler = {
     .uri = "/api/analyzer/ws",
     .method = HTTP_GET,
-    .handler = Analyzer::ws_handler,
+    .handler = analyzer_ws_handler_func,
     .user_ctx = NULL,
     .is_websocket = true,
     .handle_ws_control_frames = false,
@@ -1285,7 +1330,10 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
-    _analyzer = new Analyzer(_radioModuleConnector);
+    _analyzer = nullptr;
+    if (_settings->getAnalyzerEnabled() && !_settings->getHmlgwEnabled()) {
+        _analyzer = new Analyzer(_radioModuleConnector);
+    }
     _dtlsEncryption = dtlsEncryption;
 
     generateToken();
