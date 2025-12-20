@@ -40,6 +40,7 @@
 #include "analyzer.h"
 #include "dtls_api.h"
 #include "monitoring.h"
+#include "security_headers.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -56,6 +57,7 @@ static const char *TAG = "WebUI";
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
+        add_security_headers(req);                                     \
         if (_sysInfo) {                                                \
             char etag[32];                                             \
             snprintf(etag, sizeof(etag), "\"%s\"", _sysInfo->getCurrentVersion()); \
@@ -199,6 +201,8 @@ esp_err_t validate_auth(httpd_req_t *req)
 
 esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     // Check rate limit
     if (!rate_limiter_check_login(req))
     {
@@ -257,6 +261,7 @@ httpd_uri_t post_login_json_handler = {
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
@@ -418,6 +423,7 @@ void add_settings(cJSON *root)
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -473,6 +479,7 @@ bool cJSON_GetBoolValue(const cJSON *item)
 
 esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -632,6 +639,7 @@ httpd_uri_t post_settings_json_handler = {
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -742,6 +750,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 // Actually, let's implement a dedicated restore handler that restarts.
 esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -950,6 +959,7 @@ httpd_uri_t post_restore_handler = {
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -1050,6 +1060,7 @@ httpd_uri_t post_ota_update_handler = {
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -1077,6 +1088,7 @@ httpd_uri_t post_restart_handler = {
 
 static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
 {
+  add_security_headers(req);
   if (validate_auth(req) != ESP_OK)
   {
       return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -1113,6 +1125,7 @@ httpd_uri_t _post_firmware_online_update_handler = {
 
 esp_err_t post_check_update_handler_func(httpd_req_t *req)
 {
+  add_security_headers(req);
   if (validate_auth(req) != ESP_OK)
   {
       return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -1145,6 +1158,7 @@ httpd_uri_t post_check_update_handler = {
 
 esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -1174,6 +1188,7 @@ httpd_uri_t post_factory_reset_handler = {
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
