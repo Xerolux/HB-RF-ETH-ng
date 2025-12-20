@@ -34,6 +34,9 @@
             </BButton>
           </BInputGroupAppend>
         </BInputGroup>
+        <BFormInvalidFeedback v-if="v$.password.$error">
+          {{ t('validation.required') }}
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BAlert
         variant="danger"

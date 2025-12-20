@@ -12,7 +12,10 @@
     <h6 class="mt-3">{{ t('monitoring.snmp.title') }}</h6>
     <BForm>
       <BFormGroup label-cols-sm="4" :label="t('monitoring.snmp.enabled')">
-        <BFormCheckbox v-model="snmpConfig.enabled" switch />
+        <BFormRadioGroup buttons v-model="snmpConfig.enabled">
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
 
       <template v-if="snmpConfig.enabled">
@@ -44,7 +47,10 @@
     <h6 class="mt-3">{{ t('monitoring.checkmk.title') }}</h6>
     <BForm>
       <BFormGroup label-cols-sm="4" :label="t('monitoring.checkmk.enabled')">
-        <BFormCheckbox v-model="checkmkConfig.enabled" switch />
+        <BFormRadioGroup buttons v-model="checkmkConfig.enabled">
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
 
       <template v-if="checkmkConfig.enabled">
@@ -72,7 +78,10 @@
     <h6 class="mt-3">{{ t('monitoring.mqtt.title') }}</h6>
     <BForm>
       <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.enabled')">
-        <BFormCheckbox v-model="mqttConfig.enabled" switch />
+        <BFormRadioGroup buttons v-model="mqttConfig.enabled">
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
 
       <template v-if="mqttConfig.enabled">
@@ -102,7 +111,10 @@
         </BFormGroup>
 
         <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.haDiscoveryEnabled')">
-          <BFormCheckbox v-model="mqttConfig.haDiscoveryEnabled" switch />
+          <BFormRadioGroup buttons v-model="mqttConfig.haDiscoveryEnabled">
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
         </BFormGroup>
 
         <template v-if="mqttConfig.haDiscoveryEnabled">

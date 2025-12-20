@@ -33,6 +33,9 @@
             </BButton>
           </BInputGroupAppend>
         </BInputGroup>
+        <BFormInvalidFeedback v-if="v$.adminPassword.minLength.$invalid || v$.adminPassword.password_validator.$invalid">
+          {{ v$.adminPassword.password_validator.$message }}
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.repeatPassword')" label-cols-sm="4">
         <BInputGroup>
@@ -60,6 +63,9 @@
             </BButton>
           </BInputGroupAppend>
         </BInputGroup>
+        <BFormInvalidFeedback v-if="v$.adminPasswordRepeat.sameAsPassword.$invalid">
+          {{ v$.adminPasswordRepeat.sameAsPassword.$message }}
+        </BFormInvalidFeedback>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.networkSettings') }}</h6>
@@ -70,6 +76,11 @@
           trim
           :state="v$.hostname.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.hostname.$error">
+            <span v-if="v$.hostname.required.$invalid">{{ v$.hostname.required.$message }}</span>
+            <span v-else-if="v$.hostname.hostname_validator.$invalid">{{ v$.hostname.hostname_validator.$message }}</span>
+            <span v-else-if="v$.hostname.maxLength.$invalid">{{ v$.hostname.maxLength.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.dhcp')" label-cols-sm="4">
         <BFormRadioGroup buttons v-model="useDHCP" required>
@@ -84,6 +95,10 @@
           trim
           :state="v$.localIP.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.localIP.$error">
+             <span v-if="v$.localIP.required.$invalid">{{ v$.localIP.required.$message }}</span>
+             <span v-else>{{ v$.localIP.ipAddress.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.netmask')" label-cols-sm="4" v-if="!useDHCP">
         <BFormInput
@@ -92,6 +107,10 @@
           trim
           :state="v$.netmask.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.netmask.$error">
+             <span v-if="v$.netmask.required.$invalid">{{ v$.netmask.required.$message }}</span>
+             <span v-else>{{ v$.netmask.ipAddress.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.gateway')" label-cols-sm="4" v-if="!useDHCP">
         <BFormInput
@@ -100,6 +119,10 @@
           trim
           :state="v$.gateway.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.gateway.$error">
+             <span v-if="v$.gateway.required.$invalid">{{ v$.gateway.required.$message }}</span>
+             <span v-else>{{ v$.gateway.ipAddress.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.dns1')" label-cols-sm="4" v-if="!useDHCP">
         <BFormInput
@@ -108,6 +131,10 @@
           trim
           :state="v$.dns1.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.dns1.$error">
+             <span v-if="v$.dns1.required.$invalid">{{ v$.dns1.required.$message }}</span>
+             <span v-else>{{ v$.dns1.ipAddress.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.dns2')" label-cols-sm="4" v-if="!useDHCP">
         <BFormInput
@@ -116,11 +143,17 @@
           trim
           :state="v$.dns2.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.dns2.$error">
+             {{ v$.dns2.ipAddress.$message }}
+        </BFormInvalidFeedback>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.ipv6Settings') }}</h6>
       <BFormGroup :label="t('settings.enableIPv6')" label-cols-sm="4">
-        <BFormCheckbox v-model="enableIPv6" switch />
+        <BFormRadioGroup buttons v-model="enableIPv6" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <template v-if="enableIPv6">
         <BFormGroup :label="t('settings.ipv6Mode')" label-cols-sm="4">
@@ -138,6 +171,10 @@
               placeholder="2001:db8::1"
               :state="v$.ipv6Address.$error ? false : null"
             />
+            <BFormInvalidFeedback v-if="v$.ipv6Address.$error">
+                <span v-if="v$.ipv6Address.required.$invalid">{{ v$.ipv6Address.required.$message }}</span>
+                <span v-else>{{ v$.ipv6Address.ipv6_validator.$message }}</span>
+            </BFormInvalidFeedback>
           </BFormGroup>
           <BFormGroup :label="t('settings.ipv6PrefixLength')" label-cols-sm="4">
             <BFormInput
@@ -148,6 +185,12 @@
               placeholder="64"
               :state="v$.ipv6PrefixLength.$error ? false : null"
             />
+            <BFormInvalidFeedback v-if="v$.ipv6PrefixLength.$error">
+                <span v-if="v$.ipv6PrefixLength.required.$invalid">{{ v$.ipv6PrefixLength.required.$message }}</span>
+                <span v-else-if="v$.ipv6PrefixLength.numeric.$invalid">{{ v$.ipv6PrefixLength.numeric.$message }}</span>
+                <span v-else-if="v$.ipv6PrefixLength.minValue.$invalid">{{ v$.ipv6PrefixLength.minValue.$message }}</span>
+                <span v-else-if="v$.ipv6PrefixLength.maxValue.$invalid">{{ v$.ipv6PrefixLength.maxValue.$message }}</span>
+            </BFormInvalidFeedback>
           </BFormGroup>
           <BFormGroup :label="t('settings.ipv6Gateway')" label-cols-sm="4">
             <BFormInput
@@ -157,6 +200,10 @@
               placeholder="2001:db8::1"
               :state="v$.ipv6Gateway.$error ? false : null"
             />
+            <BFormInvalidFeedback v-if="v$.ipv6Gateway.$error">
+                <span v-if="v$.ipv6Gateway.required.$invalid">{{ v$.ipv6Gateway.required.$message }}</span>
+                <span v-else>{{ v$.ipv6Gateway.ipv6_validator.$message }}</span>
+            </BFormInvalidFeedback>
           </BFormGroup>
           <BFormGroup :label="t('settings.ipv6Dns1')" label-cols-sm="4">
             <BFormInput
@@ -166,6 +213,10 @@
               placeholder="2001:4860:4860::8888"
               :state="v$.ipv6Dns1.$error ? false : null"
             />
+            <BFormInvalidFeedback v-if="v$.ipv6Dns1.$error">
+                <span v-if="v$.ipv6Dns1.required.$invalid">{{ v$.ipv6Dns1.required.$message }}</span>
+                <span v-else>{{ v$.ipv6Dns1.ipv6_validator.$message }}</span>
+            </BFormInvalidFeedback>
           </BFormGroup>
           <BFormGroup :label="t('settings.ipv6Dns2')" label-cols-sm="4">
             <BFormInput
@@ -175,6 +226,9 @@
               placeholder="2001:4860:4860::8844"
               :state="v$.ipv6Dns2.$error ? false : null"
             />
+            <BFormInvalidFeedback v-if="v$.ipv6Dns2.$error">
+                {{ v$.ipv6Dns2.ipv6_validator.$message }}
+            </BFormInvalidFeedback>
           </BFormGroup>
         </template>
       </template>
@@ -194,6 +248,10 @@
           trim
           :state="v$.ntpServer.$error ? false : null"
         />
+        <BFormInvalidFeedback v-if="v$.ntpServer.$error">
+            <span v-if="v$.ntpServer.required.$invalid">{{ v$.ntpServer.required.$message }}</span>
+            <span v-else-if="v$.ntpServer.domainname_validator.$invalid">{{ v$.ntpServer.domainname_validator.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.dcfOffset')" label-cols-sm="4" v-if="isDcfActivated">
         <BInputGroup append="µs">
@@ -204,6 +262,10 @@
             :state="v$.dcfOffset.$error ? false : null"
           />
         </BInputGroup>
+        <BFormInvalidFeedback v-if="v$.dcfOffset.$error">
+            <span v-if="v$.dcfOffset.required.$invalid">{{ v$.dcfOffset.required.$message }}</span>
+            <span v-else-if="v$.dcfOffset.numeric.$invalid">{{ v$.dcfOffset.numeric.$message }}</span>
+        </BFormInvalidFeedback>
       </BFormGroup>
       <BFormGroup :label="t('settings.gpsBaudrate')" label-cols-sm="4" v-if="isGpsActivated">
         <BFormSelect v-model.number="gpsBaudrate">
@@ -231,15 +293,24 @@
         </BInputGroup>
       </BFormGroup>
       <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
-        <BFormCheckbox v-model="checkUpdates" switch />
+        <BFormRadioGroup buttons v-model="checkUpdates" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
-        <BFormCheckbox v-model="allowPrerelease" switch />
+        <BFormRadioGroup buttons v-model="allowPrerelease" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
       <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
-        <BFormCheckbox v-model="hmlgwEnabled" switch />
+        <BFormRadioGroup buttons v-model="hmlgwEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <template v-if="hmlgwEnabled">
         <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
@@ -250,6 +321,12 @@
             max="65535"
             :state="v$.hmlgwPort.$error ? false : null"
           />
+          <BFormInvalidFeedback v-if="v$.hmlgwPort.$error">
+                <span v-if="v$.hmlgwPort.required.$invalid">{{ v$.hmlgwPort.required.$message }}</span>
+                <span v-else-if="v$.hmlgwPort.numeric.$invalid">{{ v$.hmlgwPort.numeric.$message }}</span>
+                <span v-else-if="v$.hmlgwPort.minValue.$invalid">{{ v$.hmlgwPort.minValue.$message }}</span>
+                <span v-else-if="v$.hmlgwPort.maxValue.$invalid">{{ v$.hmlgwPort.maxValue.$message }}</span>
+          </BFormInvalidFeedback>
         </BFormGroup>
         <BFormGroup :label="t('settings.hmlgwKeepAlivePort')" label-cols-sm="4">
           <BFormInput
@@ -259,41 +336,56 @@
             max="65535"
             :state="v$.hmlgwKeepAlivePort.$error ? false : null"
           />
+          <BFormInvalidFeedback v-if="v$.hmlgwKeepAlivePort.$error">
+                <span v-if="v$.hmlgwKeepAlivePort.required.$invalid">{{ v$.hmlgwKeepAlivePort.required.$message }}</span>
+                <span v-else-if="v$.hmlgwKeepAlivePort.numeric.$invalid">{{ v$.hmlgwKeepAlivePort.numeric.$message }}</span>
+                <span v-else-if="v$.hmlgwKeepAlivePort.minValue.$invalid">{{ v$.hmlgwKeepAlivePort.minValue.$message }}</span>
+                <span v-else-if="v$.hmlgwKeepAlivePort.maxValue.$invalid">{{ v$.hmlgwKeepAlivePort.maxValue.$message }}</span>
+          </BFormInvalidFeedback>
         </BFormGroup>
       </template>
       <hr />
       <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
       <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
-        <BFormCheckbox v-model="analyzerEnabled" switch />
+        <BFormRadioGroup buttons v-model="analyzerEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
 
       <hr />
-      <h6 class="text-secondary">{{ t('settings.dtls.title') }}</h6>
-      <BFormGroup :label="t('settings.dtls.mode')" label-cols-sm="4">
+      <h6 class="text-secondary">{{ t('settings.dtlsSettings') }}</h6>
+      <BFormGroup :label="t('settings.dtlsMode')" label-cols-sm="4">
         <BFormRadioGroup buttons v-model="dtlsMode" required>
-          <BFormRadio :value="0">{{ t('common.disabled') }}</BFormRadio>
-          <BFormRadio :value="1">{{ t('settings.dtls.modePSK') }}</BFormRadio>
-          <BFormRadio :value="2">{{ t('settings.dtls.modeCert') }}</BFormRadio>
+          <BFormRadio :value="0">{{ t('settings.dtlsModeDisabled') }}</BFormRadio>
+          <BFormRadio :value="1">{{ t('settings.dtlsModePsk') }}</BFormRadio>
+          <BFormRadio :value="2">{{ t('settings.dtlsModeCertificate') }}</BFormRadio>
         </BFormRadioGroup>
       </BFormGroup>
       <template v-if="dtlsMode > 0">
-        <BFormGroup :label="t('settings.dtls.cipherSuite')" label-cols-sm="4">
+        <BFormGroup :label="t('settings.dtlsCipherSuite')" label-cols-sm="4">
           <BFormSelect v-model="dtlsCipherSuite">
-            <BFormSelectOption :value="0">AES-128-GCM</BFormSelectOption>
-            <BFormSelectOption :value="1">AES-256-GCM</BFormSelectOption>
-            <BFormSelectOption :value="2">ChaCha20-Poly1305</BFormSelectOption>
+            <BFormSelectOption :value="0">{{ t('settings.dtlsCipherAes128') }}</BFormSelectOption>
+            <BFormSelectOption :value="1">{{ t('settings.dtlsCipherAes256') }}</BFormSelectOption>
+            <BFormSelectOption :value="2">{{ t('settings.dtlsCipherChacha') }}</BFormSelectOption>
           </BFormSelect>
         </BFormGroup>
-        <BFormGroup :label="t('settings.dtls.sessionResumption')" label-cols-sm="4">
-          <BFormCheckbox v-model="dtlsSessionResumption" switch />
+        <BFormGroup :label="t('settings.dtlsSessionResumption')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="dtlsSessionResumption" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
         </BFormGroup>
         <template v-if="dtlsMode === 2">
-          <BFormGroup :label="t('settings.dtls.requireClientCert')" label-cols-sm="4">
-            <BFormCheckbox v-model="dtlsRequireClientCert" switch />
+          <BFormGroup :label="t('settings.dtlsRequireClientCert')" label-cols-sm="4">
+            <BFormRadioGroup buttons v-model="dtlsRequireClientCert" required>
+                <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+                <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+            </BFormRadioGroup>
           </BFormGroup>
         </template>
         <BAlert variant="info" :model-value="true" class="mt-2">
-            {{ t('settings.dtls.restartNote') }}
+            {{ t('settings.dtlsInfo') }}
         </BAlert>
       </template>
 
@@ -384,11 +476,11 @@ import {
 } from '@vuelidate/validators'
 import { useSettingsStore } from './stores.js'
 
+const { t } = useI18n()
+
 const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
 const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
-
-const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 
@@ -448,82 +540,82 @@ const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'stat
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
 // Validation rules
-const rules = {
+const rules = computed(() => ({
   adminPassword: {
     minLength: minLength(6),
     maxLength: maxLength(32),
-    password_validator: helpers.withMessage('Must contain letters and numbers', password_validator)
+    password_validator: helpers.withMessage(t('validation.passwordRequirements'), password_validator)
   },
   adminPasswordRepeat: {
-    sameAsPassword: sameAs(adminPassword)
+    sameAsPassword: helpers.withMessage(t('validation.sameAsPassword'), sameAs(adminPassword.value))
   },
   hostname: {
-    required,
-    hostname_validator,
+    required: helpers.withMessage(t('validation.required'), required),
+    hostname_validator: helpers.withMessage(t('validation.invalidHostname'), hostname_validator),
     maxLength: maxLength(32)
   },
   localIP: {
-    required: requiredUnless(useDHCP),
-    ipAddress
+    required: helpers.withMessage(t('validation.required'), requiredUnless(useDHCP.value)),
+    ipAddress: helpers.withMessage(t('validation.invalidIP'), ipAddress)
   },
   netmask: {
-    required: requiredUnless(useDHCP),
-    ipAddress
+    required: helpers.withMessage(t('validation.required'), requiredUnless(useDHCP.value)),
+    ipAddress: helpers.withMessage(t('validation.invalidIP'), ipAddress)
   },
   gateway: {
-    required: requiredUnless(useDHCP),
-    ipAddress
+    required: helpers.withMessage(t('validation.required'), requiredUnless(useDHCP.value)),
+    ipAddress: helpers.withMessage(t('validation.invalidIP'), ipAddress)
   },
   dns1: {
-    required: requiredUnless(useDHCP),
-    ipAddress
+    required: helpers.withMessage(t('validation.required'), requiredUnless(useDHCP.value)),
+    ipAddress: helpers.withMessage(t('validation.invalidIP'), ipAddress)
   },
   dns2: {
-    ipAddress
+    ipAddress: helpers.withMessage(t('validation.invalidIP'), ipAddress)
   },
   ipv6Address: {
-    required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    required: helpers.withMessage(t('validation.required'), requiredIf(isIPv6Static.value)),
+    ipv6_validator: helpers.withMessage(t('validation.invalidIPv6'), ipv6_validator)
   },
   ipv6PrefixLength: {
-    required: requiredIf(isIPv6Static),
-    numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 128', val => val <= 128)
+    required: helpers.withMessage(t('validation.required'), requiredIf(isIPv6Static.value)),
+    numeric: helpers.withMessage(t('validation.numeric'), numeric),
+    minValue: helpers.withMessage(t('validation.minValue', {min: 1}), val => val >= 1),
+    maxValue: helpers.withMessage(t('validation.maxValue', {max: 128}), val => val <= 128)
   },
   ipv6Gateway: {
-    required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    required: helpers.withMessage(t('validation.required'), requiredIf(isIPv6Static.value)),
+    ipv6_validator: helpers.withMessage(t('validation.invalidIPv6'), ipv6_validator)
   },
   ipv6Dns1: {
-    required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    required: helpers.withMessage(t('validation.required'), requiredIf(isIPv6Static.value)),
+    ipv6_validator: helpers.withMessage(t('validation.invalidIPv6'), ipv6_validator)
   },
   ipv6Dns2: {
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage(t('validation.invalidIPv6'), ipv6_validator)
   },
   ntpServer: {
-    required: requiredIf(isNtpActivated),
-    domainname_validator,
+    required: helpers.withMessage(t('validation.required'), requiredIf(isNtpActivated.value)),
+    domainname_validator: helpers.withMessage(t('validation.invalidHostname'), domainname_validator),
     maxLength: maxLength(64)
   },
   dcfOffset: {
-    required: requiredIf(isDcfActivated),
-    numeric
+    required: helpers.withMessage(t('validation.required'), requiredIf(isDcfActivated.value)),
+    numeric: helpers.withMessage(t('validation.numeric'), numeric)
   },
   hmlgwPort: {
-    required: requiredIf(hmlgwEnabled),
-    numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
+    required: helpers.withMessage(t('validation.required'), requiredIf(hmlgwEnabled.value)),
+    numeric: helpers.withMessage(t('validation.numeric'), numeric),
+    minValue: helpers.withMessage(t('validation.minValue', {min: 1}), val => val >= 1),
+    maxValue: helpers.withMessage(t('validation.maxValue', {max: 65535}), val => val <= 65535)
   },
   hmlgwKeepAlivePort: {
-    required: requiredIf(hmlgwEnabled),
-    numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
+    required: helpers.withMessage(t('validation.required'), requiredIf(hmlgwEnabled.value)),
+    numeric: helpers.withMessage(t('validation.numeric'), numeric),
+    minValue: helpers.withMessage(t('validation.minValue', {min: 1}), val => val >= 1),
+    maxValue: helpers.withMessage(t('validation.maxValue', {max: 65535}), val => val <= 65535)
   }
-}
+}))
 
 const v$ = useVuelidate(rules, {
   adminPassword,
