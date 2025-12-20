@@ -51,7 +51,11 @@
       "Bash(git init:*)",
       "Bash(git add:*)",
       "Bash(find:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(C:Usersbasti.platformiopenvScriptsplatformio.exe run)",
+      "Bash(/c/Users/basti/.platformio/penv/Scripts/platformio.exe run)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
