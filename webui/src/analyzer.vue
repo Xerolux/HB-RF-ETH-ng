@@ -194,6 +194,8 @@ const connect = () => {
 
   ws.onopen = () => {
     isConnected.value = true
+    // Send initial message to register client
+    ws.send('connected')
   }
 
   ws.onclose = () => {
@@ -224,15 +226,13 @@ const disconnect = () => {
 
 const addFrame = (rawFrame) => {
   let data = rawFrame.data
+  let rssi = undefined
 
   // Parse CoPro Frame
   // Format: FD <LenH> <LenL> <Dst> <Cnt> <Cmd> <Payload...> <CrcH> <CrcL>
   // Min length: 8 bytes (FD 00 00 Dst Cnt Cmd CrcH CrcL)
 
-  if (!data.startsWith('FD')) {
-     // Unknown format or raw radio frame without CoPro wrapper?
-     // Fallback to direct parsing
-  } else {
+  if (data.startsWith('FD')) {
      // Check Length
      if (data.length < 16) return // Too short
 
@@ -249,17 +249,18 @@ const addFrame = (rawFrame) => {
         const rssiHex = payloadHex.substring(0, 2)
         const frameHex = payloadHex.substring(2)
 
-        let rssi = parseInt(rssiHex, 16)
+        rssi = parseInt(rssiHex, 16)
         if (rssi >= 128) rssi -= 256 // Signed byte
 
         data = frameHex
-        // Add RSSI to frame object
-        processBidCosFrame(rawFrame.ts, data, rssi)
      } else {
-        // Other events (TX complete, etc)
-        // Optionally display them
+        // Other events (TX complete, etc) - skip
+        return
      }
   }
+
+  // Process BidCos frame (either unwrapped from CoPro or raw)
+  processBidCosFrame(rawFrame.ts, data, rssi)
 }
 
 const processBidCosFrame = (ts, data, rssi) => {
