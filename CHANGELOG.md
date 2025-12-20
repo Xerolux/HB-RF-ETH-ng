@@ -1,5 +1,22 @@
 # Changelog - HB-RF-ETH Firmware
 
+## Version 2.1.4 (2025)
+
+### Änderungen
+
+- fix-analyzer-light-login-PqJad (e6102ff)
+- Fix Analyzer Light and HM GW LAN UI improvements (ce45494)
+- Merge pull request #66 from Xerolux/claude/fix-analyzer-light-empty-gePBP (b34bf1e)
+- Fix Analyzer Light: Empty device list and no received packets (1784801)
+- fix-uart-config-warnings (f35cd8b)
+- Fix missing field initializer warnings for uart_config_t (18af250)
+- Update webui.cpp (d23aff2)
+- Merge branch 'main' of https://github.com/Xerolux/HB-RF-ETH-ng (f456a05)
+- Update settings.local.json (8a78a28)
+- Merge pull request #62 from Xerolux/bugfix/increase-uri-handler-limit-4361093178095781993 (b10a7b4)
+- Fix 'Nothing matches the given URI' error by increasing max_uri_handlers to 32 (64b2f18)
+
+
 ## Version 2.1.3 (2025)
 
 ### Änderungen
