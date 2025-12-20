@@ -8,58 +8,9 @@
   >
     <BForm @submit.stop.prevent>
       <BFormGroup :label="t('settings.changePassword')" label-cols-sm="4">
-        <BInputGroup>
-          <BFormInput
-            :type="adminPasswordVisible ? 'text' : 'password'"
-            v-model="adminPassword"
-            :state="v$.adminPassword.$error ? false : null"
-            placeholder="••••••"
-          />
-          <BInputGroupAppend>
-            <BButton
-              @click="adminPasswordVisible = !adminPasswordVisible"
-              variant="outline-secondary"
-              :aria-label="adminPasswordVisible ? 'Hide password' : 'Show password'"
-            >
-              <svg v-if="adminPasswordVisible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16">
-                <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/>
-                <path d="M11.297 5.316 5.066 11.547c-.862-.2-1.635-.726-2.195-1.474-.294-.396-.569-.83-.798-1.258a13.3 13.3 0 0 1-.954-3.14l.872-.486c.205.908.537 1.728.954 2.196.48.538 1.106.945 1.764 1.115l.623-.623A4.5 4.5 0 0 1 4.5 8a4.502 4.502 0 0 1 4.093-6.248l.965.965a5.503 5.503 0 0 0-.66.068c-1.996-.282-3.87 1.053-4.186 3.018l.865.865A3.49 3.49 0 0 0 11 8c0 .245-.045.478-.127.697l2.128 2.128a11.59 11.59 0 0 0 1.25-1.583l-.872-.486c-.238.41-.502.795-.788 1.139l-1.294-1.294z"/>
-                <path d="M0 1.354 1.354 0l14 14-1.354 1.354-14-14zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
-              </svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
-                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.314.435-.8.995-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
-                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
-              </svg>
-            </BButton>
-          </BInputGroupAppend>
-        </BInputGroup>
-      </BFormGroup>
-      <BFormGroup :label="t('settings.repeatPassword')" label-cols-sm="4">
-        <BInputGroup>
-          <BFormInput
-            :type="adminPasswordRepeatVisible ? 'text' : 'password'"
-            v-model="adminPasswordRepeat"
-            :state="v$.adminPasswordRepeat.$error ? false : null"
-            placeholder="••••••"
-          />
-          <BInputGroupAppend>
-            <BButton
-              @click="adminPasswordRepeatVisible = !adminPasswordRepeatVisible"
-              variant="outline-secondary"
-              :aria-label="adminPasswordRepeatVisible ? 'Hide password' : 'Show password'"
-            >
-              <svg v-if="adminPasswordRepeatVisible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16">
-                <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/>
-                <path d="M11.297 5.316 5.066 11.547c-.862-.2-1.635-.726-2.195-1.474-.294-.396-.569-.83-.798-1.258a13.3 13.3 0 0 1-.954-3.14l.872-.486c.205.908.537 1.728.954 2.196.48.538 1.106.945 1.764 1.115l.623-.623A4.5 4.5 0 0 1 4.5 8a4.502 4.502 0 0 1 4.093-6.248l.965.965a5.503 5.503 0 0 0-.66.068c-1.996-.282-3.87 1.053-4.186 3.018l.865.865A3.49 3.49 0 0 0 11 8c0 .245-.045.478-.127.697l2.128 2.128a11.59 11.59 0 0 0 1.25-1.583l-.872-.486c-.238.41-.502.795-.788 1.139l-1.294-1.294z"/>
-                <path d="M0 1.354 1.354 0l14 14-1.354 1.354-14-14zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
-              </svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
-                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.314.435-.8.995-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
-                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
-              </svg>
-            </BButton>
-          </BInputGroupAppend>
-        </BInputGroup>
+        <BButton variant="outline-primary" @click="showPasswordModal = true">
+          {{ t('settings.changePassword') }}
+        </BButton>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.networkSettings') }}</h6>
@@ -120,7 +71,10 @@
       <hr />
       <h6 class="text-secondary">{{ t('settings.ipv6Settings') }}</h6>
       <BFormGroup :label="t('settings.enableIPv6')" label-cols-sm="4">
-        <BFormCheckbox v-model="enableIPv6" switch />
+        <BFormRadioGroup buttons v-model="enableIPv6" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <template v-if="enableIPv6">
         <BFormGroup :label="t('settings.ipv6Mode')" label-cols-sm="4">
@@ -231,15 +185,24 @@
         </BInputGroup>
       </BFormGroup>
       <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
-        <BFormCheckbox v-model="checkUpdates" switch />
+        <BFormRadioGroup buttons v-model="checkUpdates" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
-        <BFormCheckbox v-model="allowPrerelease" switch />
+        <BFormRadioGroup buttons v-model="allowPrerelease" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
       <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
-        <BFormCheckbox v-model="hmlgwEnabled" switch />
+        <BFormRadioGroup buttons v-model="hmlgwEnabled" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <template v-if="hmlgwEnabled">
         <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
@@ -264,7 +227,10 @@
       <hr />
       <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
       <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
-        <BFormCheckbox v-model="analyzerEnabled" switch />
+        <BFormRadioGroup buttons v-model="analyzerEnabled" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
 
       <hr />
@@ -285,11 +251,17 @@
           </BFormSelect>
         </BFormGroup>
         <BFormGroup :label="t('settings.dtls.sessionResumption')" label-cols-sm="4">
-          <BFormCheckbox v-model="dtlsSessionResumption" switch />
+          <BFormRadioGroup buttons v-model="dtlsSessionResumption" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
         </BFormGroup>
         <template v-if="dtlsMode === 2">
           <BFormGroup :label="t('settings.dtls.requireClientCert')" label-cols-sm="4">
-            <BFormCheckbox v-model="dtlsRequireClientCert" switch />
+            <BFormRadioGroup buttons v-model="dtlsRequireClientCert" required>
+              <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+              <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+            </BFormRadioGroup>
           </BFormGroup>
         </template>
         <BAlert variant="info" :model-value="true" class="mt-2">
@@ -364,6 +336,79 @@
     <BButton variant="warning" block class="me-2" @click="rebootClick">{{ t('settings.reboot') }}</BButton>
     <BButton variant="danger" block @click="factoryResetClick">{{ t('settings.factoryReset') }}</BButton>
   </BCard>
+
+  <!-- Password Change Modal -->
+  <BModal
+    v-model="showPasswordModal"
+    :title="t('settings.changePassword')"
+    @ok="handlePasswordChange"
+    @cancel="resetPasswordModal"
+    ok-variant="primary"
+    :ok-title="t('common.save')"
+    :cancel-title="t('common.cancel')"
+  >
+    <BFormGroup :label="t('settings.changePassword')" label-cols-sm="4">
+      <BInputGroup>
+        <BFormInput
+          :type="adminPasswordVisible ? 'text' : 'password'"
+          v-model="adminPassword"
+          :state="passwordValidation.password.$error ? false : null"
+          placeholder="••••••"
+        />
+        <BInputGroupAppend>
+          <BButton
+            @click="adminPasswordVisible = !adminPasswordVisible"
+            variant="outline-secondary"
+            :aria-label="adminPasswordVisible ? 'Hide password' : 'Show password'"
+          >
+            <svg v-if="adminPasswordVisible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16">
+              <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/>
+              <path d="M11.297 5.316 5.066 11.547c-.862-.2-1.635-.726-2.195-1.474-.294-.396-.569-.83-.798-1.258a13.3 13.3 0 0 1-.954-3.14l.872-.486c.205.908.537 1.728.954 2.196.48.538 1.106.945 1.764 1.115l.623-.623A4.5 4.5 0 0 1 4.5 8a4.502 4.502 0 0 1 4.093-6.248l.965.965a5.503 5.503 0 0 0-.66.068c-1.996-.282-3.87 1.053-4.186 3.018l.865.865A3.49 3.49 0 0 0 11 8c0 .245-.045.478-.127.697l2.128 2.128a11.59 11.59 0 0 0 1.25-1.583l-.872-.486c-.238.41-.502.795-.788 1.139l-1.294-1.294z"/>
+              <path d="M0 1.354 1.354 0l14 14-1.354 1.354-14-14zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+              <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.314.435-.8.995-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+              <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+            </svg>
+          </BButton>
+        </BInputGroupAppend>
+      </BInputGroup>
+    </BFormGroup>
+    <BFormGroup :label="t('settings.repeatPassword')" label-cols-sm="4">
+      <BInputGroup>
+        <BFormInput
+          :type="adminPasswordRepeatVisible ? 'text' : 'password'"
+          v-model="adminPasswordRepeat"
+          :state="passwordValidation.passwordRepeat.$error ? false : null"
+          placeholder="••••••"
+        />
+        <BInputGroupAppend>
+          <BButton
+            @click="adminPasswordRepeatVisible = !adminPasswordRepeatVisible"
+            variant="outline-secondary"
+            :aria-label="adminPasswordRepeatVisible ? 'Hide password' : 'Show password'"
+          >
+            <svg v-if="adminPasswordRepeatVisible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16">
+              <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/>
+              <path d="M11.297 5.316 5.066 11.547c-.862-.2-1.635-.726-2.195-1.474-.294-.396-.569-.83-.798-1.258a13.3 13.3 0 0 1-.954-3.14l.872-.486c.205.908.537 1.728.954 2.196.48.538 1.106.945 1.764 1.115l.623-.623A4.5 4.5 0 0 1 4.5 8a4.502 4.502 0 0 1 4.093-6.248l.965.965a5.503 5.503 0 0 0-.66.068c-1.996-.282-3.87 1.053-4.186 3.018l.865.865A3.49 3.49 0 0 0 11 8c0 .245-.045.478-.127.697l2.128 2.128a11.59 11.59 0 0 0 1.25-1.583l-.872-.486c-.238.41-.502.795-.788 1.139l-1.294-1.294z"/>
+              <path d="M0 1.354 1.354 0l14 14-1.354 1.354-14-14zM8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z"/>
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+              <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.314.435-.8.995-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+              <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+            </svg>
+          </BButton>
+        </BInputGroupAppend>
+      </BInputGroup>
+    </BFormGroup>
+    <BAlert
+      variant="danger"
+      :model-value="passwordError"
+      dismissible
+      fade
+      @update:model-value="passwordError = null"
+    >{{ passwordError }}</BAlert>
+  </BModal>
 </template>
 
 <script setup>
@@ -439,6 +484,10 @@ const showSuccess = ref(null)
 const showError = ref(null)
 const loading = ref(false)
 
+// Password modal state
+const showPasswordModal = ref(false)
+const passwordError = ref(null)
+
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
 const isDcfActivated = computed(() => timesource.value === 1)
@@ -448,15 +497,23 @@ const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'stat
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
 // Validation rules
-const rules = {
-  adminPassword: {
+const passwordRules = {
+  password: {
     minLength: minLength(6),
     maxLength: maxLength(32),
     password_validator: helpers.withMessage('Must contain letters and numbers', password_validator)
   },
-  adminPasswordRepeat: {
+  passwordRepeat: {
     sameAsPassword: sameAs(adminPassword)
-  },
+  }
+}
+
+const passwordValidation = useVuelidate(passwordRules, {
+  password: adminPassword,
+  passwordRepeat: adminPasswordRepeat
+})
+
+const rules = {
   hostname: {
     required,
     hostname_validator,
@@ -526,8 +583,6 @@ const rules = {
 }
 
 const v$ = useVuelidate(rules, {
-  adminPassword,
-  adminPasswordRepeat,
   hostname,
   localIP,
   netmask,
@@ -612,7 +667,6 @@ const saveSettingsClick = async () => {
 
   try {
     const settings = {
-      adminPassword: adminPassword.value,
       hostname: hostname.value,
       useDHCP: useDHCP.value,
       localIP: localIP.value,
@@ -725,6 +779,40 @@ const factoryResetClick = async () => {
             alert('Factory Reset failed')
         }
     }
+}
+
+const handlePasswordChange = async (event) => {
+  event.preventDefault()
+  passwordValidation.value.$touch()
+
+  if (passwordValidation.value.$error) {
+    passwordError.value = t('changePassword.passwordsDoNotMatch')
+    return
+  }
+
+  if (!adminPassword.value || adminPassword.value === '') {
+    return // No password change requested
+  }
+
+  try {
+    const settings = {
+      adminPassword: adminPassword.value
+    }
+
+    await settingsStore.save(settings)
+    showPasswordModal.value = false
+    resetPasswordModal()
+    showSuccess.value = true
+  } catch (error) {
+    passwordError.value = t('settings.saveError')
+  }
+}
+
+const resetPasswordModal = () => {
+  adminPassword.value = ''
+  adminPasswordRepeat.value = ''
+  passwordError.value = null
+  passwordValidation.value.$reset()
 }
 </script>
 

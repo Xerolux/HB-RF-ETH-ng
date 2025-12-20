@@ -90,11 +90,13 @@ const loginClick = async () => {
     if (success) {
       router.push(route.query.redirect || '/')
     } else {
-      showError.value = 10
+      // Login failed - incorrect password
+      showError.value = true
       loading.value = false
     }
   } catch (error) {
-    showError.value = 10
+    // Network or server error
+    showError.value = true
     loading.value = false
   }
 }
