@@ -10,6 +10,9 @@
       <BFormGroup :label="t('firmware.installedVersion')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.currentVersion" disabled />
       </BFormGroup>
+      <BFormGroup :label="t('firmware.latestVersion')" label-cols-sm="4">
+        <BFormInput type="text" :model-value="sysInfoStore.latestVersion" disabled />
+      </BFormGroup>
       <BAlert
         variant="info"
         :model-value="true"
@@ -17,16 +20,28 @@
       >
         {{ t('firmware.versionInfo') }}
         <a
-          href="https://github.com/Xerolux/HB-RF-ETH-ng"
+          href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"
           class="alert-link"
           target="_new"
-        >GitHub (Fork v2.1)</a>
+        >GitHub Releases</a>
+      </BAlert>
+      <BAlert
+        variant="success"
+        :model-value="sysInfoStore.currentVersion >= sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
+      >
+        {{ t('firmware.upToDate') }}
       </BAlert>
       <BAlert
         variant="warning"
         :model-value="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
       >
-        {{ t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}
+        {{ t('firmware.updateAvailable', { currentVersion: sysInfoStore.currentVersion, latestVersion: sysInfoStore.latestVersion }) }}
+      </BAlert>
+      <BAlert
+        variant="danger"
+        :model-value="sysInfoStore.latestVersion == 'n/a'"
+      >
+        {{ t('firmware.versionCheckFailed') }}
       </BAlert>
 
       <BFormGroup
