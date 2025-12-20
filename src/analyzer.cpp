@@ -45,6 +45,16 @@ Analyzer::~Analyzer()
         _radioModuleConnector->removeFrameHandler(this);
     }
 
+    // Close any active websocket sessions to avoid dangling clients
+    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(200))) {
+        for (size_t i = 0; i < _clients.size(); i++) {
+            httpd_sess_trigger_close(_clients[i], _client_fds[i]);
+        }
+        _clients.clear();
+        _client_fds.clear();
+        xSemaphoreGive(_mutex);
+    }
+
     // Signal task to stop
     _running = false;
 
