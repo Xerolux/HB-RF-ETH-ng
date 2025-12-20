@@ -40,7 +40,9 @@
 
 static const char *TAG = "SysInfo";
 
-static double _cpuUsage;
+static volatile float _cpuUsage = 0.0f;
+static volatile float _memoryUsage = 0.0f;
+static volatile float _temperature = -127.0f;
 static volatile uint32_t _supplyVoltageMv = 0;
 static char _serial[13];
 static const char *_currentVersion;
@@ -86,10 +88,28 @@ void updateCPUUsageTask(void *arg)
             }
         }
 
-        _cpuUsage = 100.0 - ((idleRunTime - lastIdleRunTime) * 100.0 / ((totalRunTime - lastTotalRunTime) * 2));
+        // CPU Usage
+        _cpuUsage = 100.0f - ((idleRunTime - lastIdleRunTime) * 100.0f / ((totalRunTime - lastTotalRunTime) * 2));
 
         lastIdleRunTime = idleRunTime;
         lastTotalRunTime = totalRunTime;
+
+        // Memory Usage
+        multi_heap_info_t info;
+        heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
+        _memoryUsage = 100.0f - (info.total_free_bytes * 100.0f / (info.total_free_bytes + info.total_allocated_bytes));
+
+        // Temperature
+#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
+        if (_temp_sensor) {
+            float temp_celsius = 0.0f;
+            if (temperature_sensor_get_celsius(_temp_sensor, &temp_celsius) == ESP_OK) {
+                _temperature = temp_celsius;
+            } else {
+                _temperature = -127.0f;
+            }
+        }
+#endif
 
         // Update supply voltage in background to avoid blocking API requests
         // Measure supply voltage with 2:1 voltage divider
@@ -250,15 +270,12 @@ SysInfo::SysInfo()
 
 double SysInfo::getCpuUsage() const
 {
-    return _cpuUsage;
+    return (double)_cpuUsage;
 }
 
 double SysInfo::getMemoryUsage() const
 {
-    multi_heap_info_t info;
-    heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
-
-    return 100.0 - (info.total_free_bytes * 100.0 / (info.total_free_bytes + info.total_allocated_bytes));
+    return (double)_memoryUsage;
 }
 
 const char *SysInfo::getSerialNumber() const
@@ -302,28 +319,8 @@ const char* SysInfo::getBoardRevisionString() const
 
 double SysInfo::getTemperature() const
 {
-#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
-    if (_temp_sensor == NULL) {
-        ESP_LOGD(TAG, "Temperature sensor not initialized");
-        return -127.0; // Return special value to indicate "not available"
-    }
-
-    float temp_celsius = 0.0;
-    esp_err_t err = temperature_sensor_get_celsius(_temp_sensor, &temp_celsius);
-
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "Failed to read temperature: %s", esp_err_to_name(err));
-        return -127.0;
-    }
-
-    return (double)temp_celsius;
-#else
-    // ESP32 classic has no internal temperature sensor
-    // Return special value -127.0 to indicate "not available"
-    // This value is commonly used in temperature sensors to indicate invalid/unavailable reading
-    return -127.0;
-#endif
+    // Return cached value updated by background task
+    return (double)_temperature;
 }
 
 uint64_t SysInfo::getUptimeSeconds() const
