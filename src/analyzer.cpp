@@ -38,34 +38,56 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
 
 Analyzer::~Analyzer()
 {
-    // Stop processing task
-    _running = false;
-    if (_taskHandle) {
-        vTaskDelay(pdMS_TO_TICKS(100)); // Give task time to finish
-        vTaskDelete(_taskHandle);
-        _taskHandle = NULL;
-    }
+    ESP_LOGI(TAG, "Analyzer destructor called");
 
+    // First, deregister from radio module to stop receiving new frames
     if (_radioModuleConnector) {
         _radioModuleConnector->removeFrameHandler(this);
     }
 
+    // Signal task to stop
+    _running = false;
+
+    // Wait for task to finish gracefully (up to 500ms)
+    if (_taskHandle) {
+        int retries = 5;
+        while (retries-- > 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            // Check if task is still running by verifying queue operations
+            if (uxQueueMessagesWaiting(_frameQueue) == 0) {
+                break;
+            }
+        }
+        // Now safe to delete the task
+        vTaskDelete(_taskHandle);
+        _taskHandle = NULL;
+        ESP_LOGI(TAG, "Processing task deleted");
+    }
+
+    // Clean up queue
     if (_frameQueue) {
         vQueueDelete(_frameQueue);
         _frameQueue = NULL;
     }
 
+    // Clean up mutex
     if (_mutex) {
         vSemaphoreDelete(_mutex);
         _mutex = NULL;
     }
 
     _instance = NULL;
+    ESP_LOGI(TAG, "Analyzer destructor completed");
 }
 
 void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 {
-    if (!hasClients() || !_frameQueue) {
+    // Safety checks: ensure we're still running and resources are valid
+    if (!_running || !_frameQueue || !buffer) {
+        return;
+    }
+
+    if (!hasClients()) {
         return;
     }
 
@@ -107,11 +129,17 @@ void Analyzer::_processingTask()
     }
 
     ESP_LOGI(TAG, "Analyzer processing task stopped");
-    vTaskDelete(NULL);
+    // DO NOT delete task here - destructor will handle it
+    // This prevents double-deletion crashes
 }
 
 void Analyzer::_processFrame(const AnalyzerFrame &frame)
 {
+    // Safety check: ensure we're still running
+    if (!_running || !_mutex) {
+        return;
+    }
+
     // Convert frame to JSON
     // Format: { "ts": <timestamp_ms>, "len": <len>, "data": "<hex_string>" }
     // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
@@ -151,8 +179,8 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     ws_pkt.len = offset;
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    // Use short timeout to prevent blocking
-    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10))) {
+    // Use short timeout to prevent blocking (50ms instead of 10ms for more stability)
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50))) {
         // Iterate backwards to allow safe removal
         std::vector<int> failed_clients;
 
@@ -200,7 +228,8 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
 
 void Analyzer::addClient(httpd_handle_t hd, int fd)
 {
-    if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
+    // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(1000))) {
         bool found = false;
         for (int socket : _client_fds) {
             if (socket == fd) {
@@ -211,6 +240,7 @@ void Analyzer::addClient(httpd_handle_t hd, int fd)
         if (!found) {
             _clients.push_back(hd);
             _client_fds.push_back(fd);
+            ESP_LOGI(TAG, "Client %d added, total clients: %d", fd, _client_fds.size());
 
             // If this is the first client, register with RadioModuleConnector
             if (_client_fds.size() == 1) {
@@ -218,16 +248,20 @@ void Analyzer::addClient(httpd_handle_t hd, int fd)
             }
         }
         xSemaphoreGive(_mutex);
+    } else {
+        ESP_LOGW(TAG, "Failed to acquire mutex in addClient for fd %d", fd);
     }
 }
 
 void Analyzer::removeClient(httpd_handle_t hd, int fd)
 {
-    if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
+    // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(1000))) {
         for (size_t i = 0; i < _client_fds.size(); i++) {
             if (_client_fds[i] == fd) {
                 _clients.erase(_clients.begin() + i);
                 _client_fds.erase(_client_fds.begin() + i);
+                ESP_LOGI(TAG, "Client %d removed, remaining clients: %d", fd, _client_fds.size());
                 break;
             }
         }
@@ -237,13 +271,16 @@ void Analyzer::removeClient(httpd_handle_t hd, int fd)
             _radioModuleConnector->removeFrameHandler(this);
         }
         xSemaphoreGive(_mutex);
+    } else {
+        ESP_LOGW(TAG, "Failed to acquire mutex in removeClient for fd %d", fd);
     }
 }
 
 bool Analyzer::hasClients()
 {
     bool has = false;
-    if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
+    // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
+    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(100))) {
         has = !_client_fds.empty();
         xSemaphoreGive(_mutex);
     }
