@@ -11,6 +11,8 @@ export default {
     success: 'Erfolgreich',
     yes: 'Ja',
     no: 'Nein',
+    showPassword: 'Passwort anzeigen',
+    hidePassword: 'Passwort verbergen',
     rebootingWait: 'Das System wird neu gestartet. Bitte warten Sie ca. 10 Sekunden...',
     factoryResettingWait: 'Das System wird auf Werkseinstellungen zurückgesetzt und neu gestartet. Bitte warten...',
     confirmReboot: 'Sind Sie sicher, dass Sie das System neu starten möchten?',
