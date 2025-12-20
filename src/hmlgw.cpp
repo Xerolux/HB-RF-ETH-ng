@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <vector>
 
 static const char* TAG = "HMLGW";
@@ -212,12 +213,29 @@ void Hmlgw::runKeepAlive() {
 void Hmlgw::handleClient() {
     std::vector<uint8_t> buffer;
     uint8_t rx_buffer[1024];
+    uint32_t loop_count = 0;
+
+    // Set socket to non-blocking mode
+    int flags = fcntl(_clientSocket, F_GETFL, 0);
+    fcntl(_clientSocket, F_SETFL, flags | O_NONBLOCK);
+
+    // Set receive timeout to prevent indefinite blocking
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(_clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     while (_running) {
         int len = recv(_clientSocket, rx_buffer, sizeof(rx_buffer), 0);
         if (len < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 vTaskDelay(10 / portTICK_PERIOD_MS);
+
+                // Yield periodically to prevent watchdog timeout
+                loop_count++;
+                if (loop_count % 10 == 0) {
+                    taskYIELD();
+                }
                 continue;
             }
             ESP_LOGE(TAG, "Error occurred during recv: errno %d", errno);
@@ -229,6 +247,13 @@ void Hmlgw::handleClient() {
 
         // Append new data to buffer
         buffer.insert(buffer.end(), rx_buffer, rx_buffer + len);
+
+        // Limit buffer size to prevent memory exhaustion
+        if (buffer.size() > 65536) {
+            ESP_LOGE(TAG, "Buffer overflow protection - clearing buffer");
+            buffer.clear();
+            continue;
+        }
 
         // Process buffer
         size_t processed = 0;
@@ -247,6 +272,14 @@ void Hmlgw::handleClient() {
                  // Need at least 3 bytes for header (S + LenHigh + LenLow)
                  if (processed + 3 <= buffer.size()) {
                      uint16_t dataLen = (buffer[processed+1] << 8) | buffer[processed+2];
+
+                     // Sanity check on data length
+                     if (dataLen > 8192) {
+                         ESP_LOGE(TAG, "Invalid data length %d, skipping", dataLen);
+                         processed++;
+                         continue;
+                     }
+
                      if (processed + 3 + dataLen <= buffer.size()) {
                          // We have the full frame
                          _connector->sendFrame(&buffer[processed+3], dataLen);
@@ -270,6 +303,9 @@ void Hmlgw::handleClient() {
         if (processed > 0) {
             buffer.erase(buffer.begin(), buffer.begin() + processed);
         }
+
+        // Yield to prevent watchdog timeout
+        taskYIELD();
     }
 }
 

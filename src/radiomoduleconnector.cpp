@@ -80,9 +80,13 @@ void RadioModuleConnector::start()
 {
     setLED(false, false, false);
 
-    uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2, 0, 20, &_uart_queue, 0);
+    // Increased buffer sizes to prevent overflow under heavy load
+    // RX buffer: 4KB (was ~256 bytes) to handle burst traffic
+    // Queue: 40 events (was 20) for better buffering
+    uart_driver_install(UART_NUM_1, 4096, 0, 40, &_uart_queue, 0);
 
-    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 4096, this, 15, &_tHandle);
+    // Reduced priority from 15 to 12 to prevent task starvation
+    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 4096, this, 12, &_tHandle);
     resetModule();
 }
 
@@ -142,7 +146,14 @@ void RadioModuleConnector::sendFrame(unsigned char *buffer, uint16_t len)
 void RadioModuleConnector::_serialQueueHandler()
 {
     uart_event_t event;
-    uint8_t *buffer = (uint8_t *)malloc(UART_HW_FIFO_LEN(UART_NUM_1));
+    // Increased buffer to match new UART buffer size
+    uint8_t *buffer = (uint8_t *)malloc(4096);
+
+    if (!buffer) {
+        ESP_LOGE("RadioModuleConnector", "Failed to allocate UART buffer");
+        vTaskDelete(NULL);
+        return;
+    }
 
     uart_flush_input(UART_NUM_1);
 
@@ -153,11 +164,18 @@ void RadioModuleConnector::_serialQueueHandler()
             switch (event.type)
             {
             case UART_DATA:
-                uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
-                _streamParser->append(buffer, event.size);
+                if (event.size <= 4096) {
+                    uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
+                    _streamParser->append(buffer, event.size);
+                } else {
+                    ESP_LOGE("RadioModuleConnector", "UART data size %d exceeds buffer", event.size);
+                    uart_flush_input(UART_NUM_1);
+                    _streamParser->flush();
+                }
                 break;
             case UART_FIFO_OVF:
             case UART_BUFFER_FULL:
+                ESP_LOGW("RadioModuleConnector", "UART buffer overflow detected");
                 uart_flush_input(UART_NUM_1);
                 xQueueReset(_uart_queue);
                 _streamParser->flush();
@@ -165,11 +183,15 @@ void RadioModuleConnector::_serialQueueHandler()
             case UART_BREAK:
             case UART_PARITY_ERR:
             case UART_FRAME_ERR:
+                ESP_LOGW("RadioModuleConnector", "UART error detected");
                 _streamParser->flush();
                 break;
             default:
                 break;
             }
+
+            // Yield to prevent watchdog timeouts
+            taskYIELD();
         }
     }
 
