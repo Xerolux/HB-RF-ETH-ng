@@ -83,7 +83,7 @@ export default {
       description: 'Cifrado de transporte seguro para la comunicación entre la placa y CCU en el puerto 3008.',
       mode: 'Modo de cifrado',
       modeDisabled: 'Deshabilitado (predeterminado)',
-      modePSK: 'Clave precompartida (PSK)',
+      modePsk: 'Clave precompartida (PSK)',
       modeCert: 'Certificado X.509',
       cipherSuite: 'Suite de cifrado',
       cipherAes128: 'AES-128-GCM-SHA256',

@@ -103,7 +103,7 @@ export default {
       description: 'Secure transport encryption for communication between board and CCU on port 3008.',
       mode: 'Encryption Mode',
       modeDisabled: 'Disabled (Default)',
-      modePSK: 'Pre-Shared Key (PSK)',
+      modePsk: 'Pre-Shared Key (PSK)',
       modeCert: 'X.509 Certificate',
       cipherSuite: 'Cipher Suite',
       cipherAes128: 'AES-128-GCM-SHA256',
