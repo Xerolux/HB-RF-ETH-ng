@@ -65,124 +65,143 @@ const char *UpdateCheck::getLatestVersion()
 
 void UpdateCheck::_updateLatestVersion()
 {
+  // Always fetch releases list to properly filter by type
   char url[256];
-  if (_settings->getAllowPrerelease()) {
-      // Get the latest release (which can be a prerelease) by listing 1 per page
-      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=1");
-  } else {
-      // Get the latest stable release
-      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/latest");
-  }
+  snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=10");
 
   esp_http_client_config_t config = {};
   config.url = url;
-  config.crt_bundle_attach = esp_crt_bundle_attach; // Important for GitHub API
+  config.crt_bundle_attach = esp_crt_bundle_attach;
   config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-  // Increased buffer sizes for larger API responses
-  config.buffer_size = 8192;
+  config.buffer_size = 16384;  // Increased for multiple releases
   config.buffer_size_tx = 2048;
-  // Add timeout to prevent hanging
-  config.timeout_ms = 10000;  // 10 second timeout
+  config.timeout_ms = 15000;   // 15 second timeout
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
 
   if (!client) {
-      ESP_LOGE(TAG, "Failed to initialize HTTP client");
+      ESP_LOGE(TAG, "Failed to initialize HTTP client for update check");
       return;
   }
 
-  // Set headers
+  // Set required headers for GitHub API
   esp_http_client_set_header(client, "Accept", "application/vnd.github.v3+json");
   esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
 
   esp_err_t err = esp_http_client_perform(client);
-  if (err == ESP_OK)
-  {
-    int status_code = esp_http_client_get_status_code(client);
-    if (status_code != 200) {
-        ESP_LOGE(TAG, "GitHub API returned status code: %d", status_code);
-        esp_http_client_cleanup(client);
-        return;
-    }
-
-    // We read into a buffer. Note: Release API response can be large.
-    // We only need the tag_name.
-    // If it's a list (allowPrerelease=true), it starts with '['.
-    // If it's a single object (allowPrerelease=false), it starts with '{'.
-
-    // Using cJSON to parse might be memory intensive if the JSON is huge.
-    // Let's try to read enough to find "tag_name".
-
-    char *buffer = (char*)malloc(8192);
-    if (!buffer) {
-        ESP_LOGE(TAG, "Failed to allocate buffer for update check");
-        esp_http_client_cleanup(client);
-        return;
-    }
-
-    int len = esp_http_client_read(client, buffer, 8191);
-
-    if (len > 0)
-    {
-      buffer[len] = 0;
-
-      // Simple string search to avoid full JSON parsing overhead if possible,
-      // but cJSON is safer. Let's try cJSON. If it fails, we might need a stream parser.
-      cJSON *json = cJSON_Parse(buffer);
-
-      if (json)
-      {
-          cJSON *targetObj = json;
-
-          if (cJSON_IsArray(json)) {
-              targetObj = cJSON_GetArrayItem(json, 0);
-          }
-
-          if (targetObj) {
-              char *tagName = cJSON_GetStringValue(cJSON_GetObjectItem(targetObj, "tag_name"));
-              if (tagName != NULL)
-              {
-                  // Tag name usually starts with 'v', e.g. "v2.1.0".
-                  // Our system expects "2.1.0".
-                  if (tagName[0] == 'v') {
-                      strncpy(_latestVersion, tagName + 1, sizeof(_latestVersion) - 1);
-                  } else {
-                      strncpy(_latestVersion, tagName, sizeof(_latestVersion) - 1);
-                  }
-                  _latestVersion[sizeof(_latestVersion) - 1] = 0;
-                  ESP_LOGI(TAG, "Latest version found: %s", _latestVersion);
-              }
-          }
-          cJSON_Delete(json);
-      } else {
-          ESP_LOGW(TAG, "Failed to parse JSON from GitHub API (might be incomplete)");
-          // Fallback manual parsing if cJSON failed due to incomplete JSON in buffer
-          const char* tagKey = "\"tag_name\":\"";
-          char* pos = strstr(buffer, tagKey);
-          if (pos) {
-              pos += strlen(tagKey);
-              char* end = strchr(pos, '"');
-              if (end) {
-                  *end = 0;
-                   if (pos[0] == 'v') {
-                      strncpy(_latestVersion, pos + 1, sizeof(_latestVersion) - 1);
-                  } else {
-                      strncpy(_latestVersion, pos, sizeof(_latestVersion) - 1);
-                  }
-                   _latestVersion[sizeof(_latestVersion) - 1] = 0;
-                   ESP_LOGI(TAG, "Latest version found (fallback): %s", _latestVersion);
-              }
-          }
-      }
-    } else {
-        ESP_LOGE(TAG, "Failed to read response from GitHub API");
-    }
-
-    free(buffer);
-  } else {
-      ESP_LOGE(TAG, "Failed to check for updates: %s", esp_err_to_name(err));
+  if (err != ESP_OK) {
+      ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
+      esp_http_client_cleanup(client);
+      return;
   }
 
+  int status_code = esp_http_client_get_status_code(client);
+  if (status_code != 200) {
+      ESP_LOGE(TAG, "GitHub API returned status code: %d", status_code);
+      esp_http_client_cleanup(client);
+      return;
+  }
+
+  int content_length = esp_http_client_get_content_length(client);
+  ESP_LOGI(TAG, "GitHub API response: status=%d, content_length=%d", status_code, content_length);
+
+  // Allocate buffer for response
+  char *buffer = (char*)malloc(16384);
+  if (!buffer) {
+      ESP_LOGE(TAG, "Failed to allocate buffer for update check");
+      esp_http_client_cleanup(client);
+      return;
+  }
+
+  int total_read = 0;
+  int read_len = 0;
+
+  // Read response in chunks
+  while (total_read < 16383 && (read_len = esp_http_client_read(client, buffer + total_read, 16383 - total_read)) > 0) {
+      total_read += read_len;
+  }
+  buffer[total_read] = '\0';
+
+  if (total_read <= 0) {
+      ESP_LOGE(TAG, "Failed to read response from GitHub API");
+      free(buffer);
+      esp_http_client_cleanup(client);
+      return;
+  }
+
+  ESP_LOGI(TAG, "Read %d bytes from GitHub API", total_read);
+
+  // Parse JSON response
+  cJSON *json = cJSON_Parse(buffer);
+  free(buffer);  // Free buffer after parsing
+
+  if (!json) {
+      ESP_LOGE(TAG, "Failed to parse JSON response from GitHub API");
+      esp_http_client_cleanup(client);
+      return;
+  }
+
+  if (!cJSON_IsArray(json)) {
+      ESP_LOGE(TAG, "GitHub API response is not an array");
+      cJSON_Delete(json);
+      esp_http_client_cleanup(client);
+      return;
+  }
+
+  int array_size = cJSON_GetArraySize(json);
+  ESP_LOGI(TAG, "Found %d releases on GitHub", array_size);
+
+  bool allow_prerelease = _settings->getAllowPrerelease();
+  bool found_release = false;
+
+  // Iterate through releases to find the appropriate one
+  for (int i = 0; i < array_size; i++) {
+      cJSON *release = cJSON_GetArrayItem(json, i);
+      if (!release) continue;
+
+      cJSON *draft_obj = cJSON_GetObjectItem(release, "draft");
+      cJSON *prerelease_obj = cJSON_GetObjectItem(release, "prerelease");
+      cJSON *tag_name_obj = cJSON_GetObjectItem(release, "tag_name");
+
+      if (!tag_name_obj || !cJSON_IsString(tag_name_obj)) continue;
+
+      bool is_draft = draft_obj && cJSON_IsTrue(draft_obj);
+      bool is_prerelease = prerelease_obj && cJSON_IsTrue(prerelease_obj);
+
+      // Skip drafts (they're not meant for public consumption)
+      if (is_draft) {
+          ESP_LOGD(TAG, "Skipping draft release: %s", tag_name_obj->valuestring);
+          continue;
+      }
+
+      // Filter based on prerelease setting
+      if (!allow_prerelease && is_prerelease) {
+          ESP_LOGD(TAG, "Skipping prerelease: %s", tag_name_obj->valuestring);
+          continue;
+      }
+
+      // Found a suitable release
+      const char *tag_name = tag_name_obj->valuestring;
+      ESP_LOGI(TAG, "Found suitable release: %s (prerelease=%d)", tag_name, is_prerelease);
+
+      // Remove 'v' prefix if present
+      if (tag_name[0] == 'v' || tag_name[0] == 'V') {
+          tag_name++;
+      }
+
+      strncpy(_latestVersion, tag_name, sizeof(_latestVersion) - 1);
+      _latestVersion[sizeof(_latestVersion) - 1] = '\0';
+      found_release = true;
+      break;
+  }
+
+  if (!found_release) {
+      ESP_LOGW(TAG, "No suitable release found (allow_prerelease=%d)", allow_prerelease);
+  } else {
+      ESP_LOGI(TAG, "Latest version: %s", _latestVersion);
+  }
+
+  cJSON_Delete(json);
   esp_http_client_cleanup(client);
 }
 
