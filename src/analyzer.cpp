@@ -27,7 +27,7 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
 
     // Create processing task with lower priority (5) to not interfere with UART
     _running = true;
-    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 4096, this, 5, &_taskHandle);
+    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 8192, this, 5, &_taskHandle);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create processing task");
         _taskHandle = NULL;

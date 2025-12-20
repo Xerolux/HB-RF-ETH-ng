@@ -86,7 +86,7 @@ void RadioModuleConnector::start()
     uart_driver_install(UART_NUM_1, 4096, 0, 40, &_uart_queue, 0);
 
     // Reduced priority from 15 to 12 to prevent task starvation
-    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 4096, this, 12, &_tHandle);
+    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 6144, this, 12, &_tHandle);
     resetModule();
 }
 
