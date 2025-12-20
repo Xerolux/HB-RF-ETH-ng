@@ -277,11 +277,14 @@ void RawUartUdpListener::start()
         return;
     }
 
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
+    // Reduced priority from 15 to 10 to balance with other tasks
+    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 10, &_tHandle);
 
     _pcb = udp_new();
     if (_pcb == NULL) {
-        ESP_LOGE(TAG, "Failed to create UDP PCB");
+        ESP_LOGE(TAG, "Failed to create UDP queue");
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
         return;
     }
     udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
@@ -313,6 +316,7 @@ void RawUartUdpListener::_udpQueueHandler()
 {
     udp_event_t event;
     int64_t nextKeepAliveSentOut = esp_timer_get_time();
+    uint32_t loop_count = 0;
 
     for (;;)
     {
@@ -339,6 +343,12 @@ void RawUartUdpListener::_udpQueueHandler()
                 nextKeepAliveSentOut = now + 1000000; // 1sec
                 sendMessage(2, NULL, 0);
             }
+        }
+
+        // Yield periodically to prevent watchdog timeout
+        loop_count++;
+        if (loop_count % 10 == 0) {
+            taskYIELD();
         }
     }
 

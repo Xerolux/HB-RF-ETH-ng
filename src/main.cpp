@@ -29,6 +29,7 @@
 #include "esp_flash.h"
 #include "driver/uart.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #include "pins.h"
 #include "led.h"
@@ -53,6 +54,40 @@
 #include "dtls_encryption.h"
 
 static const char *TAG = "HB-RF-ETH";
+
+// Heap monitoring task
+static void heap_monitor_task(void *pvParameters)
+{
+    LED *statusLED = (LED *)pvParameters;
+    uint32_t low_water_mark = 0;
+    const uint32_t critical_threshold = 20480;  // 20KB critical threshold
+
+    for (;;)
+    {
+        uint32_t free_heap = esp_get_free_heap_size();
+        uint32_t min_free_heap = esp_get_minimum_free_heap_size();
+
+        if (min_free_heap < low_water_mark || low_water_mark == 0) {
+            low_water_mark = min_free_heap;
+            ESP_LOGI(TAG, "Heap low water mark: %" PRIu32 " bytes", low_water_mark);
+        }
+
+        if (free_heap < critical_threshold) {
+            ESP_LOGW(TAG, "Low heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
+                     free_heap, min_free_heap);
+        }
+
+        // Log heap stats every 5 minutes
+        static uint32_t count = 0;
+        count++;
+        if (count % 60 == 0) {
+            ESP_LOGI(TAG, "Heap status - Free: %" PRIu32 " bytes, Min free: %" PRIu32 " bytes",
+                     free_heap, min_free_heap);
+        }
+
+        vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds
+    }
+}
 
 extern "C"
 {
@@ -228,6 +263,13 @@ void app_main()
     statusLED.setState(LED_STATE_OFF);
 
     esp_ota_mark_app_valid_cancel_rollback();
+
+    // Log initial heap status
+    ESP_LOGI(TAG, "System initialized. Free heap: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Largest free block: %lu bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+
+    // Start heap monitoring task
+    xTaskCreate(heap_monitor_task, "heap_monitor", 2048, &statusLED, 1, NULL);
 
     vTaskSuspend(NULL);
 }

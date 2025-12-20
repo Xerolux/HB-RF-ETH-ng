@@ -28,6 +28,12 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         return;
     }
 
+    // Sanity check on frame length
+    if (len > 1024) {
+        ESP_LOGW(TAG, "Frame too large for analyzer: %d bytes", len);
+        return;
+    }
+
     // Convert frame to JSON
     // Format: { "ts": <timestamp_ms>, "rssi": <rssi>, "len": <len>, "data": "<hex_string>" }
     // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
@@ -71,15 +77,43 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
     ws_pkt.len = offset;
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    if (xSemaphoreTake(_mutex, portMAX_DELAY)) {
+    // Use short timeout to prevent blocking
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10))) {
         // Iterate backwards to allow safe removal
+        std::vector<int> failed_clients;
+
         for (int i = _client_fds.size() - 1; i >= 0; i--) {
             esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
             if (ret != ESP_OK) {
                 ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
+
+                // Mark for removal if connection is broken
+                if (ret == ESP_ERR_INVALID_STATE || ret == ESP_ERR_NOT_FOUND) {
+                    failed_clients.push_back(_client_fds[i]);
+                }
             }
         }
+
+        // Remove failed clients
+        for (int fd : failed_clients) {
+            for (size_t i = 0; i < _client_fds.size(); i++) {
+                if (_client_fds[i] == fd) {
+                    _clients.erase(_clients.begin() + i);
+                    _client_fds.erase(_client_fds.begin() + i);
+                    ESP_LOGI(TAG, "Removed failed client %d", fd);
+                    break;
+                }
+            }
+        }
+
+        // If no clients left, deregister
+        if (_client_fds.empty()) {
+            _radioModuleConnector->removeFrameHandler(this);
+        }
+
         xSemaphoreGive(_mutex);
+    } else {
+        ESP_LOGW(TAG, "Could not acquire mutex for WebSocket send, dropping frame");
     }
 
     if (heap_allocated) {

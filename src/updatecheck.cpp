@@ -78,18 +78,33 @@ void UpdateCheck::_updateLatestVersion()
   config.url = url;
   config.crt_bundle_attach = esp_crt_bundle_attach; // Important for GitHub API
   config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-  // Increase buffer size for API response
-  config.buffer_size = 4096;
-  config.buffer_size_tx = 1024;
+  // Increased buffer sizes for larger API responses
+  config.buffer_size = 8192;
+  config.buffer_size_tx = 2048;
+  // Add timeout to prevent hanging
+  config.timeout_ms = 10000;  // 10 second timeout
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
+
+  if (!client) {
+      ESP_LOGE(TAG, "Failed to initialize HTTP client");
+      return;
+  }
 
   // Set headers
   esp_http_client_set_header(client, "Accept", "application/vnd.github.v3+json");
   esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
 
-  if (esp_http_client_perform(client) == ESP_OK)
+  esp_err_t err = esp_http_client_perform(client);
+  if (err == ESP_OK)
   {
+    int status_code = esp_http_client_get_status_code(client);
+    if (status_code != 200) {
+        ESP_LOGE(TAG, "GitHub API returned status code: %d", status_code);
+        esp_http_client_cleanup(client);
+        return;
+    }
+
     // We read into a buffer. Note: Release API response can be large.
     // We only need the tag_name.
     // If it's a list (allowPrerelease=true), it starts with '['.
@@ -98,8 +113,14 @@ void UpdateCheck::_updateLatestVersion()
     // Using cJSON to parse might be memory intensive if the JSON is huge.
     // Let's try to read enough to find "tag_name".
 
-    char buffer[4096]; // 4KB should cover the first part of the JSON where tag_name usually resides
-    int len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
+    char *buffer = (char*)malloc(8192);
+    if (!buffer) {
+        ESP_LOGE(TAG, "Failed to allocate buffer for update check");
+        esp_http_client_cleanup(client);
+        return;
+    }
+
+    int len = esp_http_client_read(client, buffer, 8191);
 
     if (len > 0)
     {
@@ -129,6 +150,7 @@ void UpdateCheck::_updateLatestVersion()
                       strncpy(_latestVersion, tagName, sizeof(_latestVersion) - 1);
                   }
                   _latestVersion[sizeof(_latestVersion) - 1] = 0;
+                  ESP_LOGI(TAG, "Latest version found: %s", _latestVersion);
               }
           }
           cJSON_Delete(json);
@@ -148,12 +170,17 @@ void UpdateCheck::_updateLatestVersion()
                       strncpy(_latestVersion, pos, sizeof(_latestVersion) - 1);
                   }
                    _latestVersion[sizeof(_latestVersion) - 1] = 0;
+                   ESP_LOGI(TAG, "Latest version found (fallback): %s", _latestVersion);
               }
           }
       }
+    } else {
+        ESP_LOGE(TAG, "Failed to read response from GitHub API");
     }
+
+    free(buffer);
   } else {
-      ESP_LOGE(TAG, "Failed to check for updates");
+      ESP_LOGE(TAG, "Failed to check for updates: %s", esp_err_to_name(err));
   }
 
   esp_http_client_cleanup(client);
@@ -161,8 +188,11 @@ void UpdateCheck::_updateLatestVersion()
 
 void UpdateCheck::_taskFunc()
 {
-  // some time for initial network connection
-  vTaskDelay(30000 / portTICK_PERIOD_MS);
+  // Reduced initial delay from 30s to 10s to improve startup responsiveness
+  // Network should be ready by then
+  vTaskDelay(10000 / portTICK_PERIOD_MS);
+
+  uint32_t check_count = 0;
 
   for (;;)
   {
@@ -183,7 +213,16 @@ void UpdateCheck::_taskFunc()
         ESP_LOGI(TAG, "Update check is disabled.");
     }
 
-    vTaskDelay((8 * 60 * 60000) / portTICK_PERIOD_MS); // 8h
+    // Sleep in smaller chunks to allow task yielding
+    for (int i = 0; i < 480; i++) {  // 480 * 1min = 8h
+      vTaskDelay(60000 / portTICK_PERIOD_MS);
+
+      // Yield every iteration to prevent watchdog timeout
+      check_count++;
+      if (check_count % 5 == 0) {
+        taskYIELD();
+      }
+    }
   }
 
   vTaskDelete(NULL);
