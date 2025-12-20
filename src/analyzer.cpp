@@ -181,6 +181,9 @@ esp_err_t Analyzer::ws_handler(httpd_req_t *req)
     if (req->method == HTTP_GET) {
         // Handshake
         ESP_LOGI(TAG, "Handshake done, the new connection was opened");
+        if (_instance) {
+            _instance->addClient(req->handle, httpd_req_to_sockfd(req));
+        }
         return ESP_OK;
     }
 
