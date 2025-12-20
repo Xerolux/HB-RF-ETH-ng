@@ -157,31 +157,49 @@ void UpdateCheck::_updateLatestVersion()
   // Iterate through releases to find the appropriate one
   for (int i = 0; i < array_size; i++) {
       cJSON *release = cJSON_GetArrayItem(json, i);
-      if (!release) continue;
+      if (!release) {
+          ESP_LOGW(TAG, "Release at index %d is null", i);
+          continue;
+      }
 
       cJSON *draft_obj = cJSON_GetObjectItem(release, "draft");
       cJSON *prerelease_obj = cJSON_GetObjectItem(release, "prerelease");
       cJSON *tag_name_obj = cJSON_GetObjectItem(release, "tag_name");
 
-      if (!tag_name_obj || !cJSON_IsString(tag_name_obj)) continue;
+      if (!tag_name_obj || !cJSON_IsString(tag_name_obj)) {
+          ESP_LOGW(TAG, "Release at index %d has no valid tag_name", i);
+          continue;
+      }
 
-      bool is_draft = draft_obj && cJSON_IsTrue(draft_obj);
-      bool is_prerelease = prerelease_obj && cJSON_IsTrue(prerelease_obj);
+      const char *tag_name = tag_name_obj->valuestring;
+
+      // Check draft status - default to false if not present
+      bool is_draft = false;
+      if (draft_obj && cJSON_IsBool(draft_obj)) {
+          is_draft = cJSON_IsTrue(draft_obj);
+      }
+
+      // Check prerelease status - default to false if not present
+      bool is_prerelease = false;
+      if (prerelease_obj && cJSON_IsBool(prerelease_obj)) {
+          is_prerelease = cJSON_IsTrue(prerelease_obj);
+      }
+
+      ESP_LOGI(TAG, "Examining release %d: %s (draft=%d, prerelease=%d)", i, tag_name, is_draft, is_prerelease);
 
       // Skip drafts (they're not meant for public consumption)
       if (is_draft) {
-          ESP_LOGD(TAG, "Skipping draft release: %s", tag_name_obj->valuestring);
+          ESP_LOGI(TAG, "Skipping draft release: %s", tag_name);
           continue;
       }
 
       // Filter based on prerelease setting
       if (!allow_prerelease && is_prerelease) {
-          ESP_LOGD(TAG, "Skipping prerelease: %s", tag_name_obj->valuestring);
+          ESP_LOGI(TAG, "Skipping prerelease: %s (allow_prerelease=%d)", tag_name, allow_prerelease);
           continue;
       }
 
       // Found a suitable release
-      const char *tag_name = tag_name_obj->valuestring;
       ESP_LOGI(TAG, "Found suitable release: %s (prerelease=%d)", tag_name, is_prerelease);
 
       // Remove 'v' prefix if present
@@ -192,6 +210,7 @@ void UpdateCheck::_updateLatestVersion()
       strncpy(_latestVersion, tag_name, sizeof(_latestVersion) - 1);
       _latestVersion[sizeof(_latestVersion) - 1] = '\0';
       found_release = true;
+      ESP_LOGI(TAG, "Set latest version to: %s", _latestVersion);
       break;
   }
 
