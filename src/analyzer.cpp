@@ -7,45 +7,119 @@
 static const char *TAG = "Analyzer";
 static Analyzer *_instance = NULL;
 
-Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector)
+// Friend function for FreeRTOS task
+void analyzerProcessingTask(void *parameter)
+{
+    ((Analyzer *)parameter)->_processingTask();
+}
+
+Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _running(false)
 {
     _mutex = xSemaphoreCreateMutex();
     _instance = this;
+
+    // Create queue for async frame processing (holds up to 20 frames)
+    // If queue is full, oldest frames will be dropped to prevent blocking
+    _frameQueue = xQueueCreate(20, sizeof(AnalyzerFrame));
+    if (!_frameQueue) {
+        ESP_LOGE(TAG, "Failed to create frame queue");
+    }
+
+    // Create processing task with lower priority (5) to not interfere with UART
+    _running = true;
+    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 4096, this, 5, &_taskHandle);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create processing task");
+        _taskHandle = NULL;
+    } else {
+        ESP_LOGI(TAG, "Analyzer processing task created successfully");
+    }
 }
 
 Analyzer::~Analyzer()
 {
+    // Stop processing task
+    _running = false;
+    if (_taskHandle) {
+        vTaskDelay(pdMS_TO_TICKS(100)); // Give task time to finish
+        vTaskDelete(_taskHandle);
+        _taskHandle = NULL;
+    }
+
     if (_radioModuleConnector) {
         _radioModuleConnector->removeFrameHandler(this);
     }
-    vSemaphoreDelete(_mutex);
+
+    if (_frameQueue) {
+        vQueueDelete(_frameQueue);
+        _frameQueue = NULL;
+    }
+
+    if (_mutex) {
+        vSemaphoreDelete(_mutex);
+        _mutex = NULL;
+    }
+
     _instance = NULL;
 }
 
 void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 {
-    if (!hasClients()) {
+    if (!hasClients() || !_frameQueue) {
         return;
     }
 
     // Sanity check on frame length
-    if (len > 1024) {
-        ESP_LOGW(TAG, "Frame too large for analyzer: %d bytes", len);
+    if (len > ANALYZER_MAX_FRAME_SIZE) {
+        ESP_LOGW(TAG, "Frame too large for analyzer: %d bytes (max %d)", len, ANALYZER_MAX_FRAME_SIZE);
         return;
     }
 
+    // Create frame structure
+    AnalyzerFrame frame;
+    memcpy(frame.data, buffer, len);
+    frame.len = len;
+    frame.timestamp_ms = esp_timer_get_time() / 1000;
+
+    // Try to send to queue without blocking (important: don't block UART task!)
+    if (xQueueSend(_frameQueue, &frame, 0) != pdTRUE) {
+        // Queue is full, drop oldest frame and try again
+        AnalyzerFrame dummy;
+        xQueueReceive(_frameQueue, &dummy, 0); // Remove oldest
+
+        if (xQueueSend(_frameQueue, &frame, 0) != pdTRUE) {
+            // Still can't send, drop this frame
+            ESP_LOGW(TAG, "Frame queue full, dropping frame");
+        }
+    }
+}
+
+void Analyzer::_processingTask()
+{
+    AnalyzerFrame frame;
+    ESP_LOGI(TAG, "Analyzer processing task started");
+
+    while (_running) {
+        // Wait for frame with timeout to allow clean shutdown
+        if (xQueueReceive(_frameQueue, &frame, pdMS_TO_TICKS(100)) == pdTRUE) {
+            _processFrame(frame);
+        }
+    }
+
+    ESP_LOGI(TAG, "Analyzer processing task stopped");
+    vTaskDelete(NULL);
+}
+
+void Analyzer::_processFrame(const AnalyzerFrame &frame)
+{
     // Convert frame to JSON
-    // Format: { "ts": <timestamp_ms>, "rssi": <rssi>, "len": <len>, "data": "<hex_string>" }
+    // Format: { "ts": <timestamp_ms>, "len": <len>, "data": "<hex_string>" }
     // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
-    // Buffer size calculation:
-    // {"ts": (5 chars) + 20 chars (int64) + ",\"len\": (7) + 5 (uint16) + ",\"data\":\"" (9) + len*2 + "\"}" (2) + null (1)
-    // = ~50 + len * 2
-    // We use a safe stack buffer for small frames, and heap for large ones.
 
     char stack_buffer[2048];
     char* json_str = stack_buffer;
     bool heap_allocated = false;
-    size_t required_size = 64 + len * 2;
+    size_t required_size = 64 + frame.len * 2;
 
     if (required_size > sizeof(stack_buffer)) {
         json_str = (char*)malloc(required_size);
@@ -57,13 +131,13 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
     }
 
     // Header
-    int offset = snprintf(json_str, required_size, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", esp_timer_get_time() / 1000, len);
+    int offset = snprintf(json_str, required_size, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", frame.timestamp_ms, frame.len);
 
     // Fast Hex Conversion
     static const char hex_map[] = "0123456789ABCDEF";
-    for (int i = 0; i < len; i++) {
-        json_str[offset++] = hex_map[(buffer[i] >> 4) & 0xF];
-        json_str[offset++] = hex_map[buffer[i] & 0xF];
+    for (int i = 0; i < frame.len; i++) {
+        json_str[offset++] = hex_map[(frame.data[i] >> 4) & 0xF];
+        json_str[offset++] = hex_map[frame.data[i] & 0xF];
     }
 
     // Footer
