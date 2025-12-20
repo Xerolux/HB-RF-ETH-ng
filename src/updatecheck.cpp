@@ -67,13 +67,13 @@ void UpdateCheck::_updateLatestVersion()
 {
   // Always fetch releases list to properly filter by type
   char url[256];
-  snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=10");
+  snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=5");
 
   esp_http_client_config_t config = {};
   config.url = url;
   config.crt_bundle_attach = esp_crt_bundle_attach;
   config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-  config.buffer_size = 16384;  // Increased for multiple releases
+  config.buffer_size = 4096;  // Internal buffer for chunks
   config.buffer_size_tx = 2048;
   config.timeout_ms = 15000;   // 15 second timeout
 
@@ -106,7 +106,8 @@ void UpdateCheck::_updateLatestVersion()
   ESP_LOGI(TAG, "GitHub API response: status=%d, content_length=%d", status_code, content_length);
 
   // Allocate buffer for response
-  char *buffer = (char*)malloc(16384);
+  const int MAX_BUFFER_SIZE = 32768;
+  char *buffer = (char*)malloc(MAX_BUFFER_SIZE);
   if (!buffer) {
       ESP_LOGE(TAG, "Failed to allocate buffer for update check");
       esp_http_client_cleanup(client);
@@ -117,7 +118,7 @@ void UpdateCheck::_updateLatestVersion()
   int read_len = 0;
 
   // Read response in chunks
-  while (total_read < 16383 && (read_len = esp_http_client_read(client, buffer + total_read, 16383 - total_read)) > 0) {
+  while (total_read < (MAX_BUFFER_SIZE - 1) && (read_len = esp_http_client_read(client, buffer + total_read, (MAX_BUFFER_SIZE - 1) - total_read)) > 0) {
       total_read += read_len;
   }
   buffer[total_read] = '\0';
