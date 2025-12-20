@@ -54,6 +54,11 @@ uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t
 void updateCPUUsageTask(void *arg)
 {
     TaskStatus_t *taskStatus = (TaskStatus_t *)malloc(25 * sizeof(TaskStatus_t));
+    if (!taskStatus) {
+        ESP_LOGE(TAG, "Failed to allocate memory for task status");
+        vTaskDelete(NULL);
+        return;
+    }
 
     TaskHandle_t idle0Task = xTaskGetIdleTaskHandleForCore(0);
     TaskHandle_t idle1Task = xTaskGetIdleTaskHandleForCore(1);
@@ -102,42 +107,55 @@ void updateCPUUsageTask(void *arg)
 
 uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)
 {
-    // ESP-IDF 5.1 ADC oneshot API
-    adc_oneshot_unit_handle_t adc_handle;
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = adc_unit,
-        .clk_src = (adc_oneshot_clk_src_t)0,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    esp_err_t ret = adc_oneshot_new_unit(&init_config, &adc_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
-        return 0;
+    // OPTIMIZATION: Reuse ADC handle instead of creating/destroying every call
+    // This function is called every second from background task
+    static adc_oneshot_unit_handle_t adc_handle = NULL;
+    static adc_cali_handle_t cali_handle = NULL;
+    static bool adc_initialized = false;
+
+    // Initialize ADC handle only once
+    if (!adc_initialized) {
+        adc_oneshot_unit_init_cfg_t init_config = {
+            .unit_id = adc_unit,
+            .clk_src = (adc_oneshot_clk_src_t)0,
+            .ulp_mode = ADC_ULP_MODE_DISABLE,
+        };
+        esp_err_t ret = adc_oneshot_new_unit(&init_config, &adc_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
+            return 0;
+        }
+
+        adc_oneshot_chan_cfg_t config = {
+            .atten = adc_atten,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        ret = adc_oneshot_config_channel(adc_handle, adc_channel, &config);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(ret));
+            adc_oneshot_del_unit(adc_handle);
+            adc_handle = NULL;
+            return 0;
+        }
+
+        // Calibration
+        adc_cali_line_fitting_config_t cali_config = {
+            .unit_id = adc_unit,
+            .atten = adc_atten,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+            .default_vref = DEFAULT_VREF,
+        };
+        ret = adc_cali_create_scheme_line_fitting(&cali_config, &cali_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "ADC calibration failed, using raw values: %s", esp_err_to_name(ret));
+            cali_handle = NULL;
+        }
+
+        adc_initialized = true;
+        ESP_LOGI(TAG, "ADC initialized for voltage measurement");
     }
 
-    adc_oneshot_chan_cfg_t config = {
-        .atten = adc_atten,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-    };
-    ret = adc_oneshot_config_channel(adc_handle, adc_channel, &config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(ret));
-        adc_oneshot_del_unit(adc_handle);
-        return 0;
-    }
-
-    // Calibration
-    adc_cali_handle_t cali_handle = NULL;
-    adc_cali_line_fitting_config_t cali_config = {
-        .unit_id = adc_unit,
-        .atten = adc_atten,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-        .default_vref = DEFAULT_VREF,
-    };
-    ret = adc_cali_create_scheme_line_fitting(&cali_config, &cali_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "ADC calibration failed, using raw values: %s", esp_err_to_name(ret));
-    }
+    esp_err_t ret;
 
     // Read ADC with multiple samples for stability
     int adc_raw = 0;
@@ -168,11 +186,7 @@ uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t
         voltage_mv = (adc_raw * 3300) / 4095;
     }
 
-    // Cleanup
-    if (cali_handle != NULL) {
-        adc_cali_delete_scheme_line_fitting(cali_handle);
-    }
-    adc_oneshot_del_unit(adc_handle);
+    // No cleanup needed - handles are reused for better performance
 
     return voltage_mv;
 }
@@ -234,12 +248,12 @@ SysInfo::SysInfo()
 #endif
 }
 
-double SysInfo::getCpuUsage()
+double SysInfo::getCpuUsage() const
 {
     return _cpuUsage;
 }
 
-double SysInfo::getMemoryUsage()
+double SysInfo::getMemoryUsage() const
 {
     multi_heap_info_t info;
     heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
@@ -247,29 +261,29 @@ double SysInfo::getMemoryUsage()
     return 100.0 - (info.total_free_bytes * 100.0 / (info.total_free_bytes + info.total_allocated_bytes));
 }
 
-const char *SysInfo::getSerialNumber()
+const char *SysInfo::getSerialNumber() const
 {
     return _serial;
 }
 
-board_type_t SysInfo::getBoardType()
+board_type_t SysInfo::getBoardType() const
 {
     return _board;
 }
 
-const char *SysInfo::getCurrentVersion()
+const char *SysInfo::getCurrentVersion() const
 {
     return _currentVersion;
 }
 
-double SysInfo::getSupplyVoltage()
+double SysInfo::getSupplyVoltage() const
 {
     // Return cached value updated by background task
     // Apply 2:1 voltage divider correction and convert to volts
     return (_supplyVoltageMv * 2.0) / 1000.0;
 }
 
-const char* SysInfo::getBoardRevisionString()
+const char* SysInfo::getBoardRevisionString() const
 {
     switch (_board)
     {
@@ -286,7 +300,7 @@ const char* SysInfo::getBoardRevisionString()
     }
 }
 
-double SysInfo::getTemperature()
+double SysInfo::getTemperature() const
 {
 #if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
     if (_temp_sensor == NULL) {
@@ -312,14 +326,14 @@ double SysInfo::getTemperature()
 #endif
 }
 
-uint64_t SysInfo::getUptimeSeconds()
+uint64_t SysInfo::getUptimeSeconds() const
 {
     // Get current time in seconds since boot
     uint64_t uptime = (esp_timer_get_time() / 1000000);
     return uptime;
 }
 
-const char* SysInfo::getResetReason()
+const char* SysInfo::getResetReason() const
 {
     esp_reset_reason_t reason = esp_reset_reason();
 

@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <stdarg.h>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -27,6 +28,10 @@
 #endif
 
 static const char *TAG = "MONITORING";
+
+// Buffer size constants
+#define CHECKMK_OUTPUT_BUFFER_SIZE 2048
+#define CHECKMK_ALLOWED_HOSTS_SIZE 256
 
 static monitoring_config_t current_config = {};
 static bool snmp_running = false;
@@ -170,30 +175,50 @@ static void checkmk_agent_task(void *pvParameters)
         }
 
         // Send CheckMK agent output
-        char output[2048];
-        int len = 0;
+        char output[CHECKMK_OUTPUT_BUFFER_SIZE];
+        size_t len = 0;
+
+        // Helper for safe appending to buffer
+        auto safe_append = [&](const char* format, ...) {
+            if (len >= sizeof(output) - 1) return; // Buffer full
+
+            va_list args;
+            va_start(args, format);
+            int ret = vsnprintf(output + len, sizeof(output) - len, format, args);
+            va_end(args);
+
+            if (ret > 0) {
+                if (len + ret < sizeof(output)) {
+                    len += ret;
+                } else {
+                    // Truncated - saturate to max
+                    len = sizeof(output) - 1;
+                    output[len] = '\0';
+                }
+            }
+        };
 
         // Version section
-        len += snprintf(output + len, sizeof(output) - len, "<<<check_mk>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "Version: HB-RF-ETH-%s\n", get_firmware_version());
-        len += snprintf(output + len, sizeof(output) - len, "AgentOS: ESP-IDF\n");
+        safe_append("<<<check_mk>>>\n");
+        safe_append("Version: HB-RF-ETH-%s\n", get_firmware_version());
+        safe_append("AgentOS: ESP-IDF\n");
 
         // Uptime section
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
-        len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        safe_append("<<<uptime>>>\n");
+        safe_append("%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
-        len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
+        safe_append("<<<mem>>>\n");
+        safe_append("MemTotal: %lu kB\n",
                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
-        len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
+        safe_append("MemFree: %lu kB\n",
                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
-        len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "esp32 0 0 0\n");
+        safe_append("<<<cpu>>>\n");
+        safe_append("esp32 0 0 0\n");
 
         // Send data
         send(client_sock, output, len, 0);
@@ -336,20 +361,24 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
         config->snmp.enabled = false;
-        strcpy(config->snmp.community, "public");
-        strcpy(config->snmp.location, "");
-        strcpy(config->snmp.contact, "");
+        strncpy(config->snmp.community, "public", sizeof(config->snmp.community) - 1);
+        config->snmp.community[sizeof(config->snmp.community) - 1] = '\0';
+        config->snmp.location[0] = '\0';
+        config->snmp.contact[0] = '\0';
         config->snmp.port = 161;
 
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
-        strcpy(config->checkmk.allowed_hosts, "*");
+        strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
+        config->checkmk.allowed_hosts[sizeof(config->checkmk.allowed_hosts) - 1] = '\0';
 
         config->mqtt.enabled = false;
         config->mqtt.port = 1883;
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
         config->mqtt.ha_discovery_enabled = false;
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
 
         return ESP_OK;
     }
@@ -416,7 +445,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.topic_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
     }
 
     if (nvs_get_u8(nvs_handle, NVS_MQTT_HA_ENABLED, &u8_val) == ESP_OK) {
@@ -427,7 +457,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.ha_discovery_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
     }
 
     nvs_close(nvs_handle);

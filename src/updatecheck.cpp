@@ -26,6 +26,7 @@
 #include "esp_https_ota.h"
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
+#include "esp_task_wdt.h"
 #include "string.h"
 #include "cJSON.h"
 
@@ -204,6 +205,10 @@ void UpdateCheck::performOnlineUpdate()
     ESP_LOGI(TAG, "Starting OTA update from %s", url);
     _statusLED->setState(LED_STATE_BLINK_FAST);
 
+    // Disable task watchdog for this task during OTA update
+    // OTA updates can take several seconds and may trigger watchdog timeout
+    esp_task_wdt_delete(xTaskGetCurrentTaskHandle());
+
     esp_http_client_config_t config = {};
     config.url = url;
     config.crt_bundle_attach = esp_crt_bundle_attach;
@@ -215,9 +220,11 @@ void UpdateCheck::performOnlineUpdate()
     esp_err_t ret = esp_https_ota(&ota_config);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update successful, restarting...");
-        esp_restart();
+        esp_restart();  // System restart - no need to re-enable watchdog
     } else {
-        ESP_LOGE(TAG, "OTA Update failed");
-        _statusLED->setState(LED_STATE_ON); // Reset LED or to previous state?
+        ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+        _statusLED->setState(LED_STATE_ON);
+        // Re-enable watchdog for this task
+        esp_task_wdt_add(xTaskGetCurrentTaskHandle());
     }
 }

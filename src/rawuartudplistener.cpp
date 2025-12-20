@@ -224,15 +224,20 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t port = atomic_load(&_remotePort);
     uint32_t address = atomic_load(&_remoteAddress);
 
+    if (!port)
+        return;
+
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
+    if (pb == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate pbuf for sendMessage");
+        return;
+    }
+
     unsigned char *sendBuffer = (unsigned char *)pb->payload;
 
     ip_addr_t addr;
     addr.type = IPADDR_TYPE_V4;
     addr.u_addr.ip4.addr = address;
-
-    if (!port)
-        return;
 
     sendBuffer[0] = command;
     sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);
@@ -262,10 +267,23 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
-    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    // Optimization: Store struct directly in queue to avoid malloc/free per packet
+    // Use larger queue for DTLS to handle potential processing delays
+    int queueSize = atomic_load(&_dtlsEnabled) ? 64 : 32;
+
+    _udp_queue = xQueueCreate(queueSize, sizeof(udp_event_t));
+    if (_udp_queue == NULL) {
+        ESP_LOGE(TAG, "Failed to create UDP queue");
+        return;
+    }
+
     xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 
     _pcb = udp_new();
+    if (_pcb == NULL) {
+        ESP_LOGE(TAG, "Failed to create UDP PCB");
+        return;
+    }
     udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
@@ -283,20 +301,25 @@ void RawUartUdpListener::stop()
 
     _radioModuleConnector->removeFrameHandler(this);
     vTaskDelete(_tHandle);
+
+    // Clean up queue
+    if (_udp_queue) {
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()
 {
-    udp_event_t *event = NULL;
+    udp_event_t event;
     int64_t nextKeepAliveSentOut = esp_timer_get_time();
 
     for (;;)
     {
         if (xQueueReceive(_udp_queue, &event, (TickType_t)(100 / portTICK_PERIOD_MS)) == pdTRUE)
         {
-            handlePacket(event->pb, event->addr, event->port);
-            pbuf_free(event->pb);
-            free(event);
+            handlePacket(event.pb, event.addr, event.port);
+            pbuf_free(event.pb);
         }
 
         if (atomic_load(&_remotePort) != 0)
@@ -324,20 +347,14 @@ void RawUartUdpListener::_udpQueueHandler()
 
 bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
-    udp_event_t *e = (udp_event_t *)malloc(sizeof(udp_event_t));
-    if (!e)
-    {
-        return false;
-    }
+    udp_event_t e;
 
-    e->pb = pb;
-
-    e->addr.addr = ip_addr_get_ip4_u32(addr);
-    e->port = port;
+    e.pb = pb;
+    e.addr.addr = ip_addr_get_ip4_u32(addr);
+    e.port = port;
 
     if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
-        free((void *)(e));
         return false;
     }
     return true;

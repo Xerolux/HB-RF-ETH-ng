@@ -176,6 +176,12 @@ void app_main()
     RawUartUdpListener* rawUartUdpLister = NULL;
     Hmlgw* hmlgw = NULL;
 
+    // INTENTIONAL MEMORY ALLOCATION PATTERN:
+    // The following objects (hmlgw, rawUartUdpLister) are allocated with 'new'
+    // and intentionally NOT deleted. They are singleton services that persist
+    // for the entire application lifetime (until device reset).
+    // This is by design - not a memory leak.
+
     if (settings.getHmlgwEnabled()) {
         ESP_LOGI(TAG, "Starting HMLGW mode (DTLS not supported in HM-LGW)");
         hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
