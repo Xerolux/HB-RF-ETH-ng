@@ -103,7 +103,7 @@ export default {
       description: 'Sichere Transportverschlüsselung für die Kommunikation zwischen Platine und CCU über Port 3008.',
       mode: 'Verschlüsselungsmodus',
       modeDisabled: 'Deaktiviert (Standard)',
-      modePSK: 'Pre-Shared Key (PSK)',
+      modePsk: 'Pre-Shared Key (PSK)',
       modeCert: 'X.509 Zertifikat',
       cipherSuite: 'Cipher Suite',
       cipherAes128: 'AES-128-GCM-SHA256',

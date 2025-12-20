@@ -86,7 +86,7 @@ export default {
       description: 'Chiffrement de transport sécurisé pour la communication entre la carte et CCU sur le port 3008.',
       mode: 'Mode de chiffrement',
       modeDisabled: 'Désactivé (par défaut)',
-      modePSK: 'Clé prépartagée (PSK)',
+      modePsk: 'Clé prépartagée (PSK)',
       modeCert: 'Certificat X.509',
       cipherSuite: 'Suite de chiffrement',
       cipherAes128: 'AES-128-GCM-SHA256',
