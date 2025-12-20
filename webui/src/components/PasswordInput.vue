@@ -12,7 +12,7 @@
       <BButton
         @click="toggleVisibility"
         variant="outline-secondary"
-        :aria-label="visible ? 'Hide password' : 'Show password'"
+        :aria-label="visible ? t('common.hidePassword') : t('common.showPassword')"
       >
         <svg v-if="visible" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye-slash" viewBox="0 0 16 16">
           <path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/>
@@ -30,6 +30,9 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 defineProps({
   modelValue: {

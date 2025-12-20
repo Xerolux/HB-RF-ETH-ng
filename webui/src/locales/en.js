@@ -11,6 +11,8 @@ export default {
     success: 'Success',
     yes: 'Yes',
     no: 'No',
+    showPassword: 'Show password',
+    hidePassword: 'Hide password',
     rebootingWait: 'System is rebooting. Please wait approx. 10 seconds...',
     factoryResettingWait: 'System is resetting to factory defaults and rebooting. Please wait...',
     confirmReboot: 'Are you sure you want to reboot the system?',
