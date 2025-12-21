@@ -31,6 +31,7 @@
 #include "cJSON.h"
 
 static const char *TAG = "UpdateCheck";
+static const char *FALLBACK_RELEASE_NOTES = "Release notes are not available.";
 
 void _update_check_task_func(void *parameter)
 {
@@ -61,6 +62,21 @@ void UpdateCheck::checkNow()
 const char *UpdateCheck::getLatestVersion()
 {
   return _latestVersion;
+}
+
+const char* UpdateCheck::getReleaseNotes()
+{
+  return _releaseNotes;
+}
+
+const char* UpdateCheck::getDownloadUrl()
+{
+  return _downloadUrl;
+}
+
+bool UpdateCheck::hasDownloadUrl()
+{
+  return strlen(_downloadUrl) > 0;
 }
 
 void UpdateCheck::_updateLatestVersion()
@@ -155,6 +171,10 @@ void UpdateCheck::_updateLatestVersion()
   bool allow_prerelease = _settings->getAllowPrerelease();
   bool found_release = false;
 
+  // Reset cached data
+  _releaseNotes[0] = '\0';
+  _downloadUrl[0] = '\0';
+
   // Iterate through releases to find the appropriate one
   for (int i = 0; i < array_size; i++) {
       cJSON *release = cJSON_GetArrayItem(json, i);
@@ -212,11 +232,59 @@ void UpdateCheck::_updateLatestVersion()
       _latestVersion[sizeof(_latestVersion) - 1] = '\0';
       found_release = true;
       ESP_LOGI(TAG, "Set latest version to: %s", _latestVersion);
+
+      // Read release notes (body) if present
+      cJSON *body_obj = cJSON_GetObjectItem(release, "body");
+      if (body_obj && cJSON_IsString(body_obj) && body_obj->valuestring) {
+          strncpy(_releaseNotes, body_obj->valuestring, RELEASE_NOTES_SIZE - 1);
+          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
+      } else {
+          strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
+          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
+      }
+
+      // Find firmware asset download URL
+      _downloadUrl[0] = '\0';
+      cJSON *assets = cJSON_GetObjectItem(release, "assets");
+      if (assets && cJSON_IsArray(assets)) {
+          int asset_count = cJSON_GetArraySize(assets);
+          for (int j = 0; j < asset_count; j++) {
+              cJSON *asset = cJSON_GetArrayItem(assets, j);
+              if (!asset) {
+                  continue;
+              }
+
+              cJSON *name = cJSON_GetObjectItem(asset, "name");
+              cJSON *browser_download_url = cJSON_GetObjectItem(asset, "browser_download_url");
+
+              if (name && cJSON_IsString(name) && browser_download_url && cJSON_IsString(browser_download_url)) {
+                  // Prefer firmware*.bin
+                  if (strstr(name->valuestring, "firmware") != NULL && strstr(name->valuestring, ".bin") != NULL) {
+                      strncpy(_downloadUrl, browser_download_url->valuestring, DOWNLOAD_URL_SIZE - 1);
+                      _downloadUrl[DOWNLOAD_URL_SIZE - 1] = '\0';
+                      ESP_LOGI(TAG, "Found firmware asset URL: %s", _downloadUrl);
+                      break;
+                  }
+              }
+          }
+      }
+
+      // Fallback: construct default download URL if not found in assets
+      if (strlen(_downloadUrl) == 0) {
+          snprintf(_downloadUrl, DOWNLOAD_URL_SIZE, "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware.bin", _latestVersion);
+          ESP_LOGW(TAG, "Asset download URL not found, using fallback: %s", _downloadUrl);
+      }
+
       break;
   }
 
   if (!found_release) {
       ESP_LOGW(TAG, "No suitable release found (allow_prerelease=%d)", allow_prerelease);
+      strncpy(_latestVersion, "n/a", sizeof(_latestVersion) - 1);
+      _latestVersion[sizeof(_latestVersion) - 1] = '\0';
+      strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
+      _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
+      _downloadUrl[0] = '\0';
   } else {
       ESP_LOGI(TAG, "Latest version: %s", _latestVersion);
   }
@@ -274,11 +342,14 @@ void UpdateCheck::performOnlineUpdate()
         return;
     }
 
-    char url[256];
-    // Construct URL: https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v<version>/firmware.bin
-    // Note: We assume the tag has 'v' prefix, but version string might not.
-    // If _latestVersion is "2.1.1", tag is "v2.1.1".
-    snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware.bin", _latestVersion);
+    char url[DOWNLOAD_URL_SIZE];
+    if (hasDownloadUrl()) {
+        strncpy(url, _downloadUrl, sizeof(url) - 1);
+        url[sizeof(url) - 1] = '\0';
+    } else {
+        ESP_LOGE(TAG, "No download URL available for online update");
+        return;
+    }
 
     ESP_LOGI(TAG, "Starting OTA update from %s", url);
     _statusLED->setState(LED_STATE_BLINK_FAST);
