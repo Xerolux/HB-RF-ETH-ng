@@ -12,10 +12,12 @@
 
 // Maximum frame size for analyzer
 #define ANALYZER_MAX_FRAME_SIZE 1024
+#define ANALYZER_SHORT_BUFFER_SIZE 64
 
 // Structure for queued frames
 struct AnalyzerFrame {
-    unsigned char data[ANALYZER_MAX_FRAME_SIZE];
+    uint8_t shortData[ANALYZER_SHORT_BUFFER_SIZE];
+    uint8_t *longData;
     uint16_t len;
     int64_t timestamp_ms;
 };

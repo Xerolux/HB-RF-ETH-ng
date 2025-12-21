@@ -90,8 +90,14 @@ Analyzer::~Analyzer()
         ESP_LOGI(TAG, "Processing task deleted");
     }
 
-    // Clean up queue
+    // Drain queue and free any allocated memory
     if (_frameQueue) {
+        AnalyzerFrame frame;
+        while (xQueueReceive(_frameQueue, &frame, 0) == pdTRUE) {
+            if (frame.longData) {
+                free(frame.longData);
+            }
+        }
         vQueueDelete(_frameQueue);
         _frameQueue = NULL;
     }
@@ -125,18 +131,38 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 
     // Create frame structure
     AnalyzerFrame frame;
-    memcpy(frame.data, buffer, len);
     frame.len = len;
     frame.timestamp_ms = esp_timer_get_time() / 1000;
+    frame.longData = nullptr;
+
+    if (len <= ANALYZER_SHORT_BUFFER_SIZE) {
+        memcpy(frame.shortData, buffer, len);
+    } else {
+        frame.longData = (uint8_t*)malloc(len);
+        if (frame.longData) {
+            memcpy(frame.longData, buffer, len);
+        } else {
+            ESP_LOGE(TAG, "Failed to allocate memory for frame");
+            return;
+        }
+    }
 
     // Try to send to queue without blocking (important: don't block UART task!)
     if (xQueueSend(_frameQueue, &frame, 0) != pdTRUE) {
         // Queue is full, drop oldest frame and try again
         AnalyzerFrame dummy;
-        xQueueReceive(_frameQueue, &dummy, 0); // Remove oldest
+        if (xQueueReceive(_frameQueue, &dummy, 0) == pdTRUE) {
+            // Free memory if the dropped frame had dynamic allocation
+            if (dummy.longData) {
+                free(dummy.longData);
+            }
+        }
 
         if (xQueueSend(_frameQueue, &frame, 0) != pdTRUE) {
             // Still can't send, drop this frame
+            if (frame.longData) {
+                free(frame.longData);
+            }
             ESP_LOGW(TAG, "Frame queue full, dropping frame");
         }
     }
@@ -151,6 +177,10 @@ void Analyzer::_processingTask()
         // Wait for frame with timeout to allow clean shutdown
         if (xQueueReceive(_frameQueue, &frame, pdMS_TO_TICKS(100)) == pdTRUE) {
             _processFrame(frame);
+            // Free memory if frame used dynamic allocation
+            if (frame.longData) {
+                free(frame.longData);
+            }
         }
     }
 
@@ -165,6 +195,8 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     if (!_running || !_mutex) {
         return;
     }
+
+    const uint8_t* dataPtr = frame.longData ? frame.longData : frame.shortData;
 
     // Convert frame to JSON
     // Format: { "ts": <timestamp_ms>, "len": <len>, "data": "<hex_string>" }
@@ -190,8 +222,8 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     // Fast Hex Conversion
     static const char hex_map[] = "0123456789ABCDEF";
     for (int i = 0; i < frame.len; i++) {
-        json_str[offset++] = hex_map[(frame.data[i] >> 4) & 0xF];
-        json_str[offset++] = hex_map[frame.data[i] & 0xF];
+        json_str[offset++] = hex_map[(dataPtr[i] >> 4) & 0xF];
+        json_str[offset++] = hex_map[dataPtr[i] & 0xF];
     }
 
     // Footer
