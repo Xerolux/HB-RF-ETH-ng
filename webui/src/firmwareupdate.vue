@@ -103,6 +103,14 @@
         <!-- Use v-html carefully, ideally use a markdown renderer but for now pre-wrap -->
         <pre class="release-notes-content">{{ releaseNotes }}</pre>
         <BButton
+          v-if="releaseDownloadUrl"
+          :href="releaseDownloadUrl"
+          target="_blank"
+          variant="primary"
+          block
+          class="mt-2"
+        >{{ t('firmware.downloadFirmware') }}</BButton>
+        <BButton
           variant="success"
           block
           class="mt-3"
@@ -169,6 +177,7 @@ const showSuccess = ref(false)
 
 const showReleaseNotes = ref(false)
 const releaseNotes = ref('')
+const releaseDownloadUrl = ref('')
 const loadingNotes = ref(false)
 const releaseNotesError = ref(false)
 
@@ -176,11 +185,22 @@ const fetchReleaseNotes = async () => {
   loadingNotes.value = true
   releaseNotesError.value = false
   releaseNotes.value = ''
+  releaseDownloadUrl.value = ''
   try {
-    // GitHub API to get release notes
-    // Note: This relies on client-side internet access
-    const response = await axios.get(`https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/tags/v${sysInfoStore.latestVersion}`)
-    releaseNotes.value = response.data.body
+    const response = await axios.post('/api/check_update')
+    if (response.data) {
+      sysInfoStore.latestVersion = response.data.latestVersion || sysInfoStore.latestVersion
+      if (response.data.releaseNotes) {
+        releaseNotes.value = response.data.releaseNotes
+        sysInfoStore.releaseNotes = response.data.releaseNotes
+      } else {
+        releaseNotes.value = t('firmware.releaseNotesError')
+      }
+      if (response.data.downloadUrl) {
+        releaseDownloadUrl.value = response.data.downloadUrl
+        sysInfoStore.downloadUrl = response.data.downloadUrl
+      }
+    }
   } catch (error) {
     console.error('Failed to fetch release notes:', error)
     releaseNotesError.value = true
@@ -250,7 +270,11 @@ const checkUpdateClick = async () => {
         const response = await axios.post('/api/check_update')
         if (response.data && response.data.latestVersion) {
             sysInfoStore.latestVersion = response.data.latestVersion
+            sysInfoStore.releaseNotes = response.data.releaseNotes || sysInfoStore.releaseNotes
+            sysInfoStore.downloadUrl = response.data.downloadUrl || sysInfoStore.downloadUrl
             if (sysInfoStore.currentVersion < sysInfoStore.latestVersion) {
+                releaseNotes.value = response.data.releaseNotes || ''
+                releaseDownloadUrl.value = response.data.downloadUrl || ''
                 alert(t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }))
             } else {
                 alert(t('firmware.noUpdateAvailable'))

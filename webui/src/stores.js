@@ -63,6 +63,8 @@ export const useSysInfoStore = defineStore('sysInfo', {
     serial: "",
     currentVersion: "",
     latestVersion: "",
+    releaseNotes: "",
+    downloadUrl: "",
     rawUartRemoteAddress: "",
     memoryUsage: 0.0,
     cpuUsage: 0.0,

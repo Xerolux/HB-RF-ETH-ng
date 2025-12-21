@@ -1143,6 +1143,7 @@ static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
   };
 
   TaskArgs* args = new TaskArgs();
+  _updateCheck->checkNow();
   args->updateCheck = _updateCheck;
 
   xTaskCreate([](void* p) {
@@ -1181,6 +1182,8 @@ esp_err_t post_check_update_handler_func(httpd_req_t *req)
 
   cJSON *root = cJSON_CreateObject();
   cJSON_AddStringToObject(root, "latestVersion", _updateCheck->getLatestVersion());
+  cJSON_AddStringToObject(root, "releaseNotes", _updateCheck->getReleaseNotes());
+  cJSON_AddStringToObject(root, "downloadUrl", _updateCheck->getDownloadUrl());
 
   const char *json = cJSON_PrintUnformatted(root);
   httpd_resp_sendstr(req, json);
