@@ -32,6 +32,7 @@ private:
     QueueHandle_t _frameQueue;
     TaskHandle_t _taskHandle;
     bool _running;
+    bool _initialized;
 
     void _processingTask();
     void _processFrame(const AnalyzerFrame &frame);
@@ -45,6 +46,7 @@ public:
     void addClient(httpd_handle_t hd, int fd);
     void removeClient(httpd_handle_t hd, int fd);
     bool hasClients();
+    bool isReady() const { return _initialized; }
 
     // Static handler for WebSocket events
     static esp_err_t ws_handler(httpd_req_t *req);

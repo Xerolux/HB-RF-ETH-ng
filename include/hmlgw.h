@@ -27,6 +27,8 @@ private:
     int _keepAliveClientSocket;
     TaskHandle_t _keepAliveTaskHandle;
 
+    void cleanupSockets();
+    void handleFatalError(const char* reason);
     void run();
     void runKeepAlive();
     void handleClient();
