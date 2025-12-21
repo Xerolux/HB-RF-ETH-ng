@@ -3,9 +3,44 @@
 #include <cstring>
 #include <stdio.h>
 #include <inttypes.h>
+#include <cstdlib>
 
 static const char *TAG = "Analyzer";
 static Analyzer *_instance = NULL;
+
+struct AnalyzerWsSendJob {
+    httpd_handle_t handle;
+    int fd;
+    char *payload;
+    size_t len;
+    Analyzer *analyzer;
+};
+
+static void analyzer_ws_send(void *arg)
+{
+    AnalyzerWsSendJob *job = static_cast<AnalyzerWsSendJob *>(arg);
+    if (!job || !job->payload) {
+        return;
+    }
+
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = reinterpret_cast<uint8_t *>(job->payload);
+    ws_pkt.len = job->len;
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    ws_pkt.final = true;
+
+    esp_err_t ret = httpd_ws_send_frame_async(job->handle, job->fd, &ws_pkt);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to send to client %d: %s", job->fd, esp_err_to_name(ret));
+        if (job->analyzer) {
+            job->analyzer->removeClient(job->handle, job->fd);
+        }
+    }
+
+    free(job->payload);
+    free(job);
+}
 
 // Friend function for FreeRTOS task
 void analyzerProcessingTask(void *parameter)
@@ -230,53 +265,57 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     json_str[offset++] = '"';
     json_str[offset++] = '}';
     json_str[offset] = 0;
-
-    httpd_ws_frame_t ws_pkt;
-    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.payload = (uint8_t *)json_str;
-    ws_pkt.len = offset;
-    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    std::vector<httpd_handle_t> clients;
+    std::vector<int> client_fds;
 
     // Use short timeout to prevent blocking (50ms instead of 10ms for more stability)
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50))) {
-        // Iterate backwards to allow safe removal
-        std::vector<int> failed_clients;
-
-        // Check if list is not empty before iterating to prevent underflow
         if (!_client_fds.empty()) {
-            for (int i = _client_fds.size() - 1; i >= 0; i--) {
-                esp_err_t ret = httpd_ws_send_frame_async(_clients[i], _client_fds[i], &ws_pkt);
-                if (ret != ESP_OK) {
-                    ESP_LOGW(TAG, "Failed to send to client %d: %s", _client_fds[i], esp_err_to_name(ret));
-
-                    // Mark for removal if connection is broken
-                    if (ret == ESP_ERR_INVALID_STATE || ret == ESP_ERR_NOT_FOUND) {
-                        failed_clients.push_back(_client_fds[i]);
-                    }
-                }
-            }
-        }
-
-        // Remove failed clients
-        for (int fd : failed_clients) {
-            for (size_t i = 0; i < _client_fds.size(); i++) {
-                if (_client_fds[i] == fd) {
-                    _clients.erase(_clients.begin() + i);
-                    _client_fds.erase(_client_fds.begin() + i);
-                    ESP_LOGI(TAG, "Removed failed client %d", fd);
-                    break;
-                }
-            }
-        }
-
-        // If no clients left, deregister
-        if (_client_fds.empty()) {
+            clients = _clients;
+            client_fds = _client_fds;
+        } else {
             _radioModuleConnector->removeFrameHandler(this);
         }
 
         xSemaphoreGive(_mutex);
     } else {
         ESP_LOGW(TAG, "Could not acquire mutex for WebSocket send, dropping frame");
+    }
+
+    if (clients.empty()) {
+        if (heap_allocated) {
+            free(json_str);
+        }
+        return;
+    }
+
+    for (size_t i = 0; i < client_fds.size(); i++) {
+        AnalyzerWsSendJob *job = static_cast<AnalyzerWsSendJob *>(malloc(sizeof(AnalyzerWsSendJob)));
+        if (!job) {
+            ESP_LOGE(TAG, "Failed to allocate ws send job");
+            continue;
+        }
+
+        job->payload = static_cast<char *>(malloc(offset));
+        if (!job->payload) {
+            ESP_LOGE(TAG, "Failed to allocate ws payload");
+            free(job);
+            continue;
+        }
+
+        memcpy(job->payload, json_str, offset);
+        job->len = offset;
+        job->handle = clients[i];
+        job->fd = client_fds[i];
+        job->analyzer = this;
+
+        esp_err_t work_ret = httpd_queue_work(job->handle, analyzer_ws_send, job);
+        if (work_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to queue ws send for client %d: %s", job->fd, esp_err_to_name(work_ret));
+            free(job->payload);
+            free(job);
+            removeClient(job->handle, job->fd);
+        }
     }
 
     if (heap_allocated) {
