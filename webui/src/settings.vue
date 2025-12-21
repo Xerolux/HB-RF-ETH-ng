@@ -307,7 +307,15 @@
   >
     <BForm @submit.stop.prevent>
         <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
+        <BButton
+          variant="outline-primary"
+          class="mb-3"
+          @click="downloadBackup"
+          :disabled="backupLoading"
+        >
+          <BSpinner small v-if="backupLoading" class="me-2" />
+          {{ t('settings.downloadBackup') }}
+        </BButton>
 
         <hr/>
         <p>{{ t('settings.restoreInfo') }}</p>
@@ -320,9 +328,12 @@
         />
         <BButton
             variant="warning"
-            :disabled="!restoreFile"
+            :disabled="!restoreFile || restoreLoading"
             @click="restoreSettings"
-        >{{ t('settings.restore') }}</BButton>
+        >
+          <BSpinner small v-if="restoreLoading" class="me-2" />
+          {{ t('settings.restore') }}
+        </BButton>
     </BForm>
   </BCard>
 
@@ -440,6 +451,8 @@ const dtlsSessionResumption = ref(true)
 const showSuccess = ref(null)
 const showError = ref(null)
 const loading = ref(false)
+const backupLoading = ref(false)
+const restoreLoading = ref(false)
 
 // Password modal state
 const showPasswordModal = ref(false)
@@ -670,6 +683,7 @@ const saveSettingsClick = async () => {
 }
 
 const downloadBackup = async () => {
+  backupLoading.value = true
   try {
     const response = await axios.get('/api/backup', { responseType: 'blob' })
     const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -683,6 +697,8 @@ const downloadBackup = async () => {
   } catch (error) {
     console.error('Backup download failed:', error)
     alert(t('settings.backupError'))
+  } finally {
+    backupLoading.value = false
   }
 }
 
@@ -691,6 +707,7 @@ const restoreSettings = async () => {
 
     if (!confirm(t('settings.restoreConfirm'))) return
 
+    restoreLoading.value = true
     try {
         const reader = new FileReader()
         reader.onload = async (e) => {
@@ -700,11 +717,17 @@ const restoreSettings = async () => {
                 alert(t('settings.restoreSuccess'))
                 window.location.reload()
             } catch (err) {
+                restoreLoading.value = false
                 alert(t('settings.restoreError') + ': ' + err.message)
             }
         }
+        reader.onerror = () => {
+             restoreLoading.value = false
+             alert(t('settings.restoreError'))
+        }
         reader.readAsText(restoreFile.value)
     } catch (e) {
+        restoreLoading.value = false
         alert(t('settings.restoreError'))
     }
 }
