@@ -36,9 +36,16 @@ typedef enum
 
 class Settings
 {
+public:
+  static constexpr size_t PASSWORD_SALT_SIZE = 16;
+  static constexpr size_t PASSWORD_HASH_SIZE = 32; // SHA-256
+
 private:
-  char _adminPassword[33] = {0};
+  char _adminPassword[33] = {0}; // Only used transiently during migration; kept zeroed afterwards
+  uint8_t _adminPasswordSalt[PASSWORD_SALT_SIZE] = {0};
+  uint8_t _adminPasswordHash[PASSWORD_HASH_SIZE] = {0};
   bool _passwordChanged;
+  bool _passwordHashValid = false;
 
   char _hostname[33] = {0};
   bool _useDHCP;
@@ -74,8 +81,8 @@ public:
   void save();
   void clear();
 
-  char *getAdminPassword();
-  void setAdminPassword(char* password);
+  bool verifyAdminPassword(const char *password);
+  void setAdminPassword(const char* password);
   bool getPasswordChanged();
 
   char *getHostname();

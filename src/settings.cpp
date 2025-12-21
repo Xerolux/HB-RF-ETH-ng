@@ -27,15 +27,22 @@
 #include "nvs_flash.h"
 #include "esp_mac.h"
 #include "esp_log.h"
+#include "esp_random.h"
+#include "mbedtls/md.h"
 #include <string.h>
 
 Settings::Settings()
 {
+  _passwordChanged = false;
+  _passwordHashValid = false;
   load();
 }
 
 static const char *TAG = "Settings";
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
+static const char *NVS_ADMIN_PWD_SALT = "adminPasswordSalt";
+static const char *NVS_ADMIN_PWD_HASH = "adminPasswordHash";
+static const char *NVS_ADMIN_PWD_LEGACY = "adminPassword";
 
 #define GET_IP_ADDR(handle, name, var, defaultValue)  \
   if (nvs_get_u32(handle, name, &var.addr) != ESP_OK) \
@@ -72,6 +79,47 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
 #define SET_BOOL(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i8(handle, name, var ? 1 : 0));
 #define SET_UINT16(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u16(handle, name, var));
 
+static bool compute_password_hash(const char *password, const uint8_t *salt, size_t salt_len, uint8_t *out_hash, size_t hash_len)
+{
+  if (!password || !salt || !out_hash || salt_len == 0 || hash_len < Settings::PASSWORD_HASH_SIZE)
+  {
+    return false;
+  }
+
+  const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+  if (!info)
+  {
+    return false;
+  }
+
+  mbedtls_md_context_t ctx;
+  mbedtls_md_init(&ctx);
+
+  if (mbedtls_md_setup(&ctx, info, 0) != 0)
+  {
+    mbedtls_md_free(&ctx);
+    return false;
+  }
+
+  mbedtls_md_starts(&ctx);
+  mbedtls_md_update(&ctx, salt, salt_len);
+  mbedtls_md_update(&ctx, (const unsigned char *)password, strlen(password));
+  mbedtls_md_finish(&ctx, out_hash);
+  mbedtls_md_free(&ctx);
+
+  return true;
+}
+
+static uint8_t constant_time_compare(const uint8_t *a, const uint8_t *b, size_t len)
+{
+  uint8_t diff = 0;
+  for (size_t i = 0; i < len; i++)
+  {
+    diff |= a[i] ^ b[i];
+  }
+  return diff;
+}
+
 void Settings::load()
 {
   nvs_handle_t handle = 0;
@@ -90,16 +138,42 @@ void Settings::load()
       return;
   }
 
-  size_t adminPasswordLength = sizeof(_adminPassword);
-  if (nvs_get_str(handle, "adminPassword", _adminPassword, &adminPasswordLength) != ESP_OK)
+  // Load hashed admin password if available
+  size_t salt_len = sizeof(_adminPasswordSalt);
+  size_t hash_len = sizeof(_adminPasswordHash);
+  esp_err_t salt_err = nvs_get_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, &salt_len);
+  esp_err_t hash_err = nvs_get_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, &hash_len);
+
+  if (salt_err == ESP_OK && hash_err == ESP_OK && salt_len == sizeof(_adminPasswordSalt) && hash_len == sizeof(_adminPasswordHash))
   {
-    strncpy(_adminPassword, "admin", sizeof(_adminPassword) - 1);
-    _passwordChanged = false;
+    _passwordHashValid = true;
   }
   else
   {
-    // Check if password was changed (if it's not default "admin")
-    _passwordChanged = (strcmp(_adminPassword, "admin") != 0);
+    // Legacy plaintext handling and migration
+    size_t adminPasswordLength = sizeof(_adminPassword);
+    if (nvs_get_str(handle, NVS_ADMIN_PWD_LEGACY, _adminPassword, &adminPasswordLength) != ESP_OK)
+    {
+      strncpy(_adminPassword, "admin", sizeof(_adminPassword) - 1);
+      _passwordChanged = false;
+    }
+    else
+    {
+      _passwordChanged = (strcmp(_adminPassword, "admin") != 0);
+    }
+
+    esp_fill_random(_adminPasswordSalt, sizeof(_adminPasswordSalt));
+    if (compute_password_hash(_adminPassword, _adminPasswordSalt, sizeof(_adminPasswordSalt), _adminPasswordHash, sizeof(_adminPasswordHash)))
+    {
+      _passwordHashValid = true;
+      ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, sizeof(_adminPasswordSalt)));
+      ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, sizeof(_adminPasswordHash)));
+      nvs_erase_key(handle, NVS_ADMIN_PWD_LEGACY); // Best effort cleanup
+      nvs_commit(handle);
+    }
+
+    // Clear plaintext from memory
+    memset(_adminPassword, 0, sizeof(_adminPassword));
   }
 
   // Also try to load explicit passwordChanged flag (overrides auto-detection)
@@ -187,7 +261,15 @@ void Settings::save()
       return;
   }
 
-  SET_STR(handle, "adminPassword", _adminPassword);
+  if (_passwordHashValid)
+  {
+    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, sizeof(_adminPasswordSalt)));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, sizeof(_adminPasswordHash)));
+  }
+  else
+  {
+    ESP_LOGE(TAG, "Password hash not initialized, refusing to save admin password");
+  }
   SET_BOOL(handle, "passwordChanged", _passwordChanged);
 
   SET_STR(handle, "hostname", _hostname);
@@ -252,14 +334,40 @@ void Settings::clear()
   load();
 }
 
-char *Settings::getAdminPassword()
+bool Settings::verifyAdminPassword(const char *password)
 {
-  return _adminPassword;
+  if (!_passwordHashValid || !password)
+  {
+    ESP_LOGW(TAG, "Password verification attempted before initialization");
+    return false;
+  }
+
+  uint8_t candidate_hash[PASSWORD_HASH_SIZE] = {0};
+  if (!compute_password_hash(password, _adminPasswordSalt, sizeof(_adminPasswordSalt), candidate_hash, sizeof(candidate_hash)))
+  {
+    return false;
+  }
+
+  return constant_time_compare(_adminPasswordHash, candidate_hash, PASSWORD_HASH_SIZE) == 0;
 }
 
-void Settings::setAdminPassword(char *adminPassword)
+void Settings::setAdminPassword(const char *adminPassword)
 {
-  strncpy(_adminPassword, adminPassword, sizeof(_adminPassword) - 1);
+  if (!adminPassword)
+  {
+    ESP_LOGE(TAG, "setAdminPassword called with null password");
+    return;
+  }
+
+  esp_fill_random(_adminPasswordSalt, sizeof(_adminPasswordSalt));
+
+  if (!compute_password_hash(adminPassword, _adminPasswordSalt, sizeof(_adminPasswordSalt), _adminPasswordHash, sizeof(_adminPasswordHash)))
+  {
+    ESP_LOGE(TAG, "Failed to compute password hash");
+    return;
+  }
+
+  _passwordHashValid = true;
   // Mark password as changed when it's explicitly set
   _passwordChanged = true;
 }

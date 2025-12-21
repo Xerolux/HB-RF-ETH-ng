@@ -170,15 +170,13 @@ int secure_strcmp(const char *s1, const char *s2) {
 
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
-    size_t min_len = (len1 < len2) ? len1 : len2;
-    int result = 0;
+    size_t max_len = (len1 > len2) ? len1 : len2;
+    int result = (len1 != len2);
 
-    if (len1 != len2) {
-        result = 1;
-    }
-
-    for (size_t i = 0; i < min_len; i++) {
-        result |= (s1[i] ^ s2[i]);
+    for (size_t i = 0; i < max_len; i++) {
+        const char c1 = (i < len1) ? s1[i] : 0;
+        const char c2 = (i < len2) ? s2[i] : 0;
+        result |= (c1 ^ c2);
     }
 
     return result;
@@ -223,7 +221,7 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 
         char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
 
-        bool isAuthenticated = (password != NULL) && (secure_strcmp(password, _settings->getAdminPassword()) == 0);
+        bool isAuthenticated = (password != NULL) && _settings->verifyAdminPassword(password);
 
         cJSON_Delete(root);
 
