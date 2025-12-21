@@ -235,13 +235,12 @@ void UpdateCheck::_updateLatestVersion()
 
       // Read release notes (body) if present
       cJSON *body_obj = cJSON_GetObjectItem(release, "body");
+      const char* notes_src = FALLBACK_RELEASE_NOTES;
       if (body_obj && cJSON_IsString(body_obj) && body_obj->valuestring) {
-          strncpy(_releaseNotes, body_obj->valuestring, RELEASE_NOTES_SIZE - 1);
-          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
-      } else {
-          strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
-          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
+          notes_src = body_obj->valuestring;
       }
+      strncpy(_releaseNotes, notes_src, RELEASE_NOTES_SIZE - 1);
+      _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
 
       // Find firmware asset download URL
       _downloadUrl[0] = '\0';
@@ -344,8 +343,7 @@ void UpdateCheck::performOnlineUpdate()
 
     char url[DOWNLOAD_URL_SIZE];
     if (hasDownloadUrl()) {
-        strncpy(url, _downloadUrl, sizeof(url) - 1);
-        url[sizeof(url) - 1] = '\0';
+        snprintf(url, sizeof(url), "%s", _downloadUrl);
     } else {
         ESP_LOGE(TAG, "No download URL available for online update");
         return;

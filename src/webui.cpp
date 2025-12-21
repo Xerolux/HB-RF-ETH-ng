@@ -1142,8 +1142,15 @@ static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
       UpdateCheck* updateCheck;
   };
 
-  TaskArgs* args = new TaskArgs();
   _updateCheck->checkNow();
+
+  if (!_updateCheck->hasDownloadUrl()) {
+      httpd_resp_set_status(req, "503 Service Unavailable");
+      httpd_resp_sendstr(req, "Failed to fetch update information.");
+      return ESP_OK;
+  }
+
+  TaskArgs* args = new TaskArgs();
   args->updateCheck = _updateCheck;
 
   xTaskCreate([](void* p) {
