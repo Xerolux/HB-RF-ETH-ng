@@ -118,30 +118,20 @@ void Hmlgw::stop() {
 
     cleanupSockets();
 
-    // Wait for tasks to finish gracefully (up to 500ms)
-    if (_taskHandle) {
-        int retries = 5;
-        while (retries-- > 0) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            // Give the task time to exit its loop
+    auto gracefully_delete_task = [&](TaskHandle_t& task_handle, const char* task_name) {
+        if (task_handle) {
+            // Wait for the task to exit its loop for up to 500ms
+            for (int i = 0; i < 5; ++i) {
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            vTaskDelete(task_handle);
+            task_handle = NULL;
+            ESP_LOGI(TAG, "%s task deleted", task_name);
         }
-        // Now safe to delete the task
-        vTaskDelete(_taskHandle);
-        _taskHandle = NULL;
-        ESP_LOGI(TAG, "Main task deleted");
-    }
+    };
 
-    if (_keepAliveTaskHandle) {
-        int retries = 5;
-        while (retries-- > 0) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-            // Give the task time to exit its loop
-        }
-        // Now safe to delete the task
-        vTaskDelete(_keepAliveTaskHandle);
-        _keepAliveTaskHandle = NULL;
-        ESP_LOGI(TAG, "KeepAlive task deleted");
-    }
+    gracefully_delete_task(_taskHandle, "Main");
+    gracefully_delete_task(_keepAliveTaskHandle, "KeepAlive");
 }
 
 void Hmlgw::run() {
