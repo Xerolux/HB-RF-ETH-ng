@@ -111,18 +111,36 @@ void Hmlgw::start() {
 }
 
 void Hmlgw::stop() {
+    if (!_running) return;
+
     _running = false;
     _connector->removeFrameHandler(this);
 
     cleanupSockets();
 
+    // Wait for tasks to finish gracefully (up to 500ms)
     if (_taskHandle) {
+        int retries = 5;
+        while (retries-- > 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            // Give the task time to exit its loop
+        }
+        // Now safe to delete the task
         vTaskDelete(_taskHandle);
         _taskHandle = NULL;
+        ESP_LOGI(TAG, "Main task deleted");
     }
+
     if (_keepAliveTaskHandle) {
+        int retries = 5;
+        while (retries-- > 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            // Give the task time to exit its loop
+        }
+        // Now safe to delete the task
         vTaskDelete(_keepAliveTaskHandle);
         _keepAliveTaskHandle = NULL;
+        ESP_LOGI(TAG, "KeepAlive task deleted");
     }
 }
 
@@ -135,8 +153,7 @@ void Hmlgw::run() {
     _serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (_serverSocket < 0) {
         handleFatalError("Unable to create socket");
-        _taskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     int opt = 1;
@@ -144,14 +161,12 @@ void Hmlgw::run() {
 
     if (bind(_serverSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
         handleFatalError("Socket unable to bind");
-        _taskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     if (listen(_serverSocket, 1) != 0) {
         handleFatalError("Error occurred during listen");
-        _taskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     ESP_LOGI(TAG, "HMLGW Server listening on port %d", _port);
@@ -178,8 +193,8 @@ void Hmlgw::run() {
     }
 
     cleanupSockets();
-    _taskHandle = NULL;
-    vTaskDelete(NULL);
+    ESP_LOGI(TAG, "HMLGW task exiting");
+    // Don't delete task here - stop() will handle it
 }
 
 void Hmlgw::runKeepAlive() {
@@ -191,8 +206,7 @@ void Hmlgw::runKeepAlive() {
     _keepAliveServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (_keepAliveServerSocket < 0) {
         handleFatalError("Unable to create KA socket");
-        _keepAliveTaskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     int opt = 1;
@@ -200,14 +214,12 @@ void Hmlgw::runKeepAlive() {
 
     if (bind(_keepAliveServerSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
         handleFatalError("KA Socket unable to bind");
-        _keepAliveTaskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     if (listen(_keepAliveServerSocket, 1) != 0) {
         handleFatalError("KA Error occurred during listen");
-        _keepAliveTaskHandle = NULL;
-        vTaskDelete(NULL);
+        return;
     }
 
     ESP_LOGI(TAG, "HMLGW KeepAlive listening on port %d", _keepAlivePort);
@@ -240,8 +252,8 @@ void Hmlgw::runKeepAlive() {
         _keepAliveClientSocket = -1;
     }
     cleanupSockets();
-    _keepAliveTaskHandle = NULL;
-    vTaskDelete(NULL);
+    ESP_LOGI(TAG, "HMLGW KeepAlive task exiting");
+    // Don't delete task here - stop() will handle it
 }
 
 void Hmlgw::handleClient() {
