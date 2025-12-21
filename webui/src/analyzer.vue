@@ -1,27 +1,66 @@
 <template>
   <div class="container-fluid">
-    <BCard :title="t('analyzer.title')" class="mb-3">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+    <BCard class="mb-3 analyzer-card">
+      <div class="analyzer-hero">
         <div>
-          <BButton :variant="isConnected ? 'success' : 'danger'" disabled class="me-2">
-            {{ isConnected ? t('analyzer.connected') : t('analyzer.disconnected') }}
-          </BButton>
-          <BButton variant="secondary" @click="clear" class="me-2">
+          <div class="eyebrow">{{ t('nav.analyzer') }}</div>
+          <h3 class="mb-1 fw-bold">{{ t('analyzer.title') }}</h3>
+          <p class="text-muted mb-0">
+            {{ t('analyzer.description') || 'Realtime insights for radio frames with live status' }}
+          </p>
+        </div>
+        <div class="status-chip" :class="isConnected ? 'status-chip--on' : 'status-chip--off'">
+          <span class="status-dot"></span>
+          {{ isConnected ? t('analyzer.connected') : t('analyzer.disconnected') }}
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+        <div class="d-flex flex-wrap gap-2">
+          <BButton variant="secondary" @click="clear">
             {{ t('analyzer.clear') }}
           </BButton>
-        </div>
-        <div class="d-flex align-items-center">
-           <BFormCheckbox v-model="autoScroll" switch inline class="me-3">
-            {{ t('analyzer.autoScroll') }}
-          </BFormCheckbox>
           <BButton variant="outline-primary" size="sm" @click="showNamesModal = true">
             {{ t('analyzer.deviceNames') }}
           </BButton>
         </div>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div class="form-switch-label d-flex align-items-center gap-2">
+            <BFormCheckbox v-model="autoScroll" switch inline>
+              {{ t('analyzer.autoScroll') }}
+            </BFormCheckbox>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <div class="stat-tile">
+            <div class="label">{{ t('common.total') || 'Total Frames' }}</div>
+            <div class="value">{{ totalFrames }}</div>
+            <div class="hint">{{ t('common.updated') || 'Live updated' }}</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="stat-tile">
+            <div class="label">{{ t('analyzer.lastFrame') || 'Letzte Nachricht' }}</div>
+            <div class="value">{{ lastTimestamp }}</div>
+            <div class="hint">{{ t('common.timestamp') || 'Zeitstempel' }}</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="stat-tile">
+            <div class="label">{{ t('analyzer.signal') || 'Signal' }}</div>
+            <div class="value d-flex align-items-center gap-2">
+              <span class="badge" :class="rssiBadgeClass">{{ lastRssiLabel }}</span>
+            </div>
+            <div class="hint">{{ t('common.latest') || 'Zuletzt empfangen' }}</div>
+          </div>
+        </div>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-sm table-striped table-hover font-monospace" style="font-size: 0.9rem;">
+        <table class="table table-sm table-striped table-hover font-monospace analyzer-table">
           <thead>
             <tr>
               <th>#</th>
@@ -332,6 +371,22 @@ const clear = () => {
   frames.value = []
 }
 
+const totalFrames = computed(() => frames.value.length)
+const lastFrame = computed(() => frames.value.length ? frames.value[frames.value.length - 1] : null)
+const lastTimestamp = computed(() => lastFrame.value ? lastFrame.value.formattedTime : '–')
+const lastRssiLabel = computed(() => {
+  if (!lastFrame.value || lastFrame.value.rssi === undefined) return '–'
+  return `${lastFrame.value.rssi} dBm`
+})
+const rssiBadgeClass = computed(() => {
+  if (!lastFrame.value || lastFrame.value.rssi === undefined) return 'bg-secondary'
+  const rssi = lastFrame.value.rssi
+  if (rssi > -50) return 'bg-success'
+  if (rssi > -70) return 'bg-primary'
+  if (rssi > -90) return 'bg-warning text-dark'
+  return 'bg-danger'
+})
+
 onMounted(async () => {
   await settingsStore.load()
   if (!settingsStore.analyzerEnabled) {
@@ -347,3 +402,107 @@ onUnmounted(() => {
   disconnect()
 })
 </script>
+
+<style scoped>
+.analyzer-card {
+  border: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.analyzer-hero {
+  background: linear-gradient(135deg, #0d6efd 0%, #5cb3ff 40%, #e9f4ff 100%);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: #0b2b4c;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(11, 43, 76, 0.7);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+  border: 1px solid rgba(11, 43, 76, 0.15);
+  background: #fff;
+  color: #0b2b4c;
+}
+
+.status-chip--on .status-dot {
+  background: #2ecc71;
+}
+.status-chip--off .status-dot {
+  background: #dc3545;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 6px rgba(0, 0, 0, 0.04);
+}
+
+.stat-tile {
+  background: #f8fbff;
+  border: 1px solid #e5eefb;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  height: 100%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.stat-tile .label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: #5b708b;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+
+.stat-tile .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0b2b4c;
+}
+
+.stat-tile .hint {
+  color: #7d8fa4;
+  font-size: 0.85rem;
+  margin-top: 0.1rem;
+}
+
+.analyzer-table thead th {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: #5b708b;
+  border-bottom: 2px solid #e5eefb;
+}
+
+.analyzer-table tbody tr:hover {
+  box-shadow: inset 4px 0 0 #0d6efd;
+}
+
+.analyzer-table {
+  font-size: 0.9rem;
+}
+
+.table-hover tbody tr {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+</style>

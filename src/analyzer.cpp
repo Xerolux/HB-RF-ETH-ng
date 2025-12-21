@@ -13,17 +13,25 @@ void analyzerProcessingTask(void *parameter)
     ((Analyzer *)parameter)->_processingTask();
 }
 
-Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _running(false)
+Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _running(false), _initialized(false)
 {
     _mutex = xSemaphoreCreateMutex();
-    _instance = this;
+    if (!_mutex) {
+        ESP_LOGE(TAG, "Failed to create analyzer mutex");
+        return;
+    }
 
     // Create queue for async frame processing (holds up to 20 frames)
     // If queue is full, oldest frames will be dropped to prevent blocking
     _frameQueue = xQueueCreate(20, sizeof(AnalyzerFrame));
     if (!_frameQueue) {
         ESP_LOGE(TAG, "Failed to create frame queue");
+        vSemaphoreDelete(_mutex);
+        _mutex = NULL;
+        return;
     }
+
+    _instance = this;
 
     // Create processing task with lower priority (5) to not interfere with UART
     _running = true;
@@ -31,13 +39,21 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create processing task");
         _taskHandle = NULL;
+        _running = false;
+        vQueueDelete(_frameQueue);
+        _frameQueue = NULL;
+        vSemaphoreDelete(_mutex);
+        _mutex = NULL;
+        _instance = NULL;
     } else {
         ESP_LOGI(TAG, "Analyzer processing task created successfully");
+        _initialized = true;
     }
 }
 
 Analyzer::~Analyzer()
 {
+    _initialized = false;
     ESP_LOGI(TAG, "Analyzer destructor called");
 
     // First, deregister from radio module to stop receiving new frames
@@ -93,7 +109,7 @@ Analyzer::~Analyzer()
 void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 {
     // Safety checks: ensure we're still running and resources are valid
-    if (!_running || !_frameQueue || !buffer) {
+    if (!_initialized || !_running || !_frameQueue || !buffer) {
         return;
     }
 
@@ -238,6 +254,10 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
 
 void Analyzer::addClient(httpd_handle_t hd, int fd)
 {
+    if (!_initialized) {
+        ESP_LOGW(TAG, "Analyzer not initialized, rejecting client %d", fd);
+        return;
+    }
     // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(1000))) {
         bool found = false;
@@ -265,6 +285,9 @@ void Analyzer::addClient(httpd_handle_t hd, int fd)
 
 void Analyzer::removeClient(httpd_handle_t hd, int fd)
 {
+    if (!_initialized) {
+        return;
+    }
     // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(1000))) {
         for (size_t i = 0; i < _client_fds.size(); i++) {
@@ -289,6 +312,9 @@ void Analyzer::removeClient(httpd_handle_t hd, int fd)
 bool Analyzer::hasClients()
 {
     bool has = false;
+    if (!_initialized) {
+        return false;
+    }
     // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
     if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(100))) {
         has = !_client_fds.empty();
@@ -299,6 +325,12 @@ bool Analyzer::hasClients()
 
 esp_err_t Analyzer::ws_handler(httpd_req_t *req)
 {
+    if (_instance == nullptr || !_instance->isReady()) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "Analyzer is not ready");
+        return ESP_OK;
+    }
+
     if (req->method == HTTP_GET) {
         // Handshake
         ESP_LOGI(TAG, "Handshake done, the new connection was opened");

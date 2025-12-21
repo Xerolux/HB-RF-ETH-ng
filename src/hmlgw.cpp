@@ -46,32 +46,7 @@ Hmlgw::~Hmlgw() {
     stop();
 }
 
-void Hmlgw::start() {
-    if (_running) return;
-    _running = true;
-
-    // Start Main Task
-    xTaskCreate([](void* arg) {
-        static_cast<Hmlgw*>(arg)->run();
-    }, "hmlgw_task", 4096, this, 5, &_taskHandle);
-
-    // Start KeepAlive Task
-    xTaskCreate([](void* arg) {
-        static_cast<Hmlgw*>(arg)->runKeepAlive();
-    }, "hmlgw_ka_task", 2048, this, 5, &_keepAliveTaskHandle);
-
-    _connector->addFrameHandler(this);
-    // Hmlgw protocol expects raw bytes usually, but wrapped?
-    // If we use 'S' + Len + Data, we need raw data.
-    // RadioModuleConnector by default parses frames.
-    // If we want raw stream, we might need to setDecodeEscaped(false).
-    _connector->setDecodeEscaped(false);
-}
-
-void Hmlgw::stop() {
-    _running = false;
-    _connector->removeFrameHandler(this);
-
+void Hmlgw::cleanupSockets() {
     if (_clientSocket != -1) {
         close(_clientSocket);
         _clientSocket = -1;
@@ -88,6 +63,58 @@ void Hmlgw::stop() {
         close(_keepAliveServerSocket);
         _keepAliveServerSocket = -1;
     }
+}
+
+void Hmlgw::handleFatalError(const char* reason) {
+    ESP_LOGE(TAG, "HMLGW stopped due to error: %s", reason);
+    _running = false;
+    cleanupSockets();
+    _connector->removeFrameHandler(this);
+}
+
+void Hmlgw::start() {
+    if (_running) return;
+    _running = true;
+
+    // Start Main Task
+    BaseType_t taskCreated = xTaskCreate([](void* arg) {
+        static_cast<Hmlgw*>(arg)->run();
+    }, "hmlgw_task", 4096, this, 5, &_taskHandle);
+
+    if (taskCreated != pdPASS) {
+        _taskHandle = NULL;
+        handleFatalError("Failed to start HMLGW task");
+        return;
+    }
+
+    // Start KeepAlive Task
+    BaseType_t keepAliveCreated = xTaskCreate([](void* arg) {
+        static_cast<Hmlgw*>(arg)->runKeepAlive();
+    }, "hmlgw_ka_task", 2048, this, 5, &_keepAliveTaskHandle);
+
+    if (keepAliveCreated != pdPASS) {
+        _keepAliveTaskHandle = NULL;
+        handleFatalError("Failed to start HMLGW keep-alive task");
+        if (_taskHandle) {
+            vTaskDelete(_taskHandle);
+            _taskHandle = NULL;
+        }
+        return;
+    }
+
+    _connector->addFrameHandler(this);
+    // Hmlgw protocol expects raw bytes usually, but wrapped?
+    // If we use 'S' + Len + Data, we need raw data.
+    // RadioModuleConnector by default parses frames.
+    // If we want raw stream, we might need to setDecodeEscaped(false).
+    _connector->setDecodeEscaped(false);
+}
+
+void Hmlgw::stop() {
+    _running = false;
+    _connector->removeFrameHandler(this);
+
+    cleanupSockets();
 
     if (_taskHandle) {
         vTaskDelete(_taskHandle);
@@ -107,23 +134,24 @@ void Hmlgw::run() {
 
     _serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (_serverSocket < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
-        return;
+        handleFatalError("Unable to create socket");
+        _taskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     int opt = 1;
     setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     if (bind(_serverSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
-        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
-        close(_serverSocket);
-        return;
+        handleFatalError("Socket unable to bind");
+        _taskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     if (listen(_serverSocket, 1) != 0) {
-        ESP_LOGE(TAG, "Error occurred during listen: errno %d", errno);
-        close(_serverSocket);
-        return;
+        handleFatalError("Error occurred during listen");
+        _taskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     ESP_LOGI(TAG, "HMLGW Server listening on port %d", _port);
@@ -148,6 +176,9 @@ void Hmlgw::run() {
             _clientSocket = -1;
         }
     }
+
+    cleanupSockets();
+    _taskHandle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -159,23 +190,24 @@ void Hmlgw::runKeepAlive() {
 
     _keepAliveServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (_keepAliveServerSocket < 0) {
-        ESP_LOGE(TAG, "Unable to create KA socket: errno %d", errno);
-        return;
+        handleFatalError("Unable to create KA socket");
+        _keepAliveTaskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     int opt = 1;
     setsockopt(_keepAliveServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     if (bind(_keepAliveServerSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
-        ESP_LOGE(TAG, "KA Socket unable to bind: errno %d", errno);
-        close(_keepAliveServerSocket);
-        return;
+        handleFatalError("KA Socket unable to bind");
+        _keepAliveTaskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     if (listen(_keepAliveServerSocket, 1) != 0) {
-        ESP_LOGE(TAG, "KA Error occurred during listen: errno %d", errno);
-        close(_keepAliveServerSocket);
-        return;
+        handleFatalError("KA Error occurred during listen");
+        _keepAliveTaskHandle = NULL;
+        vTaskDelete(NULL);
     }
 
     ESP_LOGI(TAG, "HMLGW KeepAlive listening on port %d", _keepAlivePort);
@@ -207,6 +239,8 @@ void Hmlgw::runKeepAlive() {
         close(_keepAliveClientSocket);
         _keepAliveClientSocket = -1;
     }
+    cleanupSockets();
+    _keepAliveTaskHandle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -311,12 +345,17 @@ void Hmlgw::handleClient() {
 
 void Hmlgw::sendDataToClient(const uint8_t* data, size_t len) {
     if (_clientSocket != -1) {
-        send(_clientSocket, data, len, 0);
+        ssize_t sent = send(_clientSocket, data, len, 0);
+        if (sent < 0) {
+            ESP_LOGW(TAG, "Send failed, closing client: errno %d", errno);
+            close(_clientSocket);
+            _clientSocket = -1;
+        }
     }
 }
 
 void Hmlgw::handleFrame(unsigned char* buffer, uint16_t len) {
-    if (_clientSocket == -1) return;
+    if (!_running || _clientSocket == -1) return;
 
     // Encapsulate in 'S' frame
     // 'S' + HighLen + LowLen + Data
