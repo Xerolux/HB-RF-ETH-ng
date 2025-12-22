@@ -335,7 +335,9 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_running = true;
 
     // Start publishing task
-    xTaskCreate(mqtt_publish_task, "mqtt_publish", 4096, NULL, 5, &mqtt_publish_task_handle);
+    // Reduced from 4096 to 2048 bytes - simple periodic task with small stack buffers
+    // Only calls mqtt_handler_publish_status() every 60 seconds
+    xTaskCreate(mqtt_publish_task, "mqtt_publish", 2048, NULL, 5, &mqtt_publish_task_handle);
 
     return ESP_OK;
 }

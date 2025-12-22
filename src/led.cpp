@@ -68,7 +68,9 @@ void LED::start(Settings *settings)
 
     if (!_switchTaskHandle)
     {
-        xTaskCreate(ledSwitcherTask, "LED_Switcher", 4096, NULL, 10, &_switchTaskHandle);
+        // Reduced from 4096 to 1536 bytes - simple task using hardware LEDC PWM
+        // Task only updates LED states via LEDC registers - minimal stack needed
+        xTaskCreate(ledSwitcherTask, "LED_Switcher", 1536, NULL, 10, &_switchTaskHandle);
     }
 }
 

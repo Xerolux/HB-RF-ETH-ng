@@ -269,7 +269,8 @@ void app_main()
     ESP_LOGI(TAG, "Largest free block: %lu bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
     // Start heap monitoring task
-    xTaskCreate(heap_monitor_task, "heap_monitor", 2048, &statusLED, 1, NULL);
+    // Reduced from 2048 to 1536 bytes - very simple monitoring task
+    xTaskCreate(heap_monitor_task, "heap_monitor", 1536, &statusLED, 1, NULL);
 
     vTaskSuspend(NULL);
 }
