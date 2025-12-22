@@ -149,6 +149,12 @@ static void checkmk_agent_task(void *pvParameters)
         return;
     }
 
+    // Set accept timeout to allow clean shutdown when checkmk_running becomes false
+    struct timeval accept_timeout;
+    accept_timeout.tv_sec = 1;
+    accept_timeout.tv_usec = 0;
+    setsockopt(listen_sock, SOL_SOCKET, SO_RCVTIMEO, &accept_timeout, sizeof(accept_timeout));
+
     ESP_LOGI(TAG, "CheckMK Agent listening on port %d", config->port);
 
     while (checkmk_running) {
@@ -157,8 +163,12 @@ static void checkmk_agent_task(void *pvParameters)
 
         int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_sock < 0) {
+            // Timeout is expected when no client connects - just continue
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
             if (checkmk_running) {
-                ESP_LOGE(TAG, "Accept failed");
+                ESP_LOGE(TAG, "Accept failed: errno %d", errno);
             }
             continue;
         }

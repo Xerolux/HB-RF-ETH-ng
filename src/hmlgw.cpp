@@ -218,6 +218,12 @@ void Hmlgw::run() {
         return;
     }
 
+    // Set accept timeout to allow clean shutdown
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(_serverSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
     ESP_LOGI(TAG, "HMLGW Server listening on port %d", _port);
 
     while (_running) {
@@ -225,6 +231,10 @@ void Hmlgw::run() {
         socklen_t addr_len = sizeof(source_addr);
         int sock = accept(_serverSocket, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
+            // Timeout is normal when no client connects
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
             ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
             break;
         }
@@ -271,6 +281,12 @@ void Hmlgw::runKeepAlive() {
         return;
     }
 
+    // Set accept timeout to allow clean shutdown
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(_keepAliveServerSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
     ESP_LOGI(TAG, "HMLGW KeepAlive listening on port %d", _keepAlivePort);
 
     while (_running) {
@@ -278,24 +294,34 @@ void Hmlgw::runKeepAlive() {
         socklen_t addr_len = sizeof(source_addr);
         int sock = accept(_keepAliveServerSocket, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
-             vTaskDelay(100 / portTICK_PERIOD_MS);
+             // Timeout is normal when no client connects
+             if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                 continue;
+             }
+             ESP_LOGW(TAG, "KeepAlive accept error: errno %d", errno);
              continue;
         }
 
         _keepAliveClientSocket = sock;
-        // Keepalive usually just accepts connection and maybe echoes?
-        // Or just holds it open.
-        // We will just read and discard, or echo.
+
+        // Set recv timeout on client socket
+        setsockopt(_keepAliveClientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+        // KeepAlive protocol: accept connection and hold it open
+        // Read and discard any data (protocol doesn't require echo)
         char rx_buffer[128];
         while (_running) {
             int len = recv(_keepAliveClientSocket, rx_buffer, sizeof(rx_buffer) - 1, 0);
             if (len < 0) {
-                break;
+                // Timeout or error - check if we should continue
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    continue;  // Timeout, keep connection alive
+                }
+                break;  // Real error, close connection
             } else if (len == 0) {
-                break;
+                break;  // Client closed connection
             }
-            // Echo back? Or just ignore?
-            // "K" is sent on Data port.
+            // Data received but ignored (KeepAlive doesn't echo)
         }
         close(_keepAliveClientSocket);
         _keepAliveClientSocket = -1;
