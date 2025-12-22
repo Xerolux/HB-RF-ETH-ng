@@ -153,6 +153,11 @@ const autoScroll = ref(true)
 let ws = null
 let frameCounter = 0
 
+// Pending Frames Queue for Batch Processing
+// Optimization: Buffer frames and update Vue state in batches to reduce reactivity overhead
+const pendingFrames = []
+let flushReq = null
+
 // Device Names
 const showNamesModal = ref(false)
 const deviceNames = reactive({})
@@ -177,11 +182,6 @@ const saveName = () => {
       delete deviceNames[editingAddress.value]
     }
     localStorage.setItem('device_names', JSON.stringify(deviceNames))
-    // Refresh frames view? Vue reactive should handle it if we use a getter or method
-    // But frames array contains processed strings. We might need to re-process or just use a method in template.
-    // In template: {{ frame.src }} is static. We should use a method or make frames reactive to names.
-    // For performance, better to resolve name at render time or update existing frames.
-    // Let's update existing frames
     updateFrameNames()
     showNamesModal.value = false
   }
@@ -268,47 +268,60 @@ const addFrame = (rawFrame) => {
   let rssi = undefined
 
   // Parse CoPro Frame
-  // Format: FD <LenH> <LenL> <Dst> <Cnt> <Cmd> <Payload...> <CrcH> <CrcL>
-  // Min length: 8 bytes (FD 00 00 Dst Cnt Cmd CrcH CrcL)
-
   if (data.startsWith('FD')) {
-     // Check Length
-     if (data.length < 16) return // Too short
-
-     // Strip Header (6 bytes = 12 chars)
-     // Dst: data[6..8], Cnt: data[8..10], Cmd: data[10..12]
+     if (data.length < 16) return
      const cmd = parseInt(data.substring(10, 12), 16)
-
-     // Strip Footer (2 bytes = 4 chars)
      const payloadHex = data.substring(12, data.length - 4)
 
-     if (cmd === 0x04) { // Packet Received
-        // Payload: <RSSI> <Frame>
-        // RSSI is 1 byte
+     if (cmd === 0x04) {
         const rssiHex = payloadHex.substring(0, 2)
         const frameHex = payloadHex.substring(2)
-
         rssi = parseInt(rssiHex, 16)
-        if (rssi >= 128) rssi -= 256 // Signed byte
-
+        if (rssi >= 128) rssi -= 256
         data = frameHex
      } else {
-        // Other events (TX complete, etc) - skip
         return
      }
   }
 
-  // Process BidCos frame (either unwrapped from CoPro or raw)
-  processBidCosFrame(rawFrame.ts, data, rssi)
+  // Parse frame but do not add to reactive state yet
+  const frameObj = processBidCosFrame(rawFrame.ts, data, rssi)
+  if (frameObj) {
+     pendingFrames.push(frameObj)
+     // Schedule batch update
+     if (!flushReq) {
+       flushReq = requestAnimationFrame(flushFrames)
+     }
+  }
+}
+
+const flushFrames = () => {
+  flushReq = null
+  if (pendingFrames.length === 0) return
+
+  // Batch update reactive state
+  frames.value.push(...pendingFrames)
+  pendingFrames.length = 0
+
+  // Maintain max size
+  if (frames.value.length > 200) {
+    frames.value.splice(0, frames.value.length - 200)
+  }
+
+  // Handle scroll once per batch
+  if (autoScroll.value) {
+    nextTick(() => {
+      window.scrollTo(0, document.body.scrollHeight)
+    })
+  }
 }
 
 const processBidCosFrame = (ts, data, rssi) => {
-  if (data.length < 2) return
+  if (data.length < 2) return null
 
-  // Basic BidCos parsing: Len(1), Cnt(1), Type(1), Src(3), Dst(3), Payload...
+  // Basic BidCos parsing
   let len = parseInt(data.substring(0, 2), 16)
-  // Validate length
-  if (data.length / 2 < len + 1) return // Incomplete
+  if (data.length / 2 < len + 1) return null
 
   let cnt = parseInt(data.substring(2, 4), 16)
   let typeHex = data.substring(4, 6)
@@ -319,22 +332,16 @@ const processBidCosFrame = (ts, data, rssi) => {
   let typeName = FRAME_TYPES[typeHex] || `Unknown (${typeHex})`
 
   frameCounter++
-  if (frames.value.length > 200) {
-    frames.value.shift()
-  }
 
-  // Pre-calculate display values to avoid re-calculation in render loop
-  // Format Time
+  // Pre-calculate display values
   const sec = Math.floor(ts / 1000)
   const ms = ts % 1000
   const formattedTime = `${sec}.${ms.toString().padStart(3, '0')}`
 
-  // Row Class
   let rowClass = ''
-  if (typeHex === '02') rowClass = 'table-success' // Ack
-  else if (typeHex === '10') rowClass = 'table-info' // Info
+  if (typeHex === '02') rowClass = 'table-success'
+  else if (typeHex === '10') rowClass = 'table-info'
 
-  // RSSI Class
   let rssiClass = 'text-danger'
   if (rssi !== undefined) {
       if (rssi > -50) rssiClass = 'text-success'
@@ -342,7 +349,8 @@ const processBidCosFrame = (ts, data, rssi) => {
       else if (rssi > -90) rssiClass = 'text-warning'
   }
 
-  frames.value.push({
+  // Return object without modifying reactive state
+  return {
     id: frameCounter,
     ts: ts,
     formattedTime: formattedTime,
@@ -358,17 +366,12 @@ const processBidCosFrame = (ts, data, rssi) => {
     src: deviceNames[srcRaw] || srcRaw,
     dst: deviceNames[dstRaw] || dstRaw,
     payload: payload
-  })
-
-  if (autoScroll.value) {
-    nextTick(() => {
-      window.scrollTo(0, document.body.scrollHeight)
-    })
   }
 }
 
 const clear = () => {
   frames.value = []
+  pendingFrames.length = 0
 }
 
 const totalFrames = computed(() => frames.value.length)
@@ -400,6 +403,10 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disconnect()
+  if (flushReq) {
+     cancelAnimationFrame(flushReq)
+     flushReq = null
+  }
 })
 </script>
 
