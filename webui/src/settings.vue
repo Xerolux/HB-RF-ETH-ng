@@ -33,6 +33,7 @@
           type="text"
           v-model="localIP"
           trim
+          placeholder="192.168.1.10"
           :state="v$.localIP.$error ? false : null"
         />
       </BFormGroup>
@@ -41,6 +42,7 @@
           type="text"
           v-model="netmask"
           trim
+          placeholder="255.255.255.0"
           :state="v$.netmask.$error ? false : null"
         />
       </BFormGroup>
@@ -49,6 +51,7 @@
           type="text"
           v-model="gateway"
           trim
+          placeholder="192.168.1.1"
           :state="v$.gateway.$error ? false : null"
         />
       </BFormGroup>
@@ -57,6 +60,7 @@
           type="text"
           v-model="dns1"
           trim
+          placeholder="8.8.8.8"
           :state="v$.dns1.$error ? false : null"
         />
       </BFormGroup>
@@ -65,6 +69,7 @@
           type="text"
           v-model="dns2"
           trim
+          placeholder="8.8.4.4"
           :state="v$.dns2.$error ? false : null"
         />
       </BFormGroup>
@@ -146,6 +151,7 @@
           type="text"
           v-model="ntpServer"
           trim
+          placeholder="pool.ntp.org"
           :state="v$.ntpServer.$error ? false : null"
         />
       </BFormGroup>
