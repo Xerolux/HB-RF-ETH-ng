@@ -30,8 +30,8 @@ static void analyzer_ws_send(void *arg)
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
     ws_pkt.final = true;
 
-    // Executed on the HTTP server thread (queued via httpd_queue_work), so use the synchronous API
-    esp_err_t ret = httpd_ws_send_frame(job->handle, job->fd, &ws_pkt);
+    // Executed on the HTTP server thread (queued via httpd_queue_work), so use the async API
+    esp_err_t ret = httpd_ws_send_frame_async(job->handle, job->fd, &ws_pkt);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Failed to send to client %d: %s", job->fd, esp_err_to_name(ret));
         if (job->analyzer) {
