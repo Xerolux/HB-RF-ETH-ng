@@ -309,29 +309,22 @@ void Hmlgw::handleClient() {
     RingBuffer buffer;  // Ring buffer eliminates heap fragmentation
     uint8_t rx_buffer[1024];
     uint8_t temp_frame[8192];  // Temporary buffer for frame extraction
-    uint32_t loop_count = 0;
 
-    // Set socket to non-blocking mode
-    int flags = fcntl(_clientSocket, F_GETFL, 0);
-    fcntl(_clientSocket, F_SETFL, flags | O_NONBLOCK);
-
-    // Set receive timeout to prevent indefinite blocking
+    // Set receive timeout to allow periodic checking of _running flag
+    // Socket remains BLOCKING - recv() will wait up to 1 second for data
+    // This eliminates busy-wait polling (previously polled every 10ms)
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
     setsockopt(_clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     while (_running) {
+        // Blocking recv with 1-second timeout - eliminates CPU waste during idle
         int len = recv(_clientSocket, rx_buffer, sizeof(rx_buffer), 0);
         if (len < 0) {
+            // Check if it's just a timeout (expected when no data)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                vTaskDelay(10 / portTICK_PERIOD_MS);
-
-                // Yield periodically to prevent watchdog timeout
-                loop_count++;
-                if (loop_count % 10 == 0) {
-                    taskYIELD();
-                }
+                // Timeout occurred - this is normal, just continue waiting
                 continue;
             }
             ESP_LOGE(TAG, "Error occurred during recv: errno %d", errno);
