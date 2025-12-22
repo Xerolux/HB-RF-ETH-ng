@@ -10,7 +10,13 @@ export default {
     error: 'Erreur',
     success: 'Succès',
     yes: 'Oui',
-    no: 'Non'
+    no: 'Non',
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
+    rebootingWait: 'Le système redémarre. Veuillez patienter environ 10 secondes...',
+    factoryResettingWait: 'Le système est en cours de réinitialisation aux paramètres d\'usine et redémarre. Veuillez patienter...',
+    confirmReboot: 'Êtes-vous sûr de vouloir redémarrer le système ?',
+    confirmFactoryReset: 'Êtes-vous sûr ? Tous les paramètres seront perdus !'
   },
 
   // Header Navigation
@@ -22,7 +28,8 @@ export default {
     analyzer: 'Analyzer',
     about: 'À propos',
     login: 'Connexion',
-    logout: 'Déconnexion'
+    logout: 'Déconnexion',
+    toggleTheme: 'Changer de thème'
   },
 
   // Login Page
@@ -77,8 +84,20 @@ export default {
     // System Settings
     systemSettings: 'Paramètres système',
     ledBrightness: 'Luminosité LED',
-    checkUpdates: 'Vérifier les mises à jour',
+    checkUpdates: 'Vérifier automatiquement les mises à jour',
+    allowPrerelease: 'Autoriser les mises à jour anticipées (Beta/Alpha)',
     language: 'Langue',
+    analyzerSettings: 'Paramètres Analyzer Light',
+    enableAnalyzer: 'Activer Analyzer Light',
+    systemMaintenance: 'Maintenance du système',
+    reboot: 'Redémarrer',
+    factoryReset: 'Réinitialisation d\'usine',
+
+    // HMLGW
+    hmlgwSettings: 'Paramètres passerelle HomeMatic LAN (HMLGW)',
+    enableHmlgw: 'Activer le mode HMLGW',
+    hmlgwPort: 'Port de données (Par défaut : 2000)',
+    hmlgwKeepAlivePort: 'Port KeepAlive (Par défaut : 2001)',
 
     // DTLS Security Settings
     dtls: {
@@ -176,11 +195,20 @@ export default {
     title: 'Micrologiciel',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
+    latestVersion: 'Dernière version disponible',
     versionInfo: 'Fork modernisé v2.1 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
-    updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
+    upToDate: 'Votre micrologiciel est à jour.',
+    updateAvailable: 'Mise à jour disponible : Version {currentVersion} → {latestVersion}',
+    versionCheckFailed: 'Échec de la vérification de version. Veuillez vérifier votre connexion Internet et réessayer.',
     onlineUpdate: 'Mise à jour en ligne',
+    checkUpdate: 'Vérifier les mises à jour maintenant',
+    noUpdateAvailable: 'Aucune mise à jour disponible. Vous utilisez déjà la dernière version.',
     onlineUpdateConfirm: 'Voulez-vous vraiment télécharger et installer la mise à jour ? Le système redémarrera automatiquement.',
     onlineUpdateStarted: 'Mise à jour commencée. L\'appareil redémarrera automatiquement une fois terminé.',
+    showReleaseNotes: 'Afficher les notes de version',
+    releaseNotesTitle: 'Notes de version pour v{version}',
+    releaseNotesError: 'Échec du chargement des notes de version.',
+    downloadFirmware: 'Télécharger le micrologiciel',
     updateFile: 'Fichier du micrologiciel',
     noFileChosen: 'Aucun fichier choisi',
     browse: 'Parcourir',
@@ -248,22 +276,23 @@ export default {
   // Analyzer
   analyzer: {
     title: 'Analyzer Light',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
-    clear: 'Clear',
-    autoScroll: 'Auto Scroll',
-    time: 'Time',
-    len: 'Len',
-    cnt: 'Cnt',
+    disabled: 'La fonction Analyzer Light est désactivée. Veuillez l\'activer dans les paramètres.',
+    connected: 'Connecté',
+    disconnected: 'Déconnecté',
+    clear: 'Effacer',
+    autoScroll: 'Défilement auto',
+    time: 'Temps',
+    len: 'Long.',
+    cnt: 'Cpt',
     type: 'Type',
     src: 'Source',
     dst: 'Destination',
-    payload: 'Payload',
+    payload: 'Données',
     rssi: 'RSSI',
-    deviceNames: 'Device Names',
-    address: 'Address',
-    name: 'Name',
-    storedNames: 'Stored Names'
+    deviceNames: 'Noms des appareils',
+    address: 'Adresse',
+    name: 'Nom',
+    storedNames: 'Noms enregistrés'
   },
 
   // About Page

@@ -10,7 +10,13 @@ export default {
     error: 'Errore',
     success: 'Successo',
     yes: 'Sì',
-    no: 'No'
+    no: 'No',
+    showPassword: 'Mostra password',
+    hidePassword: 'Nascondi password',
+    rebootingWait: 'Il sistema si sta riavviando. Attendere circa 10 secondi...',
+    factoryResettingWait: 'Il sistema si sta ripristinando alle impostazioni di fabbrica e riavviando. Attendere...',
+    confirmReboot: 'Sei sicuro di voler riavviare il sistema?',
+    confirmFactoryReset: 'Sei sicuro? Tutte le impostazioni andranno perse!'
   },
 
   // Header Navigation
@@ -21,7 +27,9 @@ export default {
     monitoring: 'Monitoraggio',
     analyzer: 'Analyzer',
     about: 'Informazioni',
-    logout: 'Disconnetti'
+    login: 'Accedi',
+    logout: 'Disconnetti',
+    toggleTheme: 'Cambia tema'
   },
 
   // Login Page
@@ -31,7 +39,8 @@ export default {
     password: 'Password',
     login: 'Accedi',
     loginFailed: 'Accesso fallito',
-    invalidCredentials: 'Credenziali non valide'
+    invalidCredentials: 'Credenziali non valide',
+    loginError: 'L\'accesso non è riuscito.'
   },
 
   // Settings Page
@@ -75,55 +84,95 @@ export default {
     // System Settings
     systemSettings: 'Impostazioni di sistema',
     ledBrightness: 'Luminosità LED',
+    checkUpdates: 'Verifica aggiornamenti automaticamente',
+    allowPrerelease: 'Consenti aggiornamenti anticipati (Beta/Alpha)',
     language: 'Lingua',
+    analyzerSettings: 'Impostazioni Analyzer Light',
+    enableAnalyzer: 'Abilita Analyzer Light',
+    systemMaintenance: 'Manutenzione del sistema',
+    reboot: 'Riavvia',
+    factoryReset: 'Ripristino di fabbrica',
+
+    // HMLGW
+    hmlgwSettings: 'Impostazioni gateway HomeMatic LAN (HMLGW)',
+    enableHmlgw: 'Abilita modalità HMLGW',
+    hmlgwPort: 'Porta dati (Predefinita: 2000)',
+    hmlgwKeepAlivePort: 'Porta KeepAlive (Predefinita: 2001)',
 
     // DTLS Security Settings
-    dtlsSettings: 'Crittografia DTLS',
-    dtlsDescription: 'Crittografia di trasporto sicura per la comunicazione tra scheda e CCU sulla porta 3008.',
-    dtlsMode: 'Modalità di crittografia',
-    dtlsModeDisabled: 'Disabilitato (predefinito)',
-    dtlsModePsk: 'Chiave pre-condivisa (PSK)',
-    dtlsModeCertificate: 'Certificato X.509',
-    dtlsCipherSuite: 'Suite di cifratura',
-    dtlsCipherAes128: 'AES-128-GCM-SHA256',
-    dtlsCipherAes256: 'AES-256-GCM-SHA384 (Consigliato)',
-    dtlsCipherChacha: 'ChaCha20-Poly1305-SHA256',
-    dtlsRequireClientCert: 'Richiedere certificato client',
-    dtlsSessionResumption: 'Abilita ripresa sessione',
-    dtlsPskManagement: 'Gestione PSK',
-    dtlsPskIdentity: 'Identità PSK',
-    dtlsPskKey: 'Chiave PSK (Hex)',
-    dtlsPskGenerate: 'Genera nuova PSK',
-    dtlsPskGenerating: 'Generazione PSK...',
-    dtlsPskGenerated: 'Nuova PSK generata',
-    dtlsPskCopyWarning: 'IMPORTANTE: Copia questa chiave ora! Verrà mostrata solo una volta.',
-    dtlsPskKeyLength: 'Lunghezza chiave',
-    dtlsPsk128bit: '128 Bit',
-    dtlsPsk256bit: '256 Bit (Consigliato)',
-    dtlsPsk384bit: '384 Bit',
-    dtlsPsk512bit: '512 Bit',
-    dtlsPskStatus: 'Stato PSK',
-    dtlsPskConfigured: 'Configurato',
-    dtlsPskNotConfigured: 'Non configurato',
-    dtlsWarningDisabled: 'La comunicazione NON È CRITTOGRAFATA. Chiunque sulla rete può intercettare il traffico.',
-    dtlsWarningPsk: 'Assicurati che il PSK sia memorizzato in modo sicuro sulla CCU.',
-    dtlsInfo: 'DTLS 1.2 crittografa la comunicazione Raw-UART UDP end-to-end. Anche la CCU deve supportare DTLS.',
-    dtlsDocumentation: 'Documentazione per sviluppatori CCU',
-    dtlsViewDocs: 'Visualizza guida all\'implementazione',
-
+    dtls: {
+      title: 'Crittografia DTLS',
+      description: 'Crittografia di trasporto sicura per la comunicazione tra scheda e CCU sulla porta 3008.',
+      mode: 'Modalità di crittografia',
+      modeDisabled: 'Disabilitato (predefinito)',
+      modePsk: 'Chiave pre-condivisa (PSK)',
+      modeCert: 'Certificato X.509',
+      cipherSuite: 'Suite di cifratura',
+      cipherAes128: 'AES-128-GCM-SHA256',
+      cipherAes256: 'AES-256-GCM-SHA384 (Consigliato)',
+      cipherChacha: 'ChaCha20-Poly1305-SHA256',
+      requireClientCert: 'Richiedere certificato client',
+      sessionResumption: 'Abilita ripresa sessione',
+      pskManagement: 'Gestione PSK',
+      pskIdentity: 'Identità PSK',
+      pskKey: 'Chiave PSK (Hex)',
+      pskGenerate: 'Genera nuova PSK',
+      pskGenerating: 'Generazione PSK...',
+      pskGenerated: 'Nuova PSK generata',
+      pskCopyWarning: 'IMPORTANTE: Copia questa chiave ora! Verrà mostrata solo una volta.',
+      pskKeyLength: 'Lunghezza chiave',
+      psk128bit: '128 Bit',
+      psk256bit: '256 Bit (Consigliato)',
+      psk384bit: '384 Bit',
+      psk512bit: '512 Bit',
+      pskStatus: 'Stato PSK',
+      pskConfigured: 'Configurato',
+      pskNotConfigured: 'Non configurato',
+      warningDisabled: 'La comunicazione NON È CRITTOGRAFATA. Chiunque sulla rete può intercettare il traffico.',
+      warningPsk: 'Assicurati che il PSK sia memorizzato in modo sicuro sulla CCU.',
+      info: 'DTLS 1.2 crittografa la comunicazione Raw-UART UDP end-to-end. Anche la CCU deve supportare DTLS.',
+      documentation: 'Documentazione per sviluppatori CCU',
+      viewDocs: 'Visualizza guida all\'implementazione',
+      restartNote: 'Le modifiche alle impostazioni DTLS richiedono un riavvio del sistema.'
+    },
 
     // Messages
     saveSuccess: 'Le impostazioni sono state salvate con successo. Riavviare il sistema per applicarle.',
-    saveError: 'Si è verificato un errore durante il salvataggio delle impostazioni.'
+    saveError: 'Si è verificato un errore durante il salvataggio delle impostazioni.',
+
+    // Backup & Restore
+    backupRestore: 'Backup e ripristino',
+    backupInfo: 'Scarica un backup delle tue impostazioni per ripristinarle in seguito.',
+    restoreInfo: 'Carica un file di backup per ripristinare le impostazioni. Il sistema si riavvierà in seguito.',
+    downloadBackup: 'Scarica backup',
+    restore: 'Ripristina',
+    noFileChosen: 'Nessun file selezionato',
+    browse: 'Sfoglia',
+    restoreConfirm: 'Sei sicuro? Le impostazioni correnti verranno sovrascritte e il sistema si riavvierà.',
+    restoreSuccess: 'Impostazioni ripristinate con successo. Riavvio del sistema...',
+    restoreError: 'Errore durante il ripristino delle impostazioni',
+    backupError: 'Errore durante il download del backup'
   },
 
   // System Info
   sysinfo: {
     title: 'Informazioni di sistema',
     serial: 'Numero di serie',
+    boardRevision: 'Revisione scheda',
+    uptime: 'Tempo di attività',
+    resetReason: 'Ultimo riavvio',
+    cpuUsage: 'Utilizzo CPU',
+    memoryUsage: 'Utilizzo memoria',
+    ethernetStatus: 'Connessione Ethernet',
+    rawUartRemoteAddress: 'Connesso con',
+    radioModuleType: 'Tipo di modulo radio',
+    radioModuleSerial: 'Numero di serie',
+    radioModuleFirmware: 'Versione firmware',
+    radioModuleBidCosRadioMAC: 'Indirizzo radio (BidCoS)',
+    radioModuleHmIPRadioMAC: 'Indirizzo radio (HmIP)',
+    radioModuleSGTIN: 'SGTIN',
     version: 'Versione',
     latestVersion: 'Ultima versione',
-    uptime: 'Tempo di attività',
     memory: 'Utilizzo memoria',
     cpu: 'Utilizzo CPU',
     temperature: 'Temperatura',
@@ -142,57 +191,120 @@ export default {
 
   // Firmware Update
   firmware: {
-    title: 'Aggiornamento firmware',
+    title: 'Firmware',
     currentVersion: 'Versione corrente',
+    installedVersion: 'Versione installata',
+    latestVersion: 'Ultima versione disponibile',
+    versionInfo: 'Fork modernizzato v2.1 di Xerolux (2025) - Basato sul lavoro originale di Alexander Reinert.',
+    upToDate: 'Il tuo firmware è aggiornato.',
+    updateAvailable: 'Aggiornamento disponibile: Versione {currentVersion} → {latestVersion}',
+    versionCheckFailed: 'Verifica versione fallita. Controlla la tua connessione Internet e riprova.',
+    onlineUpdate: 'Aggiornamento online',
+    checkUpdate: 'Verifica aggiornamenti ora',
+    noUpdateAvailable: 'Nessun aggiornamento disponibile. Stai già utilizzando l\'ultima versione.',
+    onlineUpdateConfirm: 'Vuoi davvero scaricare e installare l\'aggiornamento? Il sistema si riavvierà automaticamente.',
+    onlineUpdateStarted: 'Aggiornamento avviato. Il dispositivo si riavvierà automaticamente al termine.',
+    showReleaseNotes: 'Mostra note di rilascio',
+    releaseNotesTitle: 'Note di rilascio per v{version}',
+    releaseNotesError: 'Impossibile caricare le note di rilascio.',
+    downloadFirmware: 'Scarica firmware',
+    updateFile: 'File firmware',
+    noFileChosen: 'Nessun file selezionato',
+    browse: 'Sfoglia',
     selectFile: 'Seleziona file',
     upload: 'Carica',
+    restart: 'Riavvia sistema',
     uploading: 'Caricamento in corso...',
+    uploadSuccess: 'Aggiornamento firmware caricato con successo. Il sistema si riavvierà automaticamente tra 3 secondi...',
+    uploadError: 'Si è verificato un errore.',
     updateSuccess: 'Firmware aggiornato con successo',
     updateError: 'Errore durante l\'aggiornamento del firmware',
-    warning: 'Attenzione: Non scollegare l\'alimentazione durante l\'aggiornamento!'
+    warning: 'Attenzione: Non scollegare l\'alimentazione durante l\'aggiornamento!',
+    restartConfirm: 'Vuoi davvero riavviare il sistema?'
   },
 
   // Monitoring
   monitoring: {
     title: 'Monitoraggio',
-    snmp: 'SNMP',
-    checkmk: 'Check_MK',
+    description: 'Configura il monitoraggio SNMP e CheckMK per il gateway HB-RF-ETH.',
+    save: 'Salva',
+    saving: 'Salvataggio...',
+    saveSuccess: 'Configurazione salvata con successo',
+    saveError: 'Errore durante il salvataggio della configurazione',
+    snmp: {
+      title: 'Agente SNMP',
+      enabled: 'Abilita SNMP',
+      port: 'Porta',
+      portHelp: 'Predefinito: 161',
+      community: 'Stringa community',
+      communityHelp: 'Predefinito: "public" - Si prega di cambiare per la produzione!',
+      location: 'Posizione',
+      locationHelp: 'Opzionale: es. "Sala server, Edificio A"',
+      contact: 'Contatto',
+      contactHelp: 'Opzionale: es. "admin@example.com"'
+    },
+    checkmk: {
+      title: 'Agente CheckMK',
+      enabled: 'Abilita CheckMK',
+      port: 'Porta',
+      portHelp: 'Predefinito: 6556',
+      allowedHosts: 'IP client consentiti',
+      allowedHostsHelp: 'Indirizzi IP separati da virgola (es. "192.168.1.10,192.168.1.20") o "*" per tutti'
+    },
+    mqtt: {
+      title: 'Client MQTT',
+      enabled: 'Abilita MQTT',
+      server: 'Server',
+      serverHelp: 'Nome host o IP del broker MQTT',
+      port: 'Porta',
+      portHelp: 'Predefinito: 1883',
+      user: 'Utente',
+      userHelp: 'Opzionale: Nome utente MQTT',
+      password: 'Password',
+      passwordHelp: 'Opzionale: Password MQTT',
+      topicPrefix: 'Prefisso topic',
+      topicPrefixHelp: 'Predefinito: hb-rf-eth - I topic saranno come prefix/status/...',
+      haDiscoveryEnabled: 'Scoperta Home Assistant',
+      haDiscoveryPrefix: 'Prefisso scoperta',
+      haDiscoveryPrefixHelp: 'Predefinito: homeassistant'
+    },
     enable: 'Abilita',
-    port: 'Porta',
-    community: 'Community',
-    location: 'Posizione',
-    contact: 'Contatto',
-    allowedHosts: 'Host consentiti',
-    saveSuccess: 'Impostazioni di monitoraggio salvate con successo',
-    saveError: 'Errore durante il salvataggio delle impostazioni di monitoraggio'
+    allowedHosts: 'Host consentiti'
   },
 
   // Analyzer
   analyzer: {
     title: 'Analyzer Light',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
-    clear: 'Clear',
-    autoScroll: 'Auto Scroll',
-    time: 'Time',
-    len: 'Len',
-    cnt: 'Cnt',
-    type: 'Type',
-    src: 'Source',
-    dst: 'Destination',
-    payload: 'Payload',
+    disabled: 'La funzione Analyzer Light è disabilitata. Abilitala nelle Impostazioni.',
+    connected: 'Connesso',
+    disconnected: 'Disconnesso',
+    clear: 'Cancella',
+    autoScroll: 'Scorrimento automatico',
+    time: 'Tempo',
+    len: 'Lung.',
+    cnt: 'Cont',
+    type: 'Tipo',
+    src: 'Origine',
+    dst: 'Destinazione',
+    payload: 'Dati',
     rssi: 'RSSI',
-    deviceNames: 'Device Names',
-    address: 'Address',
-    name: 'Name',
-    storedNames: 'Stored Names'
+    deviceNames: 'Nomi dispositivi',
+    address: 'Indirizzo',
+    name: 'Nome',
+    storedNames: 'Nomi memorizzati'
   },
 
   // About Page
   about: {
-    title: 'Informazioni su HB-RF-ETH-ng',
+    title: 'Informazioni',
+    version: 'Versione 2.1.0',
+    fork: 'Fork modernizzato',
+    forkDescription: 'Questa versione è un fork modernizzato di Xerolux (2025), basato sul firmware originale HB-RF-ETH. Aggiornato a ESP-IDF 5.3, toolchain moderne (GCC 13.2.0) e tecnologie WebUI attuali (Vue 3, Parcel 2, Pinia).',
+    original: 'Autore originale',
+    firmwareLicense: 'Il',
+    hardwareLicense: 'Il',
+    under: 'è rilasciato sotto',
     description: 'Gateway LAN HomeMatic BidCoS/HmIP',
-    version: 'Versione',
     author: 'Autore',
     license: 'Licenza',
     website: 'Sito web',
@@ -200,15 +312,26 @@ export default {
     support: 'Supporto'
   },
 
+  // Third Party
+  thirdParty: {
+    title: 'Software di terze parti',
+    containsThirdPartySoftware: 'Questo software contiene prodotti software di terze parti gratuiti utilizzati con varie condizioni di licenza.',
+    providedAsIs: 'Il software viene fornito "così com\'è" SENZA ALCUNA GARANZIA.'
+  },
+
   // Change Password
   changePassword: {
-    title: 'Cambia password',
+    title: 'Cambio password richiesto',
     currentPassword: 'Password corrente',
     newPassword: 'Nuova password',
     confirmPassword: 'Conferma password',
+    changePassword: 'Cambia password',
     changeSuccess: 'Password cambiata con successo',
     changeError: 'Errore durante il cambio della password',
     passwordMismatch: 'Le password non corrispondono',
-    passwordTooShort: 'La password è troppo corta (minimo 5 caratteri)'
+    passwordTooShort: 'La password deve contenere almeno 6 caratteri e includere lettere e numeri.',
+    passwordsDoNotMatch: 'Le password non corrispondono',
+    warningMessage: 'Questo è il tuo primo accesso o la password è ancora impostata su "admin". Per motivi di sicurezza, devi cambiare la password.',
+    success: 'Password cambiata con successo'
   }
 }
