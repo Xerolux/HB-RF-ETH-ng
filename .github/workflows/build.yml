@@ -34,7 +34,7 @@ jobs:
           npm run build
 
       - name: Upload WebUI artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: webui-dist
           path: webui/dist/
@@ -80,7 +80,7 @@ jobs:
           pio run -e hb-rf-eth-ng
 
       - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: firmware
           path: |
@@ -90,7 +90,7 @@ jobs:
           retention-days: 30
 
       - name: Upload build info
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: build-info
           path: |
