@@ -128,6 +128,11 @@ uint16_t HMFrame::encode(unsigned char *buffer, uint16_t len, bool escaped)
         {
             if (buffer[i] == 0xfc || buffer[i] == 0xfd)
             {
+                // Check if we have space for one more byte
+                if (res >= len)
+                {
+                    return 0; // Buffer too small for escaping
+                }
                 memmove(buffer + i + 1, buffer + i, res - i);
                 buffer[i++] = 0xfc;
                 buffer[i] &= 0x7f;

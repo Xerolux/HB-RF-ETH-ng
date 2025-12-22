@@ -187,7 +187,7 @@ export const useMonitoringStore = defineStore('monitoring', {
     snmp: {
       enabled: false,
       port: 161,
-      community: 'public',
+      community: '',  // Empty by default - user must set custom value
       location: '',
       contact: ''
     },

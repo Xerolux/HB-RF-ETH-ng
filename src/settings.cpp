@@ -154,6 +154,8 @@ void Settings::load()
     size_t adminPasswordLength = sizeof(_adminPassword);
     if (nvs_get_str(handle, NVS_ADMIN_PWD_LEGACY, _adminPassword, &adminPasswordLength) != ESP_OK)
     {
+      // Default password "admin" - User is forced to change on first login
+      // via _passwordChanged flag enforced in WebUI
       strncpy(_adminPassword, "admin", sizeof(_adminPassword) - 1);
       _passwordChanged = false;
     }
