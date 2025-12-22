@@ -10,7 +10,13 @@ export default {
     error: 'Error',
     success: 'Éxito',
     yes: 'Sí',
-    no: 'No'
+    no: 'No',
+    showPassword: 'Mostrar contraseña',
+    hidePassword: 'Ocultar contraseña',
+    rebootingWait: 'El sistema se está reiniciando. Por favor espere aproximadamente 10 segundos...',
+    factoryResettingWait: 'El sistema se está restableciendo a los valores de fábrica y reiniciando. Por favor espere...',
+    confirmReboot: '¿Está seguro de que desea reiniciar el sistema?',
+    confirmFactoryReset: '¿Está seguro? ¡Se perderán todos los ajustes!'
   },
 
   // Header Navigation
@@ -21,7 +27,9 @@ export default {
     monitoring: 'Monitoreo',
     analyzer: 'Analyzer',
     about: 'Acerca de',
-    logout: 'Cerrar sesión'
+    login: 'Iniciar sesión',
+    logout: 'Cerrar sesión',
+    toggleTheme: 'Cambiar tema'
   },
 
   // Login Page
@@ -31,7 +39,8 @@ export default {
     password: 'Contraseña',
     login: 'Acceder',
     loginFailed: 'Error al iniciar sesión',
-    invalidCredentials: 'Credenciales inválidas'
+    invalidCredentials: 'Credenciales inválidas',
+    loginError: 'El inicio de sesión no fue exitoso.'
   },
 
   // Settings Page
@@ -75,7 +84,20 @@ export default {
     // System Settings
     systemSettings: 'Configuración del sistema',
     ledBrightness: 'Brillo del LED',
+    checkUpdates: 'Buscar actualizaciones automáticamente',
+    allowPrerelease: 'Permitir actualizaciones anticipadas (Beta/Alpha)',
     language: 'Idioma',
+    analyzerSettings: 'Configuración Analyzer Light',
+    enableAnalyzer: 'Habilitar Analyzer Light',
+    systemMaintenance: 'Mantenimiento del sistema',
+    reboot: 'Reiniciar',
+    factoryReset: 'Restablecer valores de fábrica',
+
+    // HMLGW
+    hmlgwSettings: 'Configuración de la puerta de enlace HomeMatic LAN (HMLGW)',
+    enableHmlgw: 'Habilitar modo HMLGW',
+    hmlgwPort: 'Puerto de datos (Predeterminado: 2000)',
+    hmlgwKeepAlivePort: 'Puerto KeepAlive (Predeterminado: 2001)',
 
     // DTLS Security Settings
     dtls: {
@@ -117,16 +139,41 @@ export default {
 
     // Messages
     saveSuccess: 'La configuración se guardó correctamente. Reinicie el sistema para aplicarla.',
-    saveError: 'Se produjo un error al guardar la configuración.'
+    saveError: 'Se produjo un error al guardar la configuración.',
+
+    // Backup & Restore
+    backupRestore: 'Copia de seguridad y restauración',
+    backupInfo: 'Descargue una copia de seguridad de su configuración para restaurarla más tarde.',
+    restoreInfo: 'Cargue un archivo de copia de seguridad para restaurar la configuración. El sistema se reiniciará después.',
+    downloadBackup: 'Descargar copia de seguridad',
+    restore: 'Restaurar',
+    noFileChosen: 'Ningún archivo seleccionado',
+    browse: 'Explorar',
+    restoreConfirm: '¿Está seguro? La configuración actual se sobrescribirá y el sistema se reiniciará.',
+    restoreSuccess: 'Configuración restaurada correctamente. Reiniciando el sistema...',
+    restoreError: 'Error al restaurar la configuración',
+    backupError: 'Error al descargar la copia de seguridad'
   },
 
   // System Info
   sysinfo: {
     title: 'Información del sistema',
     serial: 'Número de serie',
+    boardRevision: 'Revisión de la placa',
+    uptime: 'Tiempo de actividad',
+    resetReason: 'Último reinicio',
+    cpuUsage: 'Uso de CPU',
+    memoryUsage: 'Uso de memoria',
+    ethernetStatus: 'Conexión Ethernet',
+    rawUartRemoteAddress: 'Conectado con',
+    radioModuleType: 'Tipo de módulo de radio',
+    radioModuleSerial: 'Número de serie',
+    radioModuleFirmware: 'Versión de firmware',
+    radioModuleBidCosRadioMAC: 'Dirección de radio (BidCoS)',
+    radioModuleHmIPRadioMAC: 'Dirección de radio (HmIP)',
+    radioModuleSGTIN: 'SGTIN',
     version: 'Versión',
     latestVersion: 'Última versión',
-    uptime: 'Tiempo de actividad',
     memory: 'Uso de memoria',
     cpu: 'Uso de CPU',
     temperature: 'Temperatura',
@@ -145,57 +192,120 @@ export default {
 
   // Firmware Update
   firmware: {
-    title: 'Actualización de firmware',
+    title: 'Firmware',
     currentVersion: 'Versión actual',
+    installedVersion: 'Versión instalada',
+    latestVersion: 'Última versión disponible',
+    versionInfo: 'Fork modernizado v2.1 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    upToDate: 'Su firmware está actualizado.',
+    updateAvailable: 'Actualización disponible: Versión {currentVersion} → {latestVersion}',
+    versionCheckFailed: 'Error al verificar la versión. Verifique su conexión a Internet e intente nuevamente.',
+    onlineUpdate: 'Actualización en línea',
+    checkUpdate: 'Buscar actualizaciones ahora',
+    noUpdateAvailable: 'No hay actualizaciones disponibles. Ya está ejecutando la última versión.',
+    onlineUpdateConfirm: '¿Realmente desea descargar e instalar la actualización? El sistema se reiniciará automáticamente.',
+    onlineUpdateStarted: 'Actualización iniciada. El dispositivo se reiniciará automáticamente una vez finalizado.',
+    showReleaseNotes: 'Mostrar notas de la versión',
+    releaseNotesTitle: 'Notas de la versión para v{version}',
+    releaseNotesError: 'Error al cargar las notas de la versión.',
+    downloadFirmware: 'Descargar firmware',
+    updateFile: 'Archivo de firmware',
+    noFileChosen: 'Ningún archivo seleccionado',
+    browse: 'Explorar',
     selectFile: 'Seleccionar archivo',
     upload: 'Cargar',
+    restart: 'Reiniciar sistema',
     uploading: 'Cargando...',
+    uploadSuccess: 'Actualización de firmware cargada correctamente. El sistema se reiniciará automáticamente en 3 segundos...',
+    uploadError: 'Ocurrió un error.',
     updateSuccess: 'Firmware actualizado correctamente',
     updateError: 'Error al actualizar el firmware',
-    warning: '¡Advertencia: No desconecte la alimentación durante la actualización!'
+    warning: '¡Advertencia: No desconecte la alimentación durante la actualización!',
+    restartConfirm: '¿Realmente desea reiniciar el sistema?'
   },
 
   // Monitoring
   monitoring: {
     title: 'Monitoreo',
-    snmp: 'SNMP',
-    checkmk: 'Check_MK',
+    description: 'Configure el monitoreo SNMP y CheckMK para la puerta de enlace HB-RF-ETH.',
+    save: 'Guardar',
+    saving: 'Guardando...',
+    saveSuccess: 'Configuración guardada correctamente',
+    saveError: 'Error al guardar la configuración',
+    snmp: {
+      title: 'Agente SNMP',
+      enabled: 'Habilitar SNMP',
+      port: 'Puerto',
+      portHelp: 'Predeterminado: 161',
+      community: 'Cadena de comunidad',
+      communityHelp: 'Predeterminado: "public" - ¡Por favor cambie para producción!',
+      location: 'Ubicación',
+      locationHelp: 'Opcional: p. ej. "Sala de servidores, Edificio A"',
+      contact: 'Contacto',
+      contactHelp: 'Opcional: p. ej. "admin@example.com"'
+    },
+    checkmk: {
+      title: 'Agente CheckMK',
+      enabled: 'Habilitar CheckMK',
+      port: 'Puerto',
+      portHelp: 'Predeterminado: 6556',
+      allowedHosts: 'IPs de clientes permitidas',
+      allowedHostsHelp: 'Direcciones IP separadas por comas (p. ej. "192.168.1.10,192.168.1.20") o "*" para todos'
+    },
+    mqtt: {
+      title: 'Cliente MQTT',
+      enabled: 'Habilitar MQTT',
+      server: 'Servidor',
+      serverHelp: 'Nombre de host o IP del broker MQTT',
+      port: 'Puerto',
+      portHelp: 'Predeterminado: 1883',
+      user: 'Usuario',
+      userHelp: 'Opcional: Nombre de usuario MQTT',
+      password: 'Contraseña',
+      passwordHelp: 'Opcional: Contraseña MQTT',
+      topicPrefix: 'Prefijo del tema',
+      topicPrefixHelp: 'Predeterminado: hb-rf-eth - Los temas serán como prefix/status/...',
+      haDiscoveryEnabled: 'Descubrimiento de Home Assistant',
+      haDiscoveryPrefix: 'Prefijo de descubrimiento',
+      haDiscoveryPrefixHelp: 'Predeterminado: homeassistant'
+    },
     enable: 'Habilitar',
-    port: 'Puerto',
-    community: 'Comunidad',
-    location: 'Ubicación',
-    contact: 'Contacto',
-    allowedHosts: 'Hosts permitidos',
-    saveSuccess: 'Configuración de monitoreo guardada correctamente',
-    saveError: 'Error al guardar la configuración de monitoreo'
+    allowedHosts: 'Hosts permitidos'
   },
 
   // Analyzer
   analyzer: {
     title: 'Analyzer Light',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
-    clear: 'Clear',
-    autoScroll: 'Auto Scroll',
-    time: 'Time',
-    len: 'Len',
-    cnt: 'Cnt',
-    type: 'Type',
-    src: 'Source',
-    dst: 'Destination',
-    payload: 'Payload',
+    disabled: 'La función Analyzer Light está deshabilitada. Por favor habilítela en Configuración.',
+    connected: 'Conectado',
+    disconnected: 'Desconectado',
+    clear: 'Limpiar',
+    autoScroll: 'Desplazamiento automático',
+    time: 'Tiempo',
+    len: 'Long.',
+    cnt: 'Cont',
+    type: 'Tipo',
+    src: 'Origen',
+    dst: 'Destino',
+    payload: 'Datos',
     rssi: 'RSSI',
-    deviceNames: 'Device Names',
-    address: 'Address',
-    name: 'Name',
-    storedNames: 'Stored Names'
+    deviceNames: 'Nombres de dispositivos',
+    address: 'Dirección',
+    name: 'Nombre',
+    storedNames: 'Nombres almacenados'
   },
 
   // About Page
   about: {
-    title: 'Acerca de HB-RF-ETH-ng',
+    title: 'Acerca de',
+    version: 'Versión 2.1.0',
+    fork: 'Fork modernizado',
+    forkDescription: 'Esta versión es un fork modernizado por Xerolux (2025), basado en el firmware original HB-RF-ETH. Actualizado a ESP-IDF 5.3, cadenas de herramientas modernas (GCC 13.2.0) y tecnologías WebUI actuales (Vue 3, Parcel 2, Pinia).',
+    original: 'Autor original',
+    firmwareLicense: 'El',
+    hardwareLicense: 'El',
+    under: 'está publicado bajo',
     description: 'Gateway LAN HomeMatic BidCoS/HmIP',
-    version: 'Versión',
     author: 'Autor',
     license: 'Licencia',
     website: 'Sitio web',
@@ -203,15 +313,26 @@ export default {
     support: 'Soporte'
   },
 
+  // Third Party
+  thirdParty: {
+    title: 'Software de terceros',
+    containsThirdPartySoftware: 'Este software contiene productos de software de terceros gratuitos utilizados bajo diversas condiciones de licencia.',
+    providedAsIs: 'El software se proporciona "tal cual" SIN NINGUNA GARANTÍA.'
+  },
+
   // Change Password
   changePassword: {
-    title: 'Cambiar contraseña',
+    title: 'Cambio de contraseña requerido',
     currentPassword: 'Contraseña actual',
     newPassword: 'Nueva contraseña',
     confirmPassword: 'Confirmar contraseña',
+    changePassword: 'Cambiar contraseña',
     changeSuccess: 'Contraseña cambiada correctamente',
     changeError: 'Error al cambiar la contraseña',
     passwordMismatch: 'Las contraseñas no coinciden',
-    passwordTooShort: 'La contraseña es demasiado corta (mínimo 5 caracteres)'
+    passwordTooShort: 'La contraseña debe tener al menos 6 caracteres y contener letras y números.',
+    passwordsDoNotMatch: 'Las contraseñas no coinciden',
+    warningMessage: 'Este es su primer inicio de sesión o la contraseña aún está configurada como "admin". Por razones de seguridad, debe cambiar la contraseña.',
+    success: 'Contraseña cambiada correctamente'
   }
 }
