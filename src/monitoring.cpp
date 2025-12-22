@@ -360,9 +360,9 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
-        config->snmp.enabled = false;
-        strncpy(config->snmp.community, "public", sizeof(config->snmp.community) - 1);
-        config->snmp.community[sizeof(config->snmp.community) - 1] = '\0';
+        config->snmp.enabled = false;  // Disabled by default for security
+        // Empty community string forces user to set a custom value
+        config->snmp.community[0] = '\0';
         config->snmp.location[0] = '\0';
         config->snmp.contact[0] = '\0';
         config->snmp.port = 161;

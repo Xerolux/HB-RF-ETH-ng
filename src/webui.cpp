@@ -213,39 +213,40 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-
-        cJSON *root = cJSON_Parse(buffer);
-
-        char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
-
-        bool isAuthenticated = (password != NULL) && _settings->verifyAdminPassword(password);
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        root = cJSON_CreateObject();
-
-        cJSON_AddBoolToObject(root, "isAuthenticated", isAuthenticated);
-        if (isAuthenticated)
-        {
-            // Successful login - reset rate limit for this IP
-            rate_limiter_reset_ip(req);
-            cJSON_AddStringToObject(root, "token", _token);
-            cJSON_AddBoolToObject(root, "passwordChanged", _settings->getPasswordChanged());
-        }
-
-        const char *json = cJSON_PrintUnformatted(root);
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-        cJSON_Delete(root);
-
-        return ESP_OK;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive login data");
+        return ESP_FAIL;
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+
+    cJSON *root = cJSON_Parse(buffer);
+
+    char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
+
+    bool isAuthenticated = (password != NULL) && _settings->verifyAdminPassword(password);
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    root = cJSON_CreateObject();
+
+    cJSON_AddBoolToObject(root, "isAuthenticated", isAuthenticated);
+    if (isAuthenticated)
+    {
+        // Successful login - reset rate limit for this IP
+        rate_limiter_reset_ip(req);
+        cJSON_AddStringToObject(root, "token", _token);
+        cJSON_AddBoolToObject(root, "passwordChanged", _settings->getPasswordChanged());
+    }
+
+    const char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(root);
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_login_json_handler = {
@@ -506,12 +507,16 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive settings data");
+        return ESP_FAIL;
+    }
 
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
     // Check for password length to prevent truncation/lockout
     if (adminPassword && strlen(adminPassword) > MAX_PASSWORD_LENGTH) {
@@ -519,156 +524,153 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password too long");
     }
 
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-        // Safely extract timesource with null check
-        timesource_t timesource = TIMESOURCE_NTP; // Default
-        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-        if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
+    // Safely extract timesource with null check
+    timesource_t timesource = TIMESOURCE_NTP; // Default
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
 
-        // Safely extract dcfOffset with null check
-        int dcfOffset = 0; // Default
-        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-        if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
+    // Safely extract dcfOffset with null check
+    int dcfOffset = 0; // Default
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
 
-        // Safely extract gpsBaudrate with null check
-        int gpsBaudrate = 9600; // Default
-        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-        if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
+    // Safely extract gpsBaudrate with null check
+    int gpsBaudrate = 9600; // Default
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
 
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-        // Safely extract ledBrightness with null check
-        int ledBrightness = 100; // Default
-        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-        if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
+    // Safely extract ledBrightness with null check
+    int ledBrightness = 100; // Default
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
 
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
 
-        // Safely extract ipv6PrefixLength with null check
-        int ipv6PrefixLength = 64; // Default
-        cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-        if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+    // Safely extract ipv6PrefixLength with null check
+    int ipv6PrefixLength = 64; // Default
+    cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
 
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
-        // HMLGW
-        bool hmlgwEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "hmlgwEnabled"));
-        int hmlgwPort = 2000;
-        if (cJSON_GetObjectItem(root, "hmlgwPort")) {
-             hmlgwPort = cJSON_GetObjectItem(root, "hmlgwPort")->valueint;
-        }
-        int hmlgwKeepAlivePort = 2001;
-        if (cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")) {
-             hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
-        }
-
-        bool analyzerEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "analyzerEnabled"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
-        _settings->setLEDBrightness(ledBrightness);
-
-        cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
-        if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
-            _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
-        }
-
-        cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
-        if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
-            _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
-        }
-
-        // Handle IPv6 (checking for nulls)
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
-        }
-
-        _settings->setHmlgwEnabled(hmlgwEnabled);
-        _settings->setHmlgwPort(hmlgwPort);
-        _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
-
-        if (hmlgwEnabled && analyzerEnabled) {
-            ESP_LOGW(TAG, "Disabling Analyzer because HMLGW mode is enabled");
-            analyzerEnabled = false;
-        }
-        _settings->setAnalyzerEnabled(analyzerEnabled);
-
-        // DTLS
-        int dtlsMode = _settings->getDTLSMode();
-        int dtlsCipherSuite = _settings->getDTLSCipherSuite();
-        bool dtlsRequireClientCert = _settings->getDTLSRequireClientCert();
-        bool dtlsSessionResumption = _settings->getDTLSSessionResumption();
-        if (cJSON_HasObjectItem(root, "dtlsMode")) {
-            dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
-            dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
-            dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
-            dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
-        }
-
-        // Enforce compatibility: DTLS cannot run together with Analyzer or HMLGW
-        if (analyzerEnabled || hmlgwEnabled) {
-            if (dtlsMode != DTLS_MODE_DISABLED) {
-                ESP_LOGW(TAG, "Disabling DTLS because %s is enabled", analyzerEnabled ? "Analyzer" : "HMLGW");
-            }
-            dtlsMode = DTLS_MODE_DISABLED;
-        }
-
-        _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
-
-        _settings->save();
-
-        // Start or stop Analyzer task based on new configuration
-        if (analyzerEnabled && !hmlgwEnabled) {
-            if (_analyzer == nullptr) {
-                _analyzer = new Analyzer(_radioModuleConnector);
-            }
-        } else if (_analyzer) {
-            delete _analyzer;
-            _analyzer = nullptr;
-        }
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        root = cJSON_CreateObject();
-
-        add_settings(root);
-
-        const char *json = cJSON_PrintUnformatted(root);
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-        cJSON_Delete(root);
-
-        return ESP_OK;
+    // HMLGW
+    bool hmlgwEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "hmlgwEnabled"));
+    int hmlgwPort = 2000;
+    if (cJSON_GetObjectItem(root, "hmlgwPort")) {
+         hmlgwPort = cJSON_GetObjectItem(root, "hmlgwPort")->valueint;
+    }
+    int hmlgwKeepAlivePort = 2001;
+    if (cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")) {
+         hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
     }
 
-    return ESP_FAIL;
+    bool analyzerEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "analyzerEnabled"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    _settings->setNtpServer(ntpServer);
+    _settings->setLEDBrightness(ledBrightness);
+
+    cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
+    if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
+        _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
+    }
+
+    cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
+    if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
+        _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
+    }
+
+    // Handle IPv6 (checking for nulls)
+    if (ipv6Mode) {
+         _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : (char*)"",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : (char*)"",
+            ipv6Dns1 ? ipv6Dns1 : (char*)"",
+            ipv6Dns2 ? ipv6Dns2 : (char*)""
+        );
+    }
+
+    _settings->setHmlgwEnabled(hmlgwEnabled);
+    _settings->setHmlgwPort(hmlgwPort);
+    _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
+
+    if (hmlgwEnabled && analyzerEnabled) {
+        ESP_LOGW(TAG, "Disabling Analyzer because HMLGW mode is enabled");
+        analyzerEnabled = false;
+    }
+    _settings->setAnalyzerEnabled(analyzerEnabled);
+
+    // DTLS
+    int dtlsMode = _settings->getDTLSMode();
+    int dtlsCipherSuite = _settings->getDTLSCipherSuite();
+    bool dtlsRequireClientCert = _settings->getDTLSRequireClientCert();
+    bool dtlsSessionResumption = _settings->getDTLSSessionResumption();
+    if (cJSON_HasObjectItem(root, "dtlsMode")) {
+        dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+        dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+        dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+        dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+    }
+
+    // Enforce compatibility: DTLS cannot run together with Analyzer or HMLGW
+    if (analyzerEnabled || hmlgwEnabled) {
+        if (dtlsMode != DTLS_MODE_DISABLED) {
+            ESP_LOGW(TAG, "Disabling DTLS because %s is enabled", analyzerEnabled ? "Analyzer" : "HMLGW");
+        }
+        dtlsMode = DTLS_MODE_DISABLED;
+    }
+
+    _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+
+    _settings->save();
+
+    // Start or stop Analyzer task based on new configuration
+    if (analyzerEnabled && !hmlgwEnabled) {
+        if (_analyzer == nullptr) {
+            _analyzer = new Analyzer(_radioModuleConnector);
+        }
+    } else if (_analyzer) {
+        delete _analyzer;
+        _analyzer = nullptr;
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    root = cJSON_CreateObject();
+
+    add_settings(root);
+
+    const char *json = cJSON_PrintUnformatted(root);
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(root);
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_settings_json_handler = {
@@ -808,176 +810,178 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
     int len = httpd_req_recv(req, buffer, 4095);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
         free(buffer);
-
-        if (!root) {
-             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        }
-
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
-
-        // Safely extract timesource with null check
-        timesource_t timesource = TIMESOURCE_NTP; // Default
-        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-        if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
-
-        // Safely extract dcfOffset with null check
-        int dcfOffset = 0; // Default
-        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-        if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
-
-        // Safely extract gpsBaudrate with null check
-        int gpsBaudrate = 9600; // Default
-        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-        if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
-
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
-        // Safely extract ledBrightness with null check
-        int ledBrightness = 100; // Default
-        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-        if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
-
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-
-        // Safely extract ipv6PrefixLength with null check
-        int ipv6PrefixLength = 64; // Default
-        cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-        if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
-
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
-        _settings->setLEDBrightness(ledBrightness);
-
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
-        }
-
-        // DTLS (Restore)
-        if (cJSON_HasObjectItem(root, "dtlsMode")) {
-            int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
-            int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
-            bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
-            bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
-            _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
-        }
-
-        _settings->save();
-
-        // Restore Monitoring Settings
-        cJSON *monJson = cJSON_GetObjectItem(root, "monitoring");
-        if (monJson) {
-            monitoring_config_t monConfig;
-            // Load current config first to preserve password if not overwritten
-            monitoring_get_config(&monConfig);
-
-            cJSON *snmp = cJSON_GetObjectItem(monJson, "snmp");
-            if (snmp) {
-                monConfig.snmp.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(snmp, "enabled"));
-
-                cJSON* item = cJSON_GetObjectItem(snmp, "community");
-                if (item && item->valuestring) strncpy(monConfig.snmp.community, item->valuestring, sizeof(monConfig.snmp.community)-1);
-
-                item = cJSON_GetObjectItem(snmp, "location");
-                if (item && item->valuestring) strncpy(monConfig.snmp.location, item->valuestring, sizeof(monConfig.snmp.location)-1);
-
-                item = cJSON_GetObjectItem(snmp, "contact");
-                if (item && item->valuestring) strncpy(monConfig.snmp.contact, item->valuestring, sizeof(monConfig.snmp.contact)-1);
-
-                item = cJSON_GetObjectItem(snmp, "port");
-                if (item) monConfig.snmp.port = item->valueint;
-            }
-
-            cJSON *cmk = cJSON_GetObjectItem(monJson, "checkmk");
-            if (cmk) {
-                monConfig.checkmk.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(cmk, "enabled"));
-
-                cJSON* item = cJSON_GetObjectItem(cmk, "port");
-                if (item) monConfig.checkmk.port = item->valueint;
-
-                item = cJSON_GetObjectItem(cmk, "allowed_hosts");
-                if (item && item->valuestring) strncpy(monConfig.checkmk.allowed_hosts, item->valuestring, sizeof(monConfig.checkmk.allowed_hosts)-1);
-            }
-
-            cJSON *mqtt = cJSON_GetObjectItem(monJson, "mqtt");
-            if (mqtt) {
-                monConfig.mqtt.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "enabled"));
-
-                cJSON* item = cJSON_GetObjectItem(mqtt, "server");
-                if (item && item->valuestring) strncpy(monConfig.mqtt.server, item->valuestring, sizeof(monConfig.mqtt.server)-1);
-
-                item = cJSON_GetObjectItem(mqtt, "port");
-                if (item) monConfig.mqtt.port = item->valueint;
-
-                item = cJSON_GetObjectItem(mqtt, "user");
-                if (item && item->valuestring) strncpy(monConfig.mqtt.user, item->valuestring, sizeof(monConfig.mqtt.user)-1);
-
-                item = cJSON_GetObjectItem(mqtt, "password");
-                // Only update password if provided and not empty (since backup has empty password)
-                // However, backup has "", so if user restores backup, password becomes "".
-                // If user wants to keep existing password, we should check if empty.
-                if (item && item->valuestring && strlen(item->valuestring) > 0) {
-                     strncpy(monConfig.mqtt.password, item->valuestring, sizeof(monConfig.mqtt.password)-1);
-                }
-
-                item = cJSON_GetObjectItem(mqtt, "topic_prefix");
-                if (item && item->valuestring) strncpy(monConfig.mqtt.topic_prefix, item->valuestring, sizeof(monConfig.mqtt.topic_prefix)-1);
-
-                monConfig.mqtt.ha_discovery_enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "ha_discovery_enabled"));
-
-                item = cJSON_GetObjectItem(mqtt, "ha_discovery_prefix");
-                if (item && item->valuestring) strncpy(monConfig.mqtt.ha_discovery_prefix, item->valuestring, sizeof(monConfig.mqtt.ha_discovery_prefix)-1);
-            }
-
-            monitoring_update_config(&monConfig);
-        }
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":true}");
-
-        // Restart
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_restart();
-
-        return ESP_OK;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive restore data");
+        return ESP_FAIL;
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    free(buffer);
+
+    if (!root) {
+         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+
+    // Safely extract timesource with null check
+    timesource_t timesource = TIMESOURCE_NTP; // Default
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
+
+    // Safely extract dcfOffset with null check
+    int dcfOffset = 0; // Default
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
+
+    // Safely extract gpsBaudrate with null check
+    int gpsBaudrate = 9600; // Default
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
+
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+
+    // Safely extract ledBrightness with null check
+    int ledBrightness = 100; // Default
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
+
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+
+    // Safely extract ipv6PrefixLength with null check
+    int ipv6PrefixLength = 64; // Default
+    cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    _settings->setNtpServer(ntpServer);
+    _settings->setLEDBrightness(ledBrightness);
+
+    if (ipv6Mode) {
+         _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : (char*)"",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : (char*)"",
+            ipv6Dns1 ? ipv6Dns1 : (char*)"",
+            ipv6Dns2 ? ipv6Dns2 : (char*)""
+        );
+    }
+
+    // DTLS (Restore)
+    if (cJSON_HasObjectItem(root, "dtlsMode")) {
+        int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+        int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+        bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+        bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+        _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+    }
+
+    _settings->save();
+
+    // Restore Monitoring Settings
+    cJSON *monJson = cJSON_GetObjectItem(root, "monitoring");
+    if (monJson) {
+        monitoring_config_t monConfig;
+        // Load current config first to preserve password if not overwritten
+        monitoring_get_config(&monConfig);
+
+        cJSON *snmp = cJSON_GetObjectItem(monJson, "snmp");
+        if (snmp) {
+            monConfig.snmp.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(snmp, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(snmp, "community");
+            if (item && item->valuestring) strncpy(monConfig.snmp.community, item->valuestring, sizeof(monConfig.snmp.community)-1);
+
+            item = cJSON_GetObjectItem(snmp, "location");
+            if (item && item->valuestring) strncpy(monConfig.snmp.location, item->valuestring, sizeof(monConfig.snmp.location)-1);
+
+            item = cJSON_GetObjectItem(snmp, "contact");
+            if (item && item->valuestring) strncpy(monConfig.snmp.contact, item->valuestring, sizeof(monConfig.snmp.contact)-1);
+
+            item = cJSON_GetObjectItem(snmp, "port");
+            if (item) monConfig.snmp.port = item->valueint;
+        }
+
+        cJSON *cmk = cJSON_GetObjectItem(monJson, "checkmk");
+        if (cmk) {
+            monConfig.checkmk.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(cmk, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(cmk, "port");
+            if (item) monConfig.checkmk.port = item->valueint;
+
+            item = cJSON_GetObjectItem(cmk, "allowed_hosts");
+            if (item && item->valuestring) strncpy(monConfig.checkmk.allowed_hosts, item->valuestring, sizeof(monConfig.checkmk.allowed_hosts)-1);
+        }
+
+        cJSON *mqtt = cJSON_GetObjectItem(monJson, "mqtt");
+        if (mqtt) {
+            monConfig.mqtt.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(mqtt, "server");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.server, item->valuestring, sizeof(monConfig.mqtt.server)-1);
+
+            item = cJSON_GetObjectItem(mqtt, "port");
+            if (item) monConfig.mqtt.port = item->valueint;
+
+            item = cJSON_GetObjectItem(mqtt, "user");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.user, item->valuestring, sizeof(monConfig.mqtt.user)-1);
+
+            item = cJSON_GetObjectItem(mqtt, "password");
+            // Only update password if provided and not empty (since backup has empty password)
+            // However, backup has "", so if user restores backup, password becomes "".
+            // If user wants to keep existing password, we should check if empty.
+            if (item && item->valuestring && strlen(item->valuestring) > 0) {
+                 strncpy(monConfig.mqtt.password, item->valuestring, sizeof(monConfig.mqtt.password)-1);
+            }
+
+            item = cJSON_GetObjectItem(mqtt, "topic_prefix");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.topic_prefix, item->valuestring, sizeof(monConfig.mqtt.topic_prefix)-1);
+
+            monConfig.mqtt.ha_discovery_enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "ha_discovery_enabled"));
+
+            item = cJSON_GetObjectItem(mqtt, "ha_discovery_prefix");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.ha_discovery_prefix, item->valuestring, sizeof(monConfig.mqtt.ha_discovery_prefix)-1);
+        }
+
+        monitoring_update_config(&monConfig);
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    // Restart
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_restore_handler = {

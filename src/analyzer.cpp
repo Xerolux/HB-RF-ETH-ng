@@ -313,9 +313,12 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
         esp_err_t work_ret = httpd_queue_work(job->handle, analyzer_ws_send, job);
         if (work_ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to queue ws send for client %d: %s", job->fd, esp_err_to_name(work_ret));
+            // Save values before freeing job
+            httpd_handle_t handle = job->handle;
+            int fd = job->fd;
             free(job->payload);
             free(job);
-            removeClient(job->handle, job->fd);
+            removeClient(handle, fd);
         }
     }
 

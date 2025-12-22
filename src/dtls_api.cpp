@@ -38,7 +38,7 @@ static void bytes_to_hex(const unsigned char *bytes, size_t len, char *hex_out, 
     size_t i;
     for (i = 0; i < len && (i * 2 + 2) < hex_out_size; i++)
     {
-        sprintf(hex_out + (i * 2), "%02X", bytes[i]);
+        snprintf(hex_out + (i * 2), hex_out_size - (i * 2), "%02X", bytes[i]);
     }
     hex_out[i * 2] = '\0';
 }
