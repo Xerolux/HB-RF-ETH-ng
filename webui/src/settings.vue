@@ -329,7 +329,7 @@
         <BButton
             variant="warning"
             :disabled="!restoreFile || restoreLoading"
-            @click="restoreSettings"
+            @click="restoreSettingsClick"
         >
           <BSpinner small v-if="restoreLoading" class="me-2" />
           {{ t('settings.restore') }}
@@ -344,9 +344,48 @@
     header-text-variant="white"
     class="mb-3"
   >
-    <BButton variant="warning" block class="me-2" @click="rebootClick">{{ t('settings.reboot') }}</BButton>
-    <BButton variant="danger" block @click="factoryResetClick">{{ t('settings.factoryReset') }}</BButton>
+    <BButton variant="warning" block class="me-2" @click="showRebootModal = true">{{ t('settings.reboot') }}</BButton>
+    <BButton variant="danger" block @click="showFactoryResetModal = true">{{ t('settings.factoryReset') }}</BButton>
   </BCard>
+
+  <!-- Loading Overlay -->
+  <LoadingOverlay :visible="isSystemBusy" :message="systemBusyMessage" />
+
+  <!-- Reboot Confirmation Modal -->
+  <BModal
+    v-model="showRebootModal"
+    :title="t('settings.reboot')"
+    @ok="rebootConfirmed"
+    ok-variant="warning"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmReboot') }}</p>
+  </BModal>
+
+  <!-- Factory Reset Confirmation Modal -->
+  <BModal
+    v-model="showFactoryResetModal"
+    :title="t('settings.factoryReset')"
+    @ok="factoryResetConfirmed"
+    ok-variant="danger"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmFactoryReset') }}</p>
+  </BModal>
+
+  <!-- Restore Confirmation Modal -->
+  <BModal
+    v-model="showRestoreModal"
+    :title="t('settings.restore')"
+    @ok="restoreConfirmed"
+    ok-variant="warning"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('settings.restoreConfirm') }}</p>
+  </BModal>
 
   <!-- Password Change Modal -->
   <BModal
@@ -398,6 +437,7 @@ import {
 } from '@vuelidate/validators'
 import { useSettingsStore } from './stores.js'
 import PasswordInput from './components/PasswordInput.vue'
+import LoadingOverlay from './components/LoadingOverlay.vue'
 
 const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
@@ -454,9 +494,14 @@ const loading = ref(false)
 const backupLoading = ref(false)
 const restoreLoading = ref(false)
 
-// Password modal state
+// Modals & Overlay state
 const showPasswordModal = ref(false)
 const passwordError = ref(null)
+const showRebootModal = ref(false)
+const showFactoryResetModal = ref(false)
+const showRestoreModal = ref(false)
+const isSystemBusy = ref(false)
+const systemBusyMessage = ref('')
 
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
@@ -702,65 +747,64 @@ const downloadBackup = async () => {
   }
 }
 
-const restoreSettings = async () => {
-    if (!restoreFile.value) return
+const restoreSettingsClick = () => {
+  if (!restoreFile.value) return
+  showRestoreModal.value = true
+}
 
-    if (!confirm(t('settings.restoreConfirm'))) return
-
-    restoreLoading.value = true
-    try {
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-            try {
-                const json = JSON.parse(e.target.result)
-                await axios.post('/api/restore', json)
-                alert(t('settings.restoreSuccess'))
-                window.location.reload()
-            } catch (err) {
-                restoreLoading.value = false
-                alert(t('settings.restoreError') + ': ' + err.message)
-            }
-        }
-        reader.onerror = () => {
-             restoreLoading.value = false
-             alert(t('settings.restoreError'))
-        }
-        reader.readAsText(restoreFile.value)
-    } catch (e) {
+const restoreConfirmed = async () => {
+  restoreLoading.value = true
+  try {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target.result)
+        await axios.post('/api/restore', json)
+        systemBusyMessage.value = t('settings.restoreSuccess')
+        isSystemBusy.value = true
+        setTimeout(() => { window.location.reload() }, 10000)
+      } catch (err) {
         restoreLoading.value = false
-        alert(t('settings.restoreError'))
+        alert(t('settings.restoreError') + ': ' + err.message)
+      }
     }
+    reader.onerror = () => {
+      restoreLoading.value = false
+      alert(t('settings.restoreError'))
+    }
+    reader.readAsText(restoreFile.value)
+  } catch (e) {
+    restoreLoading.value = false
+    alert(t('settings.restoreError'))
+  }
 }
 
-const rebootClick = async () => {
-    if (confirm(t('common.confirmReboot'))) {
-        try {
-            await axios.post('/api/restart')
-            // Show wait message
-            alert(t('common.rebootingWait'))
-            setTimeout(() => {
-                window.location.reload()
-            }, 10000)
-        } catch (e) {
-            console.error(e)
-        }
-    }
+const rebootConfirmed = async () => {
+  try {
+    await axios.post('/api/restart')
+    systemBusyMessage.value = t('common.rebootingWait')
+    isSystemBusy.value = true
+    setTimeout(() => {
+      window.location.reload()
+    }, 10000)
+  } catch (e) {
+    console.error(e)
+    showError.value = true
+  }
 }
 
-const factoryResetClick = async () => {
-    if (confirm(t('common.confirmFactoryReset'))) {
-        try {
-            await axios.post('/api/factory_reset')
-             // Show wait message
-            alert(t('common.factoryResettingWait'))
-            setTimeout(() => {
-                window.location.reload()
-            }, 10000)
-        } catch (e) {
-            console.error(e)
-            alert('Factory Reset failed')
-        }
-    }
+const factoryResetConfirmed = async () => {
+  try {
+    await axios.post('/api/factory_reset')
+    systemBusyMessage.value = t('common.factoryResettingWait')
+    isSystemBusy.value = true
+    setTimeout(() => {
+      window.location.reload()
+    }, 10000)
+  } catch (e) {
+    console.error(e)
+    alert('Factory Reset failed')
+  }
 }
 
 const handlePasswordChange = async (event) => {
