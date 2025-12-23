@@ -269,6 +269,9 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     // This handler is called frequently (1Hz) by the frontend.
     char buffer[SYSINFO_BUFFER_SIZE];
 
+    // Mark system info as requested to keep CPU stats updating in background
+    _sysInfo->markSysInfoRequested();
+
     // Stack overflow protection: Log high water mark periodically
     static uint32_t check_counter = 0;
     if (++check_counter % 100 == 0) { // Check every 100 calls

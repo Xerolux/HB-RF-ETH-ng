@@ -49,6 +49,7 @@ static const char *_currentVersion;
 static board_type_t _board;
 static uint64_t _bootTime;
 static temperature_sensor_handle_t _temp_sensor = NULL;
+static volatile int64_t _lastSysInfoRequestTime = 0;
 
 // Forward declaration
 uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten);
@@ -69,6 +70,29 @@ void updateCPUUsageTask(void *arg)
 
     for (;;)
     {
+        // Optimization: Only calculate detailed CPU stats if WebUI is active (requested in last 5s)
+        int64_t now = esp_timer_get_time();
+        if ((now - _lastSysInfoRequestTime) > 5000000) {
+            // Idle mode: sleep longer and skip expensive task traversal
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+
+            // Still update voltage and memory as they are cheaper and useful for other things
+            // But skip CPU calculation which requires suspending scheduler
+
+            // Memory Usage
+            multi_heap_info_t info;
+            heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
+            _memoryUsage = 100.0f - (info.total_free_bytes * 100.0f / (info.total_free_bytes + info.total_allocated_bytes));
+
+             // Update supply voltage in background
+            uint32_t voltage_mv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
+            if (voltage_mv > 0) {
+                _supplyVoltageMv = voltage_mv;
+            }
+
+            continue;
+        }
+
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
@@ -328,6 +352,11 @@ uint64_t SysInfo::getUptimeSeconds() const
     // Get current time in seconds since boot
     uint64_t uptime = (esp_timer_get_time() / 1000000);
     return uptime;
+}
+
+void SysInfo::markSysInfoRequested()
+{
+    _lastSysInfoRequestTime = esp_timer_get_time();
 }
 
 const char* SysInfo::getResetReason() const
