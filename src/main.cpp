@@ -61,6 +61,7 @@ static void heap_monitor_task(void *pvParameters)
     LED *statusLED = (LED *)pvParameters;
     uint32_t low_water_mark = 0;
     const uint32_t critical_threshold = 20480;  // 20KB critical threshold
+    UBaseType_t stack_watermark_min = 1536;  // Start with allocated size
 
     for (;;)
     {
@@ -77,12 +78,23 @@ static void heap_monitor_task(void *pvParameters)
                      free_heap, min_free_heap);
         }
 
+        // Monitor stack watermark for this task
+        UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
+        if (watermark < stack_watermark_min) {
+            stack_watermark_min = watermark;
+            ESP_LOGI(TAG, "heap_monitor stack watermark: %u bytes free (allocated: 1536)",
+                     watermark * sizeof(StackType_t));
+        }
+
         // Log heap stats every 5 minutes
         static uint32_t count = 0;
         count++;
         if (count % 60 == 0) {
             ESP_LOGI(TAG, "Heap status - Free: %" PRIu32 " bytes, Min free: %" PRIu32 " bytes",
                      free_heap, min_free_heap);
+            ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u bytes (%.1f%% used)",
+                     stack_watermark_min * sizeof(StackType_t),
+                     100.0 * (1536 - stack_watermark_min * sizeof(StackType_t)) / 1536.0);
         }
 
         vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds
