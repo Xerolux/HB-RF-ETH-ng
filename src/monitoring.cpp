@@ -163,6 +163,13 @@ static void checkmk_agent_task(void *pvParameters)
             continue;
         }
 
+        // Set timeout to prevent DoS from stalled clients
+        struct timeval timeout;
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        setsockopt(client_sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+
         char client_ip[16];
         inet_ntoa_r(client_addr.sin_addr, client_ip, sizeof(client_ip));
         ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
