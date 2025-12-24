@@ -277,8 +277,9 @@ void RawUartUdpListener::start()
         return;
     }
 
-    // Reduced priority from 15 to 10 to balance with other tasks
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 10, &_tHandle);
+    // CRITICAL: High priority (18) for CCU communication
+    // CCU messages must be processed quickly to maintain connection
+    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 18, &_tHandle);
 
     _pcb = udp_new();
     if (_pcb == NULL) {
@@ -320,7 +321,8 @@ void RawUartUdpListener::_udpQueueHandler()
 
     for (;;)
     {
-        if (xQueueReceive(_udp_queue, &event, (TickType_t)(100 / portTICK_PERIOD_MS)) == pdTRUE)
+        // OPTIMIZED: Reduced timeout from 100ms to 10ms for faster processing
+        if (xQueueReceive(_udp_queue, &event, (TickType_t)(10 / portTICK_PERIOD_MS)) == pdTRUE)
         {
             handlePacket(event.pb, event.addr, event.port);
             pbuf_free(event.pb);
@@ -330,8 +332,9 @@ void RawUartUdpListener::_udpQueueHandler()
         {
             int64_t now = esp_timer_get_time();
 
-            if (now > _lastReceivedKeepAlive + 5000000)
-            { // 5 sec
+            // OPTIMIZED: Reduced timeout from 5s to 3s for faster detection
+            if (now > _lastReceivedKeepAlive + 3000000)
+            { // 3 sec
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
@@ -345,9 +348,9 @@ void RawUartUdpListener::_udpQueueHandler()
             }
         }
 
-        // Yield periodically to prevent watchdog timeout
+        // OPTIMIZED: Yield less frequently (every 100 iterations) to maintain priority
         loop_count++;
-        if (loop_count % 10 == 0) {
+        if (loop_count % 100 == 0) {
             taskYIELD();
         }
     }
