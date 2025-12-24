@@ -110,6 +110,12 @@ extern "C"
 
 void app_main()
 {
+    // CRITICAL: Mark OTA update as valid immediately after boot
+    // This must be done BEFORE any complex initialization that could cause a panic
+    // Otherwise, ESP-IDF will automatically rollback to the previous firmware
+    esp_ota_mark_app_valid_cancel_rollback();
+    ESP_LOGI(TAG, "OTA firmware validated successfully");
+
     // CRITICAL: Disable all power management features for maximum performance
     // Radio signals require immediate processing without delays
     esp_pm_config_t pm_config = {
@@ -293,8 +299,6 @@ void app_main()
 
     powerLED.setState(LED_STATE_ON);
     statusLED.setState(LED_STATE_OFF);
-
-    esp_ota_mark_app_valid_cancel_rollback();
 
     // Log initial heap status
     ESP_LOGI(TAG, "System initialized. Free heap: %lu bytes", esp_get_free_heap_size());
