@@ -94,7 +94,16 @@ const i18n = createI18n({
 
 // Create Bootstrap Vue Next
 import { createBootstrap } from 'bootstrap-vue-next'
-import * as BootstrapVueNext from 'bootstrap-vue-next'
+// Tree-shaking: Import only used components instead of *
+import {
+  BAlert, BButton, BCard, BCollapse, BDropdownItem, BForm,
+  BFormCheckbox, BFormFile, BFormGroup, BFormInput,
+  BFormInvalidFeedback, BFormRadio, BFormRadioGroup,
+  BFormSelect, BFormSelectOption, BFormText, BInputGroup,
+  BListGroup, BListGroupItem, BModal, BNavItem,
+  BNavItemDropdown, BNavbar, BNavbarBrand, BNavbarNav,
+  BNavbarToggle, BProgress, BProgressBar, BSpinner
+} from 'bootstrap-vue-next'
 
 // Create and mount app
 const app = createApp(App)
@@ -108,11 +117,19 @@ app.use(createBootstrap({
     directives: true,
 }))
 
-// Register all BootstrapVueNext components globally
-for (const key in BootstrapVueNext) {
-  if (key.startsWith('B')) {
-    app.component(key, BootstrapVueNext[key])
-  }
+// Register used BootstrapVueNext components globally
+const components = {
+  BAlert, BButton, BCard, BCollapse, BDropdownItem, BForm,
+  BFormCheckbox, BFormFile, BFormGroup, BFormInput,
+  BFormInvalidFeedback, BFormRadio, BFormRadioGroup,
+  BFormSelect, BFormSelectOption, BFormText, BInputGroup,
+  BListGroup, BListGroupItem, BModal, BNavItem,
+  BNavItemDropdown, BNavbar, BNavbarBrand, BNavbarNav,
+  BNavbarToggle, BProgress, BProgressBar, BSpinner
+}
+
+for (const [key, component] of Object.entries(components)) {
+  app.component(key, component)
 }
 
 // Initialize theme
