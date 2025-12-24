@@ -36,6 +36,7 @@
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
+#include "nextcloud_api.h"
 #include "rate_limiter.h"
 #include "analyzer.h"
 #include "dtls_api.h"
@@ -753,6 +754,17 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
         cJSON_AddBoolToObject(mqtt, "ha_discovery_enabled", monConfig.mqtt.ha_discovery_enabled);
         cJSON_AddStringToObject(mqtt, "ha_discovery_prefix", monConfig.mqtt.ha_discovery_prefix);
 
+        // Nextcloud
+        cJSON *nextcloud = cJSON_AddObjectToObject(mon, "nextcloud");
+        cJSON_AddBoolToObject(nextcloud, "enabled", monConfig.nextcloud.enabled);
+        cJSON_AddStringToObject(nextcloud, "server_url", monConfig.nextcloud.server_url);
+        cJSON_AddStringToObject(nextcloud, "username", monConfig.nextcloud.username);
+        // SECURITY: Do not export Nextcloud password!
+        cJSON_AddStringToObject(nextcloud, "password", "");
+        cJSON_AddStringToObject(nextcloud, "backup_path", monConfig.nextcloud.backup_path);
+        cJSON_AddNumberToObject(nextcloud, "backup_interval_hours", monConfig.nextcloud.backup_interval_hours);
+        cJSON_AddBoolToObject(nextcloud, "keep_local_backup", monConfig.nextcloud.keep_local_backup);
+
         cJSON_AddItemToObject(root, "monitoring", mon);
     }
 
@@ -970,6 +982,31 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
             item = cJSON_GetObjectItem(mqtt, "ha_discovery_prefix");
             if (item && item->valuestring) strncpy(monConfig.mqtt.ha_discovery_prefix, item->valuestring, sizeof(monConfig.mqtt.ha_discovery_prefix)-1);
+        }
+
+        cJSON *nextcloud = cJSON_GetObjectItem(monJson, "nextcloud");
+        if (nextcloud) {
+            monConfig.nextcloud.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(nextcloud, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(nextcloud, "server_url");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.server_url, item->valuestring, sizeof(monConfig.nextcloud.server_url)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "username");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.username, item->valuestring, sizeof(monConfig.nextcloud.username)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "password");
+            // Only update password if provided and not empty (since backup has empty password)
+            if (item && item->valuestring && strlen(item->valuestring) > 0) {
+                 strncpy(monConfig.nextcloud.password, item->valuestring, sizeof(monConfig.nextcloud.password)-1);
+            }
+
+            item = cJSON_GetObjectItem(nextcloud, "backup_path");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.backup_path, item->valuestring, sizeof(monConfig.nextcloud.backup_path)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "backup_interval_hours");
+            if (item) monConfig.nextcloud.backup_interval_hours = (uint32_t)item->valueint;
+
+            monConfig.nextcloud.keep_local_backup = cJSON_GetBoolValue(cJSON_GetObjectItem(nextcloud, "keep_local_backup"));
         }
 
         monitoring_update_config(&monConfig);
@@ -1373,6 +1410,10 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_nextcloud_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_test_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_upload_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);

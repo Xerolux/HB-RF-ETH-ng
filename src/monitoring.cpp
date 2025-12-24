@@ -7,6 +7,7 @@
 
 #include "monitoring.h"
 #include "mqtt_handler.h"
+#include "nextcloud_client.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -56,6 +57,13 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_MQTT_PREFIX "mqtt_pfx"
 #define NVS_MQTT_HA_ENABLED "mqtt_ha_en"
 #define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
+#define NVS_NC_ENABLED "nc_en"
+#define NVS_NC_SERVER "nc_srv"
+#define NVS_NC_USER "nc_usr"
+#define NVS_NC_PASS "nc_pw"
+#define NVS_NC_PATH "nc_path"
+#define NVS_NC_INTERVAL "nc_int"
+#define NVS_NC_KEEP_LOCAL "nc_keep"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
@@ -149,6 +157,12 @@ static void checkmk_agent_task(void *pvParameters)
         return;
     }
 
+    // Set accept timeout to allow clean shutdown when checkmk_running becomes false
+    struct timeval accept_timeout;
+    accept_timeout.tv_sec = 1;
+    accept_timeout.tv_usec = 0;
+    setsockopt(listen_sock, SOL_SOCKET, SO_RCVTIMEO, &accept_timeout, sizeof(accept_timeout));
+
     ESP_LOGI(TAG, "CheckMK Agent listening on port %d", config->port);
 
     while (checkmk_running) {
@@ -157,8 +171,12 @@ static void checkmk_agent_task(void *pvParameters)
 
         int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_sock < 0) {
+            // Timeout is expected when no client connects - just continue
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
             if (checkmk_running) {
-                ESP_LOGE(TAG, "Accept failed");
+                ESP_LOGE(TAG, "Accept failed: errno %d", errno);
             }
             continue;
         }
@@ -346,6 +364,15 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled);
     nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix);
 
+    // Save Nextcloud config
+    nvs_set_u8(nvs_handle, NVS_NC_ENABLED, config->nextcloud.enabled);
+    nvs_set_str(nvs_handle, NVS_NC_SERVER, config->nextcloud.server_url);
+    nvs_set_str(nvs_handle, NVS_NC_USER, config->nextcloud.username);
+    nvs_set_str(nvs_handle, NVS_NC_PASS, config->nextcloud.password);
+    nvs_set_str(nvs_handle, NVS_NC_PATH, config->nextcloud.backup_path);
+    nvs_set_u32(nvs_handle, NVS_NC_INTERVAL, config->nextcloud.backup_interval_hours);
+    nvs_set_u8(nvs_handle, NVS_NC_KEEP_LOCAL, config->nextcloud.keep_local_backup);
+
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
@@ -379,6 +406,15 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.ha_discovery_enabled = false;
         strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
         config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
+
+        config->nextcloud.enabled = false;
+        config->nextcloud.server_url[0] = '\0';
+        config->nextcloud.username[0] = '\0';
+        config->nextcloud.password[0] = '\0';
+        strncpy(config->nextcloud.backup_path, "/HB-RF-ETH/backups", sizeof(config->nextcloud.backup_path) - 1);
+        config->nextcloud.backup_path[sizeof(config->nextcloud.backup_path) - 1] = '\0';
+        config->nextcloud.backup_interval_hours = 24;  // Daily by default
+        config->nextcloud.keep_local_backup = true;
 
         return ESP_OK;
     }
@@ -461,6 +497,47 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
     }
 
+    // Load Nextcloud config
+    if (nvs_get_u8(nvs_handle, NVS_NC_ENABLED, &u8_val) == ESP_OK) {
+        config->nextcloud.enabled = u8_val;
+    } else {
+        config->nextcloud.enabled = false;
+    }
+
+    str_len = sizeof(config->nextcloud.server_url);
+    if (nvs_get_str(nvs_handle, NVS_NC_SERVER, config->nextcloud.server_url, &str_len) != ESP_OK) {
+        config->nextcloud.server_url[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.username);
+    if (nvs_get_str(nvs_handle, NVS_NC_USER, config->nextcloud.username, &str_len) != ESP_OK) {
+        config->nextcloud.username[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.password);
+    if (nvs_get_str(nvs_handle, NVS_NC_PASS, config->nextcloud.password, &str_len) != ESP_OK) {
+        config->nextcloud.password[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.backup_path);
+    if (nvs_get_str(nvs_handle, NVS_NC_PATH, config->nextcloud.backup_path, &str_len) != ESP_OK) {
+        strncpy(config->nextcloud.backup_path, "/HB-RF-ETH/backups", sizeof(config->nextcloud.backup_path) - 1);
+        config->nextcloud.backup_path[sizeof(config->nextcloud.backup_path) - 1] = '\0';
+    }
+
+    uint32_t u32_val;
+    if (nvs_get_u32(nvs_handle, NVS_NC_INTERVAL, &u32_val) == ESP_OK) {
+        config->nextcloud.backup_interval_hours = u32_val;
+    } else {
+        config->nextcloud.backup_interval_hours = 24;
+    }
+
+    if (nvs_get_u8(nvs_handle, NVS_NC_KEEP_LOCAL, &u8_val) == ESP_OK) {
+        config->nextcloud.keep_local_backup = u8_val;
+    } else {
+        config->nextcloud.keep_local_backup = true;
+    }
+
     nvs_close(nvs_handle);
     return ESP_OK;
 }
@@ -499,6 +576,20 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         mqtt_handler_start(&current_config.mqtt);
     }
 
+    // Initialize Nextcloud client if enabled
+    if (current_config.nextcloud.enabled) {
+        esp_err_t ret = nextcloud_init(&current_config.nextcloud);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize Nextcloud client: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "Nextcloud client initialized");
+            // Start auto-backup if configured
+            if (current_config.nextcloud.backup_interval_hours > 0) {
+                nextcloud_start_auto_backup();
+            }
+        }
+    }
+
     return ESP_OK;
 }
 
@@ -515,6 +606,9 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     if (current_config.mqtt.enabled) {
         mqtt_handler_stop();
     }
+    if (current_config.nextcloud.enabled) {
+        nextcloud_stop_auto_backup();
+    }
 
     // Update config
     memcpy(&current_config, config, sizeof(monitoring_config_t));
@@ -529,6 +623,12 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     }
     if (current_config.mqtt.enabled) {
         mqtt_handler_start(&current_config.mqtt);
+    }
+    if (current_config.nextcloud.enabled) {
+        esp_err_t ret = nextcloud_init(&current_config.nextcloud);
+        if (ret == ESP_OK && current_config.nextcloud.backup_interval_hours > 0) {
+            nextcloud_start_auto_backup();
+        }
     }
 
     return ESP_OK;

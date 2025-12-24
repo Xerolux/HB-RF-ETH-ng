@@ -8,13 +8,128 @@
 static const char *TAG = "Analyzer";
 static Analyzer *_instance = NULL;
 
+// Maximum payload size: header (64) + max frame size (1024) * 2 (hex) = ~2560 bytes
+#define ANALYZER_PAYLOAD_BUFFER_SIZE 2560
+#define ANALYZER_BUFFER_POOL_SIZE 10
+
+// Forward declaration for buffer pool
+class AnalyzerBufferPool;
+
 struct AnalyzerWsSendJob {
     httpd_handle_t handle;
     int fd;
     char *payload;
     size_t len;
     Analyzer *analyzer;
+    AnalyzerBufferPool *pool;  // For returning to pool
+    uint8_t pool_index;        // Index in pool
 };
+
+// Pre-allocated buffer pool to eliminate malloc/free overhead and heap fragmentation
+class AnalyzerBufferPool {
+private:
+    AnalyzerWsSendJob _jobs[ANALYZER_BUFFER_POOL_SIZE];
+    char _payloads[ANALYZER_BUFFER_POOL_SIZE][ANALYZER_PAYLOAD_BUFFER_SIZE];
+    bool _job_in_use[ANALYZER_BUFFER_POOL_SIZE];
+    bool _payload_in_use[ANALYZER_BUFFER_POOL_SIZE];
+    SemaphoreHandle_t _mutex;
+
+public:
+    AnalyzerBufferPool() {
+        _mutex = xSemaphoreCreateMutex();
+        if (!_mutex) {
+            ESP_LOGE(TAG, "Failed to create buffer pool mutex");
+            return;
+        }
+
+        // Initialize all slots as free
+        for (int i = 0; i < ANALYZER_BUFFER_POOL_SIZE; i++) {
+            _job_in_use[i] = false;
+            _payload_in_use[i] = false;
+            _jobs[i].pool = this;
+            _jobs[i].pool_index = i;
+            _jobs[i].payload = nullptr;
+        }
+
+        ESP_LOGI(TAG, "Buffer pool initialized with %d slots (%zu bytes total)",
+                 ANALYZER_BUFFER_POOL_SIZE,
+                 sizeof(_jobs) + sizeof(_payloads));
+    }
+
+    ~AnalyzerBufferPool() {
+        if (_mutex) {
+            vSemaphoreDelete(_mutex);
+        }
+    }
+
+    // Allocate a job and payload buffer from the pool
+    AnalyzerWsSendJob* allocate() {
+        if (!_mutex) return nullptr;
+
+        AnalyzerWsSendJob* result = nullptr;
+
+        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10))) {
+            // Find free job slot
+            for (int i = 0; i < ANALYZER_BUFFER_POOL_SIZE; i++) {
+                if (!_job_in_use[i] && !_payload_in_use[i]) {
+                    _job_in_use[i] = true;
+                    _payload_in_use[i] = true;
+                    _jobs[i].payload = _payloads[i];
+                    _jobs[i].pool_index = i;
+                    result = &_jobs[i];
+                    break;
+                }
+            }
+            xSemaphoreGive(_mutex);
+        }
+
+        if (!result) {
+            ESP_LOGW(TAG, "Buffer pool exhausted, all %d slots in use", ANALYZER_BUFFER_POOL_SIZE);
+        }
+
+        return result;
+    }
+
+    // Return a job and its payload to the pool
+    void free(AnalyzerWsSendJob* job) {
+        if (!job || !_mutex) return;
+
+        uint8_t index = job->pool_index;
+        if (index >= ANALYZER_BUFFER_POOL_SIZE) {
+            ESP_LOGE(TAG, "Invalid pool index %d", index);
+            return;
+        }
+
+        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10))) {
+            if (_job_in_use[index]) {
+                _job_in_use[index] = false;
+                _payload_in_use[index] = false;
+                job->payload = nullptr;
+            }
+            xSemaphoreGive(_mutex);
+        }
+    }
+
+    // Get pool statistics for monitoring
+    void getStats(int& free_slots, int& used_slots) {
+        free_slots = 0;
+        used_slots = 0;
+
+        if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10))) {
+            for (int i = 0; i < ANALYZER_BUFFER_POOL_SIZE; i++) {
+                if (_job_in_use[i]) {
+                    used_slots++;
+                } else {
+                    free_slots++;
+                }
+            }
+            xSemaphoreGive(_mutex);
+        }
+    }
+};
+
+// Global buffer pool instance
+static AnalyzerBufferPool _bufferPool;
 
 static void analyzer_ws_send(void *arg)
 {
@@ -39,8 +154,8 @@ static void analyzer_ws_send(void *arg)
         }
     }
 
-    free(job->payload);
-    free(job);
+    // Return buffer to pool instead of free()
+    _bufferPool.free(job);
 }
 
 // Friend function for FreeRTOS task
@@ -291,16 +406,17 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     }
 
     for (size_t i = 0; i < client_fds.size(); i++) {
-        AnalyzerWsSendJob *job = static_cast<AnalyzerWsSendJob *>(malloc(sizeof(AnalyzerWsSendJob)));
+        // Allocate from buffer pool instead of malloc()
+        AnalyzerWsSendJob *job = _bufferPool.allocate();
         if (!job) {
-            ESP_LOGE(TAG, "Failed to allocate ws send job");
+            ESP_LOGW(TAG, "Buffer pool exhausted, dropping frame for client %d", client_fds[i]);
             continue;
         }
 
-        job->payload = static_cast<char *>(malloc(offset));
-        if (!job->payload) {
-            ESP_LOGE(TAG, "Failed to allocate ws payload");
-            free(job);
+        // Payload buffer already allocated by pool
+        if (offset > ANALYZER_PAYLOAD_BUFFER_SIZE) {
+            ESP_LOGE(TAG, "Payload too large for buffer pool: %d > %d", offset, ANALYZER_PAYLOAD_BUFFER_SIZE);
+            _bufferPool.free(job);
             continue;
         }
 
@@ -313,11 +429,10 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
         esp_err_t work_ret = httpd_queue_work(job->handle, analyzer_ws_send, job);
         if (work_ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to queue ws send for client %d: %s", job->fd, esp_err_to_name(work_ret));
-            // Save values before freeing job
+            // Save values before returning to pool
             httpd_handle_t handle = job->handle;
             int fd = job->fd;
-            free(job->payload);
-            free(job);
+            _bufferPool.free(job);
             removeClient(handle, fd);
         }
     }

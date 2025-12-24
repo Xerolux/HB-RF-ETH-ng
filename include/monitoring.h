@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include "esp_err.h"
+#include "nextcloud_client.h"
 
 // Forward declarations
 class SysInfo;
@@ -48,6 +49,7 @@ typedef struct {
     snmp_config_t snmp;
     checkmk_config_t checkmk;
     mqtt_config_t mqtt;
+    nextcloud_config_t nextcloud;
 } monitoring_config_t;
 
 // Initialize monitoring subsystem

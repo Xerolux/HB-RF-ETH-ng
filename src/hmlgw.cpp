@@ -36,6 +36,65 @@ const char CMD_KEEPALIVE = 'K';
 const char CMD_SERIAL = 'S';
 static const char* IDENTIFIER = "HM-USB-IF";
 
+/**
+ * Ring Buffer for efficient HMLGW data handling
+ *
+ * Eliminates heap fragmentation from std::vector reallocations
+ * Reduces CPU overhead from copy operations
+ * Provides predictable memory usage (fixed 8KB)
+ */
+class RingBuffer {
+private:
+    static const size_t BUFFER_SIZE = 8192;  // Fixed 8KB buffer
+    uint8_t _data[BUFFER_SIZE];
+    size_t _readPos;
+    size_t _writePos;
+    size_t _count;  // Number of bytes currently in buffer
+
+public:
+    RingBuffer() : _readPos(0), _writePos(0), _count(0) {}
+
+    size_t size() const { return _count; }
+    size_t capacity() const { return BUFFER_SIZE; }
+    size_t available() const { return BUFFER_SIZE - _count; }
+
+    // Write data to buffer
+    size_t write(const uint8_t* data, size_t len) {
+        size_t toWrite = (len > available()) ? available() : len;
+        for (size_t i = 0; i < toWrite; i++) {
+            _data[_writePos] = data[i];
+            _writePos = (_writePos + 1) % BUFFER_SIZE;
+        }
+        _count += toWrite;
+        return toWrite;
+    }
+
+    // Peek at data without removing it
+    uint8_t operator[](size_t index) const {
+        if (index >= _count) return 0;
+        return _data[(_readPos + index) % BUFFER_SIZE];
+    }
+
+    // Remove processed bytes from buffer
+    void consume(size_t bytes) {
+        if (bytes > _count) bytes = _count;
+        _readPos = (_readPos + bytes) % BUFFER_SIZE;
+        _count -= bytes;
+    }
+
+    // Clear buffer
+    void clear() {
+        _readPos = _writePos = _count = 0;
+    }
+
+    // Copy contiguous data for processing (needed for sendFrame)
+    void copyData(uint8_t* dest, size_t offset, size_t len) const {
+        for (size_t i = 0; i < len && (offset + i) < _count; i++) {
+            dest[i] = _data[(_readPos + offset + i) % BUFFER_SIZE];
+        }
+    }
+};
+
 Hmlgw::Hmlgw(RadioModuleConnector* connector, uint16_t port, uint16_t keepAlivePort)
     : _connector(connector), _running(false), _serverSocket(-1), _clientSocket(-1),
       _taskHandle(NULL), _port(port), _keepAlivePort(keepAlivePort),
@@ -161,6 +220,12 @@ void Hmlgw::run() {
         return;
     }
 
+    // Set accept timeout to allow clean shutdown
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(_serverSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
     ESP_LOGI(TAG, "HMLGW Server listening on port %d", _port);
 
     while (_running) {
@@ -168,6 +233,10 @@ void Hmlgw::run() {
         socklen_t addr_len = sizeof(source_addr);
         int sock = accept(_serverSocket, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
+            // Timeout is normal when no client connects
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
             ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
             break;
         }
@@ -214,6 +283,12 @@ void Hmlgw::runKeepAlive() {
         return;
     }
 
+    // Set accept timeout to allow clean shutdown
+    struct timeval timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    setsockopt(_keepAliveServerSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
     ESP_LOGI(TAG, "HMLGW KeepAlive listening on port %d", _keepAlivePort);
 
     while (_running) {
@@ -221,24 +296,34 @@ void Hmlgw::runKeepAlive() {
         socklen_t addr_len = sizeof(source_addr);
         int sock = accept(_keepAliveServerSocket, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
-             vTaskDelay(100 / portTICK_PERIOD_MS);
+             // Timeout is normal when no client connects
+             if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                 continue;
+             }
+             ESP_LOGW(TAG, "KeepAlive accept error: errno %d", errno);
              continue;
         }
 
         _keepAliveClientSocket = sock;
-        // Keepalive usually just accepts connection and maybe echoes?
-        // Or just holds it open.
-        // We will just read and discard, or echo.
+
+        // Set recv timeout on client socket
+        setsockopt(_keepAliveClientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+        // KeepAlive protocol: accept connection and hold it open
+        // Read and discard any data (protocol doesn't require echo)
         char rx_buffer[128];
         while (_running) {
             int len = recv(_keepAliveClientSocket, rx_buffer, sizeof(rx_buffer) - 1, 0);
             if (len < 0) {
-                break;
+                // Timeout or error - check if we should continue
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    continue;  // Timeout, keep connection alive
+                }
+                break;  // Real error, close connection
             } else if (len == 0) {
-                break;
+                break;  // Client closed connection
             }
-            // Echo back? Or just ignore?
-            // "K" is sent on Data port.
+            // Data received but ignored (KeepAlive doesn't echo)
         }
         close(_keepAliveClientSocket);
         _keepAliveClientSocket = -1;
@@ -249,31 +334,25 @@ void Hmlgw::runKeepAlive() {
 }
 
 void Hmlgw::handleClient() {
-    std::vector<uint8_t> buffer;
+    RingBuffer buffer;  // Ring buffer eliminates heap fragmentation
     uint8_t rx_buffer[1024];
-    uint32_t loop_count = 0;
+    uint8_t temp_frame[8192];  // Temporary buffer for frame extraction
 
-    // Set socket to non-blocking mode
-    int flags = fcntl(_clientSocket, F_GETFL, 0);
-    fcntl(_clientSocket, F_SETFL, flags | O_NONBLOCK);
-
-    // Set receive timeout to prevent indefinite blocking
+    // Set receive timeout to allow periodic checking of _running flag
+    // Socket remains BLOCKING - recv() will wait up to 1 second for data
+    // This eliminates busy-wait polling (previously polled every 10ms)
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
     setsockopt(_clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     while (_running) {
+        // Blocking recv with 1-second timeout - eliminates CPU waste during idle
         int len = recv(_clientSocket, rx_buffer, sizeof(rx_buffer), 0);
         if (len < 0) {
+            // Check if it's just a timeout (expected when no data)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                vTaskDelay(10 / portTICK_PERIOD_MS);
-
-                // Yield periodically to prevent watchdog timeout
-                loop_count++;
-                if (loop_count % 10 == 0) {
-                    taskYIELD();
-                }
+                // Timeout occurred - this is normal, just continue waiting
                 continue;
             }
             ESP_LOGE(TAG, "Error occurred during recv: errno %d", errno);
@@ -283,12 +362,15 @@ void Hmlgw::handleClient() {
             break;
         }
 
-        // Append new data to buffer
-        buffer.insert(buffer.end(), rx_buffer, rx_buffer + len);
+        // Write new data to ring buffer
+        size_t written = buffer.write(rx_buffer, len);
+        if (written < (size_t)len) {
+            ESP_LOGW(TAG, "Ring buffer full, dropped %d bytes", len - written);
+        }
 
-        // Limit buffer size to prevent memory exhaustion
-        if (buffer.size() > 65536) {
-            ESP_LOGE(TAG, "Buffer overflow protection - clearing buffer");
+        // Ring buffer overflow protection (should never happen with 8KB buffer)
+        if (buffer.size() >= buffer.capacity()) {
+            ESP_LOGE(TAG, "Ring buffer full - clearing");
             buffer.clear();
             continue;
         }
@@ -319,8 +401,9 @@ void Hmlgw::handleClient() {
                      }
 
                      if (processed + 3 + dataLen <= buffer.size()) {
-                         // We have the full frame
-                         _connector->sendFrame(&buffer[processed+3], dataLen);
+                         // We have the full frame - extract to temp buffer
+                         buffer.copyData(temp_frame, processed + 3, dataLen);
+                         _connector->sendFrame(temp_frame, dataLen);
                          processed += 3 + dataLen;
                      } else {
                          // Partial frame... wait for more data
@@ -337,9 +420,9 @@ void Hmlgw::handleClient() {
             }
         }
 
-        // Remove processed data from buffer
+        // Remove processed data from ring buffer (zero-copy operation)
         if (processed > 0) {
-            buffer.erase(buffer.begin(), buffer.begin() + processed);
+            buffer.consume(processed);
         }
 
         // Yield to prevent watchdog timeout

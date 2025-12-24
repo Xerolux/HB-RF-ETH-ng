@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "esp_log.h"
 
 static uint8_t _blinkState = 0;
 static LED *_leds[MAX_LED_COUNT] = {0};
@@ -33,6 +34,9 @@ static int _highDuty;
 
 void ledSwitcherTask(void *parameter)
 {
+    static UBaseType_t stack_watermark_min = 1536;  // Start with allocated size
+    static uint32_t iteration_count = 0;
+
     for (;;)
     {
         _blinkState = (_blinkState + 1) % 24;
@@ -45,6 +49,19 @@ void ledSwitcherTask(void *parameter)
             }
             _leds[i]->updatePinState();
         }
+
+        // Monitor stack watermark every ~5 minutes (2400 iterations * 125ms)
+        iteration_count++;
+        if (iteration_count % 2400 == 0) {
+            UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
+            if (watermark < stack_watermark_min) {
+                stack_watermark_min = watermark;
+                ESP_LOGI("LED", "LED_Switcher stack watermark: %u bytes free (allocated: 1536, usage: %.1f%%)",
+                         watermark * sizeof(StackType_t),
+                         100.0 * (1536 - watermark * sizeof(StackType_t)) / 1536.0);
+            }
+        }
+
         vTaskDelay(125 / portTICK_PERIOD_MS);
     }
 
@@ -68,7 +85,9 @@ void LED::start(Settings *settings)
 
     if (!_switchTaskHandle)
     {
-        xTaskCreate(ledSwitcherTask, "LED_Switcher", 4096, NULL, 10, &_switchTaskHandle);
+        // Reduced from 4096 to 1536 bytes - simple task using hardware LEDC PWM
+        // Task only updates LED states via LEDC registers - minimal stack needed
+        xTaskCreate(ledSwitcherTask, "LED_Switcher", 1536, NULL, 10, &_switchTaskHandle);
     }
 }
 

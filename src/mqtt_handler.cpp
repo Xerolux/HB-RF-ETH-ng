@@ -69,8 +69,24 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_publish_task(void *pvParameters)
 {
+    static UBaseType_t stack_watermark_min = 2048;  // Start with allocated size
+    static uint32_t iteration_count = 0;
+
     while (mqtt_running) {
         mqtt_handler_publish_status();
+
+        // Monitor stack watermark every ~5 minutes (5 iterations * 60s)
+        iteration_count++;
+        if (iteration_count % 5 == 0) {
+            UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
+            if (watermark < stack_watermark_min) {
+                stack_watermark_min = watermark;
+                ESP_LOGI(TAG, "mqtt_publish stack watermark: %u bytes free (allocated: 2048, usage: %.1f%%)",
+                         watermark * sizeof(StackType_t),
+                         100.0 * (2048 - watermark * sizeof(StackType_t)) / 2048.0);
+            }
+        }
+
         // Publish every 60 seconds
         vTaskDelay(60000 / portTICK_PERIOD_MS);
     }
@@ -335,7 +351,9 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_running = true;
 
     // Start publishing task
-    xTaskCreate(mqtt_publish_task, "mqtt_publish", 4096, NULL, 5, &mqtt_publish_task_handle);
+    // Reduced from 4096 to 2048 bytes - simple periodic task with small stack buffers
+    // Only calls mqtt_handler_publish_status() every 60 seconds
+    xTaskCreate(mqtt_publish_task, "mqtt_publish", 2048, NULL, 5, &mqtt_publish_task_handle);
 
     return ESP_OK;
 }
