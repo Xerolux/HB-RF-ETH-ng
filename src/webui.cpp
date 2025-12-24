@@ -522,10 +522,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
-    // Check for password length to prevent truncation/lockout
-    if (adminPassword && strlen(adminPassword) > MAX_PASSWORD_LENGTH) {
-        cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password too long");
+    // Enforce strict password validation if password is being set
+    if (adminPassword && strlen(adminPassword) > 0) {
+        if (!validatePassword(adminPassword)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password does not meet complexity requirements (min 6 chars, letters + numbers)");
+        }
     }
 
     char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
@@ -1301,22 +1303,7 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     char *newPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "newPassword"));
 
-    // Regex: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$ - approximated with manual checks
-    bool has_letter = false;
-    bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6) && (strlen(newPassword) <= MAX_PASSWORD_LENGTH);
-
-    if (is_valid_length) {
-        for (int i = 0; newPassword[i] != 0; i++) {
-            if ((newPassword[i] >= 'a' && newPassword[i] <= 'z') || (newPassword[i] >= 'A' && newPassword[i] <= 'Z')) {
-                has_letter = true;
-            } else if (newPassword[i] >= '0' && newPassword[i] <= '9') {
-                has_digit = true;
-            }
-        }
-    }
-
-    if (!is_valid_length || !has_letter || !has_digit)
+    if (!validatePassword(newPassword))
     {
         cJSON_Delete(root);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 6 characters and contain letters and numbers");

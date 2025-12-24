@@ -43,3 +43,4 @@ bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
 bool validateNtpServer(const char *ntpServer);
+bool validatePassword(const char *password);
