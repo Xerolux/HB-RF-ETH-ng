@@ -48,4 +48,5 @@ public:
     double getTemperature() const;
     uint64_t getUptimeSeconds() const;
     const char* getResetReason() const;
+    void markSysInfoRequested();
 };

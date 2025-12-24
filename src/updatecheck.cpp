@@ -29,6 +29,7 @@
 #include "esp_task_wdt.h"
 #include "string.h"
 #include "cJSON.h"
+#include "semver.h"
 
 static const char *TAG = "UpdateCheck";
 static const char *FALLBACK_RELEASE_NOTES = "Release notes are not available.";
@@ -307,7 +308,7 @@ void UpdateCheck::_taskFunc()
       ESP_LOGI(TAG, "Start checking for the latest available firmware.");
       _updateLatestVersion();
 
-      if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+      if (strcmp(_latestVersion, "n/a") != 0 && compareVersions(_latestVersion, _sysInfo->getCurrentVersion()) > 0)
       {
         ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
         _statusLED->setState(LED_STATE_BLINK_SLOW);
