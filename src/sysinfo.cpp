@@ -44,6 +44,7 @@ static volatile float _cpuUsage = 0.0f;
 static volatile float _memoryUsage = 0.0f;
 static volatile float _temperature = -127.0f;
 static volatile uint32_t _supplyVoltageMv = 0;
+static volatile uint32_t _lastSysInfoRequestTime = 0;
 static char _serial[13];
 static const char *_currentVersion;
 static board_type_t _board;
@@ -69,30 +70,36 @@ void updateCPUUsageTask(void *arg)
 
     for (;;)
     {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Optimize performance: Only calculate CPU usage if SysInfo was recently requested
+        // If no one is looking at the dashboard, we don't need to burn cycles calculating CPU usage
+        bool active = (xTaskGetTickCount() * portTICK_PERIOD_MS) - _lastSysInfoRequestTime < 5000;
 
-        UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
+        vTaskDelay((active ? 1000 : 2000) / portTICK_PERIOD_MS);
 
-        idleRunTime = 0;
+        if (active) {
+            UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
 
-        if (totalRunTime > 0)
-        {
-            for (int i = 0; i < taskCount; i++)
+            idleRunTime = 0;
+
+            if (totalRunTime > 0)
             {
-                TaskStatus_t ts = taskStatus[i];
-
-                if (ts.xHandle == idle0Task || ts.xHandle == idle1Task)
+                for (int i = 0; i < taskCount; i++)
                 {
-                    idleRunTime += ts.ulRunTimeCounter;
+                    TaskStatus_t ts = taskStatus[i];
+
+                    if (ts.xHandle == idle0Task || ts.xHandle == idle1Task)
+                    {
+                        idleRunTime += ts.ulRunTimeCounter;
+                    }
                 }
             }
+
+            // CPU Usage
+            _cpuUsage = 100.0f - ((idleRunTime - lastIdleRunTime) * 100.0f / ((totalRunTime - lastTotalRunTime) * 2));
+
+            lastIdleRunTime = idleRunTime;
+            lastTotalRunTime = totalRunTime;
         }
-
-        // CPU Usage
-        _cpuUsage = 100.0f - ((idleRunTime - lastIdleRunTime) * 100.0f / ((totalRunTime - lastTotalRunTime) * 2));
-
-        lastIdleRunTime = idleRunTime;
-        lastTotalRunTime = totalRunTime;
 
         // Memory Usage
         multi_heap_info_t info;
@@ -337,26 +344,31 @@ const char* SysInfo::getResetReason() const
     switch (reason)
     {
     case ESP_RST_POWERON:
-        return "Power-On Reset";
+        return "sysinfo.reset.poweron";
     case ESP_RST_SW:
-        return "Software Reset";
+        return "sysinfo.reset.sw";
     case ESP_RST_PANIC:
-        return "Exception/Panic";
+        return "sysinfo.reset.panic";
     case ESP_RST_INT_WDT:
-        return "Interrupt Watchdog";
+        return "sysinfo.reset.int_wdt";
     case ESP_RST_TASK_WDT:
-        return "Task Watchdog";
+        return "sysinfo.reset.task_wdt";
     case ESP_RST_WDT:
-        return "Other Watchdog";
+        return "sysinfo.reset.wdt";
     case ESP_RST_DEEPSLEEP:
-        return "Deep Sleep Reset";
+        return "sysinfo.reset.deepsleep";
     case ESP_RST_BROWNOUT:
-        return "Brownout Reset";
+        return "sysinfo.reset.brownout";
     case ESP_RST_SDIO:
-        return "SDIO Reset";
+        return "sysinfo.reset.sdio";
     case ESP_RST_EXT:
-        return "External Reset";
+        return "sysinfo.reset.ext";
     default:
-        return "Unknown";
+        return "sysinfo.reset.unknown";
     }
+}
+
+void SysInfo::markSysInfoRequested()
+{
+    _lastSysInfoRequestTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
 }

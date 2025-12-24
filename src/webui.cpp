@@ -260,6 +260,9 @@ httpd_uri_t post_login_json_handler = {
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
+    // Inform SysInfo that data was requested (wakes up CPU usage task)
+    _sysInfo->markSysInfoRequested();
+
     add_security_headers(req);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");

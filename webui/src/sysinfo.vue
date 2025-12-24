@@ -18,7 +18,7 @@
         <BFormInput type="text" :model-value="uptimeFormatted" disabled />
       </BFormGroup>
       <BFormGroup :label="t('sysinfo.resetReason')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.resetReason" disabled />
+        <BFormInput type="text" :model-value="t(sysInfoStore.resetReason)" disabled />
       </BFormGroup>
       <BFormGroup :label="t('sysinfo.cpuUsage')" label-cols-sm="4">
         <BProgress :max="100" height="2.25rem" class="form-control p-0">
