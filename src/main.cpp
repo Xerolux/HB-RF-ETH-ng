@@ -30,6 +30,8 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_pm.h"
+#include "esp_wifi.h"
 
 #include "pins.h"
 #include "led.h"
@@ -96,6 +98,24 @@ extern "C"
 
 void app_main()
 {
+    // CRITICAL: Disable all power management features for maximum performance
+    // Radio signals require immediate processing without delays
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 240,  // Maximum CPU frequency
+        .min_freq_mhz = 240,  // No CPU frequency scaling
+        .light_sleep_enable = false  // Disable light sleep
+    };
+    esp_err_t pm_err = esp_pm_configure(&pm_config);
+    if (pm_err == ESP_OK) {
+        ESP_LOGI(TAG, "Power management disabled - running at full performance");
+    } else {
+        ESP_LOGW(TAG, "Failed to configure power management: %s", esp_err_to_name(pm_err));
+    }
+
+    // Disable WiFi power saving (even though we use Ethernet)
+    // This ensures no interference from WiFi subsystem
+    esp_wifi_set_ps(WIFI_PS_NONE);
+
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
