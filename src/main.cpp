@@ -54,6 +54,7 @@
 #include "updatecheck.h"
 #include "monitoring.h"
 #include "dtls_encryption.h"
+#include "log_manager.h"
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -110,6 +111,9 @@ extern "C"
 
 void app_main()
 {
+    // Initialize logging immediately to capture startup events
+    LogManager::instance().start();
+
     // CRITICAL: Mark OTA update as valid immediately after boot
     // This must be done BEFORE any complex initialization that could cause a panic
     // Otherwise, ESP-IDF will automatically rollback to the previous firmware

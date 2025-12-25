@@ -26,6 +26,7 @@ export default {
     firmware: 'Firmware',
     monitoring: 'Monitoring',
     analyzer: 'Analyzer',
+    log: 'System Log',
     about: 'About',
     login: 'Login',
     logout: 'Logout',
@@ -346,5 +347,14 @@ export default {
     passwordsDoNotMatch: 'Passwords do not match',
     warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
     success: 'Password changed successfully'
+  },
+
+  // Log
+  log: {
+    title: 'System Log',
+    refresh: 'Refresh',
+    download: 'Download',
+    autoRefresh: 'Auto Refresh',
+    noLog: 'No log available.'
   }
 }
