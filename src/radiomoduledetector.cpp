@@ -44,13 +44,14 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
     _radioModuleConnector->addFrameHandler(this);
     _radioModuleConnector->setDecodeEscaped(true);
 
-    while (_detectState == DETECT_STATE_START_BL && _detectRetryCount < 3)
+    // Reduced timeout from 3s to 1s for faster detection when no module present
+    while (_detectState == DETECT_STATE_START_BL && _detectRetryCount < 2)
     {
         sendFrame(_detectMsgCounter++, HM_DST_COMMON, HM_CMD_COMMON_IDENTIFY, NULL, 0);
-        if (!sem_take(_detectWaitFrameDataSemaphore, 3))
+        if (!sem_take(_detectWaitFrameDataSemaphore, 1))
         {
             sendFrame(_detectMsgCounter++, HM_DST_HMSYSTEM, HM_CMD_HMSYSTEM_IDENTIFY, NULL, 0);
-            if (!sem_take(_detectWaitFrameDataSemaphore, 3))
+            if (!sem_take(_detectWaitFrameDataSemaphore, 1))
             {
                 _detectRetryCount++;
             }
@@ -58,13 +59,13 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
     }
 
     _detectRetryCount = 0;
-    while (_detectState == DETECT_STATE_START_APP && _detectRetryCount < 3)
+    while (_detectState == DETECT_STATE_START_APP && _detectRetryCount < 2)
     {
         sendFrame(_detectMsgCounter++, HM_DST_COMMON, HM_CMD_COMMON_IDENTIFY, NULL, 0);
-        if (!sem_take(_detectWaitFrameDataSemaphore, 3))
+        if (!sem_take(_detectWaitFrameDataSemaphore, 1))
         {
             sendFrame(_detectMsgCounter++, HM_DST_HMSYSTEM, HM_CMD_HMSYSTEM_IDENTIFY, NULL, 0);
-            if (!sem_take(_detectWaitFrameDataSemaphore, 3))
+            if (!sem_take(_detectWaitFrameDataSemaphore, 1))
             {
                 _detectRetryCount++;
             }
@@ -120,7 +121,7 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
             break;
         }
 
-        if (_detectState == DETECT_STATE_FINISHED || !sem_take(_detectWaitFrameDataSemaphore, 3))
+        if (_detectState == DETECT_STATE_FINISHED || !sem_take(_detectWaitFrameDataSemaphore, 1))
         {
             break;
         }

@@ -55,7 +55,8 @@
       "Bash(git push:*)",
       "Bash(C:Usersbasti.platformiopenvScriptsplatformio.exe run)",
       "Bash(/c/Users/basti/.platformio/penv/Scripts/platformio.exe run)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(cmd /c \"dir .pio\\build\\hb-rf-eth-ng\\firmware*.bin\")"
     ],
     "deny": [],
     "ask": []

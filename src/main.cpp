@@ -234,13 +234,14 @@ void app_main()
 
         const uint8_t *firmwareVersion = radioModuleDetector.getFirmwareVersion();
         ESP_LOGI(TAG, "  Firmware Version: %d.%d.%d", *firmwareVersion, *(firmwareVersion + 1), *(firmwareVersion + 2));
+
+        // Only reset module if one was detected
+        radioModuleConnector.resetModule();
     }
     else
     {
-        ESP_LOGW(TAG, "Radio module could not be detected.");
+        ESP_LOGW(TAG, "Radio module could not be detected. System will continue without radio functionality.");
     }
-
-    radioModuleConnector.resetModule();
 
     // Initialize DTLS encryption (works only in Raw UART mode)
     DTLSEncryption dtlsEncryption;
