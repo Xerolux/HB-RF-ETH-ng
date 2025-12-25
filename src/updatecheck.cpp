@@ -338,43 +338,108 @@ void UpdateCheck::_taskFunc()
 
 void UpdateCheck::performOnlineUpdate()
 {
+    ESP_LOGI(TAG, "performOnlineUpdate called");
+
+    // First check if there's a version available
     if (strcmp(_latestVersion, "n/a") == 0) {
-        ESP_LOGE(TAG, "No update version available");
+        ESP_LOGE(TAG, "No update version available - cannot proceed with update");
+        _statusLED->setState(LED_STATE_ON);
+        return;
+    }
+
+    ESP_LOGI(TAG, "Latest version available: %s", _latestVersion);
+
+    // Verify we have a download URL
+    if (!hasDownloadUrl()) {
+        ESP_LOGE(TAG, "No download URL available for online update");
+        _statusLED->setState(LED_STATE_ON);
         return;
     }
 
     char url[DOWNLOAD_URL_SIZE];
-    if (hasDownloadUrl()) {
-        strncpy(url, _downloadUrl, sizeof(url) - 1);
-        url[sizeof(url) - 1] = '\0';
-    } else {
-        ESP_LOGE(TAG, "No download URL available for online update");
-        return;
-    }
+    strncpy(url, _downloadUrl, sizeof(url) - 1);
+    url[sizeof(url) - 1] = '\0';
 
-    ESP_LOGI(TAG, "Starting OTA update from %s", url);
+    ESP_LOGI(TAG, "Starting OTA update from: %s", url);
     _statusLED->setState(LED_STATE_BLINK_FAST);
 
     // Disable task watchdog for this task during OTA update
     // OTA updates can take several seconds and may trigger watchdog timeout
-    esp_task_wdt_delete(xTaskGetCurrentTaskHandle());
+    TaskHandle_t current_task = xTaskGetCurrentTaskHandle();
+    esp_err_t wdt_err = esp_task_wdt_delete(current_task);
+    if (wdt_err != ESP_OK && wdt_err != ESP_ERR_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to remove task from watchdog: %s (continuing anyway)", esp_err_to_name(wdt_err));
+    } else {
+        ESP_LOGI(TAG, "Task watchdog disabled for OTA update");
+    }
 
+    // Configure HTTP client with proper timeouts
     esp_http_client_config_t config = {};
     config.url = url;
     config.crt_bundle_attach = esp_crt_bundle_attach;
     config.keep_alive_enable = true;
+    config.timeout_ms = 30000;  // 30 second timeout for OTA operations
+    config.buffer_size = 4096;
+    config.buffer_size_tx = 2048;
+
+    // Set GitHub headers
+    esp_http_client_handle_t http_client = esp_http_client_init(&config);
+    if (!http_client) {
+        ESP_LOGE(TAG, "Failed to initialize HTTP client for OTA");
+        _statusLED->setState(LED_STATE_ON);
+        // Re-enable watchdog
+        esp_task_wdt_add(current_task);
+        return;
+    }
+
+    esp_http_client_set_header(http_client, "User-Agent", "HB-RF-ETH-ng");
+    esp_http_client_set_header(http_client, "Accept", "application/octet-stream");
 
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &config;
 
+    ESP_LOGI(TAG, "Beginning HTTPS OTA update...");
     esp_err_t ret = esp_https_ota(&ota_config);
+
+    esp_http_client_cleanup(http_client);
+
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "OTA Update successful, restarting...");
+        ESP_LOGI(TAG, "OTA Update successful! Restarting in 2 seconds...");
+        _statusLED->setState(LED_STATE_OFF);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
         esp_restart();  // System restart - no need to re-enable watchdog
     } else {
-        ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "OTA Update failed with error: %s (0x%x)", esp_err_to_name(ret), ret);
+
+        // Provide more detailed error information
+        switch(ret) {
+            case ESP_ERR_INVALID_ARG:
+                ESP_LOGE(TAG, "Invalid argument - check URL format");
+                break;
+            case ESP_ERR_OTA_VALIDATE_FAILED:
+                ESP_LOGE(TAG, "OTA validation failed - firmware image invalid");
+                break;
+            case ESP_ERR_NO_MEM:
+                ESP_LOGE(TAG, "Insufficient memory for OTA update");
+                break;
+            case ESP_ERR_FLASH_OP_TIMEOUT:
+            case ESP_ERR_FLASH_OP_FAIL:
+                ESP_LOGE(TAG, "Flash operation failed");
+                break;
+            case ESP_FAIL:
+                ESP_LOGE(TAG, "Generic failure - check network connection and URL");
+                break;
+            default:
+                ESP_LOGE(TAG, "Unknown error occurred during OTA");
+                break;
+        }
+
         _statusLED->setState(LED_STATE_ON);
+
         // Re-enable watchdog for this task
-        esp_task_wdt_add(xTaskGetCurrentTaskHandle());
+        esp_err_t wdt_add_err = esp_task_wdt_add(current_task);
+        if (wdt_add_err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to re-add task to watchdog: %s", esp_err_to_name(wdt_add_err));
+        }
     }
 }

@@ -127,10 +127,21 @@ void Settings::load()
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
   {
-    ESP_ERROR_CHECK(nvs_flash_erase());
+    ESP_LOGW(TAG, "NVS partition needs to be erased (err: %s)", esp_err_to_name(err));
+    esp_err_t erase_err = nvs_flash_erase();
+    if (erase_err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to erase NVS flash: %s - using defaults", esp_err_to_name(erase_err));
+      // Continue with defaults - don't crash
+      return;
+    }
     err = nvs_flash_init();
   }
-  ESP_ERROR_CHECK(err);
+
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize NVS flash: %s - using defaults", esp_err_to_name(err));
+    // Continue with defaults instead of crashing
+    return;
+  }
 
   err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
   if (err != ESP_OK) {
