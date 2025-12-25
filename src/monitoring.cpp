@@ -193,24 +193,30 @@ static void checkmk_agent_task(void *pvParameters)
         }
 
         // Send CheckMK agent output
-        char output[CHECKMK_OUTPUT_BUFFER_SIZE];
+        // Allocate buffer on heap to prevent stack overflow (2KB buffer on 4KB stack is unsafe)
+        char *output = (char *)malloc(CHECKMK_OUTPUT_BUFFER_SIZE);
+        if (!output) {
+            ESP_LOGE(TAG, "Failed to allocate memory for CheckMK output");
+            close(client_sock);
+            continue;
+        }
         size_t len = 0;
 
         // Helper for safe appending to buffer
         auto safe_append = [&](const char* format, ...) {
-            if (len >= sizeof(output) - 1) return; // Buffer full
+            if (len >= CHECKMK_OUTPUT_BUFFER_SIZE - 1) return; // Buffer full
 
             va_list args;
             va_start(args, format);
-            int ret = vsnprintf(output + len, sizeof(output) - len, format, args);
+            int ret = vsnprintf(output + len, CHECKMK_OUTPUT_BUFFER_SIZE - len, format, args);
             va_end(args);
 
             if (ret > 0) {
-                if (len + ret < sizeof(output)) {
+                if (len + ret < CHECKMK_OUTPUT_BUFFER_SIZE) {
                     len += ret;
                 } else {
                     // Truncated - saturate to max
-                    len = sizeof(output) - 1;
+                    len = CHECKMK_OUTPUT_BUFFER_SIZE - 1;
                     output[len] = '\0';
                 }
             }
@@ -240,6 +246,7 @@ static void checkmk_agent_task(void *pvParameters)
 
         // Send data
         send(client_sock, output, len, 0);
+        free(output);
 
         close(client_sock);
         ESP_LOGI(TAG, "CheckMK client disconnected");
