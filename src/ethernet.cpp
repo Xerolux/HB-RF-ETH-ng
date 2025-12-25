@@ -101,11 +101,56 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
 void Ethernet::start()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle));
+
+    // Configure PHY LEDs after starting
+    _configurePHYLEDs();
 }
 
 void Ethernet::stop()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_stop(_eth_handle));
+}
+
+void Ethernet::_configurePHYLEDs()
+{
+    // LAN8720 PHY LED Configuration
+    // Register 31 (0x1F): Special Control/Status Register
+    // Bits [14:12] control LED mode:
+    //   001b: LED1=Link, LED2=Activity
+    //   010b: LED1=Link/Activity, LED2=100Mbps
+    //   111b: LED1=Link/Activity, LED2=Link/Activity
+
+    // Structure for PHY register read/write
+    struct {
+        uint32_t reg_addr;
+        uint32_t reg_value;
+    } phy_reg;
+
+    // Read current value of register 31 (0x1F)
+    phy_reg.reg_addr = 0x1F;
+    phy_reg.reg_value = 0;
+
+    esp_err_t err = esp_eth_ioctl(_eth_handle, ETH_CMD_READ_PHY_REG, &phy_reg);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to read PHY register 31: %s", esp_err_to_name(err));
+        return;
+    }
+
+    ESP_LOGI(TAG, "PHY register 31 current value: 0x%04X", phy_reg.reg_value);
+
+    // Clear LED_CFG bits [14:12] and set to mode 001b (Link on LED1, Activity on LED2)
+    phy_reg.reg_value = (phy_reg.reg_value & ~(0x7 << 12)) | (0x1 << 12);
+
+    // Write back to register 31
+    err = esp_eth_ioctl(_eth_handle, ETH_CMD_WRITE_PHY_REG, &phy_reg);
+    if (err != ESP_OK)
+    {
+        ESP_LOGW(TAG, "Failed to write PHY register 31: %s", esp_err_to_name(err));
+        return;
+    }
+
+    ESP_LOGI(TAG, "PHY LED mode configured: LED1=Link, LED2=Activity (reg 31 = 0x%04X)", phy_reg.reg_value);
 }
 
 void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2)
