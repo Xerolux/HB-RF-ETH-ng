@@ -72,7 +72,11 @@
             variant="primary"
             block
             @click="checkUpdateClick"
-        >{{ t('firmware.checkUpdate') }}</BButton>
+            :disabled="checkUpdateLoading"
+        >
+          <BSpinner small v-if="checkUpdateLoading" class="me-2" />
+          {{ t('firmware.checkUpdate') }}
+        </BButton>
       </BFormGroup>
 
       <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
@@ -152,9 +156,12 @@
         <BButton
           variant="warning"
           block
-          :disabled="firmwareUpdateStore.progress > 0"
+          :disabled="firmwareUpdateStore.progress > 0 || restartLoading"
           @click="restartClick"
-        >{{ t('firmware.restart') }}</BButton>
+        >
+          <BSpinner small v-if="restartLoading" class="me-2" />
+          {{ t('firmware.restart') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -174,6 +181,8 @@ const firmwareUpdateStore = useFirmwareUpdateStore()
 const file = ref(null)
 const showError = ref(false)
 const showSuccess = ref(false)
+const checkUpdateLoading = ref(false)
+const restartLoading = ref(false)
 
 const showReleaseNotes = ref(false)
 const releaseNotes = ref('')
@@ -253,6 +262,7 @@ const firmwareUpdateClick = async () => {
 
 const restartClick = async () => {
   if (confirm(t('firmware.restartConfirm'))) {
+    restartLoading.value = true
     try {
       await fetch('/api/restart', { method: 'POST' })
       alert(t('common.rebootingWait'))
@@ -261,11 +271,14 @@ const restartClick = async () => {
       }, 10000)
     } catch (error) {
       // Expected - device will restart and connection will be lost
+    } finally {
+      // restartLoading.value = false // No need to reset if page reloads, but good practice if it fails
     }
   }
 }
 
 const checkUpdateClick = async () => {
+    checkUpdateLoading.value = true
     try {
         const response = await axios.post('/api/check_update')
         if (response.data && response.data.latestVersion) {
@@ -283,6 +296,8 @@ const checkUpdateClick = async () => {
     } catch (e) {
         console.error(e)
         alert('Failed to check updates')
+    } finally {
+        checkUpdateLoading.value = false
     }
 }
 
