@@ -40,8 +40,8 @@ Settings::Settings()
 
 static const char *TAG = "Settings";
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
-static const char *NVS_ADMIN_PWD_SALT = "adminPasswordSalt";
-static const char *NVS_ADMIN_PWD_HASH = "adminPasswordHash";
+static const char *NVS_ADMIN_PWD_SALT = "admPwdSalt";
+static const char *NVS_ADMIN_PWD_HASH = "admPwdHash";
 static const char *NVS_ADMIN_PWD_LEGACY = "adminPassword";
 
 #define GET_IP_ADDR(handle, name, var, defaultValue)  \

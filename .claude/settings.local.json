@@ -56,7 +56,11 @@
       "Bash(C:Usersbasti.platformiopenvScriptsplatformio.exe run)",
       "Bash(/c/Users/basti/.platformio/penv/Scripts/platformio.exe run)",
       "Bash(git restore:*)",
-      "Bash(cmd /c \"dir .pio\\build\\hb-rf-eth-ng\\firmware*.bin\")"
+      "Bash(cmd /c \"dir .pio\\build\\hb-rf-eth-ng\\firmware*.bin\")",
+      "Bash(cmd /c \"python -m platformio run -e hb-rf-eth-ng\")",
+      "Bash(/c/Users/basti/.platformio/penv/Scripts/platformio.exe run:*)",
+      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe run:*)",
+      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe device monitor:*)"
     ],
     "deny": [],
     "ask": []

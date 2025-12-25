@@ -63,7 +63,7 @@ static void heap_monitor_task(void *pvParameters)
     LED *statusLED = (LED *)pvParameters;
     uint32_t low_water_mark = 0;
     const uint32_t critical_threshold = 20480;  // 20KB critical threshold
-    UBaseType_t stack_watermark_min = 1536;  // Start with allocated size
+    UBaseType_t stack_watermark_min = 2560;  // Start with allocated size
 
     for (;;)
     {
@@ -84,7 +84,7 @@ static void heap_monitor_task(void *pvParameters)
         UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
         if (watermark < stack_watermark_min) {
             stack_watermark_min = watermark;
-            ESP_LOGI(TAG, "heap_monitor stack watermark: %u bytes free (allocated: 1536)",
+            ESP_LOGI(TAG, "heap_monitor stack watermark: %u bytes free (allocated: 2560)",
                      watermark * sizeof(StackType_t));
         }
 
@@ -96,7 +96,7 @@ static void heap_monitor_task(void *pvParameters)
                      free_heap, min_free_heap);
             ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u bytes (%.1f%% used)",
                      stack_watermark_min * sizeof(StackType_t),
-                     100.0 * (1536 - stack_watermark_min * sizeof(StackType_t)) / 1536.0);
+                     100.0 * (2560 - stack_watermark_min * sizeof(StackType_t)) / 2560.0);
         }
 
         vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds
@@ -306,8 +306,8 @@ void app_main()
     ESP_LOGI(TAG, "Largest free block: %lu bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
     // Start heap monitoring task
-    // Reduced from 2048 to 1536 bytes - very simple monitoring task
-    xTaskCreate(heap_monitor_task, "heap_monitor", 1536, &statusLED, 1, NULL);
+    // Increased to 2560 bytes to accommodate ESP_LOG* macro stack usage
+    xTaskCreate(heap_monitor_task, "heap_monitor", 2560, &statusLED, 1, NULL);
 
     vTaskSuspend(NULL);
 }
