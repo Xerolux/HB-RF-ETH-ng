@@ -1244,24 +1244,63 @@ static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
       return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
   }
 
+  ESP_LOGI(TAG, "Online update requested via WebUI");
+
+  // First check for updates to ensure we have the latest version info
+  _updateCheck->checkNow();
+
+  // Verify that we have a valid version and download URL
+  const char* latest_version = _updateCheck->getLatestVersion();
+  bool has_url = _updateCheck->hasDownloadUrl();
+
+  ESP_LOGI(TAG, "Latest version: %s, Has download URL: %d", latest_version, has_url);
+
+  if (strcmp(latest_version, "n/a") == 0) {
+      ESP_LOGW(TAG, "No update available - version check returned 'n/a'");
+      httpd_resp_set_type(req, "application/json");
+      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No update available. Please check your internet connection and try again.\"}");
+      return ESP_OK;
+  }
+
+  if (!has_url) {
+      ESP_LOGW(TAG, "No download URL available for version %s", latest_version);
+      httpd_resp_set_type(req, "application/json");
+      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No download URL found for the update. Please try again later.\"}");
+      return ESP_OK;
+  }
+
+  ESP_LOGI(TAG, "Starting online update to version %s", latest_version);
+
   // Create a task to perform the update because it's blocking
   struct TaskArgs {
       UpdateCheck* updateCheck;
   };
 
   TaskArgs* args = new TaskArgs();
-  _updateCheck->checkNow();
   args->updateCheck = _updateCheck;
 
-  xTaskCreate([](void* p) {
+  BaseType_t task_created = xTaskCreate([](void* p) {
       TaskArgs* a = (TaskArgs*)p;
+      ESP_LOGI(TAG, "Online update task started");
       a->updateCheck->performOnlineUpdate();
+      // Note: If update succeeds, device will restart and this code won't execute
+      ESP_LOGW(TAG, "Online update task completed (update may have failed - check logs)");
       delete a;
       vTaskDelete(NULL);
   }, "online_update", 8192, args, 5, NULL);
 
+  if (task_created != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create online update task");
+      delete args;
+      httpd_resp_set_type(req, "application/json");
+      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to start update task. Please try again.\"}");
+      return ESP_OK;
+  }
+
+  ESP_LOGI(TAG, "Online update task created successfully");
+
   httpd_resp_set_type(req, "application/json");
-  httpd_resp_sendstr(req, "{\"success\":true}");
+  httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Update started. Device will restart automatically when complete.\"}");
   return ESP_OK;
 }
 
