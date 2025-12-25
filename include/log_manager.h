@@ -1,6 +1,9 @@
 #pragma once
 
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include <string>
 
 class LogManager {
@@ -20,11 +23,17 @@ private:
     LogManager& operator=(const LogManager&) = delete;
 
     static int vprintf_handler(const char* fmt, va_list ap);
-    void writeLog(const char* fmt, va_list ap);
+    static void log_task(void* pvParameters);
+    void processLogQueue();
+    void rotateLogIfNeeded();
 
     bool _started;
     const char* _basePath;
     const char* _currentLogFile;
     const char* _prevLogFile;
     const size_t _maxLogSize;
+
+    QueueHandle_t _logQueue;
+    SemaphoreHandle_t _fileMutex;
+    TaskHandle_t _logTaskHandle;
 };

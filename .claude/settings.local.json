@@ -60,7 +60,10 @@
       "Bash(cmd /c \"python -m platformio run -e hb-rf-eth-ng\")",
       "Bash(/c/Users/basti/.platformio/penv/Scripts/platformio.exe run:*)",
       "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe run:*)",
-      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe device monitor:*)"
+      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe device monitor:*)",
+      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/penv/Scripts/platformio.exe device list:*)",
+      "Bash(PYTHONUTF8=1 /c/Users/basti/.platformio/packages/tool-esptoolpy/esptool.py:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": []
