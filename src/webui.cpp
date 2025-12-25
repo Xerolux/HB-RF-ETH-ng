@@ -42,6 +42,7 @@
 #include "dtls_api.h"
 #include "monitoring.h"
 #include "security_headers.h"
+#include "log_manager.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -787,6 +788,35 @@ httpd_uri_t get_backup_handler = {
     .handle_ws_control_frames = false,
     .supported_subprotocol = NULL};
 
+esp_err_t get_log_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    std::string content = LogManager::instance().getLogContent();
+    httpd_resp_send(req, content.c_str(), content.length());
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_log_handler = {
+    .uri = "/api/log",
+    .method = HTTP_GET,
+    .handler = get_log_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+};
+
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
     // Re-use the logic from post_settings_json_handler but ensure it saves everything and restarts
@@ -1404,6 +1434,7 @@ void WebUI::start()
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_log_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 

@@ -60,3 +60,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+.venv/
+managed_components/
+.venv/
+managed_components/
