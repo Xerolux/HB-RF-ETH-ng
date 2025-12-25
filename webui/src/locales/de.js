@@ -26,6 +26,7 @@ export default {
     firmware: 'Firmware',
     monitoring: 'Monitoring',
     analyzer: 'Analyzer',
+    log: 'Systemprotokoll',
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
@@ -346,5 +347,14 @@ export default {
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
     warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
     success: 'Passwort erfolgreich geändert'
+  },
+
+  // Log
+  log: {
+    title: 'Systemprotokoll',
+    refresh: 'Aktualisieren',
+    download: 'Herunterladen',
+    autoRefresh: 'Auto-Refresh',
+    noLog: 'Kein Protokoll vorhanden.'
   }
 }

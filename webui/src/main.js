@@ -16,6 +16,7 @@ import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import Analyzer from './analyzer.vue'
+import Log from './log.vue'
 
 
 // Router
@@ -27,6 +28,7 @@ const router = createRouter({
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/analyzer', component: Analyzer, meta: { requiresAuth: true } },
+    { path: '/log', component: Log, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
     { path: '/login', component: Login },

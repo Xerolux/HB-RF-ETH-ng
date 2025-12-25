@@ -9,6 +9,7 @@
         <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
         <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
         <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BNavItem>
+        <BNavItem to="/log" v-if="loginStore.isLoggedIn">{{ t('nav.log') }}</BNavItem>
         <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
