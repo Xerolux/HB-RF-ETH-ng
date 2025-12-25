@@ -29,6 +29,9 @@
 </template>
 
 <script setup>
+/**
+ * Reusable password input component with visibility toggle
+ */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
