@@ -46,8 +46,11 @@
           variant="primary"
           block
           @click="changePassword"
-          :disabled="v$.$invalid"
-        >{{ t('changePassword.changePassword') }}</BButton>
+          :disabled="v$.$invalid || loading"
+        >
+          <BSpinner small v-if="loading" class="me-2" />
+          {{ loading ? t('common.saving') : t('changePassword.changePassword') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -72,6 +75,7 @@ const loginStore = useLoginStore()
 const newPassword = ref('')
 const confirmPassword = ref('')
 const error = ref(null)
+const loading = ref(false)
 
 const rules = computed(() => ({
   newPassword: { required, minLength: minLength(6), password_validator },
@@ -83,6 +87,7 @@ const v$ = useVuelidate(rules, { newPassword, confirmPassword })
 const changePassword = async () => {
   if (v$.value.$invalid) return
 
+  loading.value = true
   error.value = null
 
   try {
@@ -103,6 +108,8 @@ const changePassword = async () => {
     }
   } catch (e) {
     error.value = e.response?.data?.message || e.message
+  } finally {
+    loading.value = false
   }
 }
 </script>

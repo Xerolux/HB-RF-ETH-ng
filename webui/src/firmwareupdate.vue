@@ -60,7 +60,10 @@
           block
           :disabled="firmwareUpdateStore.progress > 0"
           @click="onlineUpdateClick"
-        >{{ t('firmware.onlineUpdate') }}</BButton>
+        >
+          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
+          {{ firmwareUpdateStore.progress > 0 ? t('firmware.updating') : t('firmware.onlineUpdate') }}
+        </BButton>
       </BFormGroup>
 
       <BFormGroup
@@ -120,7 +123,10 @@
           class="mt-3"
           :disabled="firmwareUpdateStore.progress > 0"
           @click="onlineUpdateClickFromModal"
-        >{{ t('firmware.onlineUpdate') }}</BButton>
+        >
+          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
+          {{ firmwareUpdateStore.progress > 0 ? t('firmware.updating') : t('firmware.onlineUpdate') }}
+        </BButton>
       </div>
     </BModal>
       <BProgress
@@ -150,7 +156,10 @@
           block
           :disabled="file == null || firmwareUpdateStore.progress > 0"
           @click="firmwareUpdateClick"
-        >{{ t('firmware.upload') }}</BButton>
+        >
+          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
+          {{ firmwareUpdateStore.progress > 0 ? t('firmware.uploading') : t('firmware.upload') }}
+        </BButton>
       </BFormGroup>
       <BFormGroup label-cols-sm="9">
         <BButton
