@@ -344,8 +344,14 @@
     header-text-variant="white"
     class="mb-3"
   >
-    <BButton variant="warning" block class="me-2" @click="rebootClick">{{ t('settings.reboot') }}</BButton>
-    <BButton variant="danger" block @click="factoryResetClick">{{ t('settings.factoryReset') }}</BButton>
+    <BButton variant="warning" block class="me-2" @click="rebootClick" :disabled="rebootLoading">
+      <BSpinner small v-if="rebootLoading" class="me-2" />
+      {{ rebootLoading ? t('common.rebootingWait') : t('settings.reboot') }}
+    </BButton>
+    <BButton variant="danger" block @click="factoryResetClick" :disabled="factoryResetLoading">
+      <BSpinner small v-if="factoryResetLoading" class="me-2" />
+      {{ factoryResetLoading ? t('common.factoryResettingWait') : t('settings.factoryReset') }}
+    </BButton>
   </BCard>
 
   <!-- Password Change Modal -->
@@ -453,6 +459,8 @@ const showError = ref(null)
 const loading = ref(false)
 const backupLoading = ref(false)
 const restoreLoading = ref(false)
+const rebootLoading = ref(false)
+const factoryResetLoading = ref(false)
 
 // Password modal state
 const showPasswordModal = ref(false)
@@ -734,6 +742,7 @@ const restoreSettings = async () => {
 
 const rebootClick = async () => {
     if (confirm(t('common.confirmReboot'))) {
+        rebootLoading.value = true
         try {
             await axios.post('/api/restart')
             // Show wait message
@@ -743,12 +752,14 @@ const rebootClick = async () => {
             }, 10000)
         } catch (e) {
             console.error(e)
+            rebootLoading.value = false
         }
     }
 }
 
 const factoryResetClick = async () => {
     if (confirm(t('common.confirmFactoryReset'))) {
+        factoryResetLoading.value = true
         try {
             await axios.post('/api/factory_reset')
              // Show wait message
@@ -759,6 +770,7 @@ const factoryResetClick = async () => {
         } catch (e) {
             console.error(e)
             alert('Factory Reset failed')
+            factoryResetLoading.value = false
         }
     }
 }
