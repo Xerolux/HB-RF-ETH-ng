@@ -17,3 +17,8 @@
 **Vulnerability:** The monitoring agent used `len += snprintf(...)` to append to a fixed-size stack buffer without checking if `snprintf` truncated the output. This caused `sizeof(buf) - len` to underflow when the buffer filled up, allowing subsequent writes to overflow the stack.
 **Learning:** `snprintf` returns the size *needed*, not the size *written*. Unchecked arithmetic on the return value is dangerous.
 **Prevention:** Always verify `snprintf` return values against remaining buffer space. Use a helper function for safe string building.
+
+## 2025-12-12 - [Stack Exhaustion in Tasks]
+**Vulnerability:** Large buffers (e.g., 2KB) allocated on the stack in FreeRTOS tasks with limited stack size (e.g., 4KB) can lead to stack overflows, causing crashes or undefined behavior.
+**Learning:** Embedded tasks have limited stack space. Large buffers should always be heap-allocated to prevent stack overflows, especially when using stack-heavy functions like `vsnprintf`.
+**Prevention:** Use `malloc`/`free` or `std::vector` for buffers larger than 256-512 bytes in tasks.
