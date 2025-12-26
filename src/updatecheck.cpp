@@ -225,11 +225,12 @@ void UpdateCheck::_updateLatestVersion()
       ESP_LOGI(TAG, "Found suitable release: %s (prerelease=%d)", tag_name, is_prerelease);
 
       // Remove 'v' prefix if present
-      if (tag_name[0] == 'v' || tag_name[0] == 'V') {
-          tag_name++;
+      const char* version_str = tag_name;
+      if ((tag_name[0] == 'v' || tag_name[0] == 'V') && tag_name[1] != '\0') {
+          version_str = tag_name + 1;
       }
 
-      strncpy(_latestVersion, tag_name, sizeof(_latestVersion) - 1);
+      strncpy(_latestVersion, version_str, sizeof(_latestVersion) - 1);
       _latestVersion[sizeof(_latestVersion) - 1] = '\0';
       found_release = true;
       ESP_LOGI(TAG, "Set latest version to: %s", _latestVersion);
@@ -332,8 +333,6 @@ void UpdateCheck::_taskFunc()
       }
     }
   }
-
-  vTaskDelete(NULL);
 }
 
 void UpdateCheck::performOnlineUpdate()
