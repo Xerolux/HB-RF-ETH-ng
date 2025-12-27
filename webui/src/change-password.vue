@@ -12,10 +12,10 @@
       </BAlert>
 
       <BFormGroup :label="t('changePassword.newPassword')" label-cols-sm="4">
-        <BFormInput
-          type="password"
+        <PasswordInput
           v-model="newPassword"
           :state="v$.newPassword.$error ? false : null"
+          :placeholder="''"
         />
         <BFormInvalidFeedback v-if="v$.newPassword.minLength.$invalid">
           {{ t('changePassword.passwordTooShort') }}
@@ -23,10 +23,10 @@
       </BFormGroup>
 
       <BFormGroup :label="t('changePassword.confirmPassword')" label-cols-sm="4">
-        <BFormInput
-          type="password"
+        <PasswordInput
           v-model="confirmPassword"
           :state="v$.confirmPassword.$error ? false : null"
+          :placeholder="''"
         />
         <BFormInvalidFeedback v-if="v$.confirmPassword.sameAs.$invalid">
           {{ t('changePassword.passwordsDoNotMatch') }}
@@ -64,6 +64,7 @@ import { useVuelidate } from '@vuelidate/core'
 import { required, minLength, sameAs, helpers } from '@vuelidate/validators'
 import axios from 'axios'
 import { useLoginStore } from './stores.js'
+import PasswordInput from './components/PasswordInput.vue'
 
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
