@@ -20,6 +20,17 @@ on:
         required: false
         type: boolean
         default: false
+      firmware_variants:
+        description: 'Firmware variants to build'
+        required: false
+        type: choice
+        options:
+          - 'all'
+          - 'standard'
+          - 'hmlgw'
+          - 'analyzer'
+          - 'full'
+        default: 'all'
 
 jobs:
   build-and-release:
@@ -88,19 +99,63 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio
 
-      - name: Build firmware
+      - name: Determine variants to build
+        id: variants
         run: |
-          pio run -e hb-rf-eth-ng
+          VARIANT="${{ github.event_name == 'workflow_dispatch' && inputs.firmware_variants || 'all' }}"
 
-      - name: Prepare release files
+          if [ "$VARIANT" = "all" ]; then
+            echo "VARIANTS=standard hmlgw analyzer full" >> $GITHUB_OUTPUT
+          else
+            echo "VARIANTS=$VARIANT" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Building variants: $(cat $GITHUB_OUTPUT | grep VARIANTS | cut -d= -f2)"
+
+      - name: Build firmware variants
         run: |
           mkdir -p release
-          cp .pio/build/hb-rf-eth-ng/firmware*.bin release/
-          cp .pio/build/hb-rf-eth-ng/bootloader.bin release/ || true
-          cp .pio/build/hb-rf-eth-ng/partitions.bin release/ || true
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+
+          for variant in ${{ steps.variants.outputs.VARIANTS }}; do
+            echo "Building variant: $variant"
+            pio run -e hb-rf-eth-ng-$variant
+
+            # Copy and rename firmware with variant name
+            if [ -f ".pio/build/hb-rf-eth-ng-$variant/firmware_${VERSION}.bin" ]; then
+              cp ".pio/build/hb-rf-eth-ng-$variant/firmware_${VERSION}.bin" "release/firmware-${variant}-v${VERSION}.bin"
+            elif [ -f ".pio/build/hb-rf-eth-ng-$variant/firmware.bin" ]; then
+              cp ".pio/build/hb-rf-eth-ng-$variant/firmware.bin" "release/firmware-${variant}-v${VERSION}.bin"
+            fi
+
+            # Copy bootloader and partitions (same for all variants) - only once
+            if [ ! -f "release/bootloader.bin" ]; then
+              cp ".pio/build/hb-rf-eth-ng-$variant/bootloader.bin" release/ 2>/dev/null || true
+            fi
+            if [ ! -f "release/partitions.bin" ]; then
+              cp ".pio/build/hb-rf-eth-ng-$variant/partitions.bin" release/ 2>/dev/null || true
+            fi
+          done
+
+      - name: Prepare release metadata
+        run: |
           cp version.txt release/
           cp CHANGELOG.md release/
           cp README.md release/
+
+          # Create variant info file
+          cat > release/VARIANTS.md << 'EOF'
+          # Firmware Variants
+
+          This release includes multiple firmware variants:
+
+          - **standard**: No HMLGW, No Analyzer (smallest, maximum RAM)
+          - **hmlgw**: With HomeMatic LAN Gateway support
+          - **analyzer**: With Protocol Analyzer support
+          - **full**: All features enabled (largest)
+
+          Choose the variant that matches your use case.
+          EOF
 
       - name: Create checksums
         run: |
@@ -153,8 +208,11 @@ jobs:
           body_path: release_notes.md
           files: |
             hb-rf-eth-ng-firmware-${{ steps.get_version.outputs.VERSION_TAG }}.zip
-            release/*.bin
+            release/firmware-*.bin
+            release/bootloader.bin
+            release/partitions.bin
             release/SHA256SUMS.txt
+            release/VARIANTS.md
           draft: ${{ steps.release_type.outputs.IS_DRAFT }}
           prerelease: ${{ steps.release_type.outputs.IS_PRERELEASE }}
           make_latest: ${{ steps.release_type.outputs.IS_PRERELEASE == 'false' && steps.release_type.outputs.IS_DRAFT == 'false' }}
