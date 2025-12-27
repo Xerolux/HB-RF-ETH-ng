@@ -29,6 +29,7 @@
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
 #include "esp_task_wdt.h"
+#include "esp_heap_caps.h"
 #include "string.h"
 #include "cJSON.h"
 #include "semver.h"
@@ -125,10 +126,14 @@ void UpdateCheck::_updateLatestVersion()
   ESP_LOGI(TAG, "GitHub API response: status=%d, content_length=%d", status_code, content_length);
 
   // Allocate buffer for response
-  const int MAX_BUFFER_SIZE = 32768;
+  // Reduced from 32KB to 16KB to ensure allocation succeeds even when heap is fragmented
+  // GitHub API responses for 5 releases are typically 10-15KB
+  const int MAX_BUFFER_SIZE = 16384;
   char *buffer = (char*)malloc(MAX_BUFFER_SIZE);
   if (!buffer) {
-      ESP_LOGE(TAG, "Failed to allocate buffer for update check");
+      ESP_LOGE(TAG, "Failed to allocate buffer for update check (needed %d bytes)", MAX_BUFFER_SIZE);
+      ESP_LOGE(TAG, "Free heap: %lu bytes, largest block: %lu bytes",
+               esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       esp_http_client_cleanup(client);
       return;
   }

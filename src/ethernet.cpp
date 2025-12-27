@@ -101,9 +101,8 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
 void Ethernet::start()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle));
-
-    // Configure PHY LEDs after starting
-    _configurePHYLEDs();
+    // PHY LED configuration moved to ETHERNET_EVENT_START handler
+    // to ensure the interface is fully initialized
 }
 
 void Ethernet::stop()
@@ -201,6 +200,11 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
     case ETHERNET_EVENT_START:
         ESP_LOGI(TAG, "Started");
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_hostname(_eth_netif, _settings->getHostname()));
+
+        // Configure PHY LEDs after interface is started and initialized
+        // Small delay to ensure PHY is ready for register access
+        vTaskDelay(pdMS_TO_TICKS(100));
+        _configurePHYLEDs();
         break;
     case ETHERNET_EVENT_STOP:
         _isConnected = false;
