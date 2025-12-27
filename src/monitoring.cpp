@@ -19,6 +19,7 @@
 #include "esp_timer.h"
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -165,6 +166,15 @@ static void checkmk_agent_task(void *pvParameters)
 
     ESP_LOGI(TAG, "CheckMK Agent listening on port %d", config->port);
 
+    // Allocate output buffer on heap to avoid stack overflow (2KB on 4KB stack is risky)
+    char *output = (char *)malloc(CHECKMK_OUTPUT_BUFFER_SIZE);
+    if (output == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate output buffer");
+        close(listen_sock);
+        vTaskDelete(NULL);
+        return;
+    }
+
     while (checkmk_running) {
         struct sockaddr_in client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
@@ -193,24 +203,23 @@ static void checkmk_agent_task(void *pvParameters)
         }
 
         // Send CheckMK agent output
-        char output[CHECKMK_OUTPUT_BUFFER_SIZE];
         size_t len = 0;
 
         // Helper for safe appending to buffer
         auto safe_append = [&](const char* format, ...) {
-            if (len >= sizeof(output) - 1) return; // Buffer full
+            if (len >= CHECKMK_OUTPUT_BUFFER_SIZE - 1) return; // Buffer full
 
             va_list args;
             va_start(args, format);
-            int ret = vsnprintf(output + len, sizeof(output) - len, format, args);
+            int ret = vsnprintf(output + len, CHECKMK_OUTPUT_BUFFER_SIZE - len, format, args);
             va_end(args);
 
             if (ret > 0) {
-                if (len + ret < sizeof(output)) {
+                if (len + ret < CHECKMK_OUTPUT_BUFFER_SIZE) {
                     len += ret;
                 } else {
                     // Truncated - saturate to max
-                    len = sizeof(output) - 1;
+                    len = CHECKMK_OUTPUT_BUFFER_SIZE - 1;
                     output[len] = '\0';
                 }
             }
@@ -245,6 +254,7 @@ static void checkmk_agent_task(void *pvParameters)
         ESP_LOGI(TAG, "CheckMK client disconnected");
     }
 
+    free(output);
     close(listen_sock);
     ESP_LOGI(TAG, "CheckMK Agent stopped");
     vTaskDelete(NULL);
