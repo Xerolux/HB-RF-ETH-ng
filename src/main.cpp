@@ -130,6 +130,9 @@ void app_main()
     esp_err_t pm_err = esp_pm_configure(&pm_config);
     if (pm_err == ESP_OK) {
         ESP_LOGI(TAG, "Power management disabled - running at full performance");
+    } else if (pm_err == ESP_ERR_NOT_SUPPORTED) {
+        // Power management not compiled in - system runs at full performance by default
+        ESP_LOGI(TAG, "Power management not available - running at full performance (default)");
     } else {
         ESP_LOGW(TAG, "Failed to configure power management: %s", esp_err_to_name(pm_err));
     }
