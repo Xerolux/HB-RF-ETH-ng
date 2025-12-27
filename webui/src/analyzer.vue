@@ -152,6 +152,8 @@ const isConnected = ref(false)
 const autoScroll = ref(true)
 let ws = null
 let frameCounter = 0
+const incomingBuffer = []
+let flushPending = false
 
 // Device Names
 const showNamesModal = ref(false)
@@ -319,9 +321,6 @@ const processBidCosFrame = (ts, data, rssi) => {
   let typeName = FRAME_TYPES[typeHex] || `Unknown (${typeHex})`
 
   frameCounter++
-  if (frames.value.length > 200) {
-    frames.value.shift()
-  }
 
   // Pre-calculate display values to avoid re-calculation in render loop
   // Format Time
@@ -342,7 +341,9 @@ const processBidCosFrame = (ts, data, rssi) => {
       else if (rssi > -90) rssiClass = 'text-warning'
   }
 
-  frames.value.push({
+  // OPTIMIZATION: Buffer frames and flush in batches using requestAnimationFrame
+  // This prevents layout thrashing when multiple frames arrive in a short burst
+  incomingBuffer.push({
     id: frameCounter,
     ts: ts,
     formattedTime: formattedTime,
@@ -359,6 +360,25 @@ const processBidCosFrame = (ts, data, rssi) => {
     dst: deviceNames[dstRaw] || dstRaw,
     payload: payload
   })
+
+  if (!flushPending) {
+    flushPending = true
+    requestAnimationFrame(flushQueue)
+  }
+}
+
+const flushQueue = () => {
+  flushPending = false
+  if (incomingBuffer.length === 0) return
+
+  // Flush all buffered frames to the reactive array in one operation
+  const chunk = incomingBuffer.splice(0)
+  frames.value.push(...chunk)
+
+  // Maintain max size efficiently
+  if (frames.value.length > 200) {
+    frames.value = frames.value.slice(-200)
+  }
 
   if (autoScroll.value) {
     nextTick(() => {
