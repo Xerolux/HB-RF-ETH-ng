@@ -46,7 +46,9 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
+#if ENABLE_HMLGW
 #include "hmlgw.h"
+#endif
 #include "webui.h"
 #include "mdnsserver.h"
 #include "ntpserver.h"
@@ -256,7 +258,9 @@ void app_main()
     dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
 
     RawUartUdpListener* rawUartUdpLister = NULL;
+#if ENABLE_HMLGW
     Hmlgw* hmlgw = NULL;
+#endif
 
     // INTENTIONAL MEMORY ALLOCATION PATTERN:
     // The following objects (hmlgw, rawUartUdpLister) are allocated with 'new'
@@ -264,19 +268,24 @@ void app_main()
     // for the entire application lifetime (until device reset).
     // This is by design - not a memory leak.
 
+#if ENABLE_HMLGW
     if (settings.getHmlgwEnabled()) {
         ESP_LOGI(TAG, "Starting HMLGW mode (DTLS not supported in HM-LGW)");
         hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
         hmlgw->start();
-    } else {
+    } else
+#endif
+    {
         ESP_LOGI(TAG, "Starting Raw UART UDP mode");
 
+#if ENABLE_ANALYZER
         // DTLS only works in Raw UART mode (not compatible with HM-LGW or Analyzer)
         if (settings.getAnalyzerEnabled() && dtls_mode != DTLS_MODE_DISABLED)
         {
             ESP_LOGW(TAG, "DTLS disabled: Analyzer requires unencrypted data");
             dtls_mode = DTLS_MODE_DISABLED;
         }
+#endif
 
         if (dtls_mode != DTLS_MODE_DISABLED)
         {
