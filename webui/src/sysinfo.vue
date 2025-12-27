@@ -11,9 +11,6 @@
       <BFormGroup :label="t('sysinfo.serial')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.serial" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('sysinfo.boardRevision')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.boardRevision" disabled />
-      </BFormGroup>
       <BFormGroup :label="t('sysinfo.uptime')" label-cols-sm="4">
         <BFormInput type="text" :model-value="uptimeFormatted" disabled />
       </BFormGroup>

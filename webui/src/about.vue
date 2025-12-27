@@ -61,8 +61,13 @@ import { useSysInfoStore } from './stores.js'
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
 
-onMounted(() => {
-  sysInfoStore.update()
+onMounted(async () => {
+  try {
+    await sysInfoStore.update()
+  } catch (error) {
+    console.error('Failed to load system info:', error)
+    // Gracefully degrade - variant will just not be shown
+  }
 })
 
 const libs = ref([
