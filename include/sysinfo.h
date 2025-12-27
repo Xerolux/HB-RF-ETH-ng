@@ -41,6 +41,7 @@ public:
     double getCpuUsage() const;
     double getMemoryUsage() const;
     const char* getCurrentVersion() const;
+    const char* getFirmwareVariant() const;
     const char* getSerialNumber() const;
     board_type_t getBoardType() const;
     const char* getBoardRevisionString() const;
