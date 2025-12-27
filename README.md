@@ -24,6 +24,25 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
 * **Features**: HMLGW-Modus, Analyzer Light, IPv6 Support
 * **Stabilität**: Optimierte Performance, Supply Voltage Monitoring, mbedTLS 3.6.4
 
+### Firmware-Varianten
+
+Ab Version 2.1.2 bietet die Firmware **vier verschiedene Varianten** an, um den unterschiedlichen Anforderungen gerecht zu werden:
+
+| Variante | HMLGW | Analyzer | Beschreibung | Empfohlen für |
+|----------|-------|----------|--------------|---------------|
+| **standard** | ❌ | ❌ | Basis-Features ohne HMLGW und Analyzer | Maximale Stabilität und RAM-Verfügbarkeit |
+| **hmlgw** | ✅ | ❌ | Mit HomeMatic LAN Gateway Unterstützung | Integration mit CCU/debmatic via HM-LGW Protokoll |
+| **analyzer** | ❌ | ✅ | Mit Protocol Analyzer für Funkrahmen-Analyse | Debugging und Fehlerdiagnose |
+| **full** | ✅ | ✅ | Alle Features aktiviert | Volle Funktionalität (höherer Speicherbedarf) |
+
+**Welche Variante soll ich wählen?**
+- Nutze **standard**, wenn du nur Raw UART über UDP benötigst (klassischer Modus)
+- Nutze **hmlgw**, wenn du die HomeMatic LAN Gateway Emulation brauchst
+- Nutze **analyzer**, wenn du Funkprobleme diagnostizieren möchtest
+- Nutze **full**, wenn du alle Features benötigst und genug RAM hast
+
+**Update-Sicherheit:** Das Firmware-Update-System erkennt automatisch deine installierte Variante und lädt nur kompatible Updates herunter. Ein versehentliches Cross-Update zwischen Varianten wird verhindert.
+
 ### Worum es geht
 Dieses Repository enhält die Firmware für die HB-RF-ETH Platine, welches es ermöglicht, ein Homematic Funkmodul HM-MOD-RPI-PCB oder RPI-RF-MOD per Netzwerk an eine debmatic oder piVCCU3 Installation anzubinden.
 

@@ -29,6 +29,7 @@
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
 #include "esp_task_wdt.h"
+#include "esp_heap_caps.h"
 #include "string.h"
 #include "cJSON.h"
 #include "semver.h"
@@ -125,10 +126,14 @@ void UpdateCheck::_updateLatestVersion()
   ESP_LOGI(TAG, "GitHub API response: status=%d, content_length=%d", status_code, content_length);
 
   // Allocate buffer for response
-  const int MAX_BUFFER_SIZE = 32768;
+  // Reduced from 32KB to 16KB to ensure allocation succeeds even when heap is fragmented
+  // GitHub API responses for 5 releases are typically 10-15KB
+  const int MAX_BUFFER_SIZE = 16384;
   char *buffer = (char*)malloc(MAX_BUFFER_SIZE);
   if (!buffer) {
-      ESP_LOGE(TAG, "Failed to allocate buffer for update check");
+      ESP_LOGE(TAG, "Failed to allocate buffer for update check (needed %d bytes)", MAX_BUFFER_SIZE);
+      ESP_LOGE(TAG, "Free heap: %lu bytes, largest block: %lu bytes",
+               esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
       esp_http_client_cleanup(client);
       return;
   }
@@ -247,8 +252,14 @@ void UpdateCheck::_updateLatestVersion()
           _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
       }
 
-      // Find firmware asset download URL
+      // Find firmware asset download URL matching current firmware variant
       _downloadUrl[0] = '\0';
+      const char* current_variant = _sysInfo->getFirmwareVariant();
+      char variant_pattern[64];
+      snprintf(variant_pattern, sizeof(variant_pattern), "firmware-%s-", current_variant);
+
+      ESP_LOGI(TAG, "Looking for firmware variant: %s", current_variant);
+
       cJSON *assets = cJSON_GetObjectItem(release, "assets");
       if (assets && cJSON_IsArray(assets)) {
           int asset_count = cJSON_GetArraySize(assets);
@@ -262,20 +273,22 @@ void UpdateCheck::_updateLatestVersion()
               cJSON *browser_download_url = cJSON_GetObjectItem(asset, "browser_download_url");
 
               if (name && cJSON_IsString(name) && browser_download_url && cJSON_IsString(browser_download_url)) {
-                  // Prefer firmware*.bin
-                  if (strstr(name->valuestring, "firmware") != NULL && strstr(name->valuestring, ".bin") != NULL) {
+                  // Match firmware-{variant}-*.bin pattern
+                  if (strstr(name->valuestring, variant_pattern) != NULL && strstr(name->valuestring, ".bin") != NULL) {
                       strncpy(_downloadUrl, browser_download_url->valuestring, DOWNLOAD_URL_SIZE - 1);
                       _downloadUrl[DOWNLOAD_URL_SIZE - 1] = '\0';
-                      ESP_LOGI(TAG, "Found firmware asset URL: %s", _downloadUrl);
+                      ESP_LOGI(TAG, "Found matching firmware asset: %s", name->valuestring);
                       break;
                   }
               }
           }
       }
 
-      // Fallback: construct default download URL if not found in assets
+      // Fallback: construct default download URL with variant if not found in assets
       if (strlen(_downloadUrl) == 0) {
-          snprintf(_downloadUrl, DOWNLOAD_URL_SIZE, "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware.bin", _latestVersion);
+          snprintf(_downloadUrl, DOWNLOAD_URL_SIZE,
+                   "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware-%s-v%s.bin",
+                   _latestVersion, current_variant, _latestVersion);
           ESP_LOGW(TAG, "Asset download URL not found, using fallback: %s", _downloadUrl);
       }
 

@@ -62,6 +62,7 @@ export const useSysInfoStore = defineStore('sysInfo', {
   state: () => ({
     serial: "",
     currentVersion: "",
+    firmwareVariant: "",
     latestVersion: "",
     releaseNotes: "",
     downloadUrl: "",

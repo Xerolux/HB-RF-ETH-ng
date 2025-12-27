@@ -184,7 +184,16 @@ void RadioModuleConnector::_serialQueueHandler()
             case UART_BREAK:
             case UART_PARITY_ERR:
             case UART_FRAME_ERR:
-                ESP_LOGW("RadioModuleConnector", "UART error detected");
+                // UART errors (break, parity, frame) can occur during normal operation
+                // Rate-limit logging to avoid log spam - only log every 10th error
+                {
+                    static uint32_t uart_error_count = 0;
+                    uart_error_count++;
+                    if (uart_error_count % 10 == 1) {
+                        ESP_LOGD("RadioModuleConnector", "UART error detected (count: %lu, type: %d)",
+                                uart_error_count, event.type);
+                    }
+                }
                 _streamParser->flush();
                 break;
             default:

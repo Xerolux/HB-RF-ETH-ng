@@ -31,28 +31,20 @@
 #include "esp_timer.h"
 #include "esp_system.h"
 #include "driver/temperature_sensor.h"
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
 #include "pins.h"
-
-#define DEFAULT_VREF 1100
 
 static const char *TAG = "SysInfo";
 
 static volatile float _cpuUsage = 0.0f;
 static volatile float _memoryUsage = 0.0f;
 static volatile float _temperature = -127.0f;
-static volatile uint32_t _supplyVoltageMv = 0;
 static volatile uint32_t _lastSysInfoRequestTime = 0;
 static char _serial[13];
 static const char *_currentVersion;
+static const char *_firmwareVariant;
 static board_type_t _board;
 static uint64_t _bootTime;
 static temperature_sensor_handle_t _temp_sensor = NULL;
-
-// Forward declaration
-uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten);
 
 void updateCPUUsageTask(void *arg)
 {
@@ -117,136 +109,22 @@ void updateCPUUsageTask(void *arg)
             }
         }
 #endif
-
-        // Update supply voltage in background to avoid blocking API requests
-        // Measure supply voltage with 2:1 voltage divider
-        // GPIO37 (ADC1_CH1) measures half of the actual supply voltage
-        uint32_t voltage_mv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
-        if (voltage_mv > 0) {
-            _supplyVoltageMv = voltage_mv;
-        }
     }
 
     free(taskStatus);
     vTaskDelete(NULL);
 }
 
-uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)
-{
-    // OPTIMIZATION: Reuse ADC handle instead of creating/destroying every call
-    // This function is called every second from background task
-    static adc_oneshot_unit_handle_t adc_handle = NULL;
-    static adc_cali_handle_t cali_handle = NULL;
-    static bool adc_initialized = false;
-
-    // Initialize ADC handle only once
-    if (!adc_initialized) {
-        adc_oneshot_unit_init_cfg_t init_config = {
-            .unit_id = adc_unit,
-            .clk_src = (adc_oneshot_clk_src_t)0,
-            .ulp_mode = ADC_ULP_MODE_DISABLE,
-        };
-        esp_err_t ret = adc_oneshot_new_unit(&init_config, &adc_handle);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
-            return 0;
-        }
-
-        adc_oneshot_chan_cfg_t config = {
-            .atten = adc_atten,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-        };
-        ret = adc_oneshot_config_channel(adc_handle, adc_channel, &config);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(ret));
-            adc_oneshot_del_unit(adc_handle);
-            adc_handle = NULL;
-            return 0;
-        }
-
-        // Calibration
-        adc_cali_line_fitting_config_t cali_config = {
-            .unit_id = adc_unit,
-            .atten = adc_atten,
-            .bitwidth = ADC_BITWIDTH_DEFAULT,
-            .default_vref = DEFAULT_VREF,
-        };
-        ret = adc_cali_create_scheme_line_fitting(&cali_config, &cali_handle);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "ADC calibration failed, using raw values: %s", esp_err_to_name(ret));
-            cali_handle = NULL;
-        }
-
-        adc_initialized = true;
-        ESP_LOGI(TAG, "ADC initialized for voltage measurement");
-    }
-
-    esp_err_t ret;
-
-    // Read ADC with multiple samples for stability
-    int adc_raw = 0;
-    const int num_samples = 10;
-    for (int i = 0; i < num_samples; i++) {
-        int sample;
-        ret = adc_oneshot_read(adc_handle, adc_channel, &sample);
-        if (ret == ESP_OK) {
-            adc_raw += sample;
-        } else {
-            ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(ret));
-        }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Small delay between samples
-    }
-    adc_raw /= num_samples;
-
-    // Convert to voltage
-    int voltage_mv = 0;
-    if (cali_handle != NULL) {
-        ret = adc_cali_raw_to_voltage(cali_handle, adc_raw, &voltage_mv);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to convert ADC to voltage: %s", esp_err_to_name(ret));
-            // Fallback: use raw value with approximation
-            voltage_mv = (adc_raw * 3300) / 4095; // 12-bit ADC, 3.3V ref
-        }
-    } else {
-        // No calibration, use raw value approximation
-        voltage_mv = (adc_raw * 3300) / 4095;
-    }
-
-    // No cleanup needed - handles are reused for better performance
-
-    return voltage_mv;
-}
-
+// Board detection removed - ADC voltage measurement not functional
+// All boards will report as UNKNOWN type
 board_type_t detectBoard()
 {
-    uint32_t voltage = get_voltage(BOARD_REV_SENSE_UNIT, BOARD_REV_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
-    switch (voltage) // R31/R32
-    {
-    case 400 ... 700: // 10K/2K
-        return BOARD_TYPE_REV_1_10_PUB;
-
-    case 1500 ... 1800: // 10K/10K
-        return BOARD_TYPE_REV_1_8_SK;
-
-    case 2600 ... 2900: // 2K/10K
-        return BOARD_TYPE_REV_1_8_PUB;
-
-    case 2901 ... 3200: // 1K/12K
-        return BOARD_TYPE_REV_1_10_SK;
-
-    default:
-        ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32, voltage);
-        return BOARD_TYPE_UNKNOWN;
-    }
+    ESP_LOGI(TAG, "Board detection disabled (ADC not functional)");
+    return BOARD_TYPE_UNKNOWN;
 }
 
 SysInfo::SysInfo()
 {
-    // Initial voltage read to avoid startup delay/zero value
-    _supplyVoltageMv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
     xTaskCreate(updateCPUUsageTask, "UpdateCPUUsage", 4096, NULL, 3, NULL);
 
     uint8_t baseMac[6];
@@ -255,6 +133,13 @@ SysInfo::SysInfo()
 
     const esp_app_desc_t* app_desc = esp_app_get_description();
     _currentVersion = app_desc->version;
+
+    // Set firmware variant from compile-time define
+#ifndef FIRMWARE_VARIANT
+    _firmwareVariant = "unknown";
+#else
+    _firmwareVariant = FIRMWARE_VARIANT;
+#endif
 
     _board = detectBoard();
 
@@ -300,11 +185,15 @@ const char *SysInfo::getCurrentVersion() const
     return _currentVersion;
 }
 
+const char *SysInfo::getFirmwareVariant() const
+{
+    return _firmwareVariant;
+}
+
 double SysInfo::getSupplyVoltage() const
 {
-    // Return cached value updated by background task
-    // Apply 2:1 voltage divider correction and convert to volts
-    return (_supplyVoltageMv * 2.0) / 1000.0;
+    // ADC voltage measurement disabled (not functional)
+    return 0.0;
 }
 
 const char* SysInfo::getBoardRevisionString() const

@@ -38,7 +38,9 @@
 #include "monitoring_api.h"
 #include "nextcloud_api.h"
 #include "rate_limiter.h"
+#if ENABLE_ANALYZER
 #include "analyzer.h"
+#endif
 #include "dtls_api.h"
 #include "monitoring.h"
 #include "security_headers.h"
@@ -96,7 +98,9 @@ static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
+#if ENABLE_ANALYZER
 static Analyzer *_analyzer;
+#endif
 static DTLSEncryption *_dtlsEncryption;
 static char _token[46];
 
@@ -314,6 +318,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         "{\"sysInfo\":{"
             "\"serial\":\"%s\","
             "\"currentVersion\":\"%s\","
+            "\"firmwareVariant\":\"%s\","
             "\"latestVersion\":\"%s\","
             "\"memoryUsage\":%.2f,"
             "\"cpuUsage\":%.2f,"
@@ -335,6 +340,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         "}}",
         _sysInfo->getSerialNumber(),
         _sysInfo->getCurrentVersion(),
+        _sysInfo->getFirmwareVariant(),
         _updateCheck->getLatestVersion(),
         _sysInfo->getMemoryUsage(),
         _sysInfo->getCpuUsage(),
@@ -459,6 +465,7 @@ httpd_uri_t get_settings_json_handler = {
     .handle_ws_control_frames = false,
     .supported_subprotocol = NULL};
 
+#if ENABLE_ANALYZER
 esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -476,6 +483,16 @@ esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
 
     return Analyzer::ws_handler(req);
 }
+#else
+// Stub when Analyzer is disabled
+esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    httpd_resp_set_status(req, "403 Forbidden");
+    httpd_resp_sendstr(req, "Analyzer feature not available in this firmware variant");
+    return ESP_OK;
+}
+#endif
 
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
@@ -1462,10 +1479,12 @@ WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
+#if ENABLE_ANALYZER
     _analyzer = nullptr;
     if (_settings->getAnalyzerEnabled() && !_settings->getHmlgwEnabled()) {
         _analyzer = new Analyzer(_radioModuleConnector);
     }
+#endif
     _dtlsEncryption = dtlsEncryption;
 
     generateToken();
@@ -1526,9 +1545,11 @@ void WebUI::stop()
 
 WebUI::~WebUI()
 {
+#if ENABLE_ANALYZER
     extern Analyzer *_analyzer;
     if (_analyzer) {
         delete _analyzer;
         _analyzer = nullptr;
     }
+#endif
 }
