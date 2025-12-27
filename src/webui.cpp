@@ -318,6 +318,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         "{\"sysInfo\":{"
             "\"serial\":\"%s\","
             "\"currentVersion\":\"%s\","
+            "\"firmwareVariant\":\"%s\","
             "\"latestVersion\":\"%s\","
             "\"memoryUsage\":%.2f,"
             "\"cpuUsage\":%.2f,"
@@ -339,6 +340,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         "}}",
         _sysInfo->getSerialNumber(),
         _sysInfo->getCurrentVersion(),
+        _sysInfo->getFirmwareVariant(),
         _updateCheck->getLatestVersion(),
         _sysInfo->getMemoryUsage(),
         _sysInfo->getCpuUsage(),

@@ -1,5 +1,5 @@
 <template>
-  <BNavbar type="dark" variant="primary" toggleable="sm" class="mb-3 mt-3 rounded">
+  <BNavbar type="dark" variant="primary" toggleable="sm" class="mb-3 mt-3">
     <BNavbarBrand tag="h1" class="font-weight-bold">HB-RF-ETH-ng</BNavbarBrand>
     <BNavbarToggle target="nav-collapse" />
     <BCollapse id="nav-collapse" is-nav>
