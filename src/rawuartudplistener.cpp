@@ -366,8 +366,10 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
     e.addr.addr = ip_addr_get_ip4_u32(addr);
     e.port = port;
 
-    if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
+    // Do not block if queue is full to prevent stalling the lwIP thread (DoS risk)
+    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
     {
+        ESP_LOGW(TAG, "UDP queue full, dropping Raw UART packet");
         return false;
     }
     return true;

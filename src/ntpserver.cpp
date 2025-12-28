@@ -176,8 +176,10 @@ bool NtpServer::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port
 
 #pragma GCC diagnostic pop
 
-    if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
+    // Do not block if queue is full to prevent stalling the lwIP thread (DoS risk)
+    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
     {
+        ESP_LOGW(TAG, "UDP queue full, dropping NTP packet");
         free((void *)(e));
         return false;
     }
