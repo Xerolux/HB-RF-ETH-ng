@@ -344,15 +344,39 @@
     header-text-variant="white"
     class="mb-3"
   >
-    <BButton variant="warning" block class="me-2" @click="rebootClick" :disabled="rebootLoading">
+    <BButton variant="warning" block class="me-2" @click="showRebootModal = true" :disabled="rebootLoading">
       <BSpinner small v-if="rebootLoading" class="me-2" />
       {{ rebootLoading ? t('common.rebootingWait') : t('settings.reboot') }}
     </BButton>
-    <BButton variant="danger" block @click="factoryResetClick" :disabled="factoryResetLoading">
+    <BButton variant="danger" block @click="showFactoryResetModal = true" :disabled="factoryResetLoading">
       <BSpinner small v-if="factoryResetLoading" class="me-2" />
       {{ factoryResetLoading ? t('common.factoryResettingWait') : t('settings.factoryReset') }}
     </BButton>
   </BCard>
+
+  <!-- Reboot Confirmation Modal -->
+  <BModal
+    v-model="showRebootModal"
+    :title="t('settings.reboot')"
+    @ok="confirmReboot"
+    ok-variant="warning"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmReboot') }}</p>
+  </BModal>
+
+  <!-- Factory Reset Confirmation Modal -->
+  <BModal
+    v-model="showFactoryResetModal"
+    :title="t('settings.factoryReset')"
+    @ok="confirmFactoryReset"
+    ok-variant="danger"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmFactoryReset') }}</p>
+  </BModal>
 
   <!-- Password Change Modal -->
   <BModal
@@ -462,7 +486,9 @@ const restoreLoading = ref(false)
 const rebootLoading = ref(false)
 const factoryResetLoading = ref(false)
 
-// Password modal state
+// Modal state
+const showRebootModal = ref(false)
+const showFactoryResetModal = ref(false)
 const showPasswordModal = ref(false)
 const passwordError = ref(null)
 
@@ -740,38 +766,32 @@ const restoreSettings = async () => {
     }
 }
 
-const rebootClick = async () => {
-    if (confirm(t('common.confirmReboot'))) {
-        rebootLoading.value = true
-        try {
-            await axios.post('/api/restart')
-            // Show wait message
-            alert(t('common.rebootingWait'))
-            setTimeout(() => {
-                window.location.reload()
-            }, 10000)
-        } catch (e) {
-            console.error(e)
-            rebootLoading.value = false
-        }
+const confirmReboot = async () => {
+    rebootLoading.value = true
+    try {
+        await axios.post('/api/restart')
+        // No alert needed, button state indicates progress
+        setTimeout(() => {
+            window.location.reload()
+        }, 10000)
+    } catch (e) {
+        console.error(e)
+        rebootLoading.value = false
     }
 }
 
-const factoryResetClick = async () => {
-    if (confirm(t('common.confirmFactoryReset'))) {
-        factoryResetLoading.value = true
-        try {
-            await axios.post('/api/factory_reset')
-             // Show wait message
-            alert(t('common.factoryResettingWait'))
-            setTimeout(() => {
-                window.location.reload()
-            }, 10000)
-        } catch (e) {
-            console.error(e)
-            alert('Factory Reset failed')
-            factoryResetLoading.value = false
-        }
+const confirmFactoryReset = async () => {
+    factoryResetLoading.value = true
+    try {
+        await axios.post('/api/factory_reset')
+        // No alert needed, button state indicates progress
+        setTimeout(() => {
+            window.location.reload()
+        }, 10000)
+    } catch (e) {
+        console.error(e)
+        alert(t('settings.saveError')) // Fallback error
+        factoryResetLoading.value = false
     }
 }
 
