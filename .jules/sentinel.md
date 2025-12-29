@@ -27,3 +27,8 @@
 **Vulnerability:** The UDP packet receiver used `xQueueSend(..., portMAX_DELAY)` within the lwIP callback context. If the processing task was slow or the queue was full, the call would block indefinitely, stalling the entire TCP/IP thread and causing a system-wide Denial of Service (DoS).
 **Learning:** Never use blocking calls (like `portMAX_DELAY`) in interrupt handlers or high-priority system callbacks (like lwIP).
 **Prevention:** Use a timeout of `0` in `xQueueSend` within callbacks. It is better to drop a packet than to crash the network stack.
+
+## 2025-12-12 - [Privilege Persistence via Backup Restore]
+**Vulnerability:** The system allowed restoring backups containing weak passwords (e.g., "123") in the `adminPassword` field, bypassing the password complexity requirements enforced during password changes. This allowed an attacker with a valid backup (or a modified one) to downgrade the system security.
+**Learning:** Input validation must be applied consistently across all entry points. "Restore" operations often blindly trust the input as "legacy valid state," but they should also enforce current security policies where feasible to prevent security regression.
+**Prevention:** Re-use validation logic (e.g., `validatePassword()`) in restore/import handlers. If the restored data violates current policy, either reject it or sanitize it (e.g., by preserving the existing strong password).
