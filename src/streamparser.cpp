@@ -23,6 +23,7 @@
 
 #include "streamparser.h"
 #include <stdint.h>
+#include <string.h>
 
 StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _bufferPos(0), _framePos(0), _frameLength(0), _state(NO_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
 {
@@ -88,10 +89,61 @@ void StreamParser::append(unsigned char chr)
 
 void StreamParser::append(unsigned char *buffer, uint16_t len)
 {
-    int i;
-    for (i = 0; i < len; i++)
+    uint16_t processed = 0;
+    while (processed < len)
     {
-        append(buffer[i]);
+        // Optimization: Block copy for RECEIVE_FRAME_DATA when not decoding escapes
+        if (_state == RECEIVE_FRAME_DATA && !_decodeEscaped)
+        {
+            uint16_t remainingFrame = _frameLength - _framePos;
+            uint16_t remainingBuffer = sizeof(_buffer) - _bufferPos;
+            uint16_t remainingInput = len - processed;
+
+            uint16_t chunkSize = remainingInput;
+            if (chunkSize > remainingFrame)
+                chunkSize = remainingFrame;
+            if (chunkSize > remainingBuffer)
+                chunkSize = remainingBuffer;
+
+            // Scan for 0xfd (Sync byte)
+            unsigned char *syncPos = (unsigned char *)memchr(buffer + processed, 0xfd, chunkSize);
+            if (syncPos)
+            {
+                chunkSize = syncPos - (buffer + processed);
+            }
+
+            if (chunkSize > 0)
+            {
+                memcpy(&_buffer[_bufferPos], &buffer[processed], chunkSize);
+                _bufferPos += chunkSize;
+                _framePos += chunkSize;
+
+                // _isEscaped state at the end of RECEIVE_FRAME_DATA is irrelevant
+                // because the next valid state (NO_DATA waiting for 0xfd) will reset it
+                // upon receiving 0xfd.
+
+                processed += chunkSize;
+
+                if (_framePos == _frameLength)
+                {
+                    _state = FRAME_COMPLETE;
+                }
+                if (_bufferPos == sizeof(_buffer))
+                {
+                    _state = FRAME_COMPLETE;
+                }
+
+                if (_state == FRAME_COMPLETE)
+                {
+                    _processor(_buffer, _bufferPos);
+                    _state = NO_DATA;
+                }
+
+                continue;
+            }
+        }
+
+        append(buffer[processed++]);
     }
 }
 
