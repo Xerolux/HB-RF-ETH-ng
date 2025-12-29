@@ -22,3 +22,8 @@
 **Vulnerability:** Large buffers (e.g., 2KB) allocated on the stack in FreeRTOS tasks with limited stack size (e.g., 4KB) can lead to stack overflows, causing crashes or undefined behavior.
 **Learning:** Embedded tasks have limited stack space. Large buffers should always be heap-allocated to prevent stack overflows, especially when using stack-heavy functions like `vsnprintf`.
 **Prevention:** Use `malloc`/`free` or `std::vector` for buffers larger than 256-512 bytes in tasks.
+
+## 2025-05-18 - [Network Stack Stall via Blocking Queue Send]
+**Vulnerability:** The UDP packet receiver used `xQueueSend(..., portMAX_DELAY)` within the lwIP callback context. If the processing task was slow or the queue was full, the call would block indefinitely, stalling the entire TCP/IP thread and causing a system-wide Denial of Service (DoS).
+**Learning:** Never use blocking calls (like `portMAX_DELAY`) in interrupt handlers or high-priority system callbacks (like lwIP).
+**Prevention:** Use a timeout of `0` in `xQueueSend` within callbacks. It is better to drop a packet than to crash the network stack.
