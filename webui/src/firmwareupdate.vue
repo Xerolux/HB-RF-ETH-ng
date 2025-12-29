@@ -107,7 +107,6 @@
         {{ t('firmware.releaseNotesError') }}
       </div>
       <div v-else>
-        <!-- Use v-html carefully, ideally use a markdown renderer but for now pre-wrap -->
         <pre class="release-notes-content">{{ releaseNotes }}</pre>
         <BButton
           v-if="releaseDownloadUrl"
@@ -173,11 +172,35 @@
             <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
             <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
           </svg>
-          {{ t('firmware.restart') }}
+          {{ restartLoading ? t('common.rebootingWait') : t('firmware.restart') }}
         </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
+
+  <!-- Restart Confirmation Modal -->
+  <BModal
+    v-model="showRestartModal"
+    :title="t('firmware.restart')"
+    @ok="confirmRestart"
+    ok-variant="warning"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('firmware.restartConfirm') }}</p>
+  </BModal>
+
+  <!-- Online Update Confirmation Modal -->
+  <BModal
+    v-model="showOnlineUpdateModal"
+    :title="t('firmware.onlineUpdate')"
+    @ok="confirmOnlineUpdate"
+    ok-variant="success"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('firmware.onlineUpdateConfirm') }}</p>
+  </BModal>
 </template>
 
 <script setup>
@@ -202,6 +225,10 @@ const releaseNotes = ref('')
 const releaseDownloadUrl = ref('')
 const loadingNotes = ref(false)
 const releaseNotesError = ref(false)
+
+// Modal state
+const showRestartModal = ref(false)
+const showOnlineUpdateModal = ref(false)
 
 const fetchReleaseNotes = async () => {
   loadingNotes.value = true
@@ -237,26 +264,24 @@ const onlineUpdateClickFromModal = () => {
 }
 
 const onlineUpdateClick = async () => {
-  if (confirm(t('firmware.onlineUpdateConfirm'))) {
-    showError.value = null
-    showSuccess.value = null
+  showOnlineUpdateModal.value = true
+}
 
-    // Set a fake progress to show activity or use a different indicator
-    firmwareUpdateStore.progress = 1
+const confirmOnlineUpdate = async () => {
+  showError.value = null
+  showSuccess.value = null
 
-    try {
-        const response = await fetch('/api/online_update', { method: 'POST' })
-        if (response.ok) {
-            // The device will restart, so maybe show a message "Update started, device will restart..."
-            alert(t('firmware.onlineUpdateStarted'))
-        } else {
-            showError.value = true
-        }
-        firmwareUpdateStore.progress = 0
-    } catch (error) {
-        showError.value = true
-        firmwareUpdateStore.progress = 0
-    }
+  // Set a fake progress to show activity or use a different indicator
+  firmwareUpdateStore.progress = 1
+
+  try {
+      await axios.post('/api/online_update')
+      // The device will restart, do not reset progress.
+      // Show feedback via alert for now as restart is imminent, or rely on the spinner which remains active
+      alert(t('firmware.onlineUpdateStarted'))
+  } catch (error) {
+      showError.value = true
+      firmwareUpdateStore.progress = 0
   }
 }
 
@@ -274,19 +299,19 @@ const firmwareUpdateClick = async () => {
 }
 
 const restartClick = async () => {
-  if (confirm(t('firmware.restartConfirm'))) {
-    restartLoading.value = true
-    try {
-      await fetch('/api/restart', { method: 'POST' })
-      alert(t('common.rebootingWait'))
-      setTimeout(() => {
-          window.location.reload()
-      }, 10000)
-    } catch (error) {
-      // Expected - device will restart and connection will be lost
-    } finally {
-      // restartLoading.value = false // No need to reset if page reloads, but good practice if it fails
-    }
+  showRestartModal.value = true
+}
+
+const confirmRestart = async () => {
+  restartLoading.value = true
+  try {
+    await axios.post('/api/restart')
+    setTimeout(() => {
+        window.location.reload()
+    }, 10000)
+  } catch (error) {
+    console.error(error)
+    restartLoading.value = false
   }
 }
 
