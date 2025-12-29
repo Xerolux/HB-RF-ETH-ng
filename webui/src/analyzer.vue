@@ -375,9 +375,10 @@ const flushQueue = () => {
   const chunk = incomingBuffer.splice(0)
   frames.value.push(...chunk)
 
-  // Maintain max size efficiently
-  if (frames.value.length > 200) {
-    frames.value = frames.value.slice(-200)
+  // Maintain max size efficiently (use splice to avoid replacing array and optimize Vue reactivity)
+  const overflow = frames.value.length - 200
+  if (overflow > 0) {
+    frames.value.splice(0, overflow)
   }
 
   if (autoScroll.value) {
