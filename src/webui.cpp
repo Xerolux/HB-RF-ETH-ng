@@ -922,6 +922,15 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
+    // Security: Validate password complexity before restoring to prevent downgrading security
+    if (adminPassword && strlen(adminPassword) > 0) {
+        if (!validatePassword(adminPassword)) {
+            ESP_LOGW(TAG, "Restored password is too weak. Keeping current password.");
+            // Nullify to prevent update in the subsequent check
+            adminPassword = NULL;
+        }
+    }
+
     char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
     bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
     ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
