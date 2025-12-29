@@ -73,7 +73,7 @@ jobs:
           git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "No changes to push or already on tag"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
