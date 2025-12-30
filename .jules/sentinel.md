@@ -27,3 +27,8 @@
 **Vulnerability:** The UDP packet receiver used `xQueueSend(..., portMAX_DELAY)` within the lwIP callback context. If the processing task was slow or the queue was full, the call would block indefinitely, stalling the entire TCP/IP thread and causing a system-wide Denial of Service (DoS).
 **Learning:** Never use blocking calls (like `portMAX_DELAY`) in interrupt handlers or high-priority system callbacks (like lwIP).
 **Prevention:** Use a timeout of `0` in `xQueueSend` within callbacks. It is better to drop a packet than to crash the network stack.
+
+## 2025-02-18 - [JSON Injection in SysInfo API]
+**Vulnerability:** The `/sysinfo.json` endpoint used `snprintf` to construct a JSON response using string values from various sources (GitHub API, Hardware, System) without escaping them. This allowed injection of arbitrary JSON fields or corruption of the JSON structure if the input contained double quotes or backslashes.
+**Learning:** Even "trusted" sources like GitHub API (release tags) or hardware identifiers should be treated as untrusted input when constructing structured data like JSON or SQL. Optimizations that bypass standard serialization libraries (like `cJSON`) must include manual sanitation.
+**Prevention:** Use a helper function to escape JSON-sensitive characters (`"`, `\`, control chars) before using strings in manual JSON construction, or stick to standard libraries despite minor performance overhead. I implemented a `escape_json_string` helper to maintain the performance benefit of `snprintf` while securing the output.
