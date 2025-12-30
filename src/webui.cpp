@@ -109,6 +109,76 @@ EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
 EMBED_HANDLER("/main.css", main_css_gz, "text/css")
 EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
 
+/**
+ * Escapes a string for use in JSON.
+ * @param input The source string
+ * @param output The destination buffer
+ * @param output_len The size of the destination buffer
+ */
+static void escape_json_string(const char *input, char *output, size_t output_len)
+{
+    size_t i = 0;
+    size_t j = 0;
+
+    // Always initialize output to empty string first to prevent use of uninitialized memory
+    if (output && output_len > 0) {
+        output[0] = '\0';
+    }
+
+    if (!input || !output || output_len == 0) return;
+
+    while (input[i] != '\0' && j < output_len - 1)
+    {
+        char c = input[i];
+        if (c == '"' || c == '\\' || c == '/')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = c;
+        }
+        else if (c == '\b')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = 'b';
+        }
+        else if (c == '\f')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = 'f';
+        }
+        else if (c == '\n')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = 'n';
+        }
+        else if (c == '\r')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = 'r';
+        }
+        else if (c == '\t')
+        {
+            if (j + 2 >= output_len) break;
+            output[j++] = '\\';
+            output[j++] = 't';
+        }
+        else if ((unsigned char)c < 32)
+        {
+            // Skip other control characters
+        }
+        else
+        {
+            output[j++] = c;
+        }
+        i++;
+    }
+    output[j] = '\0';
+}
+
 void generateToken()
 {
     char tokenBase[21];
@@ -307,6 +377,32 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
+    // Escape dynamic strings to prevent JSON injection
+    char esc_serial[32];
+    char esc_latestVersion[64];
+    char esc_board[32];
+    char esc_resetReason[64];
+    char esc_rmSerial[32];
+    char esc_sgtin[64];
+    char esc_remoteAddr[64];
+
+    escape_json_string(_sysInfo->getSerialNumber(), esc_serial, sizeof(esc_serial));
+    // currentVersion and firmwareVariant are trusted/hardcoded, but could escape if unsure
+    // latestVersion comes from GitHub API - MUST ESCAPE
+    escape_json_string(_updateCheck->getLatestVersion(), esc_latestVersion, sizeof(esc_latestVersion));
+    escape_json_string(_sysInfo->getBoardRevisionString(), esc_board, sizeof(esc_board));
+    escape_json_string(_sysInfo->getResetReason(), esc_resetReason, sizeof(esc_resetReason));
+    escape_json_string(_radioModuleDetector->getSerial(), esc_rmSerial, sizeof(esc_rmSerial));
+    escape_json_string(_radioModuleDetector->getSGTIN(), esc_sgtin, sizeof(esc_sgtin));
+
+    // Remote address is IP string, but safe to escape just in case
+    if (_rawUartUdpListener) {
+        escape_json_string(ip2str(_rawUartUdpListener->getConnectedRemoteAddress()), esc_remoteAddr, sizeof(esc_remoteAddr));
+    } else {
+        strncpy(esc_remoteAddr, "HMLGW Mode", sizeof(esc_remoteAddr)-1);
+        esc_remoteAddr[sizeof(esc_remoteAddr)-1] = '\0';
+    }
+
     // Format JSON
     // Note: We use "true"/"false" strings for booleans
     int written = snprintf(buffer, SYSINFO_BUFFER_SIZE,
@@ -333,27 +429,27 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
             "\"radioModuleHmIPRadioMAC\":\"%s\","
             "\"radioModuleSGTIN\":\"%s\""
         "}}",
-        _sysInfo->getSerialNumber(),
+        esc_serial,
         _sysInfo->getCurrentVersion(),
         _sysInfo->getFirmwareVariant(),
-        _updateCheck->getLatestVersion(),
+        esc_latestVersion,
         _sysInfo->getMemoryUsage(),
         _sysInfo->getCpuUsage(),
         _sysInfo->getSupplyVoltage(),
         _sysInfo->getTemperature(),
         _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
+        esc_board,
+        esc_resetReason,
         _ethernet->isConnected() ? "true" : "false",
         _ethernet->getLinkSpeedMbps(),
         _ethernet->getDuplexMode(),
-        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
+        esc_remoteAddr,
         radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
+        esc_rmSerial,
         fwVersionStr,
         bidCosMAC,
         hmIPMAC,
-        _radioModuleDetector->getSGTIN()
+        esc_sgtin
     );
 
     if (written < 0 || written >= SYSINFO_BUFFER_SIZE) {
