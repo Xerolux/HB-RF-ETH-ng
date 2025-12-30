@@ -1,233 +1,164 @@
 #include "log_manager.h"
-#include "esp_log.h"
-#include "esp_spiffs.h"
-#include <stdio.h>
+#include <esp_log.h>
+#include <esp_timer.h>
 #include <string.h>
-#include <sys/unistd.h>
-#include <sys/stat.h>
+#include <stdio.h>
+#include <cstdlib>
 
-static const char* TAG = "LogManager";
+static const char *TAG = "LogManager";
 
-// Log message structure for queue
-struct LogMessage {
-    char buffer[256];
-    size_t length;
-};
-
-LogManager::LogManager() :
-    _started(false),
-    _basePath("/spiffs"),
-    _currentLogFile("/spiffs/log.txt"),
-    _prevLogFile("/spiffs/log.txt.1"),
-    _maxLogSize(64 * 1024), // 64KB
-    _logQueue(nullptr),
-    _fileMutex(nullptr),
-    _logTaskHandle(nullptr)
-{
+LogManager::LogManager() {
+    _mutex = xSemaphoreCreateMutex();
 }
 
-LogManager::~LogManager() {
-    if (_logQueue) {
-        vQueueDelete(_logQueue);
-    }
-    if (_fileMutex) {
-        vSemaphoreDelete(_fileMutex);
-    }
-}
-
+// Singleton instance
 LogManager& LogManager::instance() {
     static LogManager instance;
     return instance;
 }
 
-int LogManager::vprintf_handler(const char* fmt, va_list ap) {
-    LogManager& mgr = LogManager::instance();
-    if (!mgr._started || !mgr._logQueue) {
-        return vprintf(fmt, ap);
+// Custom vprintf handler to capture logs
+// Note: This must NOT be static because it's a friend function declared in the header with extern linkage
+int log_vprintf(const char *fmt, va_list args) {
+    // Estimate length
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int len = vsnprintf(NULL, 0, fmt, args_copy);
+    va_end(args_copy);
+
+    if (len < 0) return 0;
+
+    // Use a small stack buffer for formatting to avoid malloc for typical log lines
+    char stack_buf[256];
+    char *buf = stack_buf;
+    bool heap_alloc = false;
+
+    if (len + 1 > sizeof(stack_buf)) {
+        buf = (char*)malloc(len + 1);
+        if (!buf) return 0; // OOM, skip logging to buffer
+        heap_alloc = true;
     }
 
-    // Format message into buffer
-    LogMessage msg;
-    msg.length = vsnprintf(msg.buffer, sizeof(msg.buffer), fmt, ap);
+    vsnprintf(buf, len + 1, fmt, args);
 
-    // Clamp to buffer size
-    if (msg.length >= sizeof(msg.buffer)) {
-        msg.length = sizeof(msg.buffer) - 1;
-    }
+    // Write to ring buffer
+    LogManager::instance().write(buf, len);
 
-    // Send to queue (non-blocking to avoid delays)
-    xQueueSend(mgr._logQueue, &msg, 0);
+    if (heap_alloc) free(buf);
 
-    // Also print to console (original behavior)
-    return vprintf(fmt, ap);
+    // Forward to default UART handler
+    return vprintf(fmt, args);
 }
 
-void LogManager::start() {
-    if (_started) return;
-
-    // Initialize SPIFFS
-    esp_vfs_spiffs_conf_t conf = {
-        .base_path = _basePath,
-        .partition_label = "spiffs",
-        .max_files = 5,
-        .format_if_mount_failed = true
-    };
-
-    esp_err_t ret = esp_vfs_spiffs_register(&conf);
-
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount or format filesystem");
-        } else if (ret == ESP_ERR_NOT_FOUND) {
-            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-        }
-        return;
-    }
-
-    // Create mutex for file access
-    _fileMutex = xSemaphoreCreateMutex();
-    if (!_fileMutex) {
-        ESP_LOGE(TAG, "Failed to create file mutex");
-        return;
-    }
-
-    // Create log queue (32 messages deep)
-    _logQueue = xQueueCreate(32, sizeof(LogMessage));
-    if (!_logQueue) {
-        ESP_LOGE(TAG, "Failed to create log queue");
-        vSemaphoreDelete(_fileMutex);
-        _fileMutex = nullptr;
-        return;
-    }
-
-    // Create log processing task
-    BaseType_t taskCreated = xTaskCreate(
-        log_task,
-        "log_task",
-        4096,  // 4KB stack
-        this,
-        5,     // Priority
-        &_logTaskHandle
-    );
-
-    if (taskCreated != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create log task");
-        vQueueDelete(_logQueue);
-        vSemaphoreDelete(_fileMutex);
-        _logQueue = nullptr;
-        _fileMutex = nullptr;
-        return;
-    }
-
-    // Register vprintf handler
-    esp_log_set_vprintf(vprintf_handler);
-
-    _started = true;
-    ESP_LOGI(TAG, "LogManager started, logging to %s", _currentLogFile);
+void LogManager::begin(size_t size) {
+    instance()._begin(size);
 }
 
-void LogManager::log_task(void* pvParameters) {
-    LogManager* mgr = static_cast<LogManager*>(pvParameters);
-    mgr->processLogQueue();
+void LogManager::clear() {
+    instance()._clear();
 }
 
-void LogManager::processLogQueue() {
-    LogMessage msg;
+void LogManager::_begin(size_t size) {
+    if (!_mutex) {
+        _mutex = xSemaphoreCreateMutex();
+    }
 
-    while (true) {
-        // Wait for log messages (block indefinitely)
-        if (xQueueReceive(_logQueue, &msg, portMAX_DELAY) == pdTRUE) {
-            // Take mutex before file operations
-            if (xSemaphoreTake(_fileMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-                // Check if rotation needed
-                rotateLogIfNeeded();
+    xSemaphoreTake(_mutex, portMAX_DELAY);
 
-                // Write to file
-                FILE* f = fopen(_currentLogFile, "a");
-                if (f != NULL) {
-                    fwrite(msg.buffer, 1, msg.length, f);
-                    fclose(f);
-                }
+    if (log_buffer) free(log_buffer);
+    log_buffer_size = size;
+    log_buffer = (char *)malloc(log_buffer_size);
+    total_written = 0;
 
-                xSemaphoreGive(_fileMutex);
+    if (log_buffer) {
+        // Zero out for cleanliness, though not strictly required for ring buffer
+        memset(log_buffer, 0, log_buffer_size);
+        esp_log_set_vprintf(log_vprintf);
+        ESP_LOGI(TAG, "Log buffering enabled (%d bytes, RingBuffer)", size);
+    } else {
+        ESP_LOGE(TAG, "Failed to allocate log buffer");
+    }
+
+    xSemaphoreGive(_mutex);
+}
+
+void LogManager::_clear() {
+    if (!_mutex) return;
+    xSemaphoreTake(_mutex, portMAX_DELAY);
+    total_written = 0;
+    if (log_buffer) memset(log_buffer, 0, log_buffer_size);
+    xSemaphoreGive(_mutex);
+}
+
+void LogManager::write(const char* data, size_t len) {
+    if (!log_buffer || len == 0) return;
+
+    if (_mutex) {
+        // Use timeout to avoid blocking logging if something is stuck
+        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            size_t current_idx = total_written % log_buffer_size;
+            size_t space_at_end = log_buffer_size - current_idx;
+
+            if (len <= space_at_end) {
+                memcpy(log_buffer + current_idx, data, len);
+            } else {
+                // Wrap around
+                memcpy(log_buffer + current_idx, data, space_at_end);
+                memcpy(log_buffer, data + space_at_end, len - space_at_end);
             }
+            total_written += len;
+            xSemaphoreGive(_mutex);
         }
     }
 }
 
-void LogManager::rotateLogIfNeeded() {
-    struct stat st;
-    if (stat(_currentLogFile, &st) == 0) {
-        if (st.st_size >= _maxLogSize) {
-            unlink(_prevLogFile);
-            rename(_currentLogFile, _prevLogFile);
+std::string LogManager::getLogContent(size_t offset) {
+    if (!log_buffer) return "";
+
+    std::string result;
+
+    if (_mutex) {
+        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            uint64_t local_total = total_written;
+
+            // If client asks for future data (shouldn't happen), return empty
+            if (offset >= local_total) {
+                xSemaphoreGive(_mutex);
+                return "";
+            }
+
+            size_t data_len = local_total - offset;
+
+            // If the client is asking for data that has been overwritten (lagging behind)
+            if (data_len > log_buffer_size) {
+                // Return the entire valid buffer to catch them up (partially)
+                // Effectively, we give them the window [total - size, total]
+                offset = local_total - log_buffer_size;
+                data_len = log_buffer_size;
+            }
+
+            // Pre-allocate to avoid reallocations
+            // Standard string::resize will abort on failure without exceptions enabled in ESP-IDF
+            // which is fine as OOM is fatal anyway.
+            result.resize(data_len);
+
+            size_t start_idx = offset % log_buffer_size;
+            size_t space_at_end = log_buffer_size - start_idx;
+
+            if (data_len <= space_at_end) {
+                memcpy(&result[0], log_buffer + start_idx, data_len);
+            } else {
+                memcpy(&result[0], log_buffer + start_idx, space_at_end);
+                memcpy(&result[space_at_end], log_buffer, data_len - space_at_end);
+            }
+
+            xSemaphoreGive(_mutex);
         }
     }
+
+    return result;
 }
 
-std::string LogManager::getLogContent() {
-    if (!_started) return "LogManager not started";
-
-    std::string content;
-
-    // Take mutex to ensure thread-safe file access
-    if (xSemaphoreTake(_fileMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        return "Error: Could not acquire file lock";
-    }
-
-    // Read previous log first
-    FILE* f = fopen(_prevLogFile, "r");
-    if (f != NULL) {
-        char buf[512];
-        while (fgets(buf, sizeof(buf), f)) {
-            content += buf;
-        }
-        fclose(f);
-        if (!content.empty()) {
-            content += "\n--- ROTATED ---\n";
-        }
-    }
-
-    // Read current log
-    f = fopen(_currentLogFile, "r");
-    if (f != NULL) {
-        char buf[512];
-        while (fgets(buf, sizeof(buf), f)) {
-            content += buf;
-        }
-        fclose(f);
-    }
-
-    xSemaphoreGive(_fileMutex);
-
-    if (content.empty()) {
-        return "No log data available";
-    }
-
-    return content;
-}
-
-void LogManager::clearLog() {
-    if (!_started) return;
-
-    // Take mutex to ensure thread-safe file access
-    if (xSemaphoreTake(_fileMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-        ESP_LOGW(TAG, "Could not acquire file lock for clearing logs");
-        return;
-    }
-
-    unlink(_prevLogFile);
-    unlink(_currentLogFile);
-
-    // Create empty current log
-    FILE* f = fopen(_currentLogFile, "w");
-    if (f) {
-        fclose(f);
-    }
-
-    xSemaphoreGive(_fileMutex);
-
-    ESP_LOGI(TAG, "Logs cleared");
+size_t LogManager::getTotalWritten() const {
+    return total_written;
 }

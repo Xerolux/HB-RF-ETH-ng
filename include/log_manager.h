@@ -1,39 +1,36 @@
 #pragma once
 
-#include "esp_err.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
+#include <cstdint>
 #include <string>
+#include <cstdarg>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class LogManager {
 public:
     static LogManager& instance();
 
-    void start();
-    std::string getLogContent();
-    void clearLog();
+    // Static wrappers for initialization (called from main.cpp)
+    static void begin(size_t size = 16384);
+    static void clear();
+
+    // Instance methods
+    std::string getLogContent(size_t offset = 0);
+    size_t getTotalWritten() const;
 
 private:
     LogManager();
-    ~LogManager();
 
-    // Prevent copy/assignment
-    LogManager(const LogManager&) = delete;
-    LogManager& operator=(const LogManager&) = delete;
+    // Internal implementation
+    void _begin(size_t size);
+    void _clear();
+    void write(const char* data, size_t len);
 
-    static int vprintf_handler(const char* fmt, va_list ap);
-    static void log_task(void* pvParameters);
-    void processLogQueue();
-    void rotateLogIfNeeded();
+    char *log_buffer = nullptr;
+    size_t log_buffer_size = 0;
+    uint64_t total_written = 0;
+    SemaphoreHandle_t _mutex = nullptr;
 
-    bool _started;
-    const char* _basePath;
-    const char* _currentLogFile;
-    const char* _prevLogFile;
-    const size_t _maxLogSize;
-
-    QueueHandle_t _logQueue;
-    SemaphoreHandle_t _fileMutex;
-    TaskHandle_t _logTaskHandle;
+    // Allow the C-style callback to access private members
+    friend int log_vprintf(const char *fmt, va_list args);
 };

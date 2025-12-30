@@ -24,6 +24,7 @@
 #include "gps.h"
 #include "pins.h"
 #include "esp_log.h"
+#include <esp_timer.h>
 #include "string.h"
 
 void gpsSerialQueueHandlerTask(void *parameter)
