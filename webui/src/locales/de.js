@@ -11,6 +11,7 @@ export default {
     success: 'Erfolgreich',
     yes: 'Ja',
     no: 'Nein',
+    delete: 'Löschen',
     saving: 'Speichern...',
     showPassword: 'Passwort anzeigen',
     hidePassword: 'Passwort verbergen',
@@ -307,7 +308,8 @@ export default {
     deviceNames: 'Gerätenamen',
     address: 'Adresse',
     name: 'Name',
-    storedNames: 'Gespeicherte Namen'
+    storedNames: 'Gespeicherte Namen',
+    editName: 'Name für {address} bearbeiten'
   },
 
   // About Page
