@@ -137,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, computed, markRaw, triggerRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLoginStore, useSettingsStore } from './stores.js'
 import { useRouter } from 'vue-router'
@@ -207,6 +207,8 @@ const updateFrameNames = () => {
     f.src = deviceNames[f.srcRaw] || f.srcRaw
     f.dst = deviceNames[f.dstRaw] || f.dstRaw
   })
+  // OPTIMIZATION (Bolt): Force update since frames are non-reactive
+  triggerRef(frames)
 }
 
 // Frame Types (BidCoS)
@@ -343,7 +345,8 @@ const processBidCosFrame = (ts, data, rssi) => {
 
   // OPTIMIZATION: Buffer frames and flush in batches using requestAnimationFrame
   // This prevents layout thrashing when multiple frames arrive in a short burst
-  incomingBuffer.push({
+  // OPTIMIZATION (Bolt): Use markRaw to prevent deep reactivity overhead for frame objects
+  incomingBuffer.push(markRaw({
     id: frameCounter,
     ts: ts,
     formattedTime: formattedTime,
@@ -359,7 +362,7 @@ const processBidCosFrame = (ts, data, rssi) => {
     src: deviceNames[srcRaw] || srcRaw,
     dst: deviceNames[dstRaw] || dstRaw,
     payload: payload
-  })
+  }))
 
   if (!flushPending) {
     flushPending = true
