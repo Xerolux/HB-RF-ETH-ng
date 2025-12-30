@@ -276,15 +276,10 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 
     // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
     // This handler is called frequently (1Hz) by the frontend.
-    char buffer[SYSINFO_BUFFER_SIZE];
-
-    // Stack overflow protection: Log high water mark periodically
-    static uint32_t check_counter = 0;
-    if (++check_counter % 100 == 0) { // Check every 100 calls
-        UBaseType_t stack_remaining = uxTaskGetStackHighWaterMark(NULL);
-        if (stack_remaining < 512) {
-            ESP_LOGW(TAG, "Low stack space in sysinfo handler: %u bytes remaining", stack_remaining);
-        }
+    // Changed to heap allocation to prevent stack overflow issues
+    char *buffer = (char*)malloc(SYSINFO_BUFFER_SIZE);
+    if (!buffer) {
+        return httpd_resp_send_500(req);
     }
 
     // Determine Radio Module Type String
@@ -314,7 +309,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 
     // Format JSON
     // Note: We use "true"/"false" strings for booleans
-    int written = snprintf(buffer, sizeof(buffer),
+    int written = snprintf(buffer, SYSINFO_BUFFER_SIZE,
         "{\"sysInfo\":{"
             "\"serial\":\"%s\","
             "\"currentVersion\":\"%s\","
@@ -361,12 +356,14 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         _radioModuleDetector->getSGTIN()
     );
 
-    if (written < 0 || written >= sizeof(buffer)) {
+    if (written < 0 || written >= SYSINFO_BUFFER_SIZE) {
         ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
+        free(buffer);
         return httpd_resp_send_500(req);
     }
 
     httpd_resp_sendstr(req, buffer);
+    free(buffer);
     return ESP_OK;
 }
 
@@ -674,12 +671,18 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     // Start or stop Analyzer task based on new configuration
     if (analyzerEnabled && !hmlgwEnabled) {
+#if ENABLE_ANALYZER
         if (_analyzer == nullptr) {
             _analyzer = new Analyzer(_radioModuleConnector);
         }
-    } else if (_analyzer) {
-        delete _analyzer;
-        _analyzer = nullptr;
+#endif
+    } else {
+#if ENABLE_ANALYZER
+        if (_analyzer) {
+            delete _analyzer;
+            _analyzer = nullptr;
+        }
+#endif
     }
 
     cJSON_Delete(root);
@@ -815,10 +818,19 @@ esp_err_t get_log_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
+    size_t offset = 0;
+    char query[32];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char param[16];
+        if (httpd_query_key_value(query, "offset", param, sizeof(param)) == ESP_OK) {
+            offset = strtoul(param, NULL, 10);
+        }
+    }
+
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
-    std::string content = LogManager::instance().getLogContent();
+    std::string content = LogManager::instance().getLogContent(offset);
     httpd_resp_send(req, content.c_str(), content.length());
 
     return ESP_OK;

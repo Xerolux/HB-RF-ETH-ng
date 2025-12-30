@@ -1,3 +1,5 @@
+#include <sdkconfig.h>
+#include <esp_timer.h>
 #include "analyzer.h"
 #include "esp_log.h"
 #include <cstring>

@@ -114,7 +114,7 @@ extern "C"
 void app_main()
 {
     // Initialize logging immediately to capture startup events
-    LogManager::instance().start();
+    LogManager::begin();
 
     // CRITICAL: Mark OTA update as valid immediately after boot
     // This must be done BEFORE any complex initialization that could cause a panic
