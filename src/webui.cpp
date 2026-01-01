@@ -45,6 +45,7 @@
 #include "monitoring.h"
 #include "security_headers.h"
 #include "log_manager.h"
+#include "json_helpers.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -307,6 +308,38 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
+    // Escape dynamic strings to prevent JSON injection
+    char esc_serial[32] = {0};
+    char esc_version[32] = {0};
+    char esc_variant[32] = {0};
+    char esc_latest[32] = {0};
+    char esc_board[32] = {0};
+    char esc_reset[64] = {0};
+    char esc_duplex[16] = {0};
+    char esc_remote[64] = {0};
+    char esc_rm_type[32] = {0};
+    char esc_rm_serial[32] = {0};
+    char esc_rm_fw[32] = {0};
+    char esc_rm_bidcos[32] = {0};
+    char esc_rm_hmip[32] = {0};
+    char esc_rm_sgtin[64] = {0};
+
+    if (escape_json_string(_sysInfo->getSerialNumber(), esc_serial, sizeof(esc_serial)) < 0) snprintf(esc_serial, sizeof(esc_serial), "error");
+    if (escape_json_string(_sysInfo->getCurrentVersion(), esc_version, sizeof(esc_version)) < 0) snprintf(esc_version, sizeof(esc_version), "error");
+    if (escape_json_string(_sysInfo->getFirmwareVariant(), esc_variant, sizeof(esc_variant)) < 0) snprintf(esc_variant, sizeof(esc_variant), "error");
+    if (escape_json_string(_updateCheck->getLatestVersion(), esc_latest, sizeof(esc_latest)) < 0) snprintf(esc_latest, sizeof(esc_latest), "error");
+    if (escape_json_string(_sysInfo->getBoardRevisionString(), esc_board, sizeof(esc_board)) < 0) snprintf(esc_board, sizeof(esc_board), "error");
+    // Reset reason can be long, if truncated it's still safe as it's null terminated now
+    escape_json_string(_sysInfo->getResetReason(), esc_reset, sizeof(esc_reset));
+    if (escape_json_string(_ethernet->getDuplexMode(), esc_duplex, sizeof(esc_duplex)) < 0) snprintf(esc_duplex, sizeof(esc_duplex), "error");
+    if (escape_json_string(_rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode", esc_remote, sizeof(esc_remote)) < 0) snprintf(esc_remote, sizeof(esc_remote), "error");
+    if (escape_json_string(radioModuleTypeStr, esc_rm_type, sizeof(esc_rm_type)) < 0) snprintf(esc_rm_type, sizeof(esc_rm_type), "error");
+    if (escape_json_string(_radioModuleDetector->getSerial(), esc_rm_serial, sizeof(esc_rm_serial)) < 0) snprintf(esc_rm_serial, sizeof(esc_rm_serial), "error");
+    if (escape_json_string(fwVersionStr, esc_rm_fw, sizeof(esc_rm_fw)) < 0) snprintf(esc_rm_fw, sizeof(esc_rm_fw), "error");
+    if (escape_json_string(bidCosMAC, esc_rm_bidcos, sizeof(esc_rm_bidcos)) < 0) snprintf(esc_rm_bidcos, sizeof(esc_rm_bidcos), "error");
+    if (escape_json_string(hmIPMAC, esc_rm_hmip, sizeof(esc_rm_hmip)) < 0) snprintf(esc_rm_hmip, sizeof(esc_rm_hmip), "error");
+    if (escape_json_string(_radioModuleDetector->getSGTIN(), esc_rm_sgtin, sizeof(esc_rm_sgtin)) < 0) snprintf(esc_rm_sgtin, sizeof(esc_rm_sgtin), "error");
+
     // Format JSON
     // Note: We use "true"/"false" strings for booleans
     int written = snprintf(buffer, SYSINFO_BUFFER_SIZE,
@@ -333,27 +366,27 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
             "\"radioModuleHmIPRadioMAC\":\"%s\","
             "\"radioModuleSGTIN\":\"%s\""
         "}}",
-        _sysInfo->getSerialNumber(),
-        _sysInfo->getCurrentVersion(),
-        _sysInfo->getFirmwareVariant(),
-        _updateCheck->getLatestVersion(),
+        esc_serial,
+        esc_version,
+        esc_variant,
+        esc_latest,
         _sysInfo->getMemoryUsage(),
         _sysInfo->getCpuUsage(),
         _sysInfo->getSupplyVoltage(),
         _sysInfo->getTemperature(),
         _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
+        esc_board,
+        esc_reset,
         _ethernet->isConnected() ? "true" : "false",
         _ethernet->getLinkSpeedMbps(),
-        _ethernet->getDuplexMode(),
-        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
-        radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
-        fwVersionStr,
-        bidCosMAC,
-        hmIPMAC,
-        _radioModuleDetector->getSGTIN()
+        esc_duplex,
+        esc_remote,
+        esc_rm_type,
+        esc_rm_serial,
+        esc_rm_fw,
+        esc_rm_bidcos,
+        esc_rm_hmip,
+        esc_rm_sgtin
     );
 
     if (written < 0 || written >= SYSINFO_BUFFER_SIZE) {
