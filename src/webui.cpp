@@ -274,14 +274,6 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
 
-    // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
-    // This handler is called frequently (1Hz) by the frontend.
-    // Changed to heap allocation to prevent stack overflow issues
-    char *buffer = (char*)malloc(SYSINFO_BUFFER_SIZE);
-    if (!buffer) {
-        return httpd_resp_send_500(req);
-    }
-
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";
     switch (_radioModuleDetector->getRadioModuleType())
@@ -307,63 +299,49 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
-    // Format JSON
-    // Note: We use "true"/"false" strings for booleans
-    int written = snprintf(buffer, SYSINFO_BUFFER_SIZE,
-        "{\"sysInfo\":{"
-            "\"serial\":\"%s\","
-            "\"currentVersion\":\"%s\","
-            "\"firmwareVariant\":\"%s\","
-            "\"latestVersion\":\"%s\","
-            "\"memoryUsage\":%.2f,"
-            "\"cpuUsage\":%.2f,"
-            "\"supplyVoltage\":%.2f,"
-            "\"temperature\":%.2f,"
-            "\"uptimeSeconds\":%" PRIu64 ","
-            "\"boardRevision\":\"%s\","
-            "\"resetReason\":\"%s\","
-            "\"ethernetConnected\":%s,"
-            "\"ethernetSpeed\":%d,"
-            "\"ethernetDuplex\":\"%s\","
-            "\"rawUartRemoteAddress\":\"%s\","
-            "\"radioModuleType\":\"%s\","
-            "\"radioModuleSerial\":\"%s\","
-            "\"radioModuleFirmwareVersion\":\"%s\","
-            "\"radioModuleBidCosRadioMAC\":\"%s\","
-            "\"radioModuleHmIPRadioMAC\":\"%s\","
-            "\"radioModuleSGTIN\":\"%s\""
-        "}}",
-        _sysInfo->getSerialNumber(),
-        _sysInfo->getCurrentVersion(),
-        _sysInfo->getFirmwareVariant(),
-        _updateCheck->getLatestVersion(),
-        _sysInfo->getMemoryUsage(),
-        _sysInfo->getCpuUsage(),
-        _sysInfo->getSupplyVoltage(),
-        _sysInfo->getTemperature(),
-        _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
-        _ethernet->isConnected() ? "true" : "false",
-        _ethernet->getLinkSpeedMbps(),
-        _ethernet->getDuplexMode(),
-        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
-        radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
-        fwVersionStr,
-        bidCosMAC,
-        hmIPMAC,
-        _radioModuleDetector->getSGTIN()
-    );
-
-    if (written < 0 || written >= SYSINFO_BUFFER_SIZE) {
-        ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
-        free(buffer);
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
         return httpd_resp_send_500(req);
     }
+    cJSON *sysInfo = cJSON_AddObjectToObject(root, "sysInfo");
 
-    httpd_resp_sendstr(req, buffer);
-    free(buffer);
+    cJSON_AddStringToObject(sysInfo, "serial", _sysInfo->getSerialNumber());
+    cJSON_AddStringToObject(sysInfo, "currentVersion", _sysInfo->getCurrentVersion());
+    cJSON_AddStringToObject(sysInfo, "firmwareVariant", _sysInfo->getFirmwareVariant());
+    cJSON_AddStringToObject(sysInfo, "latestVersion", _updateCheck->getLatestVersion());
+    cJSON_AddNumberToObject(sysInfo, "memoryUsage", _sysInfo->getMemoryUsage());
+    cJSON_AddNumberToObject(sysInfo, "cpuUsage", _sysInfo->getCpuUsage());
+    cJSON_AddNumberToObject(sysInfo, "supplyVoltage", _sysInfo->getSupplyVoltage());
+    cJSON_AddNumberToObject(sysInfo, "temperature", _sysInfo->getTemperature());
+    cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", (double)_sysInfo->getUptimeSeconds());
+    cJSON_AddStringToObject(sysInfo, "boardRevision", _sysInfo->getBoardRevisionString());
+    cJSON_AddStringToObject(sysInfo, "resetReason", _sysInfo->getResetReason());
+    cJSON_AddBoolToObject(sysInfo, "ethernetConnected", _ethernet->isConnected());
+    cJSON_AddNumberToObject(sysInfo, "ethernetSpeed", _ethernet->getLinkSpeedMbps());
+    cJSON_AddStringToObject(sysInfo, "ethernetDuplex", _ethernet->getDuplexMode());
+
+    if (_rawUartUdpListener) {
+        cJSON_AddStringToObject(sysInfo, "rawUartRemoteAddress", ip2str(_rawUartUdpListener->getConnectedRemoteAddress()));
+    } else {
+        cJSON_AddStringToObject(sysInfo, "rawUartRemoteAddress", "HMLGW Mode");
+    }
+
+    cJSON_AddStringToObject(sysInfo, "radioModuleType", radioModuleTypeStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSerial", _radioModuleDetector->getSerial());
+    cJSON_AddStringToObject(sysInfo, "radioModuleFirmwareVersion", fwVersionStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleBidCosRadioMAC", bidCosMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleHmIPRadioMAC", hmIPMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSGTIN", _radioModuleDetector->getSGTIN());
+
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json == NULL) {
+        cJSON_Delete(root);
+        return httpd_resp_send_500(req);
+    }
+    httpd_resp_sendstr(req, json);
+    free((void *)json);
+    cJSON_Delete(root);
+
     return ESP_OK;
 }
 
