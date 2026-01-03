@@ -229,7 +229,9 @@ const FRAME_TYPES = {
 
 const connect = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const url = `${protocol}//${window.location.host}/api/analyzer/ws`
+  // Pass token in query string for authentication
+  const token = encodeURIComponent(loginStore.token)
+  const url = `${protocol}//${window.location.host}/api/analyzer/ws?token=${token}`
 
   ws = new WebSocket(url)
 

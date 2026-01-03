@@ -467,6 +467,33 @@ esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
+    // Validate Auth (WebSocket requires query param since JS WebSocket API doesn't support custom headers)
+    bool authenticated = false;
+    char query[128] = {0};
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char token_param[64] = {0};
+        if (httpd_query_key_value(query, "token", token_param, sizeof(token_param)) == ESP_OK) {
+            // Note: httpd_query_key_value decodes URL-encoded values
+            if (secure_strcmp(token_param, _token) == 0) {
+                authenticated = true;
+            }
+        }
+    }
+
+    // Also try standard header auth (fallback for non-browser clients)
+    if (!authenticated) {
+        if (validate_auth(req) == ESP_OK) {
+            authenticated = true;
+        }
+    }
+
+    if (!authenticated) {
+        // Return 401. For WebSocket handshake this will fail the connection.
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
     if (!_settings->getAnalyzerEnabled() || _settings->getHmlgwEnabled()) {
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_sendstr(req, "Analyzer feature is disabled");
