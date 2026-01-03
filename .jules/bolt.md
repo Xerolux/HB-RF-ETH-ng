@@ -9,3 +9,7 @@
 ## 2024-05-24 - [ESP32 Stream Parsing]
 **Learning:** For high-throughput serial data parsing (like UART), replacing byte-by-byte state machine loops with bulk `memcpy` (scanning for delimiters like `0xfd` with `memchr`) can significantly reduce CPU usage in interrupt-heavy environments.
 **Action:** When optimizing state machines processing buffers, identify "run" states (like `RECEIVE_FRAME_DATA`) where bulk copying is safe, and use standard library functions (`memcpy`, `memchr`) to process chunks.
+
+## 2026-01-03 - [Vue 3 Large List Reactivity]
+**Learning:** For components visualizing high-frequency data (like WebSocket streams adding 100+ items/sec), standard Vue `ref([])` creates deep proxies for every object, causing massive memory and CPU overhead.
+**Action:** Use `shallowRef([])` for the main list and manually trigger updates with `triggerRef(list)` after mutations (push/splice). This keeps the array reactive but leaves the elements as plain JS objects, significantly improving performance.
