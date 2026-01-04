@@ -1,3 +1,13 @@
+## 2025-12-13 - [Buffer Deadlock in HMLGW]
+**Vulnerability:** The HMLGW protocol parser allowed frame lengths (8192 bytes) that equaled the buffer capacity. This could cause a deadlock where the parser waits for a full frame that can never fit into the remaining buffer space (due to protocol overhead), stalling the connection indefinitely.
+**Learning:** Input validation limits must account for protocol overhead and buffer constraints, not just the raw buffer size.
+**Prevention:** Set data limits well below buffer capacity (e.g., `BUFFER_SIZE / 2`) to ensure sufficient headroom for processing headers and circular wrapping.
+
+## 2025-12-12 - [Stack Exhaustion in HMLGW]
+**Vulnerability:** The `RingBuffer` class allocated an 8KB buffer on the stack within the `handleClient` method, which was called by a task with only 4KB of stack space. This guaranteed a stack overflow and crash upon client connection.
+**Learning:** Stack-allocated objects in C++ classes (like arrays member variables) are allocated on the stack where the object is instantiated.
+**Prevention:** Always check `sizeof` of objects instantiated on the stack in tasks. Use heap allocation for large buffers.
+
 ## 2025-12-12 - [DoS in OTA Handler]
 **Vulnerability:** The OTA update handler unconditionally searches for `\r\n\r\n` (header terminator) in the request body to skip headers, but the frontend sends raw binary (`application/octet-stream`). If the binary data does not contain `\r\n\r\n` in the first chunk, `strstr` returns NULL, leading to a pointer arithmetic overflow and a crash (DoS).
 **Learning:** Legacy code adapted for new purposes (multipart -> raw binary) can leave dangerous assumptions. Always verify if the data format matches the parsing logic.
