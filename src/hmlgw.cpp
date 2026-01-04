@@ -46,13 +46,29 @@ static const char* IDENTIFIER = "HM-USB-IF";
 class RingBuffer {
 private:
     static const size_t BUFFER_SIZE = 8192;  // Fixed 8KB buffer
-    uint8_t _data[BUFFER_SIZE];
+    uint8_t* _data;
     size_t _readPos;
     size_t _writePos;
     size_t _count;  // Number of bytes currently in buffer
 
 public:
-    RingBuffer() : _readPos(0), _writePos(0), _count(0) {}
+    RingBuffer() : _readPos(0), _writePos(0), _count(0) {
+        _data = (uint8_t*)malloc(BUFFER_SIZE);
+        if (!_data) {
+            ESP_LOGE(TAG, "Failed to allocate RingBuffer");
+        }
+    }
+
+    ~RingBuffer() {
+        if (_data) {
+            free(_data);
+            _data = NULL;
+        }
+    }
+
+    // Prevent copying to avoid double-free
+    RingBuffer(const RingBuffer&) = delete;
+    RingBuffer& operator=(const RingBuffer&) = delete;
 
     size_t size() const { return _count; }
     size_t capacity() const { return BUFFER_SIZE; }
@@ -60,6 +76,7 @@ public:
 
     // Write data to buffer
     size_t write(const uint8_t* data, size_t len) {
+        if (!_data) return 0;
         size_t toWrite = (len > available()) ? available() : len;
         for (size_t i = 0; i < toWrite; i++) {
             _data[_writePos] = data[i];
@@ -71,7 +88,7 @@ public:
 
     // Peek at data without removing it
     uint8_t operator[](size_t index) const {
-        if (index >= _count) return 0;
+        if (!_data || index >= _count) return 0;
         return _data[(_readPos + index) % BUFFER_SIZE];
     }
 
@@ -89,6 +106,7 @@ public:
 
     // Copy contiguous data for processing (needed for sendFrame)
     void copyData(uint8_t* dest, size_t offset, size_t len) const {
+        if (!_data) return;
         for (size_t i = 0; i < len && (offset + i) < _count; i++) {
             dest[i] = _data[(_readPos + offset + i) % BUFFER_SIZE];
         }
@@ -394,7 +412,7 @@ void Hmlgw::handleClient() {
                      uint16_t dataLen = (buffer[processed+1] << 8) | buffer[processed+2];
 
                      // Sanity check on data length
-                     if (dataLen > 8192) {
+                     if (dataLen > 4096) {
                          ESP_LOGE(TAG, "Invalid data length %d, skipping", dataLen);
                          processed++;
                          continue;
