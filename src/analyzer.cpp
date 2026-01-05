@@ -12,7 +12,8 @@ static Analyzer *_instance = NULL;
 
 // Maximum payload size: header (64) + max frame size (1024) * 2 (hex) = ~2560 bytes
 #define ANALYZER_PAYLOAD_BUFFER_SIZE 2560
-#define ANALYZER_BUFFER_POOL_SIZE 10
+// OPTIMIZED: Increased pool size from 10 to 16 for better burst handling
+#define ANALYZER_BUFFER_POOL_SIZE 16
 
 // Forward declaration for buffer pool
 class AnalyzerBufferPool;
@@ -174,9 +175,9 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
         return;
     }
 
-    // Create queue for async frame processing (holds up to 20 frames)
+    // OPTIMIZED: Increased queue size from 20 to 32 for better burst handling
     // If queue is full, oldest frames will be dropped to prevent blocking
-    _frameQueue = xQueueCreate(20, sizeof(AnalyzerFrame));
+    _frameQueue = xQueueCreate(32, sizeof(AnalyzerFrame));
     if (!_frameQueue) {
         ESP_LOGE(TAG, "Failed to create frame queue");
         vSemaphoreDelete(_mutex);
@@ -186,9 +187,10 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
 
     _instance = this;
 
-    // Create processing task with lower priority (5) to not interfere with UART
+    // OPTIMIZED: Increased priority from 5 to 12 for faster WebSocket delivery
+    // Still below UART (20), UDP (19), and HMLGW (15) but high enough for real-time streaming
     _running = true;
-    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 8192, this, 5, &_taskHandle);
+    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 8192, this, 12, &_taskHandle);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create processing task");
         _taskHandle = NULL;
@@ -327,8 +329,9 @@ void Analyzer::_processingTask()
     ESP_LOGI(TAG, "Analyzer processing task started");
 
     while (_running) {
-        // Wait for frame with timeout to allow clean shutdown
-        if (xQueueReceive(_frameQueue, &frame, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // OPTIMIZED: Reduced timeout from 100ms to 20ms for faster frame processing
+        // This ensures frames are sent to WebSocket clients with minimal delay
+        if (xQueueReceive(_frameQueue, &frame, pdMS_TO_TICKS(20)) == pdTRUE) {
             _processFrame(frame);
             // Free memory if frame used dynamic allocation
             if (frame.longData) {
