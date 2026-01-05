@@ -29,7 +29,7 @@
           :disabled="!password || password === '' || loading"
         >
           <BSpinner small v-if="loading" class="me-2" />
-          {{ t('login.login') }}
+          {{ loading ? t('common.loading') : t('login.login') }}
         </BButton>
       </BFormGroup>
     </BForm>
