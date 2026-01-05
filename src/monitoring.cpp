@@ -195,6 +195,13 @@ static void checkmk_agent_task(void *pvParameters)
         inet_ntoa_r(client_addr.sin_addr, client_ip, sizeof(client_ip));
         ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
 
+        // Set socket timeouts to prevent DoS via connection stalling
+        struct timeval timeout;
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        setsockopt(client_sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+        setsockopt(client_sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
         // Check if client IP is allowed
         if (!is_ip_allowed(config->allowed_hosts, client_ip)) {
             ESP_LOGW(TAG, "Client %s not in allowed hosts list", client_ip);
