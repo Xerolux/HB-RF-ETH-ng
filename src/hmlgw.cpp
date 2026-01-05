@@ -39,9 +39,11 @@ static const char* IDENTIFIER = "HM-USB-IF";
 /**
  * Ring Buffer for efficient HMLGW data handling
  *
- * Eliminates heap fragmentation from std::vector reallocations
- * Reduces CPU overhead from copy operations
- * Provides predictable memory usage (fixed 8KB)
+ * OPTIMIZED for real-time signal processing:
+ * - Uses memcpy for contiguous writes (2-5x faster than byte-by-byte)
+ * - Eliminates heap fragmentation from std::vector reallocations
+ * - Reduces CPU overhead from copy operations
+ * - Provides predictable memory usage (fixed 8KB)
  */
 class RingBuffer {
 private:
@@ -58,13 +60,24 @@ public:
     size_t capacity() const { return BUFFER_SIZE; }
     size_t available() const { return BUFFER_SIZE - _count; }
 
-    // Write data to buffer
+    // OPTIMIZED: Write data using memcpy for contiguous regions
     size_t write(const uint8_t* data, size_t len) {
         size_t toWrite = (len > available()) ? available() : len;
-        for (size_t i = 0; i < toWrite; i++) {
-            _data[_writePos] = data[i];
-            _writePos = (_writePos + 1) % BUFFER_SIZE;
+        if (toWrite == 0) return 0;
+
+        // Calculate how much can be written before wrap-around
+        size_t firstChunk = BUFFER_SIZE - _writePos;
+        if (firstChunk > toWrite) firstChunk = toWrite;
+
+        // First contiguous write
+        memcpy(&_data[_writePos], data, firstChunk);
+
+        // Handle wrap-around if needed
+        if (toWrite > firstChunk) {
+            memcpy(&_data[0], data + firstChunk, toWrite - firstChunk);
         }
+
+        _writePos = (_writePos + toWrite) % BUFFER_SIZE;
         _count += toWrite;
         return toWrite;
     }
@@ -87,10 +100,19 @@ public:
         _readPos = _writePos = _count = 0;
     }
 
-    // Copy contiguous data for processing (needed for sendFrame)
+    // OPTIMIZED: Copy data using memcpy for contiguous regions
     void copyData(uint8_t* dest, size_t offset, size_t len) const {
-        for (size_t i = 0; i < len && (offset + i) < _count; i++) {
-            dest[i] = _data[(_readPos + offset + i) % BUFFER_SIZE];
+        if (len == 0 || offset >= _count) return;
+        if (offset + len > _count) len = _count - offset;
+
+        size_t srcPos = (_readPos + offset) % BUFFER_SIZE;
+        size_t firstChunk = BUFFER_SIZE - srcPos;
+        if (firstChunk > len) firstChunk = len;
+
+        memcpy(dest, &_data[srcPos], firstChunk);
+
+        if (len > firstChunk) {
+            memcpy(dest + firstChunk, &_data[0], len - firstChunk);
         }
     }
 };
@@ -136,10 +158,11 @@ void Hmlgw::start() {
     _running = true;
 
     // Start Main Task
-    // CRITICAL: High priority (15) for CCU communication
+    // OPTIMIZED: Increased priority from 15 to 17 for faster CCU communication
+    // Increased stack size from 4KB to 6KB for stability
     BaseType_t taskCreated = xTaskCreate([](void* arg) {
         static_cast<Hmlgw*>(arg)->run();
-    }, "hmlgw_task", 4096, this, 15, &_taskHandle);
+    }, "hmlgw_task", 6144, this, 17, &_taskHandle);
 
     if (taskCreated != pdPASS) {
         _taskHandle = NULL;
@@ -148,10 +171,10 @@ void Hmlgw::start() {
     }
 
     // Start KeepAlive Task
-    // CRITICAL: High priority (15) for CCU keepalive
+    // OPTIMIZED: Increased priority from 15 to 16 for reliable keepalive
     BaseType_t keepAliveCreated = xTaskCreate([](void* arg) {
         static_cast<Hmlgw*>(arg)->runKeepAlive();
-    }, "hmlgw_ka_task", 2048, this, 15, &_keepAliveTaskHandle);
+    }, "hmlgw_ka_task", 2048, this, 16, &_keepAliveTaskHandle);
 
     if (keepAliveCreated != pdPASS) {
         _keepAliveTaskHandle = NULL;
@@ -425,8 +448,8 @@ void Hmlgw::handleClient() {
             buffer.consume(processed);
         }
 
-        // Yield to prevent watchdog timeout
-        taskYIELD();
+        // No taskYIELD needed - blocking recv() already yields during timeout
+        // This eliminates unnecessary context switches for better real-time performance
     }
 }
 

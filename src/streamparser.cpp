@@ -90,22 +90,28 @@ void StreamParser::append(unsigned char chr)
 void StreamParser::append(unsigned char *buffer, uint16_t len)
 {
     uint16_t processed = 0;
+
+    // OPTIMIZATION: Pre-calculate buffer limit once
+    const uint16_t bufferLimit = sizeof(_buffer);
+
     while (processed < len)
     {
         // Optimization: Block copy for RECEIVE_FRAME_DATA when not decoding escapes
+        // This is the hot path for most frame data - avoid per-byte processing
         if (_state == RECEIVE_FRAME_DATA && !_decodeEscaped)
         {
             uint16_t remainingFrame = _frameLength - _framePos;
-            uint16_t remainingBuffer = sizeof(_buffer) - _bufferPos;
+            uint16_t remainingBuffer = bufferLimit - _bufferPos;
             uint16_t remainingInput = len - processed;
 
+            // OPTIMIZATION: Calculate minimum of three values efficiently
             uint16_t chunkSize = remainingInput;
             if (chunkSize > remainingFrame)
                 chunkSize = remainingFrame;
             if (chunkSize > remainingBuffer)
                 chunkSize = remainingBuffer;
 
-            // Scan for 0xfd (Sync byte)
+            // Scan for 0xfd (Sync byte) - fast memchr is typically SIMD-optimized
             unsigned char *syncPos = (unsigned char *)memchr(buffer + processed, 0xfd, chunkSize);
             if (syncPos)
             {
@@ -114,27 +120,17 @@ void StreamParser::append(unsigned char *buffer, uint16_t len)
 
             if (chunkSize > 0)
             {
+                // OPTIMIZATION: Use optimized memcpy for bulk data transfer
                 memcpy(&_buffer[_bufferPos], &buffer[processed], chunkSize);
                 _bufferPos += chunkSize;
                 _framePos += chunkSize;
 
-                // _isEscaped state at the end of RECEIVE_FRAME_DATA is irrelevant
-                // because the next valid state (NO_DATA waiting for 0xfd) will reset it
-                // upon receiving 0xfd.
-
                 processed += chunkSize;
 
-                if (_framePos == _frameLength)
+                // Check for frame completion
+                if (_framePos == _frameLength || _bufferPos == bufferLimit)
                 {
                     _state = FRAME_COMPLETE;
-                }
-                if (_bufferPos == sizeof(_buffer))
-                {
-                    _state = FRAME_COMPLETE;
-                }
-
-                if (_state == FRAME_COMPLETE)
-                {
                     _processor(_buffer, _bufferPos);
                     _state = NO_DATA;
                 }
