@@ -292,7 +292,7 @@
           :disabled="v$.$error || loading"
         >
           <BSpinner small v-if="loading" class="me-2" />
-          {{ t('common.save') }}
+          {{ loading ? t('common.saving') : t('common.save') }}
         </BButton>
       </BFormGroup>
     </BForm>
