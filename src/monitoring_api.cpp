@@ -8,6 +8,7 @@
 #include "monitoring_api.h"
 #include "monitoring.h"
 #include "security_headers.h"
+#include "secure_utils.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -97,6 +98,9 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     content[ret] = '\0';
 
     cJSON *root = cJSON_Parse(content);
+    // SECURITY: Clear sensitive data from stack buffer immediately after parsing
+    secure_zero(content, sizeof(content));
+
     if (root == NULL)
     {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");

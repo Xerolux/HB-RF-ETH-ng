@@ -45,6 +45,7 @@
 #include "monitoring.h"
 #include "security_headers.h"
 #include "log_manager.h"
+#include "secure_utils.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -228,6 +229,8 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
     buffer[len] = 0;
 
     cJSON *root = cJSON_Parse(buffer);
+    // SECURITY: Clear sensitive data from stack buffer immediately after parsing
+    secure_zero(buffer, sizeof(buffer));
 
     char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
 
@@ -534,6 +537,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     buffer[len] = 0;
     cJSON *root = cJSON_Parse(buffer);
+    // SECURITY: Clear sensitive data from stack buffer immediately after parsing
+    secure_zero(buffer, sizeof(buffer));
 
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
@@ -910,12 +915,13 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char *buffer = (char*)malloc(4096);
+    const size_t buffer_size = 4096;
+    char *buffer = (char*)malloc(buffer_size);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    int len = httpd_req_recv(req, buffer, 4095);
+    int len = httpd_req_recv(req, buffer, buffer_size - 1);
 
     if (len <= 0)
     {
@@ -926,6 +932,8 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
     buffer[len] = 0;
     cJSON *root = cJSON_Parse(buffer);
+    // SECURITY: Clear sensitive data from heap buffer before freeing
+    secure_zero(buffer, buffer_size);
     free(buffer);
 
     if (!root) {
@@ -1425,6 +1433,9 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     buffer[len] = 0;
     cJSON *root = cJSON_Parse(buffer);
+    // SECURITY: Clear sensitive data from stack buffer immediately after parsing
+    secure_zero(buffer, sizeof(buffer));
+
     if (root == NULL)
     {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");

@@ -16,6 +16,7 @@
 #include "dtls_api.h"
 #include "esp_log.h"
 #include "cJSON.h"
+#include "secure_utils.h"
 #include <cstring>
 
 static const char *TAG = "DTLS_API";
@@ -99,6 +100,9 @@ static esp_err_t api_dtls_generate_psk_handler(httpd_req_t *req)
     content[ret] = '\0';
 
     cJSON *json = cJSON_Parse(content);
+    // SECURITY: Clear potentially sensitive data from stack buffer
+    secure_zero(content, sizeof(content));
+
     if (!json)
     {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
