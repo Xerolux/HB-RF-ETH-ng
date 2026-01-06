@@ -11,6 +11,7 @@ export default {
     success: 'Success',
     yes: 'Yes',
     no: 'No',
+    delete: 'Delete',
     saving: 'Saving...',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
@@ -307,7 +308,8 @@ export default {
     deviceNames: 'Device Names',
     address: 'Address',
     name: 'Name',
-    storedNames: 'Stored Names'
+    storedNames: 'Stored Names',
+    editName: 'Edit Name for {address}'
   },
 
   // About Page
