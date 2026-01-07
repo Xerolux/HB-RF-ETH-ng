@@ -103,21 +103,26 @@ static bool is_ip_allowed(const char* allowed_hosts, const char* client_ip) {
         return true;
     }
 
-    char* hosts_copy = strdup(allowed_hosts);
-    if (!hosts_copy) return false; // Allocation failure -> deny
+    // Use stack buffer to avoid heap fragmentation and allocation failure risks
+    // This also mitigates DoS attacks where an attacker floods connection requests
+    // forcing rapid malloc/free cycles.
+    char hosts_copy[CHECKMK_ALLOWED_HOSTS_SIZE];
+    strncpy(hosts_copy, allowed_hosts, sizeof(hosts_copy) - 1);
+    hosts_copy[sizeof(hosts_copy) - 1] = '\0';
 
     bool match = false;
+    char *saveptr = NULL;
     // Delimiters: comma, semicolon, space
-    char* token = strtok(hosts_copy, ",; ");
+    // Use strtok_r for thread safety
+    char* token = strtok_r(hosts_copy, ",; ", &saveptr);
     while (token != NULL) {
         if (strcmp(token, client_ip) == 0) {
             match = true;
             break;
         }
-        token = strtok(NULL, ",; ");
+        token = strtok_r(NULL, ",; ", &saveptr);
     }
 
-    free(hosts_copy);
     return match;
 }
 
