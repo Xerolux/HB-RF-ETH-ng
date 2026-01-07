@@ -345,6 +345,43 @@ void Analyzer::_processingTask()
     // This prevents double-deletion crashes
 }
 
+// Fast integer to string conversion
+static inline int append_number(char* buffer, int64_t val) {
+    if (val == 0) {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    // Handle negative numbers just in case, though timestamps are positive
+    if (val < 0) {
+        buffer[0] = '-';
+        // Note: this recursive call is safe as the number of digits is small
+        // and we only recurse once for the sign.
+        // However, standard absolute value for INT64_MIN is tricky.
+        // Given our domain (timestamps/lengths), we can just print 0 or clamp.
+        // But better to be correct:
+        // Let's just use snprintf for negative numbers as a fallback,
+        // OR just ignore them as they shouldn't happen.
+        // Simplest robust way for this specific use case:
+        val = -val;
+        int len = append_number(buffer + 1, val);
+        return len + 1;
+    }
+
+    char temp[24];
+    int pos = 0;
+
+    while (val > 0) {
+        temp[pos++] = '0' + (val % 10);
+        val /= 10;
+    }
+
+    for (int i = 0; i < pos; i++) {
+        buffer[i] = temp[pos - 1 - i];
+    }
+    return pos;
+}
+
 void Analyzer::_processFrame(const AnalyzerFrame &frame)
 {
     // Safety check: ensure we're still running
@@ -356,9 +393,10 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
 
     // Convert frame to JSON
     // Format: { "ts": <timestamp_ms>, "len": <len>, "data": "<hex_string>" }
-    // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
+    // Optimization: Use manual string formatting instead of snprintf/cJSON to reduce CPU overhead
+    // Increased stack buffer to avoid malloc even for max frame size (1024 * 2 + overhead)
 
-    char stack_buffer[2048];
+    char stack_buffer[2200];
     char* json_str = stack_buffer;
     bool heap_allocated = false;
     size_t required_size = 64 + frame.len * 2;
@@ -372,8 +410,22 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
         heap_allocated = true;
     }
 
-    // Header
-    int offset = snprintf(json_str, required_size, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", frame.timestamp_ms, frame.len);
+    // Manual Header Construction (faster than snprintf)
+    int offset = 0;
+
+    // {"ts":
+    memcpy(json_str + offset, "{\"ts\":", 6);
+    offset += 6;
+    offset += append_number(json_str + offset, frame.timestamp_ms);
+
+    // ,"len":
+    memcpy(json_str + offset, ",\"len\":", 7);
+    offset += 7;
+    offset += append_number(json_str + offset, frame.len);
+
+    // ,"data":"
+    memcpy(json_str + offset, ",\"data\":\"", 9);
+    offset += 9;
 
     // Fast Hex Conversion
     static const char hex_map[] = "0123456789ABCDEF";
