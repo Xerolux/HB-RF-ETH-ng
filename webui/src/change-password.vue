@@ -16,6 +16,7 @@
           v-model="newPassword"
           :state="v$.newPassword.$error ? false : null"
           :placeholder="''"
+          autocomplete="new-password"
         />
         <BFormInvalidFeedback v-if="v$.newPassword.minLength.$invalid">
           {{ t('changePassword.passwordTooShort') }}
@@ -27,6 +28,7 @@
           v-model="confirmPassword"
           :state="v$.confirmPassword.$error ? false : null"
           :placeholder="''"
+          autocomplete="new-password"
         />
         <BFormInvalidFeedback v-if="v$.confirmPassword.sameAs.$invalid">
           {{ t('changePassword.passwordsDoNotMatch') }}
