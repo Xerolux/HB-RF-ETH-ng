@@ -12,6 +12,7 @@
           v-model="password"
           :state="v$.password.$error ? false : null"
           :autofocus="true"
+          autocomplete="current-password"
         />
       </BFormGroup>
       <BAlert
