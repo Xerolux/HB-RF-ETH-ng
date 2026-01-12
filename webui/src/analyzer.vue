@@ -137,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, shallowRef, triggerRef, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLoginStore, useSettingsStore } from './stores.js'
 import { useRouter } from 'vue-router'
@@ -147,7 +147,10 @@ const loginStore = useLoginStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()
 
-const frames = ref([])
+// Use shallowRef for performance optimization
+// This prevents Vue from making every property of every frame reactive,
+// which saves significant memory and CPU during high-traffic updates.
+const frames = shallowRef([])
 const isConnected = ref(false)
 const autoScroll = ref(true)
 let ws = null
@@ -207,6 +210,8 @@ const updateFrameNames = () => {
     f.src = deviceNames[f.srcRaw] || f.srcRaw
     f.dst = deviceNames[f.dstRaw] || f.dstRaw
   })
+  // Manually trigger update since shallowRef doesn't track deep changes
+  triggerRef(frames)
 }
 
 // Frame Types (BidCoS)
@@ -380,6 +385,9 @@ const flushQueue = () => {
   if (overflow > 0) {
     frames.value.splice(0, overflow)
   }
+
+  // Manually trigger update since shallowRef doesn't track push/splice on the array
+  triggerRef(frames)
 
   if (autoScroll.value) {
     nextTick(() => {
