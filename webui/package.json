@@ -3,7 +3,7 @@
   "version": "2.1.3",
   "description": "WebUI of HB-RF-ETH firmware",
   "scripts": {
-    "dev": "parcel index.htm",
+    "dev": "parcel index.htm --host 0.0.0.0",
     "build": "parcel build index.htm --no-source-maps --no-content-hash --dist-dir dist"
   },
   "keywords": [],
