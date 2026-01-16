@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import axios from 'axios'
 import { useLoginStore, useThemeStore } from './stores.js'
 
@@ -21,9 +21,10 @@ import Log from './log.vue'
 
 // Router
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes: [
     { path: '/', component: Home },
+    { path: '/config', redirect: '/settings' },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
