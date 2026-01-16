@@ -1,0 +1,35 @@
+{
+    "common": {
+        "loading": "Lade...",
+        "save": "Speichern",
+        "saved": "Gespeichert",
+        "error": "Fehler",
+        "yes": "Ja",
+        "no": "Nein",
+        "cancel": "Abbrechen",
+        "enabled": "Aktiviert",
+        "disabled": "Deaktiviert",
+        "confirmReboot": "Möchten Sie das Gerät wirklich neu starten?",
+        "rebootingWait": "Starte neu, bitte warten...",
+        "confirmFactoryReset": "Möchten Sie das Gerät wirklich auf Werkseinstellungen zurücksetzen?",
+        "factoryResettingWait": "Setze zurück, bitte warten..."
+    },
+    "nav": {
+        "home": "Home",
+        "settings": "Einstellungen",
+        "firmware": "Firmware",
+        "monitoring": "Monitoring",
+        "analyzer": "Analyzer",
+        "log": "Protokoll",
+        "about": "Über",
+        "login": "Anmelden",
+        "logout": "Abmelden",
+        "toggleTheme": "Design umschalten"
+    },
+    "login": {
+        "title": "Anmelden",
+        "password": "Passwort",
+        "submit": "Anmelden",
+        "failed": "Anmeldung fehlgeschlagen"
+    }
+}

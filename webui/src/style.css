@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+:root {
+  --p-primary-color: #3b82f6;
+  --p-primary-contrast-color: #ffffff;
+}
+
+body {
+  background-color: var(--p-surface-ground);
+  color: var(--p-surface-text);
+  font-family: var(--font-family);
+}

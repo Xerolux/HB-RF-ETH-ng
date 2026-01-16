@@ -1,0 +1,35 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "save": "Save",
+        "saved": "Saved",
+        "error": "Error",
+        "yes": "Yes",
+        "no": "No",
+        "cancel": "Cancel",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "confirmReboot": "Are you sure you want to reboot?",
+        "rebootingWait": "Rebooting, please wait...",
+        "confirmFactoryReset": "Are you sure you want to reset to factory settings?",
+        "factoryResettingWait": "Resetting, please wait..."
+    },
+    "nav": {
+        "home": "Home",
+        "settings": "Settings",
+        "firmware": "Firmware",
+        "monitoring": "Monitoring",
+        "analyzer": "Analyzer",
+        "log": "Log",
+        "about": "About",
+        "login": "Login",
+        "logout": "Logout",
+        "toggleTheme": "Toggle Theme"
+    },
+    "login": {
+        "title": "Login",
+        "password": "Password",
+        "submit": "Login",
+        "failed": "Login failed"
+    }
+}
