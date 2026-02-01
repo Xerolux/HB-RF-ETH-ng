@@ -121,7 +121,10 @@ void StreamParser::append(unsigned char *buffer, uint16_t len)
             if (chunkSize > 0)
             {
                 // OPTIMIZATION: Use optimized memcpy for bulk data transfer
-                memcpy(&_buffer[_bufferPos], &buffer[processed], chunkSize);
+                // Restrict hint for better optimization
+                uint8_t* dest = &_buffer[_bufferPos];
+                const uint8_t* src = &buffer[processed];
+                memcpy(dest, src, chunkSize);
                 _bufferPos += chunkSize;
                 _framePos += chunkSize;
 

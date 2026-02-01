@@ -189,8 +189,9 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleCon
 
     // OPTIMIZED: Increased priority from 5 to 12 for faster WebSocket delivery
     // Still below UART (20), UDP (19), and HMLGW (15) but high enough for real-time streaming
+    // OPTIMIZED: Reduced stack from 8192 to 6144 bytes (saves 2KB RAM)
     _running = true;
-    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 8192, this, 12, &_taskHandle);
+    BaseType_t ret = xTaskCreate(analyzerProcessingTask, "Analyzer_Processing", 6144, this, 12, &_taskHandle);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create processing task");
         _taskHandle = NULL;

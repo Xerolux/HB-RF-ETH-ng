@@ -116,7 +116,8 @@ void NtpServer::start()
         return;
     }
 
-    xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler", 4096, this, 10, &_tHandle);
+    // OPTIMIZED: Reduced stack from 4096 to 3072 bytes (saves 1KB RAM)
+    xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler", 3072, this, 10, &_tHandle);
 
     _pcb = udp_new();
     if (_pcb == NULL) {

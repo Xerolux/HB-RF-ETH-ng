@@ -62,7 +62,9 @@ GPS::~GPS()
 void GPS::start()
 {
     uart_driver_install(UART_NUM_2, UART_HW_FIFO_LEN(UART_NUM_2) * 2, 0, 20, &_uart_queue, 0);
-    xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler", 4096, this, 15, &_tHandle);
+
+    // OPTIMIZED: Reduced stack from 4096 to 3072 bytes (saves 1KB RAM)
+    xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler", 3072, this, 15, &_tHandle);
 }
 
 void GPS::stop()
