@@ -167,7 +167,7 @@ void analyzerProcessingTask(void *parameter)
     ((Analyzer *)parameter)->_processingTask();
 }
 
-Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _mutex(xSemaphoreCreateMutex()), _running(false), _initialized(false)
+Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _mutex(xSemaphoreCreateMutex()), _radioModuleConnector(radioModuleConnector), _running(false), _initialized(false)
 {
     if (!_mutex) {
         ESP_LOGE(TAG, "Failed to create analyzer mutex");
@@ -321,7 +321,7 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
             ESP_LOGW(TAG, "Frame queue full, dropping frame");
         }
     }
-    // cppcheck-suppress memleak ; False positive: ownership transferred to queue on success
+    // cppcheck-suppress memleak
 }
 
 void Analyzer::_processingTask()
