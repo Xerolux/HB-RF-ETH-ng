@@ -167,7 +167,7 @@ void analyzerProcessingTask(void *parameter)
     ((Analyzer *)parameter)->_processingTask();
 }
 
-Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _mutex(xSemaphoreCreateMutex()), _radioModuleConnector(radioModuleConnector), _running(false), _initialized(false)
+Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _clients(), _client_fds(), _mutex(xSemaphoreCreateMutex()), _radioModuleConnector(radioModuleConnector), _frameQueue(NULL), _taskHandle(NULL), _running(false), _initialized(false)
 {
     if (!_mutex) {
         ESP_LOGE(TAG, "Failed to create analyzer mutex");
