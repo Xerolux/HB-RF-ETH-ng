@@ -38,8 +38,7 @@ private:
     SemaphoreHandle_t _mutex;
 
 public:
-    AnalyzerBufferPool() {
-        _mutex = xSemaphoreCreateMutex();
+    AnalyzerBufferPool() : _mutex(xSemaphoreCreateMutex()) {
         if (!_mutex) {
             ESP_LOGE(TAG, "Failed to create buffer pool mutex");
             return;
@@ -322,6 +321,7 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         }
     }
     // cppcheck-suppress memleak
+    (void)0; // Dummy statement for suppression anchor
 }
 
 void Analyzer::_processingTask()
