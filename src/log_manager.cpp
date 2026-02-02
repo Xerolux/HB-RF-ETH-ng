@@ -7,8 +7,7 @@
 
 static const char *TAG = "LogManager";
 
-LogManager::LogManager() {
-    _mutex = xSemaphoreCreateMutex();
+LogManager::LogManager() : _mutex(xSemaphoreCreateMutex()) {
 }
 
 // Singleton instance
