@@ -310,6 +310,13 @@ void RawUartUdpListener::stop()
 
     // Clean up queue
     if (_udp_queue) {
+        // Drain any pending events to prevent memory leaks (pbufs need freeing)
+        udp_event_t event;
+        while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
+            if (event.pb) {
+                pbuf_free(event.pb);
+            }
+        }
         vQueueDelete(_udp_queue);
         _udp_queue = NULL;
     }

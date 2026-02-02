@@ -103,21 +103,24 @@ static bool is_ip_allowed(const char* allowed_hosts, const char* client_ip) {
         return true;
     }
 
-    char* hosts_copy = strdup(allowed_hosts);
-    if (!hosts_copy) return false; // Allocation failure -> deny
+    // Optimization: Use stack buffer to avoid heap fragmentation
+    char hosts_copy[CHECKMK_ALLOWED_HOSTS_SIZE];
+    strncpy(hosts_copy, allowed_hosts, sizeof(hosts_copy) - 1);
+    hosts_copy[sizeof(hosts_copy) - 1] = '\0';
 
     bool match = false;
     // Delimiters: comma, semicolon, space
-    char* token = strtok(hosts_copy, ",; ");
+    char* saveptr = NULL;
+    char* token = strtok_r(hosts_copy, ",; ", &saveptr);
+
     while (token != NULL) {
         if (strcmp(token, client_ip) == 0) {
             match = true;
             break;
         }
-        token = strtok(NULL, ",; ");
+        token = strtok_r(NULL, ",; ", &saveptr);
     }
 
-    free(hosts_copy);
     return match;
 }
 
@@ -133,6 +136,7 @@ static void checkmk_agent_task(void *pvParameters)
     listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listen_sock < 0) {
         ESP_LOGE(TAG, "Unable to create socket");
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -147,6 +151,7 @@ static void checkmk_agent_task(void *pvParameters)
     if (bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         ESP_LOGE(TAG, "Socket bind failed");
         close(listen_sock);
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -154,6 +159,7 @@ static void checkmk_agent_task(void *pvParameters)
     if (listen(listen_sock, 5) < 0) {
         ESP_LOGE(TAG, "Socket listen failed");
         close(listen_sock);
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -171,6 +177,7 @@ static void checkmk_agent_task(void *pvParameters)
     if (output == NULL) {
         ESP_LOGE(TAG, "Failed to allocate output buffer");
         close(listen_sock);
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -257,6 +264,9 @@ static void checkmk_agent_task(void *pvParameters)
     free(output);
     close(listen_sock);
     ESP_LOGI(TAG, "CheckMK Agent stopped");
+
+    // Mark task as deleted so stop() knows we are done
+    checkmk_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -334,9 +344,18 @@ esp_err_t checkmk_stop(void)
     ESP_LOGI(TAG, "Stopping CheckMK agent");
     checkmk_running = false;
 
+    // Wait for task to cleanup and exit (max 2 seconds)
+    int retries = 20;
+    while (checkmk_task_handle != NULL && retries-- > 0) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     if (checkmk_task_handle != NULL) {
+        ESP_LOGW(TAG, "CheckMK agent task stuck, forcing delete");
         vTaskDelete(checkmk_task_handle);
         checkmk_task_handle = NULL;
+    } else {
+        ESP_LOGI(TAG, "CheckMK agent task stopped cleanly");
     }
 
     return ESP_OK;

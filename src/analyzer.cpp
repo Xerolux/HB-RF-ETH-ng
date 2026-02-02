@@ -353,28 +353,48 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
         return;
     }
 
-    const uint8_t* dataPtr = frame.longData ? frame.longData : frame.shortData;
-
-    // Convert frame to JSON
-    // Format: { "ts": <timestamp_ms>, "len": <len>, "data": "<hex_string>" }
-    // Optimization: Use manual string formatting instead of cJSON to reduce heap allocations
-
-    char stack_buffer[2048];
-    char* json_str = stack_buffer;
-    bool heap_allocated = false;
+    // Determine required size
     size_t required_size = 64 + frame.len * 2;
-
-    if (required_size > sizeof(stack_buffer)) {
-        json_str = (char*)malloc(required_size);
-        if (!json_str) {
-            ESP_LOGE(TAG, "Failed to allocate memory for frame JSON");
-            return;
-        }
-        heap_allocated = true;
+    if (required_size > ANALYZER_PAYLOAD_BUFFER_SIZE) {
+        ESP_LOGE(TAG, "Frame too large for analyzer buffer: %d (max %d)", (int)required_size, ANALYZER_PAYLOAD_BUFFER_SIZE);
+        return;
     }
 
+    std::vector<httpd_handle_t> clients;
+    std::vector<int> client_fds;
+
+    // Use short timeout to prevent blocking (50ms)
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50))) {
+        if (!_client_fds.empty()) {
+            clients = _clients;
+            client_fds = _client_fds;
+        } else {
+            _radioModuleConnector->removeFrameHandler(this);
+        }
+        xSemaphoreGive(_mutex);
+    } else {
+        ESP_LOGW(TAG, "Could not acquire mutex for WebSocket send, dropping frame");
+        return;
+    }
+
+    if (clients.empty()) {
+        return;
+    }
+
+    // Optimization: Allocate "master" job first to use its payload buffer for formatting.
+    // This avoids the 2KB stack buffer and potential malloc.
+    AnalyzerWsSendJob *masterJob = _bufferPool.allocate();
+    if (!masterJob) {
+        ESP_LOGW(TAG, "Buffer pool exhausted (master job), dropping frame");
+        return;
+    }
+
+    // Format directly into masterJob's payload
+    const uint8_t* dataPtr = frame.longData ? frame.longData : frame.shortData;
+    char* json_str = masterJob->payload;
+
     // Header
-    int offset = snprintf(json_str, required_size, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", frame.timestamp_ms, frame.len);
+    int offset = snprintf(json_str, ANALYZER_PAYLOAD_BUFFER_SIZE, "{\"ts\":%" PRId64 ",\"len\":%d,\"data\":\"", frame.timestamp_ms, frame.len);
 
     // Fast Hex Conversion
     static const char hex_map[] = "0123456789ABCDEF";
@@ -387,55 +407,32 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
     json_str[offset++] = '"';
     json_str[offset++] = '}';
     json_str[offset] = 0;
-    std::vector<httpd_handle_t> clients;
-    std::vector<int> client_fds;
 
-    // Use short timeout to prevent blocking (50ms instead of 10ms for more stability)
-    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(50))) {
-        if (!_client_fds.empty()) {
-            clients = _clients;
-            client_fds = _client_fds;
-        } else {
-            _radioModuleConnector->removeFrameHandler(this);
-        }
+    // Set up master job
+    masterJob->len = offset;
+    masterJob->handle = clients[0];
+    masterJob->fd = client_fds[0];
+    masterJob->analyzer = this;
 
-        xSemaphoreGive(_mutex);
-    } else {
-        ESP_LOGW(TAG, "Could not acquire mutex for WebSocket send, dropping frame");
-    }
-
-    if (clients.empty()) {
-        if (heap_allocated) {
-            free(json_str);
-        }
-        return;
-    }
-
-    for (size_t i = 0; i < client_fds.size(); i++) {
-        // Allocate from buffer pool instead of malloc()
+    // Create jobs for other clients by copying from master
+    for (size_t i = 1; i < client_fds.size(); i++) {
         AnalyzerWsSendJob *job = _bufferPool.allocate();
         if (!job) {
             ESP_LOGW(TAG, "Buffer pool exhausted, dropping frame for client %d", client_fds[i]);
             continue;
         }
 
-        // Payload buffer already allocated by pool
-        if (offset > ANALYZER_PAYLOAD_BUFFER_SIZE) {
-            ESP_LOGE(TAG, "Payload too large for buffer pool: %d > %d", offset, ANALYZER_PAYLOAD_BUFFER_SIZE);
-            _bufferPool.free(job);
-            continue;
-        }
-
-        memcpy(job->payload, json_str, offset);
+        // Copy payload from master job
+        memcpy(job->payload, masterJob->payload, offset);
         job->len = offset;
         job->handle = clients[i];
         job->fd = client_fds[i];
         job->analyzer = this;
 
+        // Queue job
         esp_err_t work_ret = httpd_queue_work(job->handle, analyzer_ws_send, job);
         if (work_ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to queue ws send for client %d: %s", job->fd, esp_err_to_name(work_ret));
-            // Save values before returning to pool
             httpd_handle_t handle = job->handle;
             int fd = job->fd;
             _bufferPool.free(job);
@@ -443,8 +440,15 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
         }
     }
 
-    if (heap_allocated) {
-        free(json_str);
+    // Finally, queue the master job
+    // We queue it last because we used its payload as the source for others
+    esp_err_t work_ret = httpd_queue_work(masterJob->handle, analyzer_ws_send, masterJob);
+    if (work_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to queue ws send for client %d: %s", masterJob->fd, esp_err_to_name(work_ret));
+        httpd_handle_t handle = masterJob->handle;
+        int fd = masterJob->fd;
+        _bufferPool.free(masterJob);
+        removeClient(handle, fd);
     }
 }
 
