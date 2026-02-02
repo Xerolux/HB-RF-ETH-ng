@@ -297,6 +297,7 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
             memcpy(frame.longData, buffer, len);
         } else {
             ESP_LOGE(TAG, "Failed to allocate memory for frame");
+            // cppcheck-suppress memleak
             return;
         }
     }
