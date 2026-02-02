@@ -35,10 +35,8 @@ void serialQueueHandlerTask(void *parameter)
     ((RadioModuleConnector *)parameter)->_serialQueueHandler();
 }
 
-RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed)
+RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed), _handlersMutex(xSemaphoreCreateMutex())
 {
-    _handlersMutex = xSemaphoreCreateMutex();
-
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;

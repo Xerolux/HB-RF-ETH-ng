@@ -54,7 +54,9 @@ private:
     size_t _count;  // Number of bytes currently in buffer
 
 public:
-    RingBuffer() : _readPos(0), _writePos(0), _count(0) {}
+    RingBuffer() : _readPos(0), _writePos(0), _count(0) {
+        memset(_data, 0, sizeof(_data));
+    }
 
     size_t size() const { return _count; }
     size_t capacity() const { return BUFFER_SIZE; }
