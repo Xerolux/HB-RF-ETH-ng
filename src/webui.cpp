@@ -45,6 +45,7 @@
 #include "monitoring.h"
 #include "security_headers.h"
 #include "log_manager.h"
+#include "secure_utils.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -131,6 +132,9 @@ void generateToken()
     size_t tokenLength;
     mbedtls_base64_encode((unsigned char *)_token, sizeof(_token), &tokenLength, shaResult, sizeof(shaResult));
     _token[tokenLength] = 0;
+
+    secure_zero(tokenBase, sizeof(tokenBase));
+    secure_zero(shaResult, sizeof(shaResult));
 }
 
 const char *ip2str(ip4_addr_t addr, ip4_addr_t fallback)
@@ -248,9 +252,15 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
     }
 
     const char *json = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
+
+    secure_zero(buffer, sizeof(buffer));
 
     return ESP_OK;
 }
@@ -273,14 +283,6 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
-
-    // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
-    // This handler is called frequently (1Hz) by the frontend.
-    // Changed to heap allocation to prevent stack overflow issues
-    char *buffer = (char*)malloc(SYSINFO_BUFFER_SIZE);
-    if (!buffer) {
-        return httpd_resp_send_500(req);
-    }
 
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";
@@ -307,63 +309,41 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
-    // Format JSON
-    // Note: We use "true"/"false" strings for booleans
-    int written = snprintf(buffer, SYSINFO_BUFFER_SIZE,
-        "{\"sysInfo\":{"
-            "\"serial\":\"%s\","
-            "\"currentVersion\":\"%s\","
-            "\"firmwareVariant\":\"%s\","
-            "\"latestVersion\":\"%s\","
-            "\"memoryUsage\":%.2f,"
-            "\"cpuUsage\":%.2f,"
-            "\"supplyVoltage\":%.2f,"
-            "\"temperature\":%.2f,"
-            "\"uptimeSeconds\":%" PRIu64 ","
-            "\"boardRevision\":\"%s\","
-            "\"resetReason\":\"%s\","
-            "\"ethernetConnected\":%s,"
-            "\"ethernetSpeed\":%d,"
-            "\"ethernetDuplex\":\"%s\","
-            "\"rawUartRemoteAddress\":\"%s\","
-            "\"radioModuleType\":\"%s\","
-            "\"radioModuleSerial\":\"%s\","
-            "\"radioModuleFirmwareVersion\":\"%s\","
-            "\"radioModuleBidCosRadioMAC\":\"%s\","
-            "\"radioModuleHmIPRadioMAC\":\"%s\","
-            "\"radioModuleSGTIN\":\"%s\""
-        "}}",
-        _sysInfo->getSerialNumber(),
-        _sysInfo->getCurrentVersion(),
-        _sysInfo->getFirmwareVariant(),
-        _updateCheck->getLatestVersion(),
-        _sysInfo->getMemoryUsage(),
-        _sysInfo->getCpuUsage(),
-        _sysInfo->getSupplyVoltage(),
-        _sysInfo->getTemperature(),
-        _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
-        _ethernet->isConnected() ? "true" : "false",
-        _ethernet->getLinkSpeedMbps(),
-        _ethernet->getDuplexMode(),
-        _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode",
-        radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
-        fwVersionStr,
-        bidCosMAC,
-        hmIPMAC,
-        _radioModuleDetector->getSGTIN()
-    );
+    cJSON *root = cJSON_CreateObject();
+    cJSON *sysInfo = cJSON_AddObjectToObject(root, "sysInfo");
 
-    if (written < 0 || written >= SYSINFO_BUFFER_SIZE) {
-        ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
-        free(buffer);
-        return httpd_resp_send_500(req);
+    cJSON_AddStringToObject(sysInfo, "serial", _sysInfo->getSerialNumber());
+    cJSON_AddStringToObject(sysInfo, "currentVersion", _sysInfo->getCurrentVersion());
+    cJSON_AddStringToObject(sysInfo, "firmwareVariant", _sysInfo->getFirmwareVariant());
+    cJSON_AddStringToObject(sysInfo, "latestVersion", _updateCheck->getLatestVersion());
+    cJSON_AddNumberToObject(sysInfo, "memoryUsage", _sysInfo->getMemoryUsage());
+    cJSON_AddNumberToObject(sysInfo, "cpuUsage", _sysInfo->getCpuUsage());
+    cJSON_AddNumberToObject(sysInfo, "supplyVoltage", _sysInfo->getSupplyVoltage());
+    cJSON_AddNumberToObject(sysInfo, "temperature", _sysInfo->getTemperature());
+    cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
+    cJSON_AddStringToObject(sysInfo, "boardRevision", _sysInfo->getBoardRevisionString());
+    cJSON_AddStringToObject(sysInfo, "resetReason", _sysInfo->getResetReason());
+    cJSON_AddBoolToObject(sysInfo, "ethernetConnected", _ethernet->isConnected());
+    cJSON_AddNumberToObject(sysInfo, "ethernetSpeed", _ethernet->getLinkSpeedMbps());
+    cJSON_AddStringToObject(sysInfo, "ethernetDuplex", _ethernet->getDuplexMode());
+    cJSON_AddStringToObject(sysInfo, "rawUartRemoteAddress", _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode");
+    cJSON_AddStringToObject(sysInfo, "radioModuleType", radioModuleTypeStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSerial", _radioModuleDetector->getSerial());
+    cJSON_AddStringToObject(sysInfo, "radioModuleFirmwareVersion", fwVersionStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleBidCosRadioMAC", bidCosMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleHmIPRadioMAC", hmIPMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSGTIN", _radioModuleDetector->getSGTIN());
+
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
     }
+    cJSON_Delete(root);
 
-    httpd_resp_sendstr(req, buffer);
-    free(buffer);
+
     return ESP_OK;
 }
 
@@ -446,8 +426,12 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
     add_settings(root);
 
     const char *json = cJSON_Print(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
 
     return ESP_OK;
@@ -693,10 +677,15 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     add_settings(root);
 
     const char *json = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
 
+    secure_zero(buffer, sizeof(buffer));
     return ESP_OK;
 }
 
@@ -792,8 +781,12 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     }
 
     const char *json = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
 
     return ESP_OK;
@@ -902,6 +895,8 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 // Actually, let's implement a dedicated restore handler that restarts.
 esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 {
+    const size_t RESTORE_BUFFER_SIZE = 4096;
+
     add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
@@ -910,12 +905,12 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char *buffer = (char*)malloc(4096);
+    char *buffer = (char*)malloc(RESTORE_BUFFER_SIZE);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    int len = httpd_req_recv(req, buffer, 4095);
+    int len = httpd_req_recv(req, buffer, RESTORE_BUFFER_SIZE - 1);
 
     if (len <= 0)
     {
@@ -926,6 +921,7 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
     buffer[len] = 0;
     cJSON *root = cJSON_Parse(buffer);
+    secure_zero(buffer, RESTORE_BUFFER_SIZE);
     free(buffer);
 
     if (!root) {
@@ -1361,8 +1357,12 @@ esp_err_t post_check_update_handler_func(httpd_req_t *req)
   cJSON_AddStringToObject(root, "downloadUrl", _updateCheck->getDownloadUrl());
 
   const char *json = cJSON_PrintUnformatted(root);
-  httpd_resp_sendstr(req, json);
-  free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
   cJSON_Delete(root);
 
   return ESP_OK;
@@ -1452,11 +1452,17 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(response, "token", _token);
 
     const char *json = cJSON_PrintUnformatted(response);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(response);
 
     ESP_LOGI(TAG, "Admin password changed successfully");
+
+    secure_zero(buffer, sizeof(buffer));
 
     return ESP_OK;
 }
