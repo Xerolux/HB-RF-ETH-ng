@@ -1052,25 +1052,28 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     char *newPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "newPassword"));
 
-    // Regex: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$ - approximated with manual checks
-    bool has_letter = false;
+    // Password requirements: min 8 chars, uppercase, lowercase, digit
+    bool has_lower = false;
+    bool has_upper = false;
     bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6);
+    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 8);
 
     if (is_valid_length) {
         for (int i = 0; newPassword[i] != 0; i++) {
-            if ((newPassword[i] >= 'a' && newPassword[i] <= 'z') || (newPassword[i] >= 'A' && newPassword[i] <= 'Z')) {
-                has_letter = true;
+            if (newPassword[i] >= 'a' && newPassword[i] <= 'z') {
+                has_lower = true;
+            } else if (newPassword[i] >= 'A' && newPassword[i] <= 'Z') {
+                has_upper = true;
             } else if (newPassword[i] >= '0' && newPassword[i] <= '9') {
                 has_digit = true;
             }
         }
     }
 
-    if (!is_valid_length || !has_letter || !has_digit)
+    if (!is_valid_length || !has_lower || !has_upper || !has_digit)
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 6 characters and contain letters and numbers");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 8 characters with uppercase, lowercase, and numbers");
     }
 
     _settings->setAdminPassword(newPassword);
@@ -1129,15 +1132,18 @@ esp_err_t post_set_ota_password_handler_func(httpd_req_t *req)
 
     char *otaPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "otaPassword"));
 
-    // Validate OTA password format
-    bool has_letter = false;
+    // Validate OTA password format: min 8 chars, uppercase, lowercase, digit
+    bool has_lower = false;
+    bool has_upper = false;
     bool has_digit = false;
-    bool is_valid_length = (otaPassword != NULL) && (strlen(otaPassword) >= 6);
+    bool is_valid_length = (otaPassword != NULL) && (strlen(otaPassword) >= 8);
 
     if (is_valid_length) {
         for (int i = 0; otaPassword[i] != 0; i++) {
-            if ((otaPassword[i] >= 'a' && otaPassword[i] <= 'z') || (otaPassword[i] >= 'A' && otaPassword[i] <= 'Z')) {
-                has_letter = true;
+            if (otaPassword[i] >= 'a' && otaPassword[i] <= 'z') {
+                has_lower = true;
+            } else if (otaPassword[i] >= 'A' && otaPassword[i] <= 'Z') {
+                has_upper = true;
             } else if (otaPassword[i] >= '0' && otaPassword[i] <= '9') {
                 has_digit = true;
             }
@@ -1146,9 +1152,9 @@ esp_err_t post_set_ota_password_handler_func(httpd_req_t *req)
 
     cJSON_Delete(root);
 
-    if (!is_valid_length || !has_letter || !has_digit) {
+    if (!is_valid_length || !has_lower || !has_upper || !has_digit) {
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Password must be at least 6 characters with letters and numbers\"}");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Password must be at least 8 characters with uppercase, lowercase, and numbers\"}");
         return ESP_OK;
     }
 

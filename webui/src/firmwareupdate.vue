@@ -248,7 +248,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
 import axios from 'axios'
@@ -277,38 +277,9 @@ const pendingAction = ref(null) // 'upload' or 'url'
 const otaPasswordSet = ref(false)
 const otaPasswordChecked = ref(false)
 
-// LocalStorage key for OTA password
-const OTA_PASSWORD_STORAGE_KEY = 'hb_rf_eth_ota_password'
-
-// Load OTA password from localStorage on mount
-const loadOtaPasswordFromStorage = () => {
-  try {
-    const stored = localStorage.getItem(OTA_PASSWORD_STORAGE_KEY)
-    if (stored) {
-      otaPassword.value = stored
-    }
-  } catch (e) {
-    console.warn('Failed to load OTA password from storage:', e)
-  }
-}
-
-// Save OTA password to localStorage
-const saveOtaPasswordToStorage = (password) => {
-  try {
-    if (password) {
-      localStorage.setItem(OTA_PASSWORD_STORAGE_KEY, password)
-    } else {
-      localStorage.removeItem(OTA_PASSWORD_STORAGE_KEY)
-    }
-  } catch (e) {
-    console.warn('Failed to save OTA password to storage:', e)
-  }
-}
-
-// Watch for password changes to persist to localStorage
-watch(otaPassword, (newValue) => {
-  saveOtaPasswordToStorage(newValue)
-})
+// NOTE: Password is NOT persisted to localStorage for security reasons.
+// Users must re-enter the OTA password for each firmware update session.
+// This is a security best practice to prevent password theft via XSS.
 
 // Countdown
 const showCountdown = ref(false)
@@ -571,7 +542,6 @@ const factoryResetClick = async () => {
 onMounted(() => {
   sysInfoStore.update()
   checkOtaPasswordStatus()
-  loadOtaPasswordFromStorage()
 })
 </script>
 

@@ -26,10 +26,10 @@
             size="lg"
           />
           <BFormInvalidFeedback v-if="v$.otaPassword.minLength.$invalid">
-            {{ t('otaPassword.passwordTooShort') || 'Password must be at least 6 characters' }}
+            {{ t('otaPassword.passwordTooShort') || 'Password must be at least 8 characters' }}
           </BFormInvalidFeedback>
           <BFormInvalidFeedback v-else-if="v$.otaPassword.password_validator.$invalid">
-            {{ t('otaPassword.passwordRequirements') || 'Must contain letters and numbers' }}
+            {{ t('otaPassword.passwordRequirements') || 'Must contain uppercase, lowercase, and numbers' }}
           </BFormInvalidFeedback>
         </BFormGroup>
 
@@ -78,8 +78,9 @@
           <div class="req-content">
             <strong>{{ t('otaPassword.requirementsTitle') || 'Password requirements:' }}</strong>
             <ul>
-              <li>{{ t('otaPassword.reqMinLength') || 'At least 6 characters' }}</li>
-              <li>{{ t('otaPassword.reqLettersNumbers') || 'Must contain letters and numbers' }}</li>
+              <li>{{ t('otaPassword.reqMinLength') || 'At least 8 characters' }}</li>
+              <li>{{ t('otaPassword.reqMixedCase') || 'Uppercase and lowercase letters' }}</li>
+              <li>{{ t('otaPassword.reqNumbers') || 'At least one number' }}</li>
             </ul>
           </div>
         </div>
@@ -134,7 +135,8 @@ const confirmPassword = ref('')
 const error = ref(null)
 const loading = ref(false)
 
-const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
+// Updated password requirements: min 8 chars, uppercase, lowercase, digit
+const password_validator = helpers.regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/)
 
 // Password strength calculation (0-100)
 const passwordStrength = computed(() => {
@@ -183,7 +185,7 @@ const strengthText = computed(() => {
 })
 
 const rules = computed(() => ({
-  otaPassword: { required, minLength: minLength(6), password_validator },
+  otaPassword: { required, minLength: minLength(8), password_validator },
   confirmPassword: { required, sameAs: sameAs(otaPassword.value) }
 }))
 
