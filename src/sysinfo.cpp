@@ -95,9 +95,6 @@ void updateCPUUsageTask(void *arg)
         lastIdleRunTime = idleRunTime;
         lastTotalRunTime = totalRunTime;
     }
-
-    free(taskStatus);
-    vTaskDelete(NULL);
 }
 
 uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)

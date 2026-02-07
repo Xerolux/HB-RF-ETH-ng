@@ -995,7 +995,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     args->url = strdup(url_buf);
     args->statusLED = _statusLED;
 
-    xTaskCreate([](void* p) {
+    BaseType_t ret = xTaskCreate([](void* p) {
         TaskArgs* a = (TaskArgs*)p;
 
         esp_http_client_config_t config = {};
@@ -1028,6 +1028,12 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         }
         vTaskDelete(NULL);
     }, "ota_url_update", 8192, args, 5, NULL);
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create OTA update task");
+        free(args->url);
+        delete args;
+    }
 
     return ESP_OK;
 }

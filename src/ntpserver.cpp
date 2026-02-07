@@ -81,6 +81,10 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     memcpy(&ntp, pb->payload, sizeof(ntp));
 
     pbuf *resp_pb = pbuf_alloc_reference(&ntp, sizeof(ntp_packet_t), PBUF_REF);
+    if (!resp_pb) {
+        ESP_LOGE(TAG, "Failed to allocate response pbuf");
+        return;
+    }
 
     ip_addr_t resp_addr;
     resp_addr.type = IPADDR_TYPE_V4;
@@ -137,8 +141,6 @@ void NtpServer::_udpQueueHandler()
             free(event);
         }
     }
-
-    vTaskDelete(NULL);
 }
 
 bool NtpServer::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)

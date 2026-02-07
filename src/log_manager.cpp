@@ -186,5 +186,10 @@ std::string LogManager::getLogContent(size_t offset) {
 }
 
 size_t LogManager::getTotalWritten() const {
-    return total_written;
+    size_t result = 0;
+    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        result = total_written;
+        xSemaphoreGive(_mutex);
+    }
+    return result;
 }
