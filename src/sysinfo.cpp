@@ -78,7 +78,13 @@ void updateCPUUsageTask(void *arg)
             }
         }
 
-        _cpuUsage = 100.0 - ((idleRunTime - lastIdleRunTime) * 100.0 / ((totalRunTime - lastTotalRunTime) * 2));
+        uint32_t totalDelta = totalRunTime - lastTotalRunTime;
+        if (totalDelta > 0) {
+            double usage = 100.0 - ((idleRunTime - lastIdleRunTime) * 100.0 / (totalDelta * 2));
+            if (usage < 0.0) usage = 0.0;
+            if (usage > 100.0) usage = 100.0;
+            _cpuUsage = usage;
+        }
 
         lastIdleRunTime = idleRunTime;
         lastTotalRunTime = totalRunTime;

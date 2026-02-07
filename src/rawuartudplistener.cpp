@@ -215,15 +215,19 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t port = atomic_load(&_remotePort);
     uint32_t address = atomic_load(&_remoteAddress);
 
+    if (!port)
+        return;
+
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
+    if (!pb) {
+        ESP_LOGE(TAG, "Failed to allocate pbuf for sendMessage");
+        return;
+    }
     unsigned char *sendBuffer = (unsigned char *)pb->payload;
 
     ip_addr_t addr;
     addr.type = IPADDR_TYPE_V4;
     addr.u_addr.ip4.addr = address;
-
-    if (!port)
-        return;
 
     sendBuffer[0] = command;
     sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);

@@ -58,24 +58,25 @@
     </BCard>
 
     <div class="login-footer">
-      <small class="text-muted">HB-RF-ETH-ng v2.1.1</small>
+      <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }}</small>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
-import { useLoginStore } from './stores.js'
+import { useLoginStore, useSysInfoStore } from './stores.js'
 
 const { t } = useI18n()
 
 const router = useRouter()
 const route = useRoute()
 const loginStore = useLoginStore()
+const sysInfoStore = useSysInfoStore()
 
 const password = ref('')
 const showError = ref(null)
@@ -86,6 +87,10 @@ const rules = {
 }
 
 const v$ = useVuelidate(rules, { password })
+
+onMounted(() => {
+  sysInfoStore.update().catch(() => {})
+})
 
 const loginClick = async () => {
   showError.value = null

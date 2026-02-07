@@ -205,6 +205,7 @@ void Settings::save()
   SET_STR(handle, "ipv6Dns1", _ipv6Dns1);
   SET_STR(handle, "ipv6Dns2", _ipv6Dns2);
 
+  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
 }
 

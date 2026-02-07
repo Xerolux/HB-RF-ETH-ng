@@ -6,7 +6,7 @@
         <RouterView />
       </main>
       <footer class="app-footer">
-        <small class="text-muted">HB-RF-ETH-ng v2.1.1 &copy; 2025</small>
+        <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025</small>
       </footer>
     </div>
   </div>
@@ -15,10 +15,11 @@
 <script setup>
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useLoginStore } from './stores.js'
+import { useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
 
 const loginStore = useLoginStore()
+const sysInfoStore = useSysInfoStore()
 const router = useRouter()
 let idleTimer = null
 const IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
@@ -62,6 +63,7 @@ watch(() => loginStore.isLoggedIn, (isLoggedIn) => {
 })
 
 onMounted(() => {
+  sysInfoStore.update().catch(() => {})
   if (loginStore.isLoggedIn) {
     setupIdleListeners()
     resetTimer()

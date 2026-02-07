@@ -338,7 +338,7 @@ const uploadFirmware = async () => {
       }
     }
 
-    await firmwareUpdateStore.update(file.value, config)
+    await firmwareUpdateStore.update(file.value, { ...config, otaPassword: otaPassword.value })
 
     showStatusModal.value = false
     startCountdown()
@@ -385,7 +385,7 @@ const executeUpload = async () => {
       }
     }
 
-    await firmwareUpdateStore.update(file.value, config)
+    await firmwareUpdateStore.update(file.value, { ...config, otaPassword: otaPassword.value })
 
     showStatusModal.value = false
     startCountdown()

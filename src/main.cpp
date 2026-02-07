@@ -175,17 +175,17 @@ void app_main()
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
 
+    // Initialize log manager early to capture all logs (8KB ring buffer)
+    LogManager::begin(8192);
+
+    // Initialize reset info system
+    ResetInfo::init();
+
     UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     updateCheck.start();
 
     WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
-
-    // Initialize log manager (8KB ring buffer)
-    LogManager::begin(8192);
-
-    // Initialize reset info system
-    ResetInfo::init();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
     monitoring_init(NULL, &sysInfo, &updateCheck);
