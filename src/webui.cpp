@@ -223,6 +223,12 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 
         cJSON *root = cJSON_Parse(buffer);
 
+        if (!root) {
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"isAuthenticated\":false,\"error\":\"Invalid request\"}");
+            return ESP_OK;
+        }
+
         char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
 
         bool isAuthenticated = (password != NULL) && (secure_strcmp(password, _settings->getAdminPassword()) == 0);
@@ -464,6 +470,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         buffer[len] = 0;
         cJSON *root = cJSON_Parse(buffer);
 
+        if (!root) {
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        }
+
         char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
         char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
@@ -474,21 +484,26 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
         ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
+        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+        timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
 
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
+        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+        int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
 
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
+        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+        int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
 
         char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
+        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+        int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
 
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
         char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
         char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
+        cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+        int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
         char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -496,11 +511,15 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
 
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+        if (hostname) {
+            _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+        }
         _settings->setTimesource(timesource);
         _settings->setDcfOffset(dcfOffset);
         _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
+        if (ntpServer) {
+            _settings->setNtpServer(ntpServer);
+        }
         _settings->setLEDBrightness(ledBrightness);
 
         cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
@@ -568,8 +587,8 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
 
-    // Add all settings including admin password (for full restore)
-    cJSON_AddStringToObject(root, "adminPassword", _settings->getAdminPassword());
+    // NOTE: Admin password is intentionally excluded from backup for security.
+    // On restore, the current password will be preserved unless explicitly changed.
 
     add_settings(root);
 
@@ -665,21 +684,26 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
         ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
+        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+        timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
 
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
+        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+        int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
 
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
+        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+        int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
 
         char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
+        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+        int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
 
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
         char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
         char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
+        cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+        int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
         char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -687,11 +711,15 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
 
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+        if (hostname) {
+            _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+        }
         _settings->setTimesource(timesource);
         _settings->setDcfOffset(dcfOffset);
         _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
+        if (ntpServer) {
+            _settings->setNtpServer(ntpServer);
+        }
         _settings->setLEDBrightness(ledBrightness);
 
         if (ipv6Mode) {
@@ -815,6 +843,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
             _statusLED->setState(LED_STATE_BLINK_FAST);
 
             OTA_CHECK(esp_ota_write(ota_handle, body_start_p, body_part_len) == ESP_OK, "Error writing OTA");
+            content_received += body_part_len;
         }
         else
         {
@@ -863,7 +892,7 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
     // Store reset reason before restart
@@ -892,7 +921,7 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
     // Store reset reason before factory reset
@@ -944,33 +973,37 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char *url = cJSON_GetStringValue(cJSON_GetObjectItem(root, "url"));
+    char *url_json = cJSON_GetStringValue(cJSON_GetObjectItem(root, "url"));
     char *otaPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "otaPassword"));
+
+    // Copy URL before freeing JSON to avoid use-after-free
+    char url_buf[256] = {0};
+    if (url_json != NULL && strlen(url_json) > 0) {
+        strncpy(url_buf, url_json, sizeof(url_buf) - 1);
+    }
 
     // Validate OTA password BEFORE deleting the JSON
     if (validate_ota_password(req, otaPassword) != ESP_OK)
     {
         cJSON_Delete(root);
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
         httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA password required or invalid\"}");
         return ESP_OK;
     }
 
     cJSON_Delete(root);
 
-    if (url == NULL || strlen(url) == 0)
+    if (url_buf[0] == '\0')
     {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"URL is required\"}");
         return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Starting OTA update from URL: %s", url);
+    ESP_LOGI(TAG, "Starting OTA update from URL: %s", url_buf);
 
     // Send success response immediately
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"OTA update started\"}");
 
     // Create a task to perform the update (it's blocking)
@@ -980,7 +1013,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     };
 
     TaskArgs* args = new TaskArgs();
-    args->url = strdup(url);
+    args->url = strdup(url_buf);
     args->statusLED = _statusLED;
 
     xTaskCreate([](void* p) {
@@ -1190,7 +1223,7 @@ esp_err_t get_ota_password_status_handler_func(httpd_req_t *req)
     snprintf(response, sizeof(response), "{\"isSet\":%s}", isSet ? "true" : "false");
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, response);
 
     return ESP_OK;

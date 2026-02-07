@@ -139,14 +139,27 @@ static void checkmk_agent_task(void *pvParameters)
         inet_ntoa_r(client_addr.sin_addr, client_ip, sizeof(client_ip));
         ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
 
-        // Check if client IP is allowed
+        // Check if client IP is allowed (exact match per comma-separated entry)
         bool allowed = false;
         if (strlen(config->allowed_hosts) == 0 || strcmp(config->allowed_hosts, "*") == 0) {
             allowed = true;
         } else {
-            // Simple IP matching (can be improved)
-            if (strstr(config->allowed_hosts, client_ip) != NULL) {
-                allowed = true;
+            // Parse comma-separated list and match each entry exactly
+            char hosts_copy[sizeof(config->allowed_hosts)];
+            strncpy(hosts_copy, config->allowed_hosts, sizeof(hosts_copy) - 1);
+            hosts_copy[sizeof(hosts_copy) - 1] = '\0';
+            char *saveptr = NULL;
+            char *token = strtok_r(hosts_copy, ",", &saveptr);
+            while (token != NULL) {
+                // Trim leading/trailing spaces
+                while (*token == ' ') token++;
+                char *end = token + strlen(token) - 1;
+                while (end > token && *end == ' ') { *end = '\0'; end--; }
+                if (strcmp(token, client_ip) == 0) {
+                    allowed = true;
+                    break;
+                }
+                token = strtok_r(NULL, ",", &saveptr);
             }
         }
 
