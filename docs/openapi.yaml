@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: HB-RF-ETH API
   description: |
-    REST API for HB-RF-ETH firmware v2.0 - Homematic RF-to-Ethernet bridge
+    REST API for HB-RF-ETH firmware v2.1 - Homematic RF-to-Ethernet bridge
 
     This API provides endpoints for device configuration, monitoring, and firmware management.
 
@@ -13,7 +13,7 @@ info:
     ## Security Note
     The default password is `admin`. **Change this immediately after first login.**
 
-  version: 2.0.0
+  version: '2.1.4'
   contact:
     name: HB-RF-ETH Project
     url: https://github.com/Xerolux/HB-RF-ETH-ng

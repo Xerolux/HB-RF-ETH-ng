@@ -1,8 +1,10 @@
 #include "log_manager.h"
 #include <esp_log.h>
 #include <esp_timer.h>
+#include <esp_heap_caps.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <cstdlib>
 
 static const char *TAG = "LogManager";
@@ -19,25 +21,41 @@ LogManager& LogManager::instance() {
 // Custom vprintf handler to capture logs
 // Note: This must NOT be static because it's a friend function declared in the header with extern linkage
 int log_vprintf(const char *fmt, va_list args) {
-    // Estimate length
-    va_list args_copy;
-    va_copy(args_copy, args);
-    int len = vsnprintf(NULL, 0, fmt, args_copy);
-    va_end(args_copy);
+    // FIX: va_list can only be consumed once. We need two copies:
+    // one for measuring length + formatting, one for forwarding to UART.
+    va_list args_for_uart;
+    va_copy(args_for_uart, args);
 
-    if (len < 0) return 0;
+    // Estimate length using the original args
+    va_list args_for_len;
+    va_copy(args_for_len, args);
+    int len = vsnprintf(NULL, 0, fmt, args_for_len);
+    va_end(args_for_len);
+
+    if (len < 0) {
+        // Still forward to UART even if we can't capture
+        int ret = vprintf(fmt, args_for_uart);
+        va_end(args_for_uart);
+        return ret;
+    }
 
     // Use a small stack buffer for formatting to avoid malloc for typical log lines
     char stack_buf[256];
     char *buf = stack_buf;
     bool heap_alloc = false;
 
-    if (len + 1 > sizeof(stack_buf)) {
+    if ((size_t)(len + 1) > sizeof(stack_buf)) {
         buf = (char*)malloc(len + 1);
-        if (!buf) return 0; // OOM, skip logging to buffer
+        if (!buf) {
+            // OOM, skip ring buffer but still forward to UART
+            int ret = vprintf(fmt, args_for_uart);
+            va_end(args_for_uart);
+            return ret;
+        }
         heap_alloc = true;
     }
 
+    // Format using original args (consumed after this)
     vsnprintf(buf, len + 1, fmt, args);
 
     // Write to ring buffer
@@ -45,8 +63,10 @@ int log_vprintf(const char *fmt, va_list args) {
 
     if (heap_alloc) free(buf);
 
-    // Forward to default UART handler
-    return vprintf(fmt, args);
+    // Forward to default UART handler using the copy
+    int ret = vprintf(fmt, args_for_uart);
+    va_end(args_for_uart);
+    return ret;
 }
 
 void LogManager::begin(size_t size) {
@@ -131,14 +151,21 @@ std::string LogManager::getLogContent(size_t offset) {
             // If the client is asking for data that has been overwritten (lagging behind)
             if (data_len > log_buffer_size) {
                 // Return the entire valid buffer to catch them up (partially)
-                // Effectively, we give them the window [total - size, total]
                 offset = local_total - log_buffer_size;
                 data_len = log_buffer_size;
             }
 
+            // FIX: Check heap before allocating to prevent OOM crash
+            // std::string::resize will abort on ESP-IDF if allocation fails
+            uint32_t free_heap = esp_get_free_heap_size();
+            if (data_len > free_heap / 2) {
+                // Cap to half of free heap to leave room for other operations
+                data_len = free_heap / 2;
+                if (data_len > log_buffer_size) data_len = log_buffer_size;
+                offset = local_total - data_len;
+            }
+
             // Pre-allocate to avoid reallocations
-            // Standard string::resize will abort on failure without exceptions enabled in ESP-IDF
-            // which is fine as OOM is fatal anyway.
             result.resize(data_len);
 
             size_t start_idx = offset % log_buffer_size;

@@ -166,7 +166,7 @@ void analyzerProcessingTask(void *parameter)
     ((Analyzer *)parameter)->_processingTask();
 }
 
-Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _clients(), _client_fds(), _mutex(xSemaphoreCreateMutex()), _radioModuleConnector(radioModuleConnector), _frameQueue(NULL), _taskHandle(NULL), _running(false), _initialized(false)
+Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _clients(), _client_fds(), _mutex(xSemaphoreCreateMutex()), _radioModuleConnector(radioModuleConnector), _frameQueue(NULL), _taskHandle(NULL), _running(false), _initialized(false), _clientCount(0)
 {
     if (!_mutex) {
         ESP_LOGE(TAG, "Failed to create analyzer mutex");
@@ -207,10 +207,14 @@ Analyzer::Analyzer(RadioModuleConnector *radioModuleConnector) : _clients(), _cl
 
 Analyzer::~Analyzer()
 {
-    _initialized = false;
     ESP_LOGI(TAG, "Analyzer destructor called");
 
-    // First, deregister from radio module to stop receiving new frames
+    // First, stop accepting new frames and clients
+    _initialized.store(false);
+    _running.store(false);
+    _clientCount.store(0);
+
+    // Deregister from radio module to stop receiving new frames
     if (_radioModuleConnector) {
         _radioModuleConnector->removeFrameHandler(this);
     }
@@ -225,20 +229,12 @@ Analyzer::~Analyzer()
         xSemaphoreGive(_mutex);
     }
 
-    // Signal task to stop
-    _running = false;
-
-    // Wait for task to finish gracefully (up to 500ms)
+    // Wait for task to finish gracefully (up to 1s)
+    // The task checks _running every 20ms, so 1s is more than sufficient
     if (_taskHandle) {
-        int retries = 5;
-        while (retries-- > 0) {
+        for (int i = 0; i < 10; i++) {
             vTaskDelay(pdMS_TO_TICKS(100));
-            // Check if task is still running by verifying queue operations
-            if (uxQueueMessagesWaiting(_frameQueue) == 0) {
-                break;
-            }
         }
-        // Now safe to delete the task
         vTaskDelete(_taskHandle);
         _taskHandle = NULL;
         ESP_LOGI(TAG, "Processing task deleted");
@@ -269,12 +265,12 @@ Analyzer::~Analyzer()
 void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
 {
     // Safety checks: ensure we're still running and resources are valid
-    if (!_initialized || !_running || !_frameQueue || !buffer) {
+    if (!_initialized.load(std::memory_order_relaxed) || !_running.load(std::memory_order_relaxed) || !_frameQueue || !buffer) {
         return;
     }
 
-    // Fast check without mutex - OK if we miss a client briefly
-    if (_client_fds.empty()) {
+    // Fast lock-free check using atomic counter (avoids reading vector without lock)
+    if (_clientCount.load(std::memory_order_relaxed) == 0) {
         return;
     }
 
@@ -459,7 +455,7 @@ void Analyzer::_processFrame(const AnalyzerFrame &frame)
 
 void Analyzer::addClient(httpd_handle_t hd, int fd)
 {
-    if (!_initialized) {
+    if (!_initialized.load()) {
         ESP_LOGW(TAG, "Analyzer not initialized, rejecting client %d", fd);
         return;
     }
@@ -475,7 +471,8 @@ void Analyzer::addClient(httpd_handle_t hd, int fd)
         if (!found) {
             _clients.push_back(hd);
             _client_fds.push_back(fd);
-            ESP_LOGI(TAG, "Client %d added, total clients: %d", fd, _client_fds.size());
+            _clientCount.store(_client_fds.size());
+            ESP_LOGI(TAG, "Client %d added, total clients: %d", fd, (int)_client_fds.size());
 
             // If this is the first client, register with RadioModuleConnector
             if (_client_fds.size() == 1) {
@@ -490,7 +487,7 @@ void Analyzer::addClient(httpd_handle_t hd, int fd)
 
 void Analyzer::removeClient(httpd_handle_t hd, int fd)
 {
-    if (!_initialized) {
+    if (!_initialized.load()) {
         return;
     }
     // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
@@ -499,7 +496,8 @@ void Analyzer::removeClient(httpd_handle_t hd, int fd)
             if (_client_fds[i] == fd) {
                 _clients.erase(_clients.begin() + i);
                 _client_fds.erase(_client_fds.begin() + i);
-                ESP_LOGI(TAG, "Client %d removed, remaining clients: %d", fd, _client_fds.size());
+                _clientCount.store(_client_fds.size());
+                ESP_LOGI(TAG, "Client %d removed, remaining clients: %d", fd, (int)_client_fds.size());
                 break;
             }
         }
@@ -516,12 +514,12 @@ void Analyzer::removeClient(httpd_handle_t hd, int fd)
 
 bool Analyzer::hasClients()
 {
-    if (!_initialized) {
+    if (!_initialized.load(std::memory_order_relaxed)) {
         return false;
     }
-    // Fast lock-free check - OK if result is slightly stale
-    // For accurate check, use mutex - but this is called from high-priority UART context
-    return !_client_fds.empty();
+    // Use atomic counter for lock-free check from high-priority UART context
+    // This avoids reading std::vector without a lock (which is undefined behavior)
+    return _clientCount.load(std::memory_order_relaxed) > 0;
 }
 
 esp_err_t Analyzer::ws_handler(httpd_req_t *req)

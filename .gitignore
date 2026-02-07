@@ -61,7 +61,4 @@ Thumbs.db
 *.tmp
 *.bak
 .venv/
-managed_components/
-.venv/
-managed_components/
 nul

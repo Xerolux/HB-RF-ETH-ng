@@ -9,6 +9,7 @@
 #include "cJSON.h"
 #include <vector>
 #include <string>
+#include <atomic>
 
 // Maximum frame size for analyzer
 #define ANALYZER_MAX_FRAME_SIZE 1024
@@ -33,8 +34,9 @@ private:
     // Async processing
     QueueHandle_t _frameQueue;
     TaskHandle_t _taskHandle;
-    bool _running;
-    bool _initialized;
+    std::atomic<bool> _running;
+    std::atomic<bool> _initialized;
+    std::atomic<int> _clientCount;  // Lock-free client count for hasClients()
 
     void _processingTask();
     void _processFrame(const AnalyzerFrame &frame);

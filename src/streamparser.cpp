@@ -62,6 +62,16 @@ void StreamParser::append(unsigned char chr)
 
         case RECEIVE_LENGTH_LOW_BYTE:
             _frameLength |= (_isEscaped ? chr | 0x80 : chr);
+            // FIX: Validate frame length to prevent uint16_t wraparound
+            // and to reject impossibly large frames early.
+            // Max valid HM frame payload is ~512 bytes, but we allow up to
+            // buffer size minus header overhead as a safety margin.
+            if (_frameLength > sizeof(_buffer) - 10) {
+                _state = NO_DATA;
+                _bufferPos = 0;
+                _isEscaped = false;
+                return;
+            }
             _frameLength += 2; // handle crc as frame data
             _framePos = 0;
             _state = RECEIVE_FRAME_DATA;
