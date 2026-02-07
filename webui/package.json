@@ -12,21 +12,21 @@
   "dependencies": {
     "@vuelidate/core": "^2.0.3",
     "@vuelidate/validators": "^2.0.4",
-    "axios": "^1.7.9",
+    "axios": "^1.13.4",
     "bootstrap": "^5.3.3",
-    "bootstrap-vue-next": "^0.41.0",
-    "pinia": "^2.3.1",
-    "vue": "^3.5.25",
-    "vue-i18n": "^10.0.6",
-    "vue-router": "^4.5.0"
+    "bootstrap-vue-next": "^0.43.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.27",
+    "vue-i18n": "^11.2.8",
+    "vue-router": "^5.0.2"
   },
   "devDependencies": {
-    "@parcel/compressor-brotli": "^2.16.3",
-    "@parcel/compressor-gzip": "^2.16.3",
-    "@parcel/transformer-vue": "^2.16.3",
-    "@vitejs/plugin-vue": "^5.2.1",
+    "@parcel/compressor-brotli": "^2.16.4",
+    "@parcel/compressor-gzip": "^2.16.4",
+    "@parcel/transformer-vue": "^2.16.4",
+    "@vitejs/plugin-vue": "^6.0.4",
     "buffer": "^6.0.3",
-    "parcel": "^2.16.3",
+    "parcel": "^2.16.4",
     "process": "^0.11.10"
   }
 }
