@@ -117,13 +117,19 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
             if (data[3] == 0)
             {
+                // New connection requested
                 endpointConnectionIdentifier += 2;
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
                 atomic_store(&_connectionStarted, false);
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
+                // Client has different endpoint ID - accept it to force sync
+                // This happens when RaspberryMatic has a persistent session from before reboot
+                ESP_LOGI(TAG, "Accepting client endpoint identifier %d (was %d) to synchronize session", data[3], endpointConnectionIdentifier);
+                endpointConnectionIdentifier = data[3];
+                atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
+                atomic_store(&_connectionStarted, false);
             }
 
             // Update connection parameters and send response
