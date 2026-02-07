@@ -1,4 +1,4 @@
-# HB-RF-ETH-ng Firmware v2.1.1
+# HB-RF-ETH-ng Firmware v2.1.2
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
@@ -16,6 +16,20 @@
 
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
 
+**Version 2.1.2 Änderungen:**
+* **Erhöhte Sicherheit**
+  * Stärkere Passwort-Anforderungen (8 Zeichen, Groß-/Kleinschreibung, Zahlen)
+  * OTA-Passwort wird nicht mehr im Browser gespeichert (Security Best Practice)
+* **Verbesserte Firmware-Update-UX**
+  * Passwort-Stärke-Anzeige beim Setzen
+  * Warnhinweis wenn OTA-Passwort nicht gesetzt
+  * Automatischer Neustart nach erfolgreichem Update
+* **Detaillierte Neustart-Gründe** in der WebUI
+  * Zeigt Ursache des letzten Neustarts (Update, Werksreset, Fehler, etc.)
+* **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
+* **Werksreset** auch über WebUI möglich
+* **Moderne, responsive WebUI** mit Mobile-Support
+
 **Version 2.1.1 Änderungen:**
 * Aktualisierung auf ESP-IDF 5.x
 * Kompatibilität mit modernen Toolchains (GCC 14.2.0)
@@ -26,14 +40,6 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
   * Erzwungene Passwortänderung beim ersten Login
   * **Separates OTA-Passwort** für Firmware-Updates
   * Timing-attacken-geschützte Passwortvergleiche
-* **Detaillierte Neustart-Gründe** in der WebUI
-  * Zeigt Ursache des letzten Neustarts (Update, Werksreset, Fehler, etc.)
-* **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
-* **Verbesserte Firmware-Update-UX**
-  * Passwort-Stärke-Anzeige beim Setzen
-  * Warnhinweis wenn OTA-Passwort nicht gesetzt
-  * Automatischer Neustart nach erfolgreichem Update
-* **Moderne, responsive WebUI** mit Mobile-Support
 
 ### Worum es geht
 Dieses Repository enhält die Firmware für die HB-RF-ETH Platine, welches es ermöglicht, ein Homematic Funkmodul HM-MOD-RPI-PCB oder RPI-RF-MOD per Netzwerk an eine debmatic oder piVCCU3 Installation anzubinden.
