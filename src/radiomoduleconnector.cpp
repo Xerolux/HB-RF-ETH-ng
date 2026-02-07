@@ -98,22 +98,33 @@ void RadioModuleConnector::stop()
 
 void RadioModuleConnector::addFrameHandler(FrameHandler *handler)
 {
-    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+    if (!handler) {
+        return;
+    }
+    if (xSemaphoreTake(_handlersMutex, pdMS_TO_TICKS(100))) {
+        // Double-check to prevent duplicates
         if (std::find(_frameHandlers.begin(), _frameHandlers.end(), handler) == _frameHandlers.end()) {
             _frameHandlers.push_back(handler);
         }
         xSemaphoreGive(_handlersMutex);
+    } else {
+        ESP_LOGW("RadioModuleConnector", "Failed to acquire mutex in addFrameHandler");
     }
 }
 
 void RadioModuleConnector::removeFrameHandler(FrameHandler *handler)
 {
-    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
+    if (!handler) {
+        return;
+    }
+    if (xSemaphoreTake(_handlersMutex, pdMS_TO_TICKS(100))) {
         auto it = std::find(_frameHandlers.begin(), _frameHandlers.end(), handler);
         if (it != _frameHandlers.end()) {
             _frameHandlers.erase(it);
         }
         xSemaphoreGive(_handlersMutex);
+    } else {
+        ESP_LOGW("RadioModuleConnector", "Failed to acquire mutex in removeFrameHandler");
     }
 }
 

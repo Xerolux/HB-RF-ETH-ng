@@ -273,12 +273,13 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         return;
     }
 
-    if (!hasClients()) {
+    // Fast check without mutex - OK if we miss a client briefly
+    if (_client_fds.empty()) {
         return;
     }
 
     // Sanity check on frame length
-    if (len > ANALYZER_MAX_FRAME_SIZE) {
+    if (len == 0 || len > ANALYZER_MAX_FRAME_SIZE) {
         ESP_LOGW(TAG, "Frame too large for analyzer: %d bytes (max %d)", len, ANALYZER_MAX_FRAME_SIZE);
         return;
     }
@@ -292,12 +293,16 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
     if (len <= ANALYZER_SHORT_BUFFER_SIZE) {
         memcpy(frame.shortData, buffer, len);
     } else {
+        // SAFETY: Check heap before allocating
+        if (esp_get_minimum_free_heap_size() < (size_t)len + 1024) {
+            ESP_LOGW(TAG, "Insufficient heap for large frame (%d bytes), dropping", len);
+            return;
+        }
         frame.longData = (uint8_t*)malloc(len);
         if (frame.longData) {
             memcpy(frame.longData, buffer, len);
         } else {
-            ESP_LOGE(TAG, "Failed to allocate memory for frame");
-            // cppcheck-suppress memleak
+            ESP_LOGE(TAG, "Failed to allocate memory for frame (%d bytes)", len);
             return;
         }
     }
@@ -314,15 +319,14 @@ void Analyzer::handleFrame(unsigned char *buffer, uint16_t len)
         }
 
         if (xQueueSend(_frameQueue, &frame, 0) != pdTRUE) {
-            // Still can't send, drop this frame
+            // Still can't send, drop this frame and free its memory
             if (frame.longData) {
                 free(frame.longData);
             }
             ESP_LOGW(TAG, "Frame queue full, dropping frame");
         }
     }
-    // cppcheck-suppress memleak
-    (void)0; // Dummy statement for suppression anchor
+    // Memory ownership transferred to queue - no leak
 }
 
 void Analyzer::_processingTask()
@@ -512,16 +516,12 @@ void Analyzer::removeClient(httpd_handle_t hd, int fd)
 
 bool Analyzer::hasClients()
 {
-    bool has = false;
     if (!_initialized) {
         return false;
     }
-    // Use timeout instead of portMAX_DELAY to prevent potential deadlocks
-    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(100))) {
-        has = !_client_fds.empty();
-        xSemaphoreGive(_mutex);
-    }
-    return has;
+    // Fast lock-free check - OK if result is slightly stale
+    // For accurate check, use mutex - but this is called from high-priority UART context
+    return !_client_fds.empty();
 }
 
 esp_err_t Analyzer::ws_handler(httpd_req_t *req)

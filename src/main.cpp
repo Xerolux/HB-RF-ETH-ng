@@ -64,22 +64,30 @@ static const char *TAG = "HB-RF-ETH";
 static void heap_monitor_task(void *pvParameters)
 {
     LED *statusLED = (LED *)pvParameters;
-    uint32_t low_water_mark = 0;
-    const uint32_t critical_threshold = 20480;  // 20KB critical threshold
-    UBaseType_t stack_watermark_min = 2560;  // Start with allocated size
+    uint32_t low_water_mark = UINT32_MAX;
+    const uint32_t critical_threshold = 30720;  // 30KB critical threshold (raised from 20KB)
+    const uint32_t warning_threshold = 51200;   // 50KB warning threshold
+    UBaseType_t stack_watermark_min = UINT32_MAX;
 
     for (;;)
     {
         uint32_t free_heap = esp_get_free_heap_size();
         uint32_t min_free_heap = esp_get_minimum_free_heap_size();
 
-        if (min_free_heap < low_water_mark || low_water_mark == 0) {
+        // Update low water mark
+        if (min_free_heap < low_water_mark) {
             low_water_mark = min_free_heap;
             ESP_LOGI(TAG, "Heap low water mark: %" PRIu32 " bytes", low_water_mark);
         }
 
+        // Critical threshold - could indicate memory leak
         if (free_heap < critical_threshold) {
-            ESP_LOGW(TAG, "Low heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
+            ESP_LOGW(TAG, "CRITICAL: Low heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
+                     free_heap, min_free_heap);
+        }
+        // Warning threshold - early warning
+        else if (free_heap < warning_threshold) {
+            ESP_LOGI(TAG, "WARNING: Heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
                      free_heap, min_free_heap);
         }
 
@@ -87,19 +95,20 @@ static void heap_monitor_task(void *pvParameters)
         UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
         if (watermark < stack_watermark_min) {
             stack_watermark_min = watermark;
-            ESP_LOGI(TAG, "heap_monitor stack watermark: %u bytes free (allocated: 2560)",
-                     watermark * sizeof(StackType_t));
+            ESP_LOGI(TAG, "heap_monitor stack watermark: %u words free (allocated: 2560)",
+                     watermark);
         }
 
-        // Log heap stats every 5 minutes
+        // Log heap stats every 5 minutes (60 x 5 seconds)
         static uint32_t count = 0;
         count++;
         if (count % 60 == 0) {
-            ESP_LOGI(TAG, "Heap status - Free: %" PRIu32 " bytes, Min free: %" PRIu32 " bytes",
-                     free_heap, min_free_heap);
-            ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u bytes (%.1f%% used)",
-                     stack_watermark_min * sizeof(StackType_t),
-                     100.0 * (2560 - stack_watermark_min * sizeof(StackType_t)) / 2560.0);
+            uint32_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+            ESP_LOGI(TAG, "Heap status - Free: %" PRIu32 " B, Min: %" PRIu32 " B, Largest: %" PRIu32 " B",
+                     free_heap, min_free_heap, largest_block);
+            ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u words (%.1f%% used)",
+                     stack_watermark_min,
+                     100.0 * (2560 / sizeof(StackType_t) - stack_watermark_min) / (2560.0 / sizeof(StackType_t)));
         }
 
         vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds

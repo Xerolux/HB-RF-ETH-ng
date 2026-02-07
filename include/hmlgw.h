@@ -15,16 +15,16 @@
 class Hmlgw : public FrameHandler {
 private:
     RadioModuleConnector* _connector;
-    std::atomic<bool> _running;
-    int _serverSocket;
-    int _clientSocket;
+    std::atomic<bool> _running{false};
+    std::atomic<int> _serverSocket{-1};
+    std::atomic<int> _clientSocket{-1};
     TaskHandle_t _taskHandle;
     uint16_t _port;
     uint16_t _keepAlivePort;
 
     // KeepAlive socket
-    int _keepAliveServerSocket;
-    int _keepAliveClientSocket;
+    std::atomic<int> _keepAliveServerSocket{-1};
+    std::atomic<int> _keepAliveClientSocket{-1};
     TaskHandle_t _keepAliveTaskHandle;
 
     void cleanupSockets();

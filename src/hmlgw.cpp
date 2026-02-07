@@ -36,6 +36,11 @@ const char CMD_KEEPALIVE = 'K';
 const char CMD_SERIAL = 'S';
 static const char* IDENTIFIER = "HM-USB-IF";
 
+// Fixed limits for security
+#define MAX_FRAME_SIZE 8000  // Maximum frame size to prevent buffer overflow
+#define RX_BUFFER_SIZE 1024
+#define TEMP_FRAME_BUFFER_SIZE 8192
+
 /**
  * Ring Buffer for efficient HMLGW data handling
  *
@@ -120,9 +125,16 @@ public:
 };
 
 Hmlgw::Hmlgw(RadioModuleConnector* connector, uint16_t port, uint16_t keepAlivePort)
-    : _connector(connector), _running(false), _serverSocket(-1), _clientSocket(-1),
-      _taskHandle(NULL), _port(port), _keepAlivePort(keepAlivePort),
-      _keepAliveServerSocket(-1), _keepAliveClientSocket(-1), _keepAliveTaskHandle(NULL) {
+    : _connector(connector),
+      _running(false),
+      _serverSocket(-1),
+      _clientSocket(-1),
+      _taskHandle(NULL),
+      _port(port),
+      _keepAlivePort(keepAlivePort),
+      _keepAliveServerSocket(-1),
+      _keepAliveClientSocket(-1),
+      _keepAliveTaskHandle(NULL) {
 }
 
 Hmlgw::~Hmlgw() {
@@ -130,21 +142,21 @@ Hmlgw::~Hmlgw() {
 }
 
 void Hmlgw::cleanupSockets() {
-    if (_clientSocket != -1) {
-        close(_clientSocket);
-        _clientSocket = -1;
+    int clientSock = _clientSocket.exchange(-1);
+    if (clientSock >= 0) {
+        close(clientSock);
     }
-    if (_serverSocket != -1) {
-        close(_serverSocket);
-        _serverSocket = -1;
+    int serverSock = _serverSocket.exchange(-1);
+    if (serverSock >= 0) {
+        close(serverSock);
     }
-    if (_keepAliveClientSocket != -1) {
-        close(_keepAliveClientSocket);
-        _keepAliveClientSocket = -1;
+    int kaClientSock = _keepAliveClientSocket.exchange(-1);
+    if (kaClientSock >= 0) {
+        close(kaClientSock);
     }
-    if (_keepAliveServerSocket != -1) {
-        close(_keepAliveServerSocket);
-        _keepAliveServerSocket = -1;
+    int kaServerSock = _keepAliveServerSocket.exchange(-1);
+    if (kaServerSock >= 0) {
+        close(kaServerSock);
     }
 }
 
@@ -226,21 +238,22 @@ void Hmlgw::run() {
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(_port);
 
-    _serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (_serverSocket < 0) {
+    int serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+    _serverSocket.store(serverSock);
+    if (serverSock < 0) {
         handleFatalError("Unable to create socket");
         return;
     }
 
     int opt = 1;
-    setsockopt(_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    if (bind(_serverSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
+    if (bind(serverSock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
         handleFatalError("Socket unable to bind");
         return;
     }
 
-    if (listen(_serverSocket, 1) != 0) {
+    if (listen(serverSock, 1) != 0) {
         handleFatalError("Error occurred during listen");
         return;
     }
@@ -249,14 +262,14 @@ void Hmlgw::run() {
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    setsockopt(_serverSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(serverSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     ESP_LOGI(TAG, "HMLGW Server listening on port %d", _port);
 
     while (_running) {
         struct sockaddr_in source_addr;
         socklen_t addr_len = sizeof(source_addr);
-        int sock = accept(_serverSocket, (struct sockaddr *)&source_addr, &addr_len);
+        int sock = accept(serverSock, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
             // Timeout is normal when no client connects
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -267,14 +280,14 @@ void Hmlgw::run() {
         }
 
         ESP_LOGI(TAG, "Socket accepted");
-        _clientSocket = sock;
+        _clientSocket.store(sock);
 
         handleClient();
 
         ESP_LOGI(TAG, "Socket disconnected");
-        if (_clientSocket != -1) {
-            close(_clientSocket);
-            _clientSocket = -1;
+        int clientSock = _clientSocket.exchange(-1);
+        if (clientSock >= 0) {
+            close(clientSock);
         }
     }
 
@@ -289,21 +302,22 @@ void Hmlgw::runKeepAlive() {
     dest_addr.sin_family = AF_INET;
     dest_addr.sin_port = htons(_keepAlivePort);
 
-    _keepAliveServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (_keepAliveServerSocket < 0) {
+    int serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+    _keepAliveServerSocket.store(serverSock);
+    if (serverSock < 0) {
         handleFatalError("Unable to create KA socket");
         return;
     }
 
     int opt = 1;
-    setsockopt(_keepAliveServerSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(serverSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    if (bind(_keepAliveServerSocket, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
+    if (bind(serverSock, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) != 0) {
         handleFatalError("KA Socket unable to bind");
         return;
     }
 
-    if (listen(_keepAliveServerSocket, 1) != 0) {
+    if (listen(serverSock, 1) != 0) {
         handleFatalError("KA Error occurred during listen");
         return;
     }
@@ -312,14 +326,14 @@ void Hmlgw::runKeepAlive() {
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    setsockopt(_keepAliveServerSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(serverSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     ESP_LOGI(TAG, "HMLGW KeepAlive listening on port %d", _keepAlivePort);
 
     while (_running) {
          struct sockaddr_in source_addr;
         socklen_t addr_len = sizeof(source_addr);
-        int sock = accept(_keepAliveServerSocket, (struct sockaddr *)&source_addr, &addr_len);
+        int sock = accept(serverSock, (struct sockaddr *)&source_addr, &addr_len);
         if (sock < 0) {
              // Timeout is normal when no client connects
              if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -329,16 +343,18 @@ void Hmlgw::runKeepAlive() {
              continue;
         }
 
-        _keepAliveClientSocket = sock;
+        // SAFETY: Use local variable to avoid race conditions with _keepAliveClientSocket
+        int clientSock = sock;
+        _keepAliveClientSocket.store(sock);
 
         // Set recv timeout on client socket
-        setsockopt(_keepAliveClientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        setsockopt(clientSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
         // KeepAlive protocol: accept connection and hold it open
         // Read and discard any data (protocol doesn't require echo)
         char rx_buffer[128];
         while (_running) {
-            int len = recv(_keepAliveClientSocket, rx_buffer, sizeof(rx_buffer) - 1, 0);
+            int len = recv(clientSock, rx_buffer, sizeof(rx_buffer) - 1, 0);
             if (len < 0) {
                 // Timeout or error - check if we should continue
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -350,8 +366,12 @@ void Hmlgw::runKeepAlive() {
             }
             // Data received but ignored (KeepAlive doesn't echo)
         }
-        close(_keepAliveClientSocket);
-        _keepAliveClientSocket = -1;
+        close(clientSock);
+        // Only update if still the same socket (avoid race with cleanup)
+        int expected = clientSock;
+        if (_keepAliveClientSocket.compare_exchange_strong(expected, -1)) {
+            // Successfully cleared
+        }
     }
     cleanupSockets();
     ESP_LOGI(TAG, "HMLGW KeepAlive task exiting");
@@ -360,8 +380,14 @@ void Hmlgw::runKeepAlive() {
 
 void Hmlgw::handleClient() {
     RingBuffer buffer;  // Ring buffer eliminates heap fragmentation
-    uint8_t rx_buffer[1024];
-    uint8_t temp_frame[8192];  // Temporary buffer for frame extraction
+    uint8_t rx_buffer[RX_BUFFER_SIZE];
+    uint8_t temp_frame[TEMP_FRAME_BUFFER_SIZE];  // Temporary buffer for frame extraction
+
+    // Get client socket atomically for this session
+    int clientSock = _clientSocket.load();
+    if (clientSock < 0) {
+        return;
+    }
 
     // Set receive timeout to allow periodic checking of _running flag
     // Socket remains BLOCKING - recv() will wait up to 1 second for data
@@ -369,11 +395,17 @@ void Hmlgw::handleClient() {
     struct timeval timeout;
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
-    setsockopt(_clientSocket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    setsockopt(clientSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     while (_running) {
+        // Check if client socket is still valid before recv
+        if (_clientSocket.load() < 0) {
+            ESP_LOGW(TAG, "Client socket invalidated");
+            break;
+        }
+
         // Blocking recv with 1-second timeout - eliminates CPU waste during idle
-        int len = recv(_clientSocket, rx_buffer, sizeof(rx_buffer), 0);
+        int len = recv(clientSock, rx_buffer, sizeof(rx_buffer), 0);
         if (len < 0) {
             // Check if it's just a timeout (expected when no data)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -418,14 +450,20 @@ void Hmlgw::handleClient() {
                  if (processed + 3 <= buffer.size()) {
                      uint16_t dataLen = (buffer[processed+1] << 8) | buffer[processed+2];
 
-                     // Sanity check on data length
-                     if (dataLen > 8192) {
-                         ESP_LOGE(TAG, "Invalid data length %d, skipping", dataLen);
+                     // SECURITY: Strict bounds check to prevent buffer overflow
+                     if (dataLen > MAX_FRAME_SIZE) {
+                         ESP_LOGE(TAG, "Invalid data length %d (max %d), skipping", dataLen, MAX_FRAME_SIZE);
                          processed++;
                          continue;
                      }
 
                      if (processed + 3 + dataLen <= buffer.size()) {
+                         // SAFETY: Verify temp_frame is large enough
+                         if (dataLen > TEMP_FRAME_BUFFER_SIZE) {
+                             ESP_LOGE(TAG, "Frame too large for temp buffer: %d", dataLen);
+                             processed++;
+                             continue;
+                         }
                          // We have the full frame - extract to temp buffer
                          buffer.copyData(temp_frame, processed + 3, dataLen);
                          _connector->sendFrame(temp_frame, dataLen);
@@ -456,18 +494,35 @@ void Hmlgw::handleClient() {
 }
 
 void Hmlgw::sendDataToClient(const uint8_t* data, size_t len) {
-    if (_clientSocket != -1) {
-        ssize_t sent = send(_clientSocket, data, len, 0);
-        if (sent < 0) {
+    // SAFETY: Make a local copy of socket to avoid TOCTOU race condition
+    int sock = _clientSocket.load();
+    if (sock < 0) {
+        return;
+    }
+
+    // Use MSG_DONTWAIT to avoid blocking on dead connections
+    ssize_t sent = send(sock, data, len, MSG_DONTWAIT);
+    if (sent < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EPIPE) {
+            // Connection broken or would block - close it
+            ESP_LOGW(TAG, "Send failed (errno %d), closing client", errno);
+        } else {
             ESP_LOGW(TAG, "Send failed, closing client: errno %d", errno);
-            close(_clientSocket);
-            _clientSocket = -1;
+        }
+        // Only close if still the same socket (avoid closing a new connection)
+        int expected = sock;
+        if (_clientSocket.compare_exchange_strong(expected, -1)) {
+            close(sock);
         }
     }
 }
 
 void Hmlgw::handleFrame(unsigned char* buffer, uint16_t len) {
-    if (!_running || _clientSocket == -1) return;
+    if (!_running) return;
+
+    // SAFETY: Make a local copy of socket to avoid TOCTOU race condition
+    int sock = _clientSocket.load();
+    if (sock < 0) return;
 
     // Encapsulate in 'S' frame
     // 'S' + HighLen + LowLen + Data
@@ -476,6 +531,15 @@ void Hmlgw::handleFrame(unsigned char* buffer, uint16_t len) {
     header[1] = (len >> 8) & 0xFF;
     header[2] = len & 0xFF;
 
-    sendDataToClient(header, 3);
+    // Send header first
+    ssize_t sent = send(sock, header, 3, MSG_DONTWAIT);
+    if (sent < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            ESP_LOGW(TAG, "Send header failed: errno %d", errno);
+        }
+        return;
+    }
+
+    // Send data
     sendDataToClient(buffer, len);
 }

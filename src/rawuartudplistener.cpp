@@ -206,8 +206,10 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
 ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 {
-    uint16_t port = atomic_load(&_remotePort);
-    uint32_t address = atomic_load(&_remoteAddress);
+    // SAFETY: Load both atomics before checking to get consistent snapshot
+    // Note: There's still a small race window, but it's acceptable for this use case
+    uint32_t address = atomic_load_explicit(&_remoteAddress, memory_order_relaxed);
+    uint16_t port = atomic_load_explicit(&_remotePort, memory_order_relaxed);
 
     if (port)
     {
@@ -222,8 +224,9 @@ ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 
 void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffer, size_t len)
 {
-    uint16_t port = atomic_load(&_remotePort);
-    uint32_t address = atomic_load(&_remoteAddress);
+    // SAFETY: Load atomics in a consistent order
+    uint32_t address = atomic_load_explicit(&_remoteAddress, memory_order_relaxed);
+    uint16_t port = atomic_load_explicit(&_remotePort, memory_order_relaxed);
 
     if (!port)
         return;
@@ -241,7 +244,7 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     addr.u_addr.ip4.addr = address;
 
     sendBuffer[0] = command;
-    sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);
+    sendBuffer[1] = (unsigned char)atomic_fetch_add_explicit(&_counter, 1, memory_order_relaxed);
 
     if (len)
         memcpy(sendBuffer + 2, buffer, len);
