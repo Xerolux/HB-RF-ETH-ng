@@ -101,9 +101,13 @@ jobs:
           cp ".pio/build/hb-rf-eth-ng/bootloader.bin" release/ 2>/dev/null || true
           cp ".pio/build/hb-rf-eth-ng/partitions.bin" release/ 2>/dev/null || true
 
-          # Copy documentation
+          # Copy version file
           cp version.txt release/
-          cp README.md release/
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          python generate_release_notes.py "$VERSION" release/RELEASE_NOTES.md
 
       - name: Create checksums
         run: |
@@ -142,7 +146,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
           name: 🚀 HB-RF-ETH-ng Firmware ${{ steps.get_version.outputs.VERSION_TAG }}
-          body_path: release/README.md
+          body_path: release/RELEASE_NOTES.md
           files: |
             release/firmware_*.bin
             release/bootloader.bin
