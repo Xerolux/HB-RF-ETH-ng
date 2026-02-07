@@ -6,7 +6,7 @@ platformio_local.ini
 # ESP-IDF Build artifacts
 build/
 sdkconfig
-sdkconfig.old
+sdkconfig.*
 managed_components/
 
 # Firmware binaries
