@@ -8,18 +8,9 @@
   >
     <BForm @submit.stop.prevent>
       <BFormGroup :label="t('settings.changePassword')" label-cols-sm="4">
-        <BFormInput
-          type="password"
-          v-model="adminPassword"
-          :state="v$.adminPassword.$error ? false : null"
-        />
-      </BFormGroup>
-      <BFormGroup :label="t('settings.repeatPassword')" label-cols-sm="4">
-        <BFormInput
-          type="password"
-          v-model="adminPasswordRepeat"
-          :state="v$.adminPasswordRepeat.$error ? false : null"
-        />
+        <BButton variant="outline-primary" @click="showPasswordModal = true">
+          {{ t('settings.changePassword') }}
+        </BButton>
       </BFormGroup>
       <hr />
       <h6 class="text-secondary">{{ t('settings.networkSettings') }}</h6>
@@ -80,7 +71,10 @@
       <hr />
       <h6 class="text-secondary">{{ t('settings.ipv6Settings') }}</h6>
       <BFormGroup :label="t('settings.enableIPv6')" label-cols-sm="4">
-        <BFormCheckbox v-model="enableIPv6" switch />
+        <BFormRadioGroup buttons v-model="enableIPv6" required>
+          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
       <template v-if="enableIPv6">
         <BFormGroup :label="t('settings.ipv6Mode')" label-cols-sm="4">
@@ -190,12 +184,82 @@
           </BFormSelect>
         </BInputGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
-        <BFormCheckbox v-model="checkUpdates" switch />
+      <template v-if="sysInfoStore.enableHmlgw">
+        <hr />
+        <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
+        <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="hmlgwEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
+        </BFormGroup>
+        <template v-if="hmlgwEnabled">
+          <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
+            <BFormInput
+              type="number"
+              v-model.number="hmlgwPort"
+              min="1"
+              max="65535"
+              :state="v$.hmlgwPort.$error ? false : null"
+            />
+          </BFormGroup>
+          <BFormGroup :label="t('settings.hmlgwKeepAlivePort')" label-cols-sm="4">
+            <BFormInput
+              type="number"
+              v-model.number="hmlgwKeepAlivePort"
+              min="1"
+              max="65535"
+              :state="v$.hmlgwKeepAlivePort.$error ? false : null"
+            />
+          </BFormGroup>
+        </template>
+      </template>
+      <template v-if="sysInfoStore.enableAnalyzer">
+        <hr />
+        <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
+        <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="analyzerEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
+        </BFormGroup>
+      </template>
+
+      <hr />
+      <h6 class="text-secondary">{{ t('settings.dtls.title') }}</h6>
+      <BFormGroup :label="t('settings.dtls.mode')" label-cols-sm="4">
+        <BFormRadioGroup buttons v-model="dtlsMode" required>
+          <BFormRadio :value="0">{{ t('common.disabled') }}</BFormRadio>
+          <BFormRadio :value="1">{{ t('settings.dtls.modePsk') }}</BFormRadio>
+          <BFormRadio :value="2">{{ t('settings.dtls.modeCert') }}</BFormRadio>
+        </BFormRadioGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
-        <BFormCheckbox v-model="allowPrerelease" switch />
-      </BFormGroup>
+      <template v-if="dtlsMode > 0">
+        <BFormGroup :label="t('settings.dtls.cipherSuite')" label-cols-sm="4">
+          <BFormSelect v-model="dtlsCipherSuite">
+            <BFormSelectOption :value="0">AES-128-GCM</BFormSelectOption>
+            <BFormSelectOption :value="1">AES-256-GCM</BFormSelectOption>
+            <BFormSelectOption :value="2">ChaCha20-Poly1305</BFormSelectOption>
+          </BFormSelect>
+        </BFormGroup>
+        <BFormGroup :label="t('settings.dtls.sessionResumption')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="dtlsSessionResumption" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
+        </BFormGroup>
+        <template v-if="dtlsMode === 2">
+          <BFormGroup :label="t('settings.dtls.requireClientCert')" label-cols-sm="4">
+            <BFormRadioGroup buttons v-model="dtlsRequireClientCert" required>
+              <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+              <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+            </BFormRadioGroup>
+          </BFormGroup>
+        </template>
+        <BAlert variant="info" :model-value="true" class="mt-2">
+            {{ t('settings.dtls.restartNote') }}
+        </BAlert>
+      </template>
 
       <BAlert
         variant="success"
@@ -217,8 +281,11 @@
           variant="primary"
           block
           @click="saveSettingsClick"
-          :disabled="v$.$error"
-        >{{ t('common.save') }}</BButton>
+          :disabled="v$.$error || loading"
+        >
+          <BSpinner small v-if="loading" class="me-2" />
+          {{ t('common.save') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -232,7 +299,15 @@
   >
     <BForm @submit.stop.prevent>
         <p>{{ t('settings.backupInfo') }}</p>
-        <BButton variant="outline-primary" class="mb-3" @click="downloadBackup">{{ t('settings.downloadBackup') }}</BButton>
+        <BButton
+          variant="outline-primary"
+          class="mb-3"
+          @click="downloadBackup"
+          :disabled="backupLoading"
+        >
+          <BSpinner small v-if="backupLoading" class="me-2" />
+          {{ t('settings.downloadBackup') }}
+        </BButton>
 
         <hr/>
         <p>{{ t('settings.restoreInfo') }}</p>
@@ -245,11 +320,93 @@
         />
         <BButton
             variant="warning"
-            :disabled="!restoreFile"
+            :disabled="!restoreFile || restoreLoading"
             @click="restoreSettings"
-        >{{ t('settings.restore') }}</BButton>
+        >
+          <BSpinner small v-if="restoreLoading" class="me-2" />
+          {{ t('settings.restore') }}
+        </BButton>
     </BForm>
   </BCard>
+
+  <BCard
+    :header="t('settings.systemMaintenance')"
+    header-tag="h6"
+    header-bg-variant="danger"
+    header-text-variant="white"
+    class="mb-3"
+  >
+    <BButton variant="warning" block class="me-2" @click="showRebootModal = true" :disabled="rebootLoading">
+      <BSpinner small v-if="rebootLoading" class="me-2" />
+      <svg v-else aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise me-2" viewBox="0 0 16 16">
+        <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+        <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+      </svg>
+      {{ rebootLoading ? t('common.rebootingWait') : t('settings.reboot') }}
+    </BButton>
+    <BButton variant="danger" block @click="showFactoryResetModal = true" :disabled="factoryResetLoading">
+      <BSpinner small v-if="factoryResetLoading" class="me-2" />
+      <svg v-else aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
+        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+      </svg>
+      {{ factoryResetLoading ? t('common.factoryResettingWait') : t('settings.factoryReset') }}
+    </BButton>
+  </BCard>
+
+  <!-- Reboot Confirmation Modal -->
+  <BModal
+    v-model="showRebootModal"
+    :title="t('settings.reboot')"
+    @ok="confirmReboot"
+    ok-variant="warning"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmReboot') }}</p>
+  </BModal>
+
+  <!-- Factory Reset Confirmation Modal -->
+  <BModal
+    v-model="showFactoryResetModal"
+    :title="t('settings.factoryReset')"
+    @ok="confirmFactoryReset"
+    ok-variant="danger"
+    :ok-title="t('common.yes')"
+    :cancel-title="t('common.no')"
+  >
+    <p>{{ t('common.confirmFactoryReset') }}</p>
+  </BModal>
+
+  <!-- Password Change Modal -->
+  <BModal
+    v-model="showPasswordModal"
+    :title="t('settings.changePassword')"
+    @ok="handlePasswordChange"
+    @cancel="resetPasswordModal"
+    ok-variant="primary"
+    :ok-title="t('common.save')"
+    :cancel-title="t('common.cancel')"
+  >
+    <BFormGroup :label="t('settings.changePassword')" label-cols-sm="4">
+      <PasswordInput
+        v-model="adminPassword"
+        :state="passwordValidation.password.$error ? false : null"
+      />
+    </BFormGroup>
+    <BFormGroup :label="t('settings.repeatPassword')" label-cols-sm="4">
+      <PasswordInput
+        v-model="adminPasswordRepeat"
+        :state="passwordValidation.passwordRepeat.$error ? false : null"
+      />
+    </BFormGroup>
+    <BAlert
+      variant="danger"
+      :model-value="passwordError"
+      dismissible
+      fade
+      @update:model-value="passwordError = null"
+    >{{ passwordError }}</BAlert>
+  </BModal>
 </template>
 
 <script setup>
@@ -268,7 +425,8 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore } from './stores.js'
+import { useSettingsStore, useSysInfoStore } from './stores.js'
+import PasswordInput from './components/PasswordInput.vue'
 
 const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
@@ -277,6 +435,7 @@ const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}
 const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
+const sysInfoStore = useSysInfoStore()
 
 // Local form state
 const restoreFile = ref(null)
@@ -304,11 +463,31 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
-const checkUpdates = ref(true)
-const allowPrerelease = ref(false)
+const hmlgwEnabled = ref(false)
+const hmlgwPort = ref(2000)
+const hmlgwKeepAlivePort = ref(2001)
+
+const analyzerEnabled = ref(false)
+
+// DTLS
+const dtlsMode = ref(0)
+const dtlsCipherSuite = ref(1)
+const dtlsRequireClientCert = ref(false)
+const dtlsSessionResumption = ref(true)
 
 const showSuccess = ref(null)
 const showError = ref(null)
+const loading = ref(false)
+const backupLoading = ref(false)
+const restoreLoading = ref(false)
+const rebootLoading = ref(false)
+const factoryResetLoading = ref(false)
+
+// Modal state
+const showRebootModal = ref(false)
+const showFactoryResetModal = ref(false)
+const showPasswordModal = ref(false)
+const passwordError = ref(null)
 
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
@@ -319,15 +498,25 @@ const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'stat
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
 // Validation rules
-const rules = {
-  adminPassword: {
+const passwordRules = {
+  password: {
+    required,
     minLength: minLength(6),
     maxLength: maxLength(32),
     password_validator: helpers.withMessage('Must contain letters and numbers', password_validator)
   },
-  adminPasswordRepeat: {
-    sameAsPassword: sameAs(adminPassword)
-  },
+  passwordRepeat: {
+    required,
+    sameAsPassword: helpers.withMessage('Passwords do not match', sameAs(adminPassword))
+  }
+}
+
+const passwordValidation = useVuelidate(passwordRules, {
+  password: adminPassword,
+  passwordRepeat: adminPasswordRepeat
+})
+
+const rules = {
   hostname: {
     required,
     hostname_validator,
@@ -381,12 +570,22 @@ const rules = {
   dcfOffset: {
     required: requiredIf(isDcfActivated),
     numeric
+  },
+  hmlgwPort: {
+    required: requiredIf(hmlgwEnabled),
+    numeric,
+    minValue: helpers.withMessage('Min 1', val => val >= 1),
+    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
+  },
+  hmlgwKeepAlivePort: {
+    required: requiredIf(hmlgwEnabled),
+    numeric,
+    minValue: helpers.withMessage('Min 1', val => val >= 1),
+    maxValue: helpers.withMessage('Max 65535', val => val <= 65535)
   }
 }
 
 const v$ = useVuelidate(rules, {
-  adminPassword,
-  adminPasswordRepeat,
   hostname,
   localIP,
   netmask,
@@ -399,7 +598,9 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
-  dcfOffset
+  dcfOffset,
+  hmlgwPort,
+  hmlgwKeepAlivePort
 })
 
 // Load settings from store
@@ -416,8 +617,24 @@ const loadSettings = () => {
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
-  checkUpdates.value = settingsStore.checkUpdates
-  allowPrerelease.value = settingsStore.allowPrerelease
+
+  if (settingsStore.hmlgwEnabled !== undefined) {
+      hmlgwEnabled.value = settingsStore.hmlgwEnabled
+      hmlgwPort.value = settingsStore.hmlgwPort || 2000
+      hmlgwKeepAlivePort.value = settingsStore.hmlgwKeepAlivePort || 2001
+  }
+
+  if (settingsStore.analyzerEnabled !== undefined) {
+      analyzerEnabled.value = settingsStore.analyzerEnabled
+  }
+
+  // Load DTLS settings
+  if (settingsStore.dtlsMode !== undefined) {
+    dtlsMode.value = settingsStore.dtlsMode
+    dtlsCipherSuite.value = settingsStore.dtlsCipherSuite
+    dtlsRequireClientCert.value = settingsStore.dtlsRequireClientCert
+    dtlsSessionResumption.value = settingsStore.dtlsSessionResumption
+  }
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -437,7 +654,7 @@ watch(() => settingsStore.$state, () => {
 }, { deep: true })
 
 onMounted(async () => {
-  await settingsStore.load()
+  await Promise.all([settingsStore.load(), sysInfoStore.update()])
   loadSettings()
 })
 
@@ -445,12 +662,12 @@ const saveSettingsClick = async () => {
   v$.value.$touch()
   if (v$.value.$error) return
 
+  loading.value = true
   showError.value = false
   showSuccess.value = false
 
   try {
     const settings = {
-      adminPassword: adminPassword.value,
       hostname: hostname.value,
       useDHCP: useDHCP.value,
       localIP: localIP.value,
@@ -463,8 +680,16 @@ const saveSettingsClick = async () => {
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
-      checkUpdates: checkUpdates.value,
-      allowPrerelease: allowPrerelease.value,
+      // HMLGW
+      hmlgwEnabled: hmlgwEnabled.value,
+      hmlgwPort: hmlgwPort.value,
+      hmlgwKeepAlivePort: hmlgwKeepAlivePort.value,
+      analyzerEnabled: analyzerEnabled.value,
+      // DTLS
+      dtlsMode: dtlsMode.value,
+      dtlsCipherSuite: dtlsCipherSuite.value,
+      dtlsRequireClientCert: dtlsRequireClientCert.value,
+      dtlsSessionResumption: dtlsSessionResumption.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
@@ -479,10 +704,13 @@ const saveSettingsClick = async () => {
     showSuccess.value = true
   } catch (error) {
     showError.value = true
+  } finally {
+    loading.value = false
   }
 }
 
 const downloadBackup = async () => {
+  backupLoading.value = true
   try {
     const response = await axios.get('/api/backup', { responseType: 'blob' })
     const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -496,6 +724,8 @@ const downloadBackup = async () => {
   } catch (error) {
     console.error('Backup download failed:', error)
     alert(t('settings.backupError'))
+  } finally {
+    backupLoading.value = false
   }
 }
 
@@ -504,6 +734,7 @@ const restoreSettings = async () => {
 
     if (!confirm(t('settings.restoreConfirm'))) return
 
+    restoreLoading.value = true
     try {
         const reader = new FileReader()
         reader.onload = async (e) => {
@@ -513,13 +744,78 @@ const restoreSettings = async () => {
                 alert(t('settings.restoreSuccess'))
                 window.location.reload()
             } catch (err) {
+                restoreLoading.value = false
                 alert(t('settings.restoreError') + ': ' + err.message)
             }
         }
+        reader.onerror = () => {
+             restoreLoading.value = false
+             alert(t('settings.restoreError'))
+        }
         reader.readAsText(restoreFile.value)
     } catch (e) {
+        restoreLoading.value = false
         alert(t('settings.restoreError'))
     }
+}
+
+const confirmReboot = async () => {
+    rebootLoading.value = true
+    try {
+        await axios.post('/api/restart')
+        // No alert needed, button state indicates progress
+        setTimeout(() => {
+            window.location.reload()
+        }, 10000)
+    } catch (e) {
+        console.error(e)
+        rebootLoading.value = false
+    }
+}
+
+const confirmFactoryReset = async () => {
+    factoryResetLoading.value = true
+    try {
+        await axios.post('/api/factory_reset')
+        // No alert needed, button state indicates progress
+        setTimeout(() => {
+            window.location.reload()
+        }, 10000)
+    } catch (e) {
+        console.error(e)
+        alert(t('settings.saveError')) // Fallback error
+        factoryResetLoading.value = false
+    }
+}
+
+const handlePasswordChange = async (event) => {
+  event.preventDefault()
+  passwordValidation.value.$touch()
+
+  if (passwordValidation.value.$error) {
+    passwordError.value = passwordValidation.value.$errors[0].$message
+    return
+  }
+
+  try {
+    const settings = {
+      adminPassword: adminPassword.value
+    }
+
+    await settingsStore.save(settings)
+    showPasswordModal.value = false
+    resetPasswordModal()
+    showSuccess.value = true
+  } catch (error) {
+    passwordError.value = t('settings.saveError')
+  }
+}
+
+const resetPasswordModal = () => {
+  adminPassword.value = ''
+  adminPasswordRepeat.value = ''
+  passwordError.value = null
+  passwordValidation.value.$reset()
 }
 </script>
 

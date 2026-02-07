@@ -30,11 +30,16 @@
 #include <atomic>
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
+#include "settings.h"
+#include "dtls_encryption.h"
 
 class RawUartUdpListener : FrameHandler
 {
 private:
     RadioModuleConnector *_radioModuleConnector;
+    Settings *_settings;
+    DTLSEncryption *_dtls;
+
     std::atomic<uint> _remoteAddress;
     std::atomic<ushort> _remotePort;
     std::atomic<bool> _connectionStarted;
@@ -45,11 +50,14 @@ private:
     QueueHandle_t _udp_queue;
     TaskHandle_t _tHandle = NULL;
 
+    // DTLS enabled flag
+    std::atomic<bool> _dtlsEnabled;
+
     void handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
     void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
 
 public:
-    RawUartUdpListener(RadioModuleConnector *radioModuleConnector);
+    RawUartUdpListener(RadioModuleConnector *radioModuleConnector, Settings *settings, DTLSEncryption *dtls);
 
     void handleFrame(unsigned char *buffer, uint16_t len);
     void handleEvent();

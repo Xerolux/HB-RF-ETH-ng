@@ -26,23 +26,225 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/param.h>
+#include <atomic>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
+#include "validation.h"
+#include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "esp_ota_ops.h"
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
+#include "nextcloud_api.h"
 #include "rate_limiter.h"
-// #include "prometheus.h"
+#if ENABLE_ANALYZER
+#include "analyzer.h"
+#endif
+#include "dtls_api.h"
+#include "monitoring.h"
+#include "security_headers.h"
+#include "log_manager.h"
+#include "secure_utils.h"
+#include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 
 static const char *TAG = "WebUI";
+
+// FIX: Use std::atomic instead of volatile for proper thread safety
+static std::atomic<bool> _restart_requested{false};
+static TaskHandle_t _restart_task_handle = NULL;
+
+// Lightweight version check: cache + 24h interval
+static char _available_version[16] = "";
+static uint32_t _last_version_check_ms = 0;
+static bool _version_check_running = false;
+#define VERSION_CHECK_INTERVAL_MS (24UL * 60 * 60 * 1000)  // 24 hours
+#define VERSION_CHECK_URL "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version"
+
+// Buffer for version check HTTP event handler
+static char _ver_check_buf[16];
+static int _ver_check_buf_len = 0;
+
+static esp_err_t _version_check_event_handler(esp_http_client_event_t *evt)
+{
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        int copy_len = evt->data_len;
+        if (_ver_check_buf_len + copy_len >= (int)sizeof(_ver_check_buf))
+            copy_len = sizeof(_ver_check_buf) - _ver_check_buf_len - 1;
+        if (copy_len > 0) {
+            memcpy(_ver_check_buf + _ver_check_buf_len, evt->data, copy_len);
+            _ver_check_buf_len += copy_len;
+            _ver_check_buf[_ver_check_buf_len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
+
+static void _version_check_task(void *param)
+{
+    ESP_LOGI(TAG, "VersionCheck: Fetching %s", VERSION_CHECK_URL);
+
+    _ver_check_buf[0] = '\0';
+    _ver_check_buf_len = 0;
+
+    esp_http_client_config_t config = {};
+    config.url = VERSION_CHECK_URL;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.buffer_size = 512;
+    config.buffer_size_tx = 256;
+    config.timeout_ms = 15000;
+    config.event_handler = _version_check_event_handler;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client) {
+        esp_err_t err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            int status = esp_http_client_get_status_code(client);
+            if (status == 200 && _ver_check_buf_len > 0) {
+                // Trim trailing whitespace/newlines
+                int len = _ver_check_buf_len;
+                while (len > 0 && (_ver_check_buf[len-1] == '\n' || _ver_check_buf[len-1] == '\r' || _ver_check_buf[len-1] == ' '))
+                    _ver_check_buf[--len] = '\0';
+                strncpy(_available_version, _ver_check_buf, sizeof(_available_version) - 1);
+                ESP_LOGI(TAG, "VersionCheck: Available version: %s", _available_version);
+            } else {
+                ESP_LOGW(TAG, "VersionCheck: HTTP %d, data_len=%d", status, _ver_check_buf_len);
+            }
+        } else {
+            ESP_LOGE(TAG, "VersionCheck: Failed: %s", esp_err_to_name(err));
+        }
+        esp_http_client_cleanup(client);
+    }
+
+    _last_version_check_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+    _version_check_running = false;
+    vTaskDelete(NULL);
+}
+
+static void _trigger_version_check()
+{
+    if (_version_check_running) return;
+
+    uint32_t now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+    // Check if interval has elapsed (or first time)
+    if (_last_version_check_ms == 0 || (now_ms - _last_version_check_ms) >= VERSION_CHECK_INTERVAL_MS) {
+        // Only run if enough free heap (TLS needs ~40KB)
+        if (esp_get_free_heap_size() < 45000) {
+            ESP_LOGW(TAG, "VersionCheck: Skipped, low heap (%lu)", (unsigned long)esp_get_free_heap_size());
+            return;
+        }
+        _version_check_running = true;
+        xTaskCreate(_version_check_task, "ver_chk", 4096, NULL, 2, NULL);
+    }
+}
+
+/**
+ * Safe restart task - runs at highest priority to ensure clean shutdown
+ *
+ * This task:
+ * 1. Gives time for HTTP response to be sent
+ * 2. Waits for all pending operations to complete
+ * 3. Calls esp_restart() with proper cleanup
+ */
+static void restart_task(void* pvParameters) {
+    ESP_LOGI(TAG, "Restart task initiated - preparing for system restart");
+
+    // Give the HTTP response time to be sent to client
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // Log the restart reason
+    ESP_LOGW(TAG, "System restart requested - esp_restart() will be called");
+
+    // Disable watchdogs that might interfere with restart
+    esp_task_wdt_reset();
+
+    // Additional delay to ensure all buffers are flushed
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Now perform the restart
+    ESP_LOGI(TAG, "Calling esp_restart()...");
+
+    // Disable interrupts and restart
+    esp_restart();
+
+    // Should never reach here, but just in case:
+    vTaskDelete(NULL);
+}
+
+/**
+ * Trigger a system restart via a dedicated high-priority task
+ *
+ * This is the preferred method for restart as it:
+ * - Ensures HTTP response is sent before restart
+ * - Runs at high priority to prevent interference
+ * - Allows ESP-IDF to properly cleanup resources
+ */
+static void trigger_restart() {
+    // FIX: Use atomic exchange to prevent TOCTOU race between check and set
+    bool expected = false;
+    if (!_restart_requested.compare_exchange_strong(expected, true)) {
+        ESP_LOGW(TAG, "Restart already requested, ignoring duplicate request");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Scheduling system restart...");
+
+    // Create restart task at very high priority (24, above almost everything)
+    // This ensures the restart completes even if system is under load
+    BaseType_t ret = xTaskCreate(
+        restart_task,
+        "restart_task",
+        4096,           // Stack size
+        NULL,           // Parameters
+        24,             // Priority - very high, below ESP-IDF tasks (25-31)
+        &_restart_task_handle
+    );
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create restart task! Trying immediate restart...");
+        // Fallback: immediate restart after short delay
+        vTaskDelay(pdMS_TO_TICKS(100));
+        esp_restart();
+    }
+}
+
+// Buffer size constants - prevent magic numbers
+#define TOKEN_BASE_SIZE 21
+#define ETAG_BUFFER_SIZE 32
+#define TOKEN_BUFFER_SIZE 46
+#define SYSINFO_BUFFER_SIZE 1536
+#define IF_NONE_MATCH_SIZE 64
+
+#define BUILD_ETAG __DATE__ __TIME__
 
 #define EMBED_HANDLER(_uri, _resource, _contentType)                   \
     extern const char _resource[] asm("_binary_" #_resource "_start"); \
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
+        add_security_headers(req);                                     \
+        {                                                              \
+            char etag[48];                                             \
+            snprintf(etag, sizeof(etag), "\"%s-%s\"",                  \
+                _sysInfo ? _sysInfo->getCurrentVersion() : "0",        \
+                BUILD_ETAG);                                           \
+            httpd_resp_set_hdr(req, "ETag", etag);                     \
+            httpd_resp_set_hdr(req, "Cache-Control", "no-cache");      \
+            char if_none_match[64];                                    \
+            if (httpd_req_get_hdr_value_str(req, "If-None-Match",      \
+                if_none_match, sizeof(if_none_match)) == ESP_OK) {     \
+                if (strstr(if_none_match, etag)) {                     \
+                    httpd_resp_set_status(req, "304 Not Modified");    \
+                    httpd_resp_send(req, NULL, 0);                     \
+                    return ESP_OK;                                     \
+                }                                                      \
+            }                                                          \
+        }                                                              \
         httpd_resp_set_type(req, _contentType);                        \
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");           \
         httpd_resp_send(req, _resource, _resource##_length);           \
@@ -52,29 +254,37 @@ static const char *TAG = "WebUI";
         .uri = _uri,                                                   \
         .method = HTTP_GET,                                            \
         .handler = _resource##_handler_func,                           \
-        .user_ctx = NULL};
+        .user_ctx = NULL,                                              \
+        .is_websocket = false,                                         \
+        .handle_ws_control_frames = false,                             \
+        .supported_subprotocol = NULL};
+
+static Settings *_settings;
+static LED *_statusLED;
+static SysInfo *_sysInfo;
+static Ethernet *_ethernet;
+static RawUartUdpListener *_rawUartUdpListener;
+static RadioModuleConnector *_radioModuleConnector;
+static RadioModuleDetector *_radioModuleDetector;
+#if ENABLE_ANALYZER
+static Analyzer *_analyzer;
+#endif
+static DTLSEncryption *_dtlsEncryption;
+static char _token[46];
 
 EMBED_HANDLER("/*", index_html_gz, "text/html")
 EMBED_HANDLER("/main.js", main_js_gz, "application/javascript")
 EMBED_HANDLER("/main.css", main_css_gz, "text/css")
 EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon")
 
-static Settings *_settings;
-static LED *_statusLED;
-static SysInfo *_sysInfo;
-static UpdateCheck *_updateCheck;
-static Ethernet *_ethernet;
-static RawUartUdpListener *_rawUartUdpListener;
-static RadioModuleConnector *_radioModuleConnector;
-static RadioModuleDetector *_radioModuleDetector;
-static char _token[46];
-
 void generateToken()
 {
     char tokenBase[21];
     *((uint32_t *)tokenBase) = esp_random();
     *((uint32_t *)(tokenBase + sizeof(uint32_t))) = esp_random();
-    strcpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber());
+    // Safe copy with bounds check (13 chars max for serial + 8 bytes random = 21 total)
+    strncpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber(), sizeof(tokenBase) - 2 * sizeof(uint32_t) - 1);
+    tokenBase[sizeof(tokenBase) - 1] = '\0'; // Ensure null termination
 
     unsigned char shaResult[32];
 
@@ -89,6 +299,9 @@ void generateToken()
     size_t tokenLength;
     mbedtls_base64_encode((unsigned char *)_token, sizeof(_token), &tokenLength, shaResult, sizeof(shaResult));
     _token[tokenLength] = 0;
+
+    secure_zero(tokenBase, sizeof(tokenBase));
+    secure_zero(shaResult, sizeof(shaResult));
 }
 
 const char *ip2str(ip4_addr_t addr, ip4_addr_t fallback)
@@ -134,15 +347,13 @@ int secure_strcmp(const char *s1, const char *s2) {
 
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
-    size_t min_len = (len1 < len2) ? len1 : len2;
-    int result = 0;
+    size_t max_len = (len1 > len2) ? len1 : len2;
+    int result = (len1 != len2);
 
-    if (len1 != len2) {
-        result = 1;
-    }
-
-    for (size_t i = 0; i < min_len; i++) {
-        result |= (s1[i] ^ s2[i]);
+    for (size_t i = 0; i < max_len; i++) {
+        const char c1 = (i < len1) ? s1[i] : 0;
+        const char c2 = (i < len2) ? s2[i] : 0;
+        result |= (c1 ^ c2);
     }
 
     return result;
@@ -165,6 +376,8 @@ esp_err_t validate_auth(httpd_req_t *req)
 
 esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     // Check rate limit
     if (!rate_limiter_check_login(req))
     {
@@ -177,54 +390,66 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-
-        cJSON *root = cJSON_Parse(buffer);
-
-        char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
-
-        bool isAuthenticated = (password != NULL) && (secure_strcmp(password, _settings->getAdminPassword()) == 0);
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        root = cJSON_CreateObject();
-
-        cJSON_AddBoolToObject(root, "isAuthenticated", isAuthenticated);
-        if (isAuthenticated)
-        {
-            // Successful login - reset rate limit for this IP
-            rate_limiter_reset_ip(req);
-            cJSON_AddStringToObject(root, "token", _token);
-            cJSON_AddBoolToObject(root, "passwordChanged", _settings->getPasswordChanged());
-        }
-
-        const char *json = cJSON_PrintUnformatted(root);
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-        cJSON_Delete(root);
-
-        return ESP_OK;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive login data");
+        return ESP_FAIL;
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+
+    cJSON *root = cJSON_Parse(buffer);
+
+    char *password = cJSON_GetStringValue(cJSON_GetObjectItem(root, "password"));
+
+    bool isAuthenticated = (password != NULL) && _settings->verifyAdminPassword(password);
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    root = cJSON_CreateObject();
+
+    cJSON_AddBoolToObject(root, "isAuthenticated", isAuthenticated);
+    if (isAuthenticated)
+    {
+        // Successful login - reset rate limit for this IP
+        rate_limiter_reset_ip(req);
+        cJSON_AddStringToObject(root, "token", _token);
+        cJSON_AddBoolToObject(root, "passwordChanged", _settings->getPasswordChanged());
+    }
+
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
+    cJSON_Delete(root);
+
+    secure_zero(buffer, sizeof(buffer));
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_login_json_handler = {
     .uri = "/login.json",
     .method = HTTP_POST,
     .handler = post_login_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
-    httpd_resp_set_type(req, "application/json");
+    // Inform SysInfo that data was requested (wakes up CPU usage task)
+    _sysInfo->markSysInfoRequested();
 
-    // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
-    // This handler is called frequently (1Hz) by the frontend.
-    char buffer[1536]; // Increased buffer to be safe, ESP32 stack usually allows this
+    add_security_headers(req);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
 
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";
@@ -251,59 +476,58 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
-    // Format JSON
-    // Note: We use "true"/"false" strings for booleans
-    int written = snprintf(buffer, sizeof(buffer),
-        "{\"sysInfo\":{"
-            "\"serial\":\"%s\","
-            "\"currentVersion\":\"%s\","
-            "\"latestVersion\":\"%s\","
-            "\"memoryUsage\":%.2f,"
-            "\"cpuUsage\":%.2f,"
-            "\"supplyVoltage\":%.2f,"
-            "\"temperature\":%.2f,"
-            "\"uptimeSeconds\":%" PRIu64 ","
-            "\"boardRevision\":\"%s\","
-            "\"resetReason\":\"%s\","
-            "\"ethernetConnected\":%s,"
-            "\"ethernetSpeed\":%d,"
-            "\"ethernetDuplex\":\"%s\","
-            "\"rawUartRemoteAddress\":\"%s\","
-            "\"radioModuleType\":\"%s\","
-            "\"radioModuleSerial\":\"%s\","
-            "\"radioModuleFirmwareVersion\":\"%s\","
-            "\"radioModuleBidCosRadioMAC\":\"%s\","
-            "\"radioModuleHmIPRadioMAC\":\"%s\","
-            "\"radioModuleSGTIN\":\"%s\""
-        "}}",
-        _sysInfo->getSerialNumber(),
-        _sysInfo->getCurrentVersion(),
-        _updateCheck->getLatestVersion(),
-        _sysInfo->getMemoryUsage(),
-        _sysInfo->getCpuUsage(),
-        _sysInfo->getSupplyVoltage(),
-        _sysInfo->getTemperature(),
-        _sysInfo->getUptimeSeconds(),
-        _sysInfo->getBoardRevisionString(),
-        _sysInfo->getResetReason(),
-        _ethernet->isConnected() ? "true" : "false",
-        _ethernet->getLinkSpeedMbps(),
-        _ethernet->getDuplexMode(),
-        ip2str(_rawUartUdpListener->getConnectedRemoteAddress()),
-        radioModuleTypeStr,
-        _radioModuleDetector->getSerial(),
-        fwVersionStr,
-        bidCosMAC,
-        hmIPMAC,
-        _radioModuleDetector->getSGTIN()
-    );
+    cJSON *root = cJSON_CreateObject();
+    cJSON *sysInfo = cJSON_AddObjectToObject(root, "sysInfo");
 
-    if (written < 0 || written >= sizeof(buffer)) {
-        ESP_LOGE(TAG, "SysInfo JSON buffer overflow or error");
-        return httpd_resp_send_500(req);
+    cJSON_AddStringToObject(sysInfo, "serial", _sysInfo->getSerialNumber());
+    cJSON_AddStringToObject(sysInfo, "currentVersion", _sysInfo->getCurrentVersion());
+    cJSON_AddStringToObject(sysInfo, "firmwareVariant", _sysInfo->getFirmwareVariant());
+    cJSON_AddNumberToObject(sysInfo, "memoryUsage", _sysInfo->getMemoryUsage());
+    cJSON_AddNumberToObject(sysInfo, "cpuUsage", _sysInfo->getCpuUsage());
+    cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
+    cJSON_AddStringToObject(sysInfo, "boardRevision", _sysInfo->getBoardRevisionString());
+    cJSON_AddStringToObject(sysInfo, "resetReason", _sysInfo->getResetReason());
+    cJSON_AddBoolToObject(sysInfo, "ethernetConnected", _ethernet->isConnected());
+    cJSON_AddNumberToObject(sysInfo, "ethernetSpeed", _ethernet->getLinkSpeedMbps());
+    cJSON_AddStringToObject(sysInfo, "ethernetDuplex", _ethernet->getDuplexMode());
+    cJSON_AddStringToObject(sysInfo, "rawUartRemoteAddress", _rawUartUdpListener ? ip2str(_rawUartUdpListener->getConnectedRemoteAddress()) : "HMLGW Mode");
+    cJSON_AddStringToObject(sysInfo, "radioModuleType", radioModuleTypeStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSerial", _radioModuleDetector->getSerial());
+    cJSON_AddStringToObject(sysInfo, "radioModuleFirmwareVersion", fwVersionStr);
+    cJSON_AddStringToObject(sysInfo, "radioModuleBidCosRadioMAC", bidCosMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleHmIPRadioMAC", hmIPMAC);
+    cJSON_AddStringToObject(sysInfo, "radioModuleSGTIN", _radioModuleDetector->getSGTIN());
+
+    // Feature capabilities (compile-time)
+#if ENABLE_HMLGW
+    cJSON_AddBoolToObject(sysInfo, "enableHmlgw", true);
+#else
+    cJSON_AddBoolToObject(sysInfo, "enableHmlgw", false);
+#endif
+#if ENABLE_ANALYZER
+    cJSON_AddBoolToObject(sysInfo, "enableAnalyzer", true);
+#else
+    cJSON_AddBoolToObject(sysInfo, "enableAnalyzer", false);
+#endif
+
+    // Available version from lightweight GitHub check
+    if (_available_version[0] != '\0') {
+        cJSON_AddStringToObject(sysInfo, "availableVersion", _available_version);
     }
 
-    httpd_resp_sendstr(req, buffer);
+    // Trigger version check if needed (24h interval)
+    _trigger_version_check();
+
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
+    cJSON_Delete(root);
+
+
     return ESP_OK;
 }
 
@@ -311,7 +535,10 @@ httpd_uri_t get_sysinfo_json_handler = {
     .uri = "/sysinfo.json",
     .method = HTTP_GET,
     .handler = get_sysinfo_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 void add_settings(cJSON *root)
 {
@@ -339,9 +566,6 @@ void add_settings(cJSON *root)
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 
-    cJSON_AddBoolToObject(settings, "checkUpdates", _settings->getCheckUpdates());
-    cJSON_AddBoolToObject(settings, "allowPrerelease", _settings->getAllowPrerelease());
-
     // IPv6 Settings
     cJSON_AddBoolToObject(settings, "enableIPv6", _settings->getEnableIPv6());
     cJSON_AddStringToObject(settings, "ipv6Mode", _settings->getIPv6Mode());
@@ -350,10 +574,24 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ipv6Gateway", _settings->getIPv6Gateway());
     cJSON_AddStringToObject(settings, "ipv6Dns1", _settings->getIPv6Dns1());
     cJSON_AddStringToObject(settings, "ipv6Dns2", _settings->getIPv6Dns2());
+
+    // HMLGW
+    cJSON_AddBoolToObject(settings, "hmlgwEnabled", _settings->getHmlgwEnabled());
+    cJSON_AddNumberToObject(settings, "hmlgwPort", _settings->getHmlgwPort());
+    cJSON_AddNumberToObject(settings, "hmlgwKeepAlivePort", _settings->getHmlgwKeepAlivePort());
+
+    cJSON_AddBoolToObject(settings, "analyzerEnabled", _settings->getAnalyzerEnabled());
+
+    // DTLS
+    cJSON_AddNumberToObject(settings, "dtlsMode", _settings->getDTLSMode());
+    cJSON_AddNumberToObject(settings, "dtlsCipherSuite", _settings->getDTLSCipherSuite());
+    cJSON_AddBoolToObject(settings, "dtlsRequireClientCert", _settings->getDTLSRequireClientCert());
+    cJSON_AddBoolToObject(settings, "dtlsSessionResumption", _settings->getDTLSSessionResumption());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -362,13 +600,19 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
     cJSON *root = cJSON_CreateObject();
 
     add_settings(root);
 
     const char *json = cJSON_Print(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
 
     return ESP_OK;
@@ -378,7 +622,57 @@ httpd_uri_t get_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_GET,
     .handler = get_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+#if ENABLE_ANALYZER
+esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (!_settings->getAnalyzerEnabled() || _settings->getHmlgwEnabled()) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Analyzer feature is disabled");
+        return ESP_OK;
+    }
+
+    // Lazily create analyzer only when feature is enabled to reduce background load
+    if (_analyzer == nullptr) {
+        // FIX: Check heap before creating Analyzer (uses ~40KB for buffer pool)
+        uint32_t free_heap = esp_get_free_heap_size();
+        if (free_heap < 60000) {
+            ESP_LOGW(TAG, "Insufficient heap for Analyzer: %" PRIu32 " bytes free", free_heap);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_sendstr(req, "Insufficient memory for Analyzer");
+            return ESP_OK;
+        }
+        _analyzer = new Analyzer(_radioModuleConnector);
+        if (!_analyzer || !_analyzer->isReady()) {
+            ESP_LOGE(TAG, "Failed to initialize Analyzer");
+            if (_analyzer) {
+                delete _analyzer;
+                _analyzer = nullptr;
+            }
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_sendstr(req, "Failed to initialize Analyzer");
+            return ESP_OK;
+        }
+    }
+
+    return Analyzer::ws_handler(req);
+}
+#else
+// Stub when Analyzer is disabled
+esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    httpd_resp_set_status(req, "403 Forbidden");
+    httpd_resp_sendstr(req, "Analyzer feature not available in this firmware variant");
+    return ESP_OK;
+}
+#endif
 
 ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
@@ -404,6 +698,7 @@ bool cJSON_GetBoolValue(const cJSON *item)
 
 esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -414,101 +709,187 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     char buffer[1024];
     int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
-
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
-
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
-
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
-
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
-
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
-
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
-        _settings->setLEDBrightness(ledBrightness);
-
-        cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
-        if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
-            _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
-        }
-
-        cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
-        if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
-            _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
-        }
-
-        // Handle IPv6 (checking for nulls)
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
-        }
-
-        _settings->save();
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        root = cJSON_CreateObject();
-
-        add_settings(root);
-
-        const char *json = cJSON_PrintUnformatted(root);
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-        cJSON_Delete(root);
-
-        return ESP_OK;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive settings data");
+        return ESP_FAIL;
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    // Enforce strict password validation if password is being set
+    if (adminPassword && strlen(adminPassword) > 0) {
+        if (!validatePassword(adminPassword)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password does not meet complexity requirements (min 6 chars, letters + numbers)");
+        }
+    }
+
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+
+    // Safely extract timesource with null check
+    timesource_t timesource = TIMESOURCE_NTP; // Default
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
+
+    // Safely extract dcfOffset with null check
+    int dcfOffset = 0; // Default
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
+
+    // Safely extract gpsBaudrate with null check
+    int gpsBaudrate = 9600; // Default
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
+
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+
+    // Safely extract ledBrightness with null check
+    int ledBrightness = 100; // Default
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
+
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+
+    // Safely extract ipv6PrefixLength with null check
+    int ipv6PrefixLength = 64; // Default
+    cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    // HMLGW
+    bool hmlgwEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "hmlgwEnabled"));
+    int hmlgwPort = 2000;
+    if (cJSON_GetObjectItem(root, "hmlgwPort")) {
+         hmlgwPort = cJSON_GetObjectItem(root, "hmlgwPort")->valueint;
+    }
+    int hmlgwKeepAlivePort = 2001;
+    if (cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")) {
+         hmlgwKeepAlivePort = cJSON_GetObjectItem(root, "hmlgwKeepAlivePort")->valueint;
+    }
+
+    bool analyzerEnabled = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "analyzerEnabled"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    _settings->setNtpServer(ntpServer);
+    _settings->setLEDBrightness(ledBrightness);
+
+    // Handle IPv6 (checking for nulls)
+    if (ipv6Mode) {
+         _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : (char*)"",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : (char*)"",
+            ipv6Dns1 ? ipv6Dns1 : (char*)"",
+            ipv6Dns2 ? ipv6Dns2 : (char*)""
+        );
+    }
+
+    _settings->setHmlgwEnabled(hmlgwEnabled);
+    _settings->setHmlgwPort(hmlgwPort);
+    _settings->setHmlgwKeepAlivePort(hmlgwKeepAlivePort);
+
+    if (hmlgwEnabled && analyzerEnabled) {
+        ESP_LOGW(TAG, "Disabling Analyzer because HMLGW mode is enabled");
+        analyzerEnabled = false;
+    }
+    _settings->setAnalyzerEnabled(analyzerEnabled);
+
+    // DTLS
+    int dtlsMode = _settings->getDTLSMode();
+    int dtlsCipherSuite = _settings->getDTLSCipherSuite();
+    bool dtlsRequireClientCert = _settings->getDTLSRequireClientCert();
+    bool dtlsSessionResumption = _settings->getDTLSSessionResumption();
+    if (cJSON_HasObjectItem(root, "dtlsMode")) {
+        dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+        dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+        dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+        dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+    }
+
+    // Enforce compatibility: DTLS cannot run together with Analyzer or HMLGW
+    if (analyzerEnabled || hmlgwEnabled) {
+        if (dtlsMode != DTLS_MODE_DISABLED) {
+            ESP_LOGW(TAG, "Disabling DTLS because %s is enabled", analyzerEnabled ? "Analyzer" : "HMLGW");
+        }
+        dtlsMode = DTLS_MODE_DISABLED;
+    }
+
+    _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+
+    _settings->save();
+
+    // Start or stop Analyzer task based on new configuration
+    if (analyzerEnabled && !hmlgwEnabled) {
+#if ENABLE_ANALYZER
+        if (_analyzer == nullptr) {
+            _analyzer = new Analyzer(_radioModuleConnector);
+        }
+#endif
+    } else {
+#if ENABLE_ANALYZER
+        if (_analyzer) {
+            delete _analyzer;
+            _analyzer = nullptr;
+        }
+#endif
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    root = cJSON_CreateObject();
+
+    add_settings(root);
+
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
+    cJSON_Delete(root);
+
+    secure_zero(buffer, sizeof(buffer));
+    return ESP_OK;
 }
 
 httpd_uri_t post_settings_json_handler = {
     .uri = "/settings.json",
     .method = HTTP_POST,
     .handler = post_settings_json_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -517,13 +898,13 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"settings.json\"");
 
     cJSON *root = cJSON_CreateObject();
 
-    // Add all settings including admin password (for full restore)
-    cJSON_AddStringToObject(root, "adminPassword", _settings->getAdminPassword());
-
+    // Add all settings (password is excluded for security reasons)
     add_settings(root);
 
     // Merge settings object into root if add_settings creates a sub-object
@@ -543,9 +924,58 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
         cJSON_DeleteItemFromObject(root, "settings");
     }
 
+    // Add Monitoring settings (separately, but included in backup)
+    monitoring_config_t monConfig;
+    if (monitoring_get_config(&monConfig) == ESP_OK) {
+        cJSON *mon = cJSON_CreateObject();
+
+        // SNMP
+        cJSON *snmp = cJSON_AddObjectToObject(mon, "snmp");
+        cJSON_AddBoolToObject(snmp, "enabled", monConfig.snmp.enabled);
+        cJSON_AddStringToObject(snmp, "community", monConfig.snmp.community);
+        cJSON_AddStringToObject(snmp, "location", monConfig.snmp.location);
+        cJSON_AddStringToObject(snmp, "contact", monConfig.snmp.contact);
+        cJSON_AddNumberToObject(snmp, "port", monConfig.snmp.port);
+
+        // CheckMK
+        cJSON *cmk = cJSON_AddObjectToObject(mon, "checkmk");
+        cJSON_AddBoolToObject(cmk, "enabled", monConfig.checkmk.enabled);
+        cJSON_AddNumberToObject(cmk, "port", monConfig.checkmk.port);
+        cJSON_AddStringToObject(cmk, "allowed_hosts", monConfig.checkmk.allowed_hosts);
+
+        // MQTT
+        cJSON *mqtt = cJSON_AddObjectToObject(mon, "mqtt");
+        cJSON_AddBoolToObject(mqtt, "enabled", monConfig.mqtt.enabled);
+        cJSON_AddStringToObject(mqtt, "server", monConfig.mqtt.server);
+        cJSON_AddNumberToObject(mqtt, "port", monConfig.mqtt.port);
+        cJSON_AddStringToObject(mqtt, "user", monConfig.mqtt.user);
+        // SECURITY: Do not export MQTT password!
+        cJSON_AddStringToObject(mqtt, "password", "");
+        cJSON_AddStringToObject(mqtt, "topic_prefix", monConfig.mqtt.topic_prefix);
+        cJSON_AddBoolToObject(mqtt, "ha_discovery_enabled", monConfig.mqtt.ha_discovery_enabled);
+        cJSON_AddStringToObject(mqtt, "ha_discovery_prefix", monConfig.mqtt.ha_discovery_prefix);
+
+        // Nextcloud
+        cJSON *nextcloud = cJSON_AddObjectToObject(mon, "nextcloud");
+        cJSON_AddBoolToObject(nextcloud, "enabled", monConfig.nextcloud.enabled);
+        cJSON_AddStringToObject(nextcloud, "server_url", monConfig.nextcloud.server_url);
+        cJSON_AddStringToObject(nextcloud, "username", monConfig.nextcloud.username);
+        // SECURITY: Do not export Nextcloud password!
+        cJSON_AddStringToObject(nextcloud, "password", "");
+        cJSON_AddStringToObject(nextcloud, "backup_path", monConfig.nextcloud.backup_path);
+        cJSON_AddNumberToObject(nextcloud, "backup_interval_hours", monConfig.nextcloud.backup_interval_hours);
+        cJSON_AddBoolToObject(nextcloud, "keep_local_backup", monConfig.nextcloud.keep_local_backup);
+
+        cJSON_AddItemToObject(root, "monitoring", mon);
+    }
+
     const char *json = cJSON_PrintUnformatted(root);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(root);
 
     return ESP_OK;
@@ -555,7 +985,79 @@ httpd_uri_t get_backup_handler = {
     .uri = "/api/backup",
     .method = HTTP_GET,
     .handler = get_backup_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+esp_err_t get_log_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    size_t offset = 0;
+    char query[32];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char param[16];
+        if (httpd_query_key_value(query, "offset", param, sizeof(param)) == ESP_OK) {
+            offset = strtoul(param, NULL, 10);
+        }
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    std::string content = LogManager::instance().getLogContent(offset);
+    httpd_resp_send(req, content.c_str(), content.length());
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_log_handler = {
+    .uri = "/api/log",
+    .method = HTTP_GET,
+    .handler = get_log_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+};
+
+esp_err_t get_log_download_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    // Set headers for file download
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"hb-rf-eth-log.txt\"");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    std::string content = LogManager::instance().getLogContent();
+    httpd_resp_send(req, content.c_str(), content.length());
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_log_download_handler = {
+    .uri = "/api/log/download",
+    .method = HTTP_GET,
+    .handler = get_log_download_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+};
 
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
@@ -582,6 +1084,9 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 // Actually, let's implement a dedicated restore handler that restarts.
 esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 {
+    const size_t RESTORE_BUFFER_SIZE = 4096;
+
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -589,96 +1094,220 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char *buffer = (char*)malloc(4096);
+    char *buffer = (char*)malloc(RESTORE_BUFFER_SIZE);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    int len = httpd_req_recv(req, buffer, 4095);
+    int len = httpd_req_recv(req, buffer, RESTORE_BUFFER_SIZE - 1);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
         free(buffer);
-
-        if (!root) {
-             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        }
-
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
-
-        timesource_t timesource = (timesource_t)cJSON_GetObjectItem(root, "timesource")->valueint;
-
-        int dcfOffset = cJSON_GetObjectItem(root, "dcfOffset")->valueint;
-
-        int gpsBaudrate = cJSON_GetObjectItem(root, "gpsBaudrate")->valueint;
-
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
-        int ledBrightness = cJSON_GetObjectItem(root, "ledBrightness")->valueint;
-
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        int ipv6PrefixLength = cJSON_GetObjectItem(root, "ipv6PrefixLength")->valueint;
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        _settings->setNtpServer(ntpServer);
-        _settings->setLEDBrightness(ledBrightness);
-
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
-        }
-
-        _settings->save();
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":true}");
-
-        // Restart
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_restart();
-
-        return ESP_OK;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive restore data");
+        return ESP_FAIL;
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    secure_zero(buffer, RESTORE_BUFFER_SIZE);
+    free(buffer);
+
+    if (!root) {
+         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+
+    // Safely extract timesource with null check
+    timesource_t timesource = TIMESOURCE_NTP; // Default
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    if (timesourceItem) timesource = (timesource_t)timesourceItem->valueint;
+
+    // Safely extract dcfOffset with null check
+    int dcfOffset = 0; // Default
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    if (dcfOffsetItem) dcfOffset = dcfOffsetItem->valueint;
+
+    // Safely extract gpsBaudrate with null check
+    int gpsBaudrate = 9600; // Default
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    if (gpsBaudrateItem) gpsBaudrate = gpsBaudrateItem->valueint;
+
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+
+    // Safely extract ledBrightness with null check
+    int ledBrightness = 100; // Default
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    if (ledBrightnessItem) ledBrightness = ledBrightnessItem->valueint;
+
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+
+    // Safely extract ipv6PrefixLength with null check
+    int ipv6PrefixLength = 64; // Default
+    cJSON *ipv6PrefixLengthItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    if (ipv6PrefixLengthItem) ipv6PrefixLength = ipv6PrefixLengthItem->valueint;
+
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    _settings->setNtpServer(ntpServer);
+    _settings->setLEDBrightness(ledBrightness);
+
+    if (ipv6Mode) {
+         _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : (char*)"",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : (char*)"",
+            ipv6Dns1 ? ipv6Dns1 : (char*)"",
+            ipv6Dns2 ? ipv6Dns2 : (char*)""
+        );
+    }
+
+    // DTLS (Restore)
+    if (cJSON_HasObjectItem(root, "dtlsMode")) {
+        int dtlsMode = cJSON_GetObjectItem(root, "dtlsMode")->valueint;
+        int dtlsCipherSuite = cJSON_GetObjectItem(root, "dtlsCipherSuite")->valueint;
+        bool dtlsRequireClientCert = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsRequireClientCert"));
+        bool dtlsSessionResumption = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "dtlsSessionResumption"));
+        _settings->setDTLSSettings(dtlsMode, dtlsCipherSuite, dtlsRequireClientCert, dtlsSessionResumption);
+    }
+
+    _settings->save();
+
+    // Restore Monitoring Settings
+    cJSON *monJson = cJSON_GetObjectItem(root, "monitoring");
+    if (monJson) {
+        monitoring_config_t monConfig;
+        // Load current config first to preserve password if not overwritten
+        monitoring_get_config(&monConfig);
+
+        cJSON *snmp = cJSON_GetObjectItem(monJson, "snmp");
+        if (snmp) {
+            monConfig.snmp.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(snmp, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(snmp, "community");
+            if (item && item->valuestring) strncpy(monConfig.snmp.community, item->valuestring, sizeof(monConfig.snmp.community)-1);
+
+            item = cJSON_GetObjectItem(snmp, "location");
+            if (item && item->valuestring) strncpy(monConfig.snmp.location, item->valuestring, sizeof(monConfig.snmp.location)-1);
+
+            item = cJSON_GetObjectItem(snmp, "contact");
+            if (item && item->valuestring) strncpy(monConfig.snmp.contact, item->valuestring, sizeof(monConfig.snmp.contact)-1);
+
+            item = cJSON_GetObjectItem(snmp, "port");
+            if (item) monConfig.snmp.port = item->valueint;
+        }
+
+        cJSON *cmk = cJSON_GetObjectItem(monJson, "checkmk");
+        if (cmk) {
+            monConfig.checkmk.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(cmk, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(cmk, "port");
+            if (item) monConfig.checkmk.port = item->valueint;
+
+            item = cJSON_GetObjectItem(cmk, "allowed_hosts");
+            if (item && item->valuestring) strncpy(monConfig.checkmk.allowed_hosts, item->valuestring, sizeof(monConfig.checkmk.allowed_hosts)-1);
+        }
+
+        cJSON *mqtt = cJSON_GetObjectItem(monJson, "mqtt");
+        if (mqtt) {
+            monConfig.mqtt.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(mqtt, "server");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.server, item->valuestring, sizeof(monConfig.mqtt.server)-1);
+
+            item = cJSON_GetObjectItem(mqtt, "port");
+            if (item) monConfig.mqtt.port = item->valueint;
+
+            item = cJSON_GetObjectItem(mqtt, "user");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.user, item->valuestring, sizeof(monConfig.mqtt.user)-1);
+
+            item = cJSON_GetObjectItem(mqtt, "password");
+            // Only update password if provided and not empty (since backup has empty password)
+            // However, backup has "", so if user restores backup, password becomes "".
+            // If user wants to keep existing password, we should check if empty.
+            if (item && item->valuestring && strlen(item->valuestring) > 0) {
+                 strncpy(monConfig.mqtt.password, item->valuestring, sizeof(monConfig.mqtt.password)-1);
+            }
+
+            item = cJSON_GetObjectItem(mqtt, "topic_prefix");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.topic_prefix, item->valuestring, sizeof(monConfig.mqtt.topic_prefix)-1);
+
+            monConfig.mqtt.ha_discovery_enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(mqtt, "ha_discovery_enabled"));
+
+            item = cJSON_GetObjectItem(mqtt, "ha_discovery_prefix");
+            if (item && item->valuestring) strncpy(monConfig.mqtt.ha_discovery_prefix, item->valuestring, sizeof(monConfig.mqtt.ha_discovery_prefix)-1);
+        }
+
+        cJSON *nextcloud = cJSON_GetObjectItem(monJson, "nextcloud");
+        if (nextcloud) {
+            monConfig.nextcloud.enabled = cJSON_GetBoolValue(cJSON_GetObjectItem(nextcloud, "enabled"));
+
+            cJSON* item = cJSON_GetObjectItem(nextcloud, "server_url");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.server_url, item->valuestring, sizeof(monConfig.nextcloud.server_url)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "username");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.username, item->valuestring, sizeof(monConfig.nextcloud.username)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "password");
+            // Only update password if provided and not empty (since backup has empty password)
+            if (item && item->valuestring && strlen(item->valuestring) > 0) {
+                 strncpy(monConfig.nextcloud.password, item->valuestring, sizeof(monConfig.nextcloud.password)-1);
+            }
+
+            item = cJSON_GetObjectItem(nextcloud, "backup_path");
+            if (item && item->valuestring) strncpy(monConfig.nextcloud.backup_path, item->valuestring, sizeof(monConfig.nextcloud.backup_path)-1);
+
+            item = cJSON_GetObjectItem(nextcloud, "backup_interval_hours");
+            if (item) monConfig.nextcloud.backup_interval_hours = (uint32_t)item->valueint;
+
+            monConfig.nextcloud.keep_local_backup = cJSON_GetBoolValue(cJSON_GetObjectItem(nextcloud, "keep_local_backup"));
+        }
+
+        monitoring_update_config(&monConfig);
+    }
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings restored. System is restarting...\"}");
+
+    // Use trigger_restart() for more reliable reboot
+    trigger_restart();
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_restore_handler = {
     .uri = "/api/restore",
     .method = HTTP_POST,
     .handler = post_restore_handler_func_actual,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
@@ -693,6 +1322,7 @@ httpd_uri_t post_restore_handler = {
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -766,14 +1396,15 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     OTA_CHECK(esp_ota_end(ota_handle) == ESP_OK, "Error writing OTA");
     OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error writing OTA");
 
-    ESP_LOGI(TAG, "OTA finished, restarting in 3 seconds to activate new firmware.");
-    httpd_resp_sendstr(req, "Firmware update completed, restarting in 3 seconds...");
+    ESP_LOGI(TAG, "OTA finished successfully! Partition: %s, Size: %d bytes",
+             update_partition->label, content_received);
+    httpd_resp_sendstr(req, "Firmware update completed! System is restarting...");
 
     _statusLED->setState(LED_STATE_OFF);
 
-    // Automatic restart after successful OTA update
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Use trigger_restart() for more reliable reboot
+    // This ensures all connections are properly closed before restart
+    trigger_restart();
 
     return ESP_OK;
 
@@ -786,10 +1417,14 @@ httpd_uri_t post_ota_update_handler = {
     .uri = "/ota_update",
     .method = HTTP_POST,
     .handler = post_ota_update_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -797,11 +1432,10 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_sendstr(req, "{\"success\":true}");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"System is restarting...\"}");
 
-    // Restart after a short delay to allow response to be sent
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Trigger restart via dedicated task (more reliable than direct esp_restart from HTTP handler)
+    trigger_restart();
 
     return ESP_OK;
 }
@@ -810,43 +1444,43 @@ httpd_uri_t post_restart_handler = {
     .uri = "/api/restart",
     .method = HTTP_POST,
     .handler = post_restart_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
-static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
+esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 {
-  if (validate_auth(req) != ESP_OK)
-  {
-      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-  }
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
 
-  // Create a task to perform the update because it's blocking
-  struct TaskArgs {
-      UpdateCheck* updateCheck;
-  };
+    // Reset settings
+    _settings->clear();
 
-  TaskArgs* args = new TaskArgs();
-  args->updateCheck = _updateCheck;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Factory reset complete. System is restarting...\"}");
 
-  xTaskCreate([](void* p) {
-      TaskArgs* a = (TaskArgs*)p;
-      a->updateCheck->performOnlineUpdate();
-      delete a;
-      vTaskDelete(NULL);
-  }, "online_update", 8192, args, 5, NULL);
+    // Use trigger_restart() for more reliable reboot
+    trigger_restart();
 
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_sendstr(req, "{\"success\":true}");
-  return ESP_OK;
+    return ESP_OK;
 }
 
-httpd_uri_t _post_firmware_online_update_handler = {
-    .uri = "/api/online_update",
+httpd_uri_t post_factory_reset_handler = {
+    .uri = "/api/factory_reset",
     .method = HTTP_POST,
-    .handler = _post_firmware_online_update_handler_func,
-    .user_ctx = NULL};
+    .handler = post_factory_reset_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -869,22 +1503,7 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     char *newPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "newPassword"));
 
-    // Regex: ^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$ - approximated with manual checks
-    bool has_letter = false;
-    bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 6);
-
-    if (is_valid_length) {
-        for (int i = 0; newPassword[i] != 0; i++) {
-            if ((newPassword[i] >= 'a' && newPassword[i] <= 'z') || (newPassword[i] >= 'A' && newPassword[i] <= 'Z')) {
-                has_letter = true;
-            } else if (newPassword[i] >= '0' && newPassword[i] <= '9') {
-                has_digit = true;
-            }
-        }
-    }
-
-    if (!is_valid_length || !has_letter || !has_digit)
+    if (!validatePassword(newPassword))
     {
         cJSON_Delete(root);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 6 characters and contain letters and numbers");
@@ -904,11 +1523,17 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(response, "token", _token);
 
     const char *json = cJSON_PrintUnformatted(response);
-    httpd_resp_sendstr(req, json);
-    free((void *)json);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_500(req);
+    }
     cJSON_Delete(response);
 
     ESP_LOGI(TAG, "Admin password changed successfully");
+
+    secure_zero(buffer, sizeof(buffer));
 
     return ESP_OK;
 }
@@ -917,20 +1542,38 @@ httpd_uri_t post_change_password_handler = {
     .uri = "/api/change-password",
     .method = HTTP_POST,
     .handler = post_change_password_handler_func,
-    .user_ctx = NULL};
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
+
+httpd_uri_t get_analyzer_ws_handler = {
+    .uri = "/api/analyzer/ws",
+    .method = HTTP_GET,
+    .handler = analyzer_ws_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = true,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL};
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
-WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
+WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector, DTLSEncryption *dtlsEncryption)
 {
     _settings = settings;
     _statusLED = statusLED;
     _sysInfo = sysInfo;
     _ethernet = ethernet;
-    _updateCheck = updateCheck;
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
+#if ENABLE_ANALYZER
+    _analyzer = nullptr;
+    if (_settings->getAnalyzerEnabled() && !_settings->getHmlgwEnabled()) {
+        _analyzer = new Analyzer(_radioModuleConnector);
+    }
+#endif
+    _dtlsEncryption = dtlsEncryption;
 
     generateToken();
 }
@@ -941,8 +1584,9 @@ void WebUI::start()
     rate_limiter_init();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 8192;
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 32;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     _httpd_handle = NULL;
@@ -955,13 +1599,24 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
-        httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_nextcloud_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_test_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_nextcloud_upload_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_log_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
+
+        httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
+
+        // Register DTLS API handlers
+        register_dtls_api_handlers(_httpd_handle, _settings, _dtlsEncryption);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);
@@ -973,4 +1628,15 @@ void WebUI::start()
 void WebUI::stop()
 {
     httpd_stop(_httpd_handle);
+}
+
+WebUI::~WebUI()
+{
+#if ENABLE_ANALYZER
+    extern Analyzer *_analyzer;
+    if (_analyzer) {
+        delete _analyzer;
+        _analyzer = nullptr;
+    }
+#endif
 }

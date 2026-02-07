@@ -10,15 +10,25 @@ export default {
     error: 'Fehler',
     success: 'Erfolgreich',
     yes: 'Ja',
-    no: 'Nein'
+    no: 'Nein',
+    saving: 'Speichern...',
+    showPassword: 'Passwort anzeigen',
+    hidePassword: 'Passwort verbergen',
+    rebootingWait: 'Das System wird neu gestartet. Bitte warten Sie ca. 10 Sekunden...',
+    factoryResettingWait: 'Das System wird auf Werkseinstellungen zurückgesetzt und neu gestartet. Bitte warten...',
+    confirmReboot: 'Sind Sie sicher, dass Sie das System neu starten möchten?',
+    confirmFactoryReset: 'Sind Sie sicher? Alle Einstellungen gehen verloren!'
   },
 
   // Header Navigation
   nav: {
     home: 'Status',
     settings: 'Einstellungen',
-    firmware: 'Firmware',
+    networkSystem: 'Netzwerk & System',
+    firmware: 'Firmware-Update',
     monitoring: 'Monitoring',
+    analyzer: 'Analyzer',
+    log: 'Systemprotokoll',
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
@@ -77,9 +87,55 @@ export default {
     // System Settings
     systemSettings: 'Systemeinstellungen',
     ledBrightness: 'LED Helligkeit',
-    checkUpdates: 'Nach Updates suchen',
-    allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
+    analyzerSettings: 'Analyzer Light Einstellungen',
+    enableAnalyzer: 'Analyzer Light aktivieren',
+    systemMaintenance: 'Systemwartung',
+    reboot: 'Neu starten',
+    factoryReset: 'Werkseinstellungen',
+
+    // HMLGW
+    hmlgwSettings: 'HomeMatic LAN Gateway (HMLGW) Einstellungen',
+    enableHmlgw: 'HMLGW-Modus aktivieren',
+    hmlgwPort: 'Daten-Port (Standard: 2000)',
+    hmlgwKeepAlivePort: 'KeepAlive-Port (Standard: 2001)',
+
+    // DTLS Security Settings
+    dtls: {
+      title: 'DTLS Verschlüsselung',
+      description: 'Sichere Transportverschlüsselung für die Kommunikation zwischen Platine und CCU über Port 3008.',
+      mode: 'Verschlüsselungsmodus',
+      modeDisabled: 'Deaktiviert (Standard)',
+      modePsk: 'Pre-Shared Key (PSK)',
+      modeCert: 'X.509 Zertifikat',
+      cipherSuite: 'Cipher Suite',
+      cipherAes128: 'AES-128-GCM-SHA256',
+      cipherAes256: 'AES-256-GCM-SHA384 (Empfohlen)',
+      cipherChacha: 'ChaCha20-Poly1305-SHA256',
+      requireClientCert: 'Client-Zertifikat erforderlich',
+      sessionResumption: 'Session Resumption aktivieren',
+      pskManagement: 'PSK Verwaltung',
+      pskIdentity: 'PSK Identity',
+      pskKey: 'PSK Schlüssel (Hex)',
+      pskGenerate: 'Neuen PSK generieren',
+      pskGenerating: 'PSK wird generiert...',
+      pskGenerated: 'Neuer PSK wurde generiert',
+      pskCopyWarning: 'WICHTIG: Kopieren Sie diesen Schlüssel jetzt! Er wird nur einmal angezeigt.',
+      pskKeyLength: 'Schlüssellänge',
+      psk128bit: '128 Bit',
+      psk256bit: '256 Bit (Empfohlen)',
+      psk384bit: '384 Bit',
+      psk512bit: '512 Bit',
+      pskStatus: 'PSK Status',
+      pskConfigured: 'Konfiguriert',
+      pskNotConfigured: 'Nicht konfiguriert',
+      warningDisabled: 'Die Kommunikation ist UNVERSCHLÜSSELT. Jeder im Netzwerk kann mitlesen.',
+      warningPsk: 'Stellen Sie sicher, dass der PSK sicher auf der CCU gespeichert ist.',
+      info: 'DTLS 1.2 verschlüsselt die Raw-UART UDP Kommunikation Ende-zu-Ende. Die CCU muss ebenfalls DTLS unterstützen.',
+      documentation: 'Dokumentation für CCU-Entwickler',
+      viewDocs: 'Implementierungsanleitung anzeigen',
+      restartNote: 'Änderungen an DTLS-Einstellungen erfordern einen Neustart des Systems.'
+    },
 
     // Messages
     saveSuccess: 'Einstellungen wurden erfolgreich gespeichert. Bitte starten Sie das System neu, um sie zu übernehmen.',
@@ -106,6 +162,19 @@ export default {
     boardRevision: 'Board-Revision',
     uptime: 'Laufzeit',
     resetReason: 'Letzter Neustart',
+    reset: {
+      unknown: 'Unbekannt',
+      poweron: 'Einschalten (Power-On)',
+      ext: 'Externer Reset (Pin)',
+      sw: 'Software Reset (Neustart)',
+      panic: 'Systemfehler (Panic)',
+      int_wdt: 'Interrupt Watchdog',
+      task_wdt: 'Task Watchdog',
+      wdt: 'Watchdog Timer',
+      deepsleep: 'Deep Sleep',
+      brownout: 'Spannungseinbruch (Brownout)',
+      sdio: 'SDIO Reset'
+    },
     cpuUsage: 'CPU Auslastung',
     memoryUsage: 'Speicherauslastung',
     ethernetStatus: 'Ethernet-Verbindung',
@@ -116,12 +185,12 @@ export default {
     radioModuleBidCosRadioMAC: 'Funkadresse (BidCoS)',
     radioModuleHmIPRadioMAC: 'Funkadresse (HmIP)',
     radioModuleSGTIN: 'SGTIN',
+    availableVersion: 'Verfügbare Version',
+    upToDate: 'Aktuell',
+    updateAvailable: 'Update verfügbar!',
     version: 'Version',
-    latestVersion: 'Neueste Version',
     memory: 'Speichernutzung',
     cpu: 'CPU Auslastung',
-    temperature: 'Temperatur',
-    voltage: 'Versorgungsspannung',
     ethernet: 'Ethernet',
     connected: 'Verbunden',
     disconnected: 'Getrennt',
@@ -140,19 +209,13 @@ export default {
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
     versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
-    updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
-    onlineUpdate: 'Online Update durchführen',
-    onlineUpdateConfirm: 'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
-    onlineUpdateStarted: 'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
-    showReleaseNotes: 'Release Notes anzeigen',
-    releaseNotesTitle: 'Release Notes für v{version}',
-    releaseNotesError: 'Release Notes konnten nicht von GitHub geladen werden.',
     updateFile: 'Firmware Datei',
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',
     selectFile: 'Datei auswählen',
     upload: 'Hochladen',
     restart: 'System neu starten',
+    updating: 'Aktualisiere...',
     uploading: 'Wird hochgeladen...',
     uploadSuccess: 'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
     uploadError: 'Es ist ein Fehler aufgetreten.',
@@ -211,10 +274,32 @@ export default {
     allowedHosts: 'Erlaubte Hosts'
   },
 
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    disabled: 'Die Analyzer Light Funktion ist deaktiviert. Bitte in den Einstellungen aktivieren.',
+    connected: 'Verbunden',
+    disconnected: 'Getrennt',
+    clear: 'Leeren',
+    autoScroll: 'Auto-Scroll',
+    time: 'Zeit',
+    len: 'Länge',
+    cnt: 'Zähler',
+    type: 'Typ',
+    src: 'Quelle',
+    dst: 'Ziel',
+    payload: 'Daten',
+    rssi: 'RSSI',
+    deviceNames: 'Gerätenamen',
+    address: 'Adresse',
+    name: 'Name',
+    storedNames: 'Gespeicherte Namen'
+  },
+
   // About Page
   about: {
     title: 'Über',
-    version: 'Version 2.1.0',
+    version: 'Version 2.1.4',
     fork: 'Modernisierte Fork',
     forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
     original: 'Original-Autor',
@@ -250,5 +335,13 @@ export default {
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
     warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
     success: 'Passwort erfolgreich geändert'
+  },
+
+  // Log
+  log: {
+    title: 'Systemprotokoll',
+    refresh: 'Aktualisieren',
+    autoRefresh: 'Auto-Refresh',
+    noLog: 'Kein Protokoll vorhanden.'
   }
 }

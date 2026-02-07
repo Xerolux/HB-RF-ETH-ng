@@ -36,9 +36,16 @@ typedef enum
 
 class Settings
 {
+public:
+  static constexpr size_t PASSWORD_SALT_SIZE = 16;
+  static constexpr size_t PASSWORD_HASH_SIZE = 32; // SHA-256
+
 private:
-  char _adminPassword[33] = {0};
+  char _adminPassword[33] = {0}; // Only used transiently during migration; kept zeroed afterwards
+  uint8_t _adminPasswordSalt[PASSWORD_SALT_SIZE] = {0};
+  uint8_t _adminPasswordHash[PASSWORD_HASH_SIZE] = {0};
   bool _passwordChanged;
+  bool _passwordHashValid = false;
 
   char _hostname[33] = {0};
   bool _useDHCP;
@@ -74,8 +81,8 @@ public:
   void save();
   void clear();
 
-  char *getAdminPassword();
-  void setAdminPassword(char* password);
+  bool verifyAdminPassword(const char *password);
+  void setAdminPassword(const char* password);
   bool getPasswordChanged();
 
   char *getHostname();
@@ -120,4 +127,38 @@ public:
 
   // IPv6 setter
   void setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway, char *ipv6Dns1, char *ipv6Dns2);
+
+  // DTLS getters
+  int getDTLSMode();
+  int getDTLSCipherSuite();
+  bool getDTLSRequireClientCert();
+  bool getDTLSSessionResumption();
+
+  // DTLS setter
+  void setDTLSSettings(int dtlsMode, int dtlsCipherSuite, bool requireClientCert, bool sessionResumption);
+
+  // HM-LGW getters/setters
+  bool getHmlgwEnabled();
+  void setHmlgwEnabled(bool enabled);
+  uint16_t getHmlgwPort();
+  void setHmlgwPort(uint16_t port);
+  uint16_t getHmlgwKeepAlivePort();
+  void setHmlgwKeepAlivePort(uint16_t port);
+
+  // Analyzer getters/setters
+  bool getAnalyzerEnabled();
+  void setAnalyzerEnabled(bool enabled);
+
+private:
+  // DTLS encryption settings
+  int32_t _dtlsMode;              // 0=Disabled, 1=PSK, 2=Certificate
+  int32_t _dtlsCipherSuite;       // 0=AES-128-GCM, 1=AES-256-GCM, 2=ChaCha20-Poly1305
+  bool _dtlsRequireClientCert;    // Require client certificate in cert mode
+  bool _dtlsSessionResumption;    // Enable session resumption
+
+  bool _hmlgwEnabled;
+  uint16_t _hmlgwPort;
+  uint16_t _hmlgwKeepAlivePort;
+
+  bool _analyzerEnabled;
 };

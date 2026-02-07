@@ -1,0 +1,1010 @@
+
+***** /var/log/boot.log *****
+fsck 1.47.3 (8-Jul-2025)
+userfs: clean, 659/4112384 files, 420248/16449280 blocks
+Starting udevd: OK
+Identifying host system: QEMU Standard PC (i440FX + PIIX, 1996) (ova-KVM), OK
+Initializing ZRAM Swap: OK
+Initializing RTC Clock: rtc_cmos 00:03, OK
+Starting acpid: OK
+Running sysctl: OK
+Checking for UserFS Resize: not required
+Checking for Factory Reset: not required
+Checking for Backup Restore: not required
+Running seedrng: OK
+Initializing System: OK
+Setup ca-certificates: OK
+Starting logging: OK
+Init onboard LEDs: init, OK
+Starting qemu-guest-agent: OK
+Starting irqbalance: OK
+Starting system dbus-daemon: OK
+Starting bluetoothd: disabled
+Starting network: eth0: link up, static, firewall, inet up, 192.168.178.53, wlan0: missing, OK
+Starting Network Interface Plugging Daemon: eth0.
+Starting chrony: OK
+Identifying Homematic RF-Hardware: ......HmRF: n/a, HmIP: n/a, OK
+Updating Homematic RF-Hardware: no GPIO/USB connected RF-hardware found
+Starting hs485dLoader: disabled
+Starting xinetd: OK
+Starting eq3configd: OK
+Starting lighttpd: OK
+Starting ser2net: disabled
+Starting ssdpd: OK
+Starting sshd: OK
+Starting NUT services: disabled
+Initializing Third-Party Addons: OK
+Starting LGWFirmwareUpdate: not required
+Setting LAN Gateway keys: not required
+Starting hs485d: disabled
+Starting multimacd: not required
+Starting rfd: no BidCos-RF hardware found
+Starting HMIPServer: ...OK
+Starting ReGaHss: .OK
+Starting CloudMatic: OK
+Starting Third-Party Addons: OK
+Starting crond: OK
+Setup onboard LEDs: booted, OK
+Finished Boot: 3.85.7.20260131 (ova)
+
+
+***** /var/log/hmserver.log *****
+
+
+***** /var/log/lighttpd-access.log *****
+192.168.178.57 192.168.178.53:2010 - [07/Feb/2026:19:01:20 +0100] "POST /RPC2 HTTP/1.1" 503 18 "-" "Python-xmlrpc/3.13"
+192.168.178.57 192.168.178.53:2001 - [07/Feb/2026:19:01:20 +0100] "POST /RPC2 HTTP/1.1" 503 18 "-" "Python-xmlrpc/3.13"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET / HTTP/1.1" 200 2623 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /pages/index.htm&client=3 HTTP/1.1" 302 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /pages/index.htm?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 11528 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/style.cgi HTTP/1.1" 200 146798 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/nfs_datepicker.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/msdropdown/dd.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/jquery.powertip.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/jquery.jqplot.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/spectrum.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/hmBootstrap.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/main.min.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/smoothness/jquery.ui.timepicker.css?v=0.3.2 HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/css/extern/smoothness/jquery-ui.min.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/lib/codemirror.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/foldgutter.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/hint/show-hint.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/search/matchesonscrollbar.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/dialog/dialog.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/display/fullscreen.css HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/bootstrap.bundle.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqueryURLPlugin.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/wz_jsgraphics.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/scriptaculous.js?load=builder,effects,dragdrop,slider HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/prototype.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.form.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.blockUI.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.powertip.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.barRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.dd.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.jqplot.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/sliderControl.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/nfs_datepicker.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/template.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.canvasTextRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.canvasAxisTickRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.categoryAxisRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.dateAxisRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.enhancedLegendRenderer.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.cursor.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/loadTextResource.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.markerRenderer.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jqplot.highlighter.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/common/viewmodels.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/knockout.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/translate.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/lib/codemirror.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery.ui.timepicker.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/jquery-ui.min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/iro.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/spectrum.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/json2min.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/foldcode.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/hint/anyword-hint.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/hint/show-hint.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/edit/closebrackets.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/edit/matchbrackets.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/mode/clike/clike.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/dialog/dialog.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/display/fullscreen.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/comment-fold.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/indent-fold.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/brace-fold.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/fold/foldgutter.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/builder.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/search/jump-to-line.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/search/matchesonscrollbar.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/scroll/annotatescrollbar.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/search/search.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/codemirror/addon/search/searchcursor.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/dragdrop.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/slider.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/extern/effects.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/webui.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.extension.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.deviceDescription.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.group.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.system.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.channelDescription.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.help.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.option.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.label.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.stringtable.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.diagram.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/lang/en/translate.lang.notTranslated.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "GET /webui/js/mainmenu/admin.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:25 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 1254 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 85 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 55 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 55 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 59 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.extension.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.deviceDescription.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.group.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.system.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.channelDescription.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.help.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.option.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.label.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.stringtable.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.diagram.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /webui/js/lang/en/translate.lang.notTranslated.js HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "GET /ise/htm/header.htm HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /pages/tabs/startpage.htm?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 20751 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 54 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 161 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 65 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 82 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 418574 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 168 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 72 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 49 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 60 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 2560 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 174 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 2571 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 171 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 166 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:29 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 905 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:31 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 84 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:32 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 905 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:34 +0100] "GET /config/help.cgi?sid=@w9BEQ5VvmA@&from=internal HTTP/1.1" 200 9974 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:34 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:35 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:36 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:38 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:41 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:41 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:45 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:47 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:48 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.57 192.168.178.53:2001 - [07/Feb/2026:19:01:50 +0100] "POST /RPC2 HTTP/1.1" 503 3159 "-" "Python-xmlrpc/3.13"
+192.168.178.57 192.168.178.53:2010 - [07/Feb/2026:19:01:50 +0100] "POST /RPC2 HTTP/1.1" 503 3159 "-" "Python-xmlrpc/3.13"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:51 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:52 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:54 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:57 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:57 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:58 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:58 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:01:59 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 871 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.52 192.168.178.53 - [07/Feb/2026:19:01:59 +0100] "GET / HTTP/1.1" 200 2623 "-" "undici"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:01 +0100] "POST /pages/tabs/startpage.htm?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 20751 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:01 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 65 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:01 +0100] "GET /ise/img/loading.gif HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:01 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:01 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:02 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 905 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:05 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:05 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 905 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:06 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:08 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 905 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:10 +0100] "GET /config/help.cgi?sid=@w9BEQ5VvmA@&from=internal HTTP/1.1" 200 9954 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:11 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:11 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:11 +0100] "POST /pages/tabs/admin/systemconfig.htm?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 6055 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:14 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:14 +0100] "GET /config/control_panel.cgi?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 10700 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:16 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:17 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:20 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:21 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:23 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:26 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:26 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:27 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:27 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 58 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:28 +0100] "POST /pages/tabs/admin/systemconfig.htm?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 6055 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:29 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:31 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:32 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:35 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 47 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:35 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:36 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:38 +0100] "GET /config/control_panel.cgi?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 10745 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:38 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:40 +0100] "GET /ise/img/tr50.gif HTTP/1.1" 304 0 "http://192.168.178.53/pages/index.htm?sid=@w9BEQ5VvmA@" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:40 +0100] "POST /config/cp_maintenance.cgi?sid=@w9BEQ5VvmA@ HTTP/1.1" 200 14946 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:40 +0100] "GET /ise/img/occu-logo_small_gray.png HTTP/1.1" 304 0 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:41 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 171 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:41 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:41 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:44 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:46 +0100] "POST /api/homematic.cgi HTTP/1.1" 200 56 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.166 192.168.178.53 - [07/Feb/2026:19:02:47 +0100] "POST /esp/system.htm?sid=@w9BEQ5VvmA@&action=UpdateUI HTTP/1.1" 200 876 "-" "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36"
+192.168.178.57 192.168.178.53:2001 - [07/Feb/2026:19:02:49 +0100] "POST /RPC2 HTTP/1.1" 503 3159 "-" "Python-xmlrpc/3.13"
+
+
+***** /var/log/lighttpd-error.log *****
+2026-02-07 19:01:18: (../src/server.c.1971) server started (lighttpd/1.4.82)
+2026-02-07 19:01:24: (../src/server.c.1271) [note] graceful shutdown started
+2026-02-07 19:01:24: (../src/server.c.1222) [note] pid 1733 continuing to handle 2 connection(s) in progress
+2026-02-07 19:01:24: (../src/server.c.1971) server started (lighttpd/1.4.82)
+2026-02-07 19:01:24: (../src/server.c.1271) [note] graceful shutdown started
+2026-02-07 19:01:24: (../src/server.c.2372) server stopped by UID = 0 PID = 1427
+2026-02-07 19:01:50: (../src/gw_backend.c.288) establishing connection failed: socket: tcp:127.0.0.1:32001: Connection refused
+2026-02-07 19:01:50: (../src/gw_backend.c.971) all handlers for /RPC2? on  are down.
+2026-02-07 19:01:50: (../src/gw_backend.c.288) establishing connection failed: socket: tcp:127.0.0.1:32010: Connection refused
+2026-02-07 19:01:50: (../src/gw_backend.c.971) all handlers for /RPC2? on  are down.
+2026-02-07 19:01:52: (../src/gw_backend.c.365) gw-server re-enabled: tcp:127.0.0.1:32010 127.0.0.1 32010 
+2026-02-07 19:01:52: (../src/gw_backend.c.365) gw-server re-enabled: tcp:127.0.0.1:32001 127.0.0.1 32001 
+2026-02-07 19:02:49: (../src/gw_backend.c.288) establishing connection failed: socket: tcp:127.0.0.1:32001: Connection refused
+2026-02-07 19:02:49: (../src/gw_backend.c.971) all handlers for /RPC2? on  are down.
+2026-02-07 19:02:49: (../src/gw_backend.c.288) establishing connection failed: socket: tcp:127.0.0.1:32010: Connection refused
+2026-02-07 19:02:49: (../src/gw_backend.c.971) all handlers for /RPC2? on  are down.
+
+
+***** /var/log/messages *****
+Feb  7 19:01:03 localhost syslog.info syslogd started: BusyBox v1.37.0
+Feb  7 19:01:03 localhost kern.notice kernel: klogd started: BusyBox v1.37.0 (2026-01-31 10:51:38 UTC)
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.000000] Linux version 6.12.67 (builder@f172ff4370ea) (x86_64-buildroot-linux-gnu-gcc.br_real (Buildroot -g4af23e8) 14.3.0, GNU ld (GNU Binutils) 2.43.1) #1 SMP PREEMPT Sat Jan 31 11:06:25 UTC 2026
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] Command line: BOOT_IMAGE=/zImage root=PARTUUID=deedbeef-02 rootfstype=ext4 fsck.repair=yes console=tty2 ro rootwait rootdelay=5 init_on_alloc=1 init_on_free=1 slab_nomerge net.ifnames=0 quiet loglevel=0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-provided physical RAM map:
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009fbff] usable
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x000000000009fc00-0x000000000009ffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x00000000000f0000-0x00000000000fffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x0000000000100000-0x000000007ffd9fff] usable
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x000000007ffda000-0x000000007fffffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x00000000feffc000-0x00000000feffffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x00000000fffc0000-0x00000000ffffffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] BIOS-e820: [mem 0x000000fd00000000-0x000000ffffffffff] reserved
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] NX (Execute Disable) protection: active
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] APIC: Static calls initialized
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] SMBIOS 2.8 present.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] DMI: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.17.0-0-gb52ca86e094d-prebuilt.qemu.org 04/01/2014
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] DMI: Memory slots populated: 1/1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] Hypervisor detected: KVM
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] last_pfn = 0x7ffda max_arch_pfn = 0x400000000
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] kvm-clock: Using msrs 4b564d01 and 4b564d00
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000000] kvm-clock: using sched offset of 78790730981309 cycles
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000001] clocksource: kvm-clock: mask: 0xffffffffffffffff max_cycles: 0x1cd42e4dffb, max_idle_ns: 881590591483 ns
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000004] tsc: Detected 3293.810 MHz processor
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.000601] e820: update [mem 0x00000000-0x00000fff] usable ==> reserved
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.000603] e820: remove [mem 0x000a0000-0x000fffff] usable
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000606] last_pfn = 0x7ffda max_arch_pfn = 0x400000000
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000635] MTRR map: 4 entries (3 fixed + 1 variable; max 19), built from 8 variable MTRRs
+Feb  7 19:01:03 localhost kern.info kernel: [    0.000638] x86/PAT: Configuration [0-7]: WB  WC  UC- UC  WB  WP  UC- WT  
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002408] found SMP MP-table at [mem 0x000f5490-0x000f549f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002574] ACPI: Early table checksum verification disabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002576] ACPI: RSDP 0x00000000000F52B0 000014 (v00 BOCHS )
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002579] ACPI: RSDT 0x000000007FFE2E08 000034 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002583] ACPI: FACP 0x000000007FFE2C22 000074 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002586] ACPI: DSDT 0x000000007FFDF040 003BE2 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002588] ACPI: FACS 0x000000007FFDF000 000040
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002589] ACPI: APIC 0x000000007FFE2C96 000080 (v03 BOCHS  BXPC     00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002591] ACPI: SSDT 0x000000007FFE2D16 0000CA (v01 BOCHS  VMGENID  00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002592] ACPI: WAET 0x000000007FFE2DE0 000028 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002593] ACPI: Reserving FACP table memory at [mem 0x7ffe2c22-0x7ffe2c95]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002594] ACPI: Reserving DSDT table memory at [mem 0x7ffdf040-0x7ffe2c21]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002595] ACPI: Reserving FACS table memory at [mem 0x7ffdf000-0x7ffdf03f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002596] ACPI: Reserving APIC table memory at [mem 0x7ffe2c96-0x7ffe2d15]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002596] ACPI: Reserving SSDT table memory at [mem 0x7ffe2d16-0x7ffe2ddf]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.002597] ACPI: Reserving WAET table memory at [mem 0x7ffe2de0-0x7ffe2e07]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003033] No NUMA configuration found
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003034] Faking a node at [mem 0x0000000000000000-0x000000007ffd9fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003036] NODE_DATA(0) allocated [mem 0x7ffd4f00-0x7ffd9fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003049] Zone ranges:
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003050]   DMA      [mem 0x0000000000001000-0x0000000000ffffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003051]   DMA32    [mem 0x0000000001000000-0x000000007ffd9fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003052]   Normal   empty
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003053]   Device   empty
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003053] Movable zone start for each node
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003054] Early memory node ranges
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003054]   node   0: [mem 0x0000000000001000-0x000000000009efff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003055]   node   0: [mem 0x0000000000100000-0x000000007ffd9fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003056] Initmem setup node 0 [mem 0x0000000000001000-0x000000007ffd9fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003063] On node 0, zone DMA: 1 pages in unavailable ranges
+Feb  7 19:01:03 localhost kern.info kernel: [    0.003082] On node 0, zone DMA: 97 pages in unavailable ranges
+Feb  7 19:01:03 localhost kern.info kernel: [    0.006826] On node 0, zone DMA32: 38 pages in unavailable ranges
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008104] ACPI: PM-Timer IO Port: 0x608
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008117] ACPI: LAPIC_NMI (acpi_id[0xff] dfl dfl lint[0x1])
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008150] IOAPIC[0]: apic_id 0, version 17, address 0xfec00000, GSI 0-23
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008151] ACPI: INT_SRC_OVR (bus 0 bus_irq 0 global_irq 2 dfl dfl)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008153] ACPI: INT_SRC_OVR (bus 0 bus_irq 5 global_irq 5 high level)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008154] ACPI: INT_SRC_OVR (bus 0 bus_irq 9 global_irq 9 high level)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008154] ACPI: INT_SRC_OVR (bus 0 bus_irq 10 global_irq 10 high level)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008155] ACPI: INT_SRC_OVR (bus 0 bus_irq 11 global_irq 11 high level)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008157] ACPI: Using ACPI (MADT) for SMP configuration information
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008163] CPU topo: Max. logical packages:   1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008164] CPU topo: Max. logical dies:       1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008164] CPU topo: Max. dies per package:   1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008168] CPU topo: Max. threads per core:   1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008168] CPU topo: Num. cores per package:     2
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008169] CPU topo: Num. threads per package:   2
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008169] CPU topo: Allowing 2 present CPUs plus 0 hotplug CPUs
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008184] kvm-guest: APIC: eoi() replaced with kvm_guest_apic_eoi_write()
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008197] PM: hibernation: Registered nosave memory: [mem 0x00000000-0x00000fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008198] PM: hibernation: Registered nosave memory: [mem 0x0009f000-0x000fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008200] [mem 0x80000000-0xfeffbfff] available for PCI devices
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008201] Booting paravirtualized kernel on KVM
+Feb  7 19:01:03 localhost kern.info kernel: [    0.008203] clocksource: refined-jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1910969940391419 ns
+Feb  7 19:01:03 localhost kern.info kernel: [    0.012873] setup_percpu: NR_CPUS:64 nr_cpumask_bits:2 nr_cpu_ids:2 nr_node_ids:1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013036] percpu: Embedded 58 pages/cpu s198488 r8192 d30888 u1048576
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.013038] pcpu-alloc: s198488 r8192 d30888 u1048576 alloc=1*2097152
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.013040] pcpu-alloc: [0] 0 1 
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013062] kvm-guest: PV spinlocks enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013064] PV qspinlock hash table entries: 256 (order: 0, 4096 bytes, linear)
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.013065] Kernel command line: BOOT_IMAGE=/zImage root=PARTUUID=deedbeef-02 rootfstype=ext4 fsck.repair=yes console=tty2 ro rootwait rootdelay=5 init_on_alloc=1 init_on_free=1 slab_nomerge net.ifnames=0 quiet loglevel=0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013328] Dentry cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013442] Inode-cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013470] Fallback order for Node 0: 0 
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013472] Built 1 zonelists, mobility grouping on.  Total pages: 524152
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013473] Policy zone: DMA32
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013721] mem auto-init: stack:all(zero), heap alloc:on, heap free:on
+Feb  7 19:01:03 localhost kern.info kernel: [    0.013722] mem auto-init: clearing system memory may take some time...
+Feb  7 19:01:03 localhost kern.info kernel: [    0.266913] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267137] rcu: Preemptible hierarchical RCU implementation.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267138] rcu: 	RCU event tracing is enabled.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267138] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=2.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267139] 	Trampoline variant of Tasks RCU enabled.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267140] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267141] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=2
+Feb  7 19:01:03 localhost kern.info kernel: [    0.267145] RCU Tasks: Setting shift to 1 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=2.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270181] NR_IRQS: 4352, nr_irqs: 440, preallocated irqs: 16
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270374] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270432] kfence: initialized - using 2097152 bytes for 255 objects at 0x(____ptrval____)-0x(____ptrval____)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270487] Console: colour dummy device 80x25
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270489] printk: legacy console [tty2] enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.270714] ACPI: Core revision 20240827
+Feb  7 19:01:03 localhost kern.info kernel: [    0.271075] APIC: Switch to symmetric I/O mode setup
+Feb  7 19:01:03 localhost kern.info kernel: [    0.271243] x2apic enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.271490] APIC: Switched APIC routing to: physical x2apic
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272430] ..TIMER: vector=0x30 apic1=0 pin1=2 apic2=-1 pin2=-1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272452] clocksource: tsc-early: mask: 0xffffffffffffffff max_cycles: 0x2f7a74fe427, max_idle_ns: 440795287973 ns
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272457] Calibrating delay loop (skipped) preset value.. 6587.62 BogoMIPS (lpj=3293810)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272582] Last level iTLB entries: 4KB 512, 2MB 255, 4MB 127
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272585] Last level dTLB entries: 4KB 512, 2MB 255, 4MB 127, 1GB 0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272588] Spectre V1 : Mitigation: usercopy/swapgs barriers and __user pointer sanitization
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272591] Spectre V2 : Mitigation: Retpolines
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272591] Spectre V2 : Spectre v2 / SpectreRSB: Filling RSB on context switch and VMEXIT
+Feb  7 19:01:03 localhost kern.info kernel: [    0.272595] x86/fpu: x87 FPU will use FXSAVE
+Feb  7 19:01:03 localhost kern.info kernel: [    0.289619] Freeing SMP alternatives memory: 52K
+Feb  7 19:01:03 localhost kern.info kernel: [    0.289626] pid_max: default: 32768 minimum: 301
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290115] LSM: initializing lsm=capability,landlock,yama,apparmor
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290411] landlock: Up and running.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290412] Yama: becoming mindful.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290469] AppArmor: AppArmor initialized
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290565] Mount-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.290567] Mountpoint-cache hash table entries: 4096 (order: 3, 32768 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393200] smpboot: CPU0: AMD Common KVM processor (family: 0xf, model: 0x6, stepping: 0x1)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393398] Performance Events: AMD PMU driver.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393410] ... version:                0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393411] ... bit width:              48
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393412] ... generic registers:      4
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393412] ... value mask:             0000ffffffffffff
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393413] ... max period:             00007fffffffffff
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393414] ... fixed-purpose events:   0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393414] ... event mask:             000000000000000f
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] signal: max sigframe size: 1440
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] rcu: Hierarchical SRCU implementation.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] rcu: 	Max phase no-delay instances is 400.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] smp: Bringing up secondary CPUs ...
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] smpboot: x86: Booting SMP configuration:
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393455] .... node  #0, CPUs:      #1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393473] smp: Brought up 1 node, 2 CPUs
+Feb  7 19:01:03 localhost kern.info kernel: [    0.393475] smpboot: Total of 2 processors activated (13175.24 BogoMIPS)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394496] Memory: 2014668K/2096608K available (18432K kernel code, 2820K rwdata, 6808K rodata, 2876K init, 1028K bss, 78280K reserved, 0K cma-reserved)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394637] devtmpfs: initialized
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394637] x86/mm: Memory block size: 128MB
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394758] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394758] futex hash table entries: 512 (order: 3, 32768 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.394848] pinctrl core: initialized pinctrl subsystem
+Feb  7 19:01:03 localhost kern.info kernel: [    0.395544] PM: RTC time: 18:00:56, date: 2026-02-07
+Feb  7 19:01:03 localhost kern.info kernel: [    0.395762] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396016] audit: initializing netlink subsys (disabled)
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.396041] audit: type=2000 audit(1770487257.114:1): state=initialized audit_enabled=0 res=1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396041] thermal_sys: Registered thermal governor 'step_wise'
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396041] thermal_sys: Registered thermal governor 'user_space'
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396041] cpuidle: using governor menu
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396515] PCI: Using configuration type 1 for base access
+Feb  7 19:01:03 localhost kern.info kernel: [    0.396660] kprobes: kprobe jump-optimization is enabled. All kprobes are optimized if possible.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.398550] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+Feb  7 19:01:03 localhost kern.info kernel: [    0.398551] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+Feb  7 19:01:03 localhost kern.info kernel: [    0.399094] ACPI: Added _OSI(Module Device)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.399095] ACPI: Added _OSI(Processor Device)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.399096] ACPI: Added _OSI(Processor Aggregator Device)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.399891] ACPI: 2 ACPI AML tables successfully acquired and loaded
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400460] ACPI: Interpreter enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400466] ACPI: PM: (supports S0 S5)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400467] ACPI: Using IOAPIC for interrupt routing
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400475] PCI: Using host bridge windows from ACPI; if necessary, use "pci=nocrs" and report a bug
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400476] PCI: Using E820 reservations for host bridge windows
+Feb  7 19:01:03 localhost kern.info kernel: [    0.400568] ACPI: Enabled 3 GPEs in block 00 to 0F
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405007] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405012] acpi PNP0A03:00: _OSC: OS supports [ASPM ClockPM Segments MSI HPX-Type3]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405014] acpi PNP0A03:00: _OSC: not requesting OS control; OS requires [ExtendedConfig ASPM ClockPM MSI]
+Feb  7 19:01:03 localhost kern.warn kernel: [    0.405020] acpi PNP0A03:00: fail to add MMCONFIG information, can't access extended configuration space under this bridge
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405156] PCI host bridge to bus 0000:00
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405158] pci_bus 0000:00: root bus resource [io  0x0000-0x0cf7 window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405159] pci_bus 0000:00: root bus resource [io  0x0d00-0xffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405161] pci_bus 0000:00: root bus resource [mem 0x000a0000-0x000bffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405162] pci_bus 0000:00: root bus resource [mem 0x80000000-0xfebfffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405163] pci_bus 0000:00: root bus resource [mem 0x100000000-0x17fffffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405164] pci_bus 0000:00: root bus resource [bus 00-ff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405219] pci 0000:00:00.0: [8086:1237] type 00 class 0x060000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.405802] pci 0000:00:01.0: [8086:7000] type 00 class 0x060100 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.406589] pci 0000:00:01.1: [8086:7010] type 00 class 0x010180 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.409256] pci 0000:00:01.1: BAR 4 [io  0xe120-0xe12f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.410470] pci 0000:00:01.1: BAR 0 [io  0x01f0-0x01f7]: legacy IDE quirk
+Feb  7 19:01:03 localhost kern.info kernel: [    0.410474] pci 0000:00:01.1: BAR 1 [io  0x03f6]: legacy IDE quirk
+Feb  7 19:01:03 localhost kern.info kernel: [    0.410475] pci 0000:00:01.1: BAR 2 [io  0x0170-0x0177]: legacy IDE quirk
+Feb  7 19:01:03 localhost kern.info kernel: [    0.410476] pci 0000:00:01.1: BAR 3 [io  0x0376]: legacy IDE quirk
+Feb  7 19:01:03 localhost kern.info kernel: [    0.410707] pci 0000:00:01.2: [8086:7020] type 00 class 0x0c0300 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.413460] pci 0000:00:01.2: BAR 4 [io  0xe100-0xe11f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.415269] pci 0000:00:01.3: [8086:7113] type 00 class 0x068000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.415923] pci 0000:00:01.3: quirk: [io  0x0600-0x063f] claimed by PIIX4 ACPI
+Feb  7 19:01:03 localhost kern.info kernel: [    0.415937] pci 0000:00:01.3: quirk: [io  0x0700-0x070f] claimed by PIIX4 SMB
+Feb  7 19:01:03 localhost kern.info kernel: [    0.416209] pci 0000:00:02.0: [1234:1111] type 00 class 0x030000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.418775] pci 0000:00:02.0: BAR 0 [mem 0xfd000000-0xfdffffff pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.420830] pci 0000:00:02.0: BAR 2 [mem 0xfea50000-0xfea50fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.425466] pci 0000:00:02.0: ROM [mem 0xfea40000-0xfea4ffff pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.425563] pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.425932] pci 0000:00:03.0: [1af4:1002] type 00 class 0x00ff00 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.427079] pci 0000:00:03.0: BAR 0 [io  0xe000-0xe03f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.428458] pci 0000:00:03.0: BAR 1 [mem 0xfea51000-0xfea51fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.432351] pci 0000:00:03.0: BAR 4 [mem 0xfe400000-0xfe403fff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.434641] pci 0000:00:05.0: [1af4:1004] type 00 class 0x010000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.435459] pci 0000:00:05.0: BAR 0 [io  0xe040-0xe07f]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.437082] pci 0000:00:05.0: BAR 1 [mem 0xfea52000-0xfea52fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.442010] pci 0000:00:05.0: BAR 4 [mem 0xfe404000-0xfe407fff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.444429] pci 0000:00:08.0: [1af4:1003] type 00 class 0x078000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.445319] pci 0000:00:08.0: BAR 0 [io  0xe080-0xe0bf]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.445905] pci 0000:00:08.0: BAR 1 [mem 0xfea53000-0xfea53fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.448461] pci 0000:00:08.0: BAR 4 [mem 0xfe408000-0xfe40bfff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.452460] pci 0000:00:12.0: [1af4:1000] type 00 class 0x020000 conventional PCI endpoint
+Feb  7 19:01:03 localhost kern.info kernel: [    0.453272] pci 0000:00:12.0: BAR 0 [io  0xe0c0-0xe0ff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.453849] pci 0000:00:12.0: BAR 1 [mem 0xfea54000-0xfea54fff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.456460] pci 0000:00:12.0: BAR 4 [mem 0xfe40c000-0xfe40ffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.457269] pci 0000:00:12.0: ROM [mem 0xfea00000-0xfea3ffff pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.458592] pci 0000:00:1e.0: [1b36:0001] type 01 class 0x060400 conventional PCI bridge
+Feb  7 19:01:03 localhost kern.info kernel: [    0.459466] pci 0000:00:1e.0: BAR 0 [mem 0xfea55000-0xfea550ff 64bit]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.460170] pci 0000:00:1e.0: PCI bridge to [bus 01]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.460205] pci 0000:00:1e.0:   bridge window [io  0xd000-0xdfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.460229] pci 0000:00:1e.0:   bridge window [mem 0xfe800000-0xfe9fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.460691] pci 0000:00:1e.0:   bridge window [mem 0xfe200000-0xfe3fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.461569] pci 0000:00:1f.0: [1b36:0001] type 01 class 0x060400 conventional PCI bridge
+Feb  7 19:01:03 localhost kern.info kernel: [    0.464798] pci 0000:00:1f.0: BAR 0 [mem 0xfea56000-0xfea560ff 64bit]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.465334] pci 0000:00:1f.0: PCI bridge to [bus 02]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.465369] pci 0000:00:1f.0:   bridge window [io  0xc000-0xcfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.465393] pci 0000:00:1f.0:   bridge window [mem 0xfe600000-0xfe7fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.465670] pci 0000:00:1f.0:   bridge window [mem 0xfe000000-0xfe1fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.466684] pci_bus 0000:01: extended config space not accessible
+Feb  7 19:01:03 localhost kern.info kernel: [    0.467034] pci 0000:00:1e.0: PCI bridge to [bus 01]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.467688] pci_bus 0000:02: extended config space not accessible
+Feb  7 19:01:03 localhost kern.info kernel: [    0.468033] pci 0000:00:1f.0: PCI bridge to [bus 02]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469141] ACPI: PCI: Interrupt link LNKA configured for IRQ 10
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469257] ACPI: PCI: Interrupt link LNKB configured for IRQ 10
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469357] ACPI: PCI: Interrupt link LNKC configured for IRQ 11
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469511] ACPI: PCI: Interrupt link LNKD configured for IRQ 11
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469568] ACPI: PCI: Interrupt link LNKS configured for IRQ 9
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] iommu: Default domain type: Translated
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] iommu: DMA domain TLB invalidation policy: strict mode
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.469798] SCSI subsystem initialized
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.469798] libata version 3.00 loaded.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] ACPI: bus type USB registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] usbcore: registered new interface driver usbfs
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] usbcore: registered new interface driver hub
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] usbcore: registered new device driver usb
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] pps_core: LinuxPPS API ver. 1 registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] PTP clock support registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] NetLabel: Initializing
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] NetLabel:  domain hash size = 128
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] NetLabel:  protocols = UNLABELED CIPSOv4 CALIPSO
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] NetLabel:  unlabeled traffic allowed by default
+Feb  7 19:01:03 localhost kern.info kernel: [    0.469798] PCI: Using ACPI for IRQ routing
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.469798] PCI: pci_cache_line_size set to 64 bytes
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.470522] e820: reserve RAM buffer [mem 0x0009fc00-0x0009ffff]
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.470525] e820: reserve RAM buffer [mem 0x7ffda000-0x7fffffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.470540] pci 0000:00:02.0: vgaarb: setting as boot VGA device
+Feb  7 19:01:03 localhost kern.info kernel: [    0.470540] pci 0000:00:02.0: vgaarb: bridge control possible
+Feb  7 19:01:03 localhost kern.info kernel: [    0.470540] pci 0000:00:02.0: vgaarb: VGA device added: decodes=io+mem,owns=io+mem,locks=none
+Feb  7 19:01:03 localhost kern.info kernel: [    0.470540] vgaarb: loaded
+Feb  7 19:01:03 localhost kern.info kernel: [    0.470571] clocksource: Switched to clocksource kvm-clock
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.471231] VFS: Disk quotas dquot_6.6.0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.471250] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.471387] AppArmor: AppArmor Filesystem Enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.471395] pnp: PnP ACPI init
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.471450] pnp 00:02: [dma 2]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.471622] pnp: PnP ACPI: found 4 devices
+Feb  7 19:01:03 localhost kern.info kernel: [    0.478500] clocksource: acpi_pm: mask: 0xffffff max_cycles: 0xffffff, max_idle_ns: 2085701024 ns
+Feb  7 19:01:03 localhost kern.info kernel: [    0.478612] NET: Registered PF_INET protocol family
+Feb  7 19:01:03 localhost kern.info kernel: [    0.478641] IP idents hash table entries: 32768 (order: 6, 262144 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479200] tcp_listen_portaddr_hash hash table entries: 1024 (order: 2, 16384 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479203] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479274] TCP established hash table entries: 16384 (order: 5, 131072 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479289] TCP bind hash table entries: 16384 (order: 7, 524288 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479321] TCP: Hash tables configured (established 16384 bind 16384)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479388] MPTCP token hash table entries: 2048 (order: 4, 49152 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479411] UDP hash table entries: 1024 (order: 3, 32768 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479415] UDP-Lite hash table entries: 1024 (order: 3, 32768 bytes, linear)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479516] NET: Registered PF_UNIX/PF_LOCAL protocol family
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479694] RPC: Registered named UNIX socket transport module.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479695] RPC: Registered udp transport module.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479695] RPC: Registered tcp transport module.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479696] RPC: Registered tcp-with-tls transport module.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479696] RPC: Registered tcp NFSv4.1 backchannel transport module.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479704] pci 0000:00:1e.0: PCI bridge to [bus 01]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.479723] pci 0000:00:1e.0:   bridge window [io  0xd000-0xdfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.480224] pci 0000:00:1e.0:   bridge window [mem 0xfe800000-0xfe9fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.480509] pci 0000:00:1e.0:   bridge window [mem 0xfe200000-0xfe3fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.481120] pci 0000:00:1f.0: PCI bridge to [bus 02]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.481135] pci 0000:00:1f.0:   bridge window [io  0xc000-0xcfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.481602] pci 0000:00:1f.0:   bridge window [mem 0xfe600000-0xfe7fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.481904] pci 0000:00:1f.0:   bridge window [mem 0xfe000000-0xfe1fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482465] pci_bus 0000:00: resource 4 [io  0x0000-0x0cf7 window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482468] pci_bus 0000:00: resource 5 [io  0x0d00-0xffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482470] pci_bus 0000:00: resource 6 [mem 0x000a0000-0x000bffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482471] pci_bus 0000:00: resource 7 [mem 0x80000000-0xfebfffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482472] pci_bus 0000:00: resource 8 [mem 0x100000000-0x17fffffff window]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482474] pci_bus 0000:01: resource 0 [io  0xd000-0xdfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482475] pci_bus 0000:01: resource 1 [mem 0xfe800000-0xfe9fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482477] pci_bus 0000:01: resource 2 [mem 0xfe200000-0xfe3fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482478] pci_bus 0000:02: resource 0 [io  0xc000-0xcfff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482479] pci_bus 0000:02: resource 1 [mem 0xfe600000-0xfe7fffff]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482480] pci_bus 0000:02: resource 2 [mem 0xfe000000-0xfe1fffff 64bit pref]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482534] pci 0000:00:01.0: PIIX3: Enabling Passive Release
+Feb  7 19:01:03 localhost kern.info kernel: [    0.482549] pci 0000:00:00.0: Limiting direct PCI/PCI transfers
+Feb  7 19:01:03 localhost kern.info kernel: [    0.483027] ACPI: \_SB_.LNKD: Enabled at IRQ 11
+Feb  7 19:01:03 localhost kern.info kernel: [    0.483647] PCI: CLS 0 bytes, default 64
+Feb  7 19:01:03 localhost kern.info kernel: [    0.483786] clocksource: tsc: mask: 0xffffffffffffffff max_cycles: 0x2f7a74fe427, max_idle_ns: 440795287973 ns
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.484227] Initialise system trusted keyrings
+Feb  7 19:01:03 localhost kern.info kernel: [    0.484283] workingset: timestamp_bits=56 max_order=19 bucket_order=0
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.486315] NFS: Registering the id_resolver key type
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.486321] Key type id_resolver registered
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.486321] Key type id_legacy registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.486410] fuse: init (API version 7.41)
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.497672] Key type asymmetric registered
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.497674] Asymmetric key parser 'x509' registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.497721] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 247)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.497727] io scheduler mq-deadline registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.497728] io scheduler kyber registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.497975] ledtrig-cpu: registered to indicate activity on CPUs
+Feb  7 19:01:03 localhost kern.info kernel: [    0.498012] hv_vmbus: registering driver hyperv_fb
+Feb  7 19:01:03 localhost kern.info kernel: [    0.498067] input: Power Button as /devices/LNXSYSTM:00/LNXPWRBN:00/input/input0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.499134] ACPI: button: Power Button [PWRF]
+Feb  7 19:01:03 localhost kern.info kernel: [    0.499772] ACPI: \_SB_.LNKC: Enabled at IRQ 10
+Feb  7 19:01:03 localhost kern.info kernel: [    0.501389] ACPI: \_SB_.LNKA: Enabled at IRQ 10
+Feb  7 19:01:03 localhost kern.info kernel: [    0.504468] ACPI: \_SB_.LNKB: Enabled at IRQ 11
+Feb  7 19:01:03 localhost kern.info kernel: [    0.505953] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.506492] Non-volatile memory driver v1.3
+Feb  7 19:01:03 localhost kern.info kernel: [    0.506497] Linux agpgart interface v0.103
+Feb  7 19:01:03 localhost kern.info kernel: [    0.506550] ACPI: bus type drm_connector registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507379] loop: module loaded
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507448] zram: Added device: zram0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507468] Guest personality initialized and is inactive
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507498] VMCI host device registered (name=vmci, major=10, minor=257)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507499] Initialized host personality
+Feb  7 19:01:03 localhost kern.info kernel: [    0.507747] virtio_scsi virtio1: 2/0/0 default/read/poll queues
+Feb  7 19:01:03 localhost kern.info kernel: [    0.509065] scsi host0: Virtio SCSI HBA
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.509687] scsi 0:0:0:0: Direct-Access     QEMU     QEMU HARDDISK    2.5+ PQ: 0 ANSI: 5
+Feb  7 19:01:03 localhost kern.info kernel: [    0.517361] VMware PVSCSI driver - version 1.0.7.0-k
+Feb  7 19:01:03 localhost kern.info kernel: [    0.517378] hv_vmbus: registering driver hv_storvsc
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.517441] sd 0:0:0:0: Attached scsi generic sg0 type 0
+Feb  7 19:01:03 localhost kern.warn kernel: [    0.517465] sd 0:0:0:0: Power-on or device reset occurred
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.517568] sd 0:0:0:0: [sda] 134217728 512-byte logical blocks: (68.7 GB/64.0 GiB)
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.517591] sd 0:0:0:0: [sda] Write Protect is off
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.517593] sd 0:0:0:0: [sda] Mode Sense: 63 00 10 08
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.517650] sd 0:0:0:0: [sda] Write cache: enabled, read cache: enabled, supports DPO and FUA
+Feb  7 19:01:03 localhost kern.debug kernel: [    0.517695] ata_piix 0000:00:01.1: version 2.13
+Feb  7 19:01:03 localhost kern.info kernel: [    0.518501] scsi host1: ata_piix
+Feb  7 19:01:03 localhost kern.info kernel: [    0.518613] scsi host2: ata_piix
+Feb  7 19:01:03 localhost kern.info kernel: [    0.518630] ata1: PATA max MWDMA2 cmd 0x1f0 ctl 0x3f6 bmdma 0xe120 irq 14 lpm-pol 0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.518631] ata2: PATA max MWDMA2 cmd 0x170 ctl 0x376 bmdma 0xe128 irq 15 lpm-pol 0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.518773] tun: Universal TUN/TAP device driver, 1.6
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520732] e100: Intel(R) PRO/100 Network Driver
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520735] e100: Copyright(c) 1999-2006 Intel Corporation
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520751] e1000: Intel(R) PRO/1000 Network Driver
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520752] e1000: Copyright (c) 1999-2006 Intel Corporation.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520757] e1000e: Intel(R) PRO/1000 Network Driver
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520758] e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520767] igb: Intel(R) Gigabit Ethernet Network Driver
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520768] igb: Copyright (c) 2007-2014 Intel Corporation.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520774] sky2: driver version 1.30
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520793] VMware vmxnet3 virtual NIC driver - version 1.9.0.0-k-NAPI
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520802] hv_vmbus: registering driver hv_netvsc
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520803] Fusion MPT base driver 3.04.20
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520804] Copyright (c) 1999-2008 LSI Corporation
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520808] Fusion MPT SPI Host driver 3.04.20
+Feb  7 19:01:03 localhost kern.info kernel: [    0.520813] Fusion MPT SAS Host driver 3.04.20
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521654] uhci_hcd 0000:00:01.2: UHCI Host Controller
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521700] uhci_hcd 0000:00:01.2: new USB bus registered, assigned bus number 1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521820] uhci_hcd 0000:00:01.2: irq 11, io port 0x0000e100
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521900] usb usb1: New USB device found, idVendor=1d6b, idProduct=0001, bcdDevice= 6.12
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521902] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521904] usb usb1: Product: UHCI Host Controller
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521905] usb usb1: Manufacturer: Linux 6.12.67 uhci_hcd
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521906] usb usb1: SerialNumber: 0000:00:01.2
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521980] hub 1-0:1.0: USB hub found
+Feb  7 19:01:03 localhost kern.info kernel: [    0.521984] hub 1-0:1.0: 2 ports detected
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522169] usbcore: registered new interface driver usb-storage
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522186] usbcore: registered new interface driver usbserial_generic
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522190] usbserial: USB Serial support registered for generic
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522210] i8042: PNP: PS/2 Controller [PNP0303:KBD,PNP0f13:MOU] at 0x60,0x64 irq 1,12
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522350]  sda: sda1 sda2 sda3
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.522419] sd 0:0:0:0: [sda] Attached SCSI disk
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522987] serio: i8042 KBD port at 0x60,0x64 irq 1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.522993] serio: i8042 AUX port at 0x60,0x64 irq 12
+Feb  7 19:01:03 localhost kern.info kernel: [    0.523070] rtc_cmos 00:03: RTC can wake from S4
+Feb  7 19:01:03 localhost kern.info kernel: [    0.523577] rtc_cmos 00:03: registered as rtc0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.523689] rtc_cmos 00:03: setting system clock to 2026-02-07T18:00:57 UTC (1770487257)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.523911] rtc_cmos 00:03: alarms up to one day, y3k, 242 bytes nvram
+Feb  7 19:01:03 localhost kern.info kernel: [    0.523947] input: AT Translated Set 2 keyboard as /devices/platform/i8042/serio0/input/input1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.524027] Driver for 1-wire Dallas network protocol.
+Feb  7 19:01:03 localhost kern.info kernel: [    0.526191] device-mapper: ioctl: 4.48.0-ioctl (2023-03-01) initialised: dm-devel@lists.linux.dev
+Feb  7 19:01:03 localhost kern.warn kernel: [    0.526231] amd_pstate: the _CPC object is not present in SBIOS or ACPI disabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.526378] [drm] Initialized simpledrm 1.0.0 for simple-framebuffer.0 on minor 0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.528389] Console: switching to colour frame buffer device 128x48
+Feb  7 19:01:03 localhost kern.info kernel: [    0.529067] simple-framebuffer simple-framebuffer.0: [drm] fb0: simpledrmdrmfb frame buffer device
+Feb  7 19:01:03 localhost kern.info kernel: [    0.529525] hid: raw HID events driver (C) Jiri Kosina
+Feb  7 19:01:03 localhost kern.info kernel: [    0.529703] usbcore: registered new interface driver usbhid
+Feb  7 19:01:03 localhost kern.info kernel: [    0.529705] usbhid: USB HID core driver
+Feb  7 19:01:03 localhost kern.info kernel: [    0.529970] Initializing XFRM netlink socket
+Feb  7 19:01:03 localhost kern.info kernel: [    0.530066] NET: Registered PF_INET6 protocol family
+Feb  7 19:01:03 localhost kern.info kernel: [    0.530459] Segment Routing with IPv6
+Feb  7 19:01:03 localhost kern.info kernel: [    0.530466] In-situ OAM (IOAM) with IPv6
+Feb  7 19:01:03 localhost kern.info kernel: [    0.530506] NET: Registered PF_PACKET protocol family
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.530555] Key type dns_resolver registered
+Feb  7 19:01:03 localhost kern.info kernel: [    0.530719] IPI shorthand broadcast: enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.532069] sched_clock: Marking stable (530007390, 1076284)->(533714698, -2631024)
+Feb  7 19:01:03 localhost kern.info kernel: [    0.532169] registered taskstats version 1
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.532170] Loading compiled-in X.509 certificates
+Feb  7 19:01:03 localhost kern.notice kernel: [    0.532693] Loaded X.509 cert 'Build time autogenerated kernel key: 3b1d6a617aab9612c6b72f65b4c7465296bcca13'
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534267] Demotion targets for Node 0: null
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534282] AppArmor: AppArmor sha256 policy hashing enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534350] PM:   Magic number: 14:371:38
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534361] bdi 7:3: hash matches
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534396] printk: legacy console [netcon0] enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534397] netconsole: network logging started
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534430] clk: Disabling unused clocks
+Feb  7 19:01:03 localhost kern.info kernel: [    0.534535] Waiting 5 sec before mounting root device...
+Feb  7 19:01:03 localhost kern.info kernel: [    0.743124] usb 1-1: new full-speed USB device number 2 using uhci_hcd
+Feb  7 19:01:03 localhost kern.info kernel: [    0.908497] usb 1-1: New USB device found, idVendor=0627, idProduct=0001, bcdDevice= 0.00
+Feb  7 19:01:03 localhost kern.info kernel: [    0.908506] usb 1-1: New USB device strings: Mfr=1, Product=3, SerialNumber=10
+Feb  7 19:01:03 localhost kern.info kernel: [    0.908508] usb 1-1: Product: QEMU USB Tablet
+Feb  7 19:01:03 localhost kern.info kernel: [    0.908511] usb 1-1: Manufacturer: QEMU
+Feb  7 19:01:03 localhost kern.info kernel: [    0.908512] usb 1-1: SerialNumber: 28754-0000:00:01.2-1
+Feb  7 19:01:03 localhost kern.info kernel: [    0.916696] input: QEMU QEMU USB Tablet as /devices/pci0000:00/0000:00:01.2/usb1/1-1/1-1:1.0/0003:0627:0001.0001/input/input4
+Feb  7 19:01:03 localhost kern.info kernel: [    0.916825] hid-generic 0003:0627:0001.0001: input,hidraw0: USB HID v0.01 Mouse [QEMU QEMU USB Tablet] on usb-0000:00:01.2-1/input0
+Feb  7 19:01:03 localhost kern.info kernel: [    0.936359] input: ImExPS/2 Generic Explorer Mouse as /devices/platform/i8042/serio1/input/input3
+Feb  7 19:01:03 localhost kern.info kernel: [    5.871151] md: Waiting for all devices to be available before autodetect
+Feb  7 19:01:03 localhost kern.info kernel: [    5.871156] md: If you don't use raid, use raid=noautodetect
+Feb  7 19:01:03 localhost kern.info kernel: [    5.871157] md: Autodetecting RAID arrays.
+Feb  7 19:01:03 localhost kern.info kernel: [    5.871159] md: autorun ...
+Feb  7 19:01:03 localhost kern.info kernel: [    5.871159] md: ... autorun DONE.
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882160] EXT4-fs (sda2): orphan cleanup on readonly fs
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882277] EXT4-fs (sda2): mounted filesystem 62d07c9a-daa5-4612-be73-5807e9cd6961 ro with ordered data mode. Quota mode: none.
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882293] VFS: Mounted root (ext4 filesystem) readonly on device 8:2.
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882468] devtmpfs: mounted
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882793] Freeing unused kernel image (initmem) memory: 2876K
+Feb  7 19:01:03 localhost kern.info kernel: [    5.882804] Write protecting the kernel read-only data: 26624k
+Feb  7 19:01:03 localhost kern.info kernel: [    5.883047] Freeing unused kernel image (rodata/data gap) memory: 1384K
+Feb  7 19:01:03 localhost kern.info kernel: [    5.912149] x86/mm: Checked W+X mappings: passed, no W+X pages found.
+Feb  7 19:01:03 localhost kern.info kernel: [    5.912168] Run /sbin/init as init process
+Feb  7 19:01:03 localhost kern.debug kernel: [    5.912169]   with arguments:
+Feb  7 19:01:03 localhost kern.debug kernel: [    5.912170]     /sbin/init
+Feb  7 19:01:03 localhost kern.debug kernel: [    5.912170]   with environment:
+Feb  7 19:01:03 localhost kern.debug kernel: [    5.912171]     HOME=/
+Feb  7 19:01:03 localhost kern.debug kernel: [    5.912171]     TERM=linux
+Feb  7 19:01:03 localhost kern.err kernel: [    5.960738] EXT4-fs: Mount option(s) incompatible with ext2
+Feb  7 19:01:03 localhost kern.info kernel: [    5.966236] EXT4-fs (sda3): mounted filesystem d3fee5e4-73fd-4aeb-aead-551a4cdd5ce6 r/w with ordered data mode. Quota mode: none.
+Feb  7 19:01:03 localhost daemon.info kernel: [    6.045061] udevd[96]: starting version 3.2.14
+Feb  7 19:01:03 localhost kern.notice kernel: [    6.269103] random: crng init done
+Feb  7 19:01:03 localhost daemon.info kernel: [    6.280221] udevd[96]: starting eudev-3.2.14
+Feb  7 19:01:03 localhost kern.info kernel: [    6.314685] Free page reporting enabled
+Feb  7 19:01:03 localhost kern.info kernel: [    6.409336] zram: Added device: zram1
+Feb  7 19:01:03 localhost kern.info kernel: [    6.410314] zram1: detected capacity change from 0 to 4247440
+Feb  7 19:01:03 localhost kern.info kernel: [    6.413738] Adding 2123716k swap on /dev/zram1.  Priority:75 extents:1 across:2123716k SS
+Feb  7 19:01:03 localhost daemon.warn /usr/sbin/irqbalance: thermal: failed to receive messages.
+Feb  7 19:01:03 localhost daemon.warn /usr/sbin/irqbalance: Failed to initialize thermal events.
+Feb  7 19:01:03 localhost user.notice rfkill: block set for type bluetooth
+Feb  7 19:01:03 localhost syslog.info syslogd exiting
+Feb  7 19:01:03 ccu3 syslog.info syslogd started: BusyBox v1.37.0
+Feb  7 19:01:03 ccu3 kern.notice kernel: klogd started: BusyBox v1.37.0 (2026-01-31 10:51:38 UTC)
+Feb  7 19:01:04 ccu3 user.info firewall: configuration set
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: ifplugd 0.28 initializing.
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: Using interface eth0/4E:AB:EA:B7:78:96 with driver <virtio_net> (version: 1.0.0)
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: Using detection mode: SIOCETHTOOL
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: Initialization complete, link beat detected.
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: Executing '/etc/ifplugd/ifplugd.action eth0 up'.
+Feb  7 19:01:04 ccu3 daemon.warn ifplugd(eth0)[1286]: client: ifup: interface eth0 already configured
+Feb  7 19:01:04 ccu3 daemon.info ifplugd(eth0)[1286]: Program executed successfully.
+Feb  7 19:01:10 ccu3 daemon.notice ntpdate[1293]: step time server 139.162.152.20 offset -0.256031 sec
+Feb  7 19:01:10 ccu3 daemon.info chronyd[1296]: chronyd version 4.8 starting (+CMDMON +REFCLOCK +RTC +PRIVDROP -SCFILTER -SIGND -NTS -SECHASH +IPV6 -DEBUG)
+Feb  7 19:01:10 ccu3 daemon.info chronyd[1296]: Added source ID#0000000001 (0.de.pool.ntp.org)
+Feb  7 19:01:10 ccu3 kern.warn kernel: [   14.050193] generic_raw_uart: loading out-of-tree module taints kernel.
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.052825] raw-uart raw-uart: Reset radio module
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.159148] raw-uart raw-uart: Registered new raw-uart device using underlying device HB-RF-ETH@-.
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.159175] hb-rf-eth hb-rf-eth: failed creating connect sysfs file: 0
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.160923] hb-rf-eth hb-rf-eth: Trying to connect to 192.168.178.56
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.263198] hb-rf-eth hb-rf-eth: Successfully connected to 192.168.178.56
+Feb  7 19:01:10 ccu3 kern.info kernel: [   14.266983] raw-uart raw-uart: Reset radio module
+Feb  7 19:01:13 ccu3 kern.info kernel: [   16.390204] raw-uart raw-uart: Reset radio module
+Feb  7 19:01:18 ccu3 kern.info kernel: [   21.812293] raw-uart raw-uart: Reset radio module
+Feb  7 19:01:18 ccu3 daemon.err xinetd[1412]: Unable to read included directory: /etc/config/xinetd.d [file=/etc/xinetd.conf] [line=14]
+Feb  7 19:01:18 ccu3 daemon.crit xinetd[1412]: 1412 {init_services} no services. Exiting...
+Feb  7 19:01:18 ccu3 auth.info sshd[1450]: Server listening on 0.0.0.0 port 22.
+Feb  7 19:01:18 ccu3 auth.info sshd[1450]: Server listening on :: port 22.
+Feb  7 19:01:18 ccu3 user.info cuxd: started cux-daemon
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: CUx-Daemon(2.13) on CCU(3.85.7.20260131) start PID:1476
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: write_pid /var/run/cuxd.pid [1476]
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: load paramsets(/usr/local/addons/cuxd/cuxd.ps) size:912 update(-42s):Sat Feb  7 19:00:36 2026
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: 2 device-paramset(s) loaded ok!
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: write_proxy /var/cache/cuxd_proxy.ini (1476 /usr/local/addons/cuxd/ 2.13 3.85.7.20260131 0)
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: add interface 'CUxD'
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: write interface(1) 'VirtualDevices' to /usr/local/etc/config/InterfacesList.xml
+Feb  7 19:01:18 ccu3 daemon.info cuxd[1476]: write interface(2) 'CUxD' to /usr/local/etc/config/InterfacesList.xml
+Feb  7 19:01:20 ccu3 daemon.warn cuxd[1476]: process_rpc_request(127.0.0.1) - illegal XMLRPC(listDevices) request
+Feb  7 19:01:20 ccu3 daemon.warn cuxd[1476]: process_rpc_request(127.0.0.1) - illegal XMLRPC(init) request
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000F17099D9143:1","MOTION"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000F17099D9143:1","MOTION"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085A49A3F7D3:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085A49A3F7D3:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F138B:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F138B:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13B6:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13B6:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1390:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1390:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1378:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1378:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F11FE:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F11FE:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1373:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1373:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13B2:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13B2:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1391:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1391:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE9941CBB:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE9941CBB:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13A6:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13A6:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000860C98D723B:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000860C98D723B:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000858A994AEB3:7","ENERGY_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000858A994AEB3:7","ENERGY_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00185D89A9F2ED:1","RAIN_COUNTER"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00185D89A9F2ED:1","RAIN_COUNTER"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00185D89A9F2ED:1","ILLUMINATION"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00185D89A9F2ED:1","ILLUMINATION"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: ScriptRuntimeError: ! Meldung CCU-Reboot ! Version 1.0, Autor: dtp  ! +++++ Variablendeklaration +++++ string message; string now; string present;  ! +++++ Sound für Pushover-Nachricht if(dom.GetObject("CCU SV Pushover Sound")){dom.GetObject("CCU SV Pushover Sound").State("bugle");}  ! +++++ Variable present umwandeln für Nachrichtenausgabe +++++ present = dom.GetObject("Haus SV Anwesenheit").Value(); if(present == 1){   present = "in Anwesenheit.";   dom.GetObject("CCU SV Push Prio").State("-1"); } else{   present = "in ABWESENHEIT.";   dom.GetObject("CCU SV Push Prio").State("0"); }  ! +++++ Erzeugen des Zeitstempels und Setzen der Systemvariablen über den Neustart +++++ now = system.Date("%d.%m.%Y, %H:%M"); dom.GetObject("CCU SV Letzter Neustart").State(now);  ! +++++ Erzeugen der Nachricht +++++ message = "CCU neu gestartet"; message = message#"\n"#present;  ! +++++ Programm "CCU PRG Push-Nachrichten" ausführen +++++ dom.GetObject("CCU SV Push Text").State(message); d
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A911:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A911:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A911:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A7B2:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A7B2:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A7B2:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A8F5:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A8F5:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A8F5:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A913:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A913:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A913:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A904:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A904:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A904:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A92C:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A92C:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A92C:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1BE998A7A0:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1BE998A7A0:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1BE998A7A0:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085A49A3F7D3:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085A49A3F7D3:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F138B:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F138B:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13B6:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13B6:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1390:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1390:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1378:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1378:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F11FE:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F11FE:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1373:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1373:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13B2:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13B2:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F1391:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F1391:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE9941CBB:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE9941CBB:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00085BE98F13A6:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00085BE98F13A6:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000860C98D723B:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000860C98D723B:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000858A994AEB3:7","ENERGY_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000858A994AEB3:7","ENERGY_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: ScriptRuntimeError: object chn = dom.GetObject('6998'); object oOverflow = chn.DPByControl('POWERMETER_PSM.ENERGY_COUNTER_OVERFLOW'); object oEnergyCounter = chn.DPByControl('POWERMETER_PSM.ENERGY_COUNTER'); object oSysVarEnergyCounter = dom.GetObject('svEnergyCounter_6998_000858A994AFA8:7'); object oSysVarEnergyCounterOldVal = dom.GetObject('svEnergyCounterOldVal_6998'); boolean overFlowFlag = oOverflow.Value(); real devVal = oEnergyCounter.Value(); real devValMax = oEnergyCounter.ValueMax(); real oldDevVal = oSysVarEnergyCounterOldVal.Value(); real diffVal = 0.0; real sysVarVal = oSysVarEnergyCounter.Value(); integer tmp_devVal = (devVal.ToString().ToFloat() * 1000).ToInteger(); integer tmp_oldDevVal = (oldDevVal.ToString().ToFloat() * 1000).ToInteger(); if (overFlowFlag == false) { ! Normal conditions if (tmp_oldDevVal <= tmp_devVal) { diffVal = devVal - oldDevVal; } ! Device has rebooted if (tmp_oldDevVal > tmp_devVal) { diffVal = devVal; } } else { !overFlow is true
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00185D89A9F2ED:1","RAIN_COUNTER_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00185D89A9F2ED:1","RAIN_COUNTER_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00185D89A9F2ED:1","SUNSHINEDURATION_OVERFLOW"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00185D89A9F2ED:1","SUNSHINEDURATION_OVERFLOW"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:25 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"00185D89A9F2ED:1","SUNSHINEDURATION"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"00185D89A9F2ED:1","SUNSHINEDURATION"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:25 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:26 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1709AB6687:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:26 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1709AB6687:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:26 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1709AB6687:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:27 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000ED709AED62F:1","ACTUAL_TEMPERATURE"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000ED709AED62F:1","ACTUAL_TEMPERATURE"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0.000000 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:27 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000ED709AED62F:1","HUMIDITY"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000ED709AED62F:1","HUMIDITY"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:27 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000ED709AED62F:1","ACTUAL_TEMPERATURE_STATUS"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000ED709AED62F:1","ACTUAL_TEMPERATURE_STATUS"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:27 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'getValue': empty interface URL (interface: 1214, params: {"000ED709AED62F:1","HUMIDITY_STATUS"}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'getValue' call failed (interface: 1214, params: {"000ED709AED62F:1","HUMIDITY_STATUS"}) [CallGetValue():iseXmlRpc.cpp:1448]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: CallGetValue failed; sVal = 0 [ReadValue():iseDOMdpHSS.cpp:124]
+Feb  7 19:01:27 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': empty interface URL (interface: 1214, params: {"000A1709AB7545:1","ACTIVE_PROFILE",1}) [CallXmlrpcMethod():iseXmlRpc.cpp:2631]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1214, params: {"000A1709AB7545:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:27 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = 000A1709AB7545:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 18:01:29 ccu3 daemon.info : starting pid 1793, tty '': '/bin/mv /tmp/boot.log /var/log/boot.log'
+Feb  7 18:01:29 ccu3 daemon.info : starting pid 1794, tty '/dev/null': '/usr/bin/monit -Ic /etc/monitrc'
+Feb  7 19:01:29 ccu3 user.info monit[1794]: Starting Monit 5.35.2 daemon with http interface at /var/run/monit.sock
+Feb  7 19:01:29 ccu3 user.info monit[1794]: 'ccu3' Monit 5.35.2 started
+Feb  7 19:01:30 ccu3 user.info ReGaHss: ReGa entering normal operation
+Feb  7 19:01:35 ccu3 daemon.info cuxd[1476]: INIT 'xmlrpc_bin://127.0.0.1:31999' '3524'
+Feb  7 19:01:35 ccu3 daemon.info cuxd[1476]: RPC-server from HM-CCU (3524) registered!
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000009:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000009:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000009:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000010:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000010:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000010:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000011:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000011:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000011:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000012:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000012:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000012:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000013:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000013:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000013:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000014:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000014:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000014:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000015:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000015:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000015:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:35 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000016:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000016:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:35 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000016:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:36 ccu3 daemon.info cuxd[1476]: connection to 127.0.0.1:8183 successfull!
+Feb  7 19:01:36 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000017:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:36 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000017:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:36 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000017:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:37 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000018:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:37 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000018:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:37 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000018:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:38 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000019:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:38 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000019:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:38 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000019:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:39 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000020:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:39 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000020:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:39 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000020:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:40 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000021:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:40 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000021:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:40 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000021:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:41 ccu3 local0.warn ReGaHss: WARNING: XMLRPC 'setValue': rpcClient.isFault() failed (url: xmlrpc://127.0.0.1:39292/groups, params: {"INT0000022:1","ACTIVE_PROFILE",1}, result: [faultCode:-321,faultString:""]) [CallXmlrpcMethod():iseXmlRpc.cpp:2621]
+Feb  7 19:01:41 ccu3 local0.err ReGaHss: ERROR: XMLRPC 'setValue' call failed (interface: 1008, params: {"INT0000022:1","ACTIVE_PROFILE",1}) [CallSetValue():iseXmlRpc.cpp:1518]
+Feb  7 19:01:41 ccu3 local0.err ReGaHss: ERROR: rpc.CallSetValue failed; address = INT0000022:1 [WriteValue():iseDOMdpHSS.cpp:76]
+Feb  7 19:01:42 ccu3 user.err monit[1794]: 'hw-watchdogEnabled' status failed (1) -- no output
+Feb  7 19:01:42 ccu3 user.err monit[1794]: 'wlan0Exists' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'hs485dEnabled' status failed (2) -- grep: /var/etc/hs485d.conf: No such file or directory
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'multimacdEnabled' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'hmlangwEnabled' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'rfdEnabled' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.warn monit[1794]: 'hasUSB' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'voltageCheckEnabled' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'coProcessorCheck' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.warn monit[1794]: 'eMMCLifeTimeCheck' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.warn monit[1794]: 'rpi4usb3Check' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'tailscaleEnabled' status failed (1) -- no output
+Feb  7 19:01:45 ccu3 user.err monit[1794]: Lookup for '/media/usb1' filesystem failed  -- not found in /proc/self/mounts
+Feb  7 19:01:45 ccu3 user.err monit[1794]: Filesystem '/media/usb1' not mounted
+Feb  7 19:01:45 ccu3 user.err monit[1794]: 'usb1' unable to read filesystem '/media/usb1' state
+Feb  7 19:01:45 ccu3 user.info monit[1794]: 'usb1' trying to restart
+Feb  7 19:02:03 ccu3 user.warn monit[1794]: 'hasUSB' status failed (1) -- no output
+Feb  7 19:02:03 ccu3 user.warn monit[1794]: 'eMMCLifeTimeCheck' status failed (1) -- no output
+Feb  7 19:02:03 ccu3 user.warn monit[1794]: 'rpi4usb3Check' status failed (1) -- no output
+Feb  7 19:02:03 ccu3 user.err monit[1794]: Filesystem '/media/usb1' not mounted
+Feb  7 19:02:03 ccu3 user.err monit[1794]: 'usb1' unable to read filesystem '/media/usb1' state
+Feb  7 19:02:03 ccu3 user.info monit[1794]: 'usb1' trying to restart
+Feb  7 19:02:17 ccu3 daemon.info chronyd[1296]: Selected source 139.162.152.20 (0.de.pool.ntp.org)
+Feb  7 19:02:20 ccu3 user.warn monit[1794]: 'hasUSB' status failed (1) -- no output
+Feb  7 19:02:20 ccu3 user.err monit[1794]: 'eMMCLifeTimeCheck' status failed (1) -- no output
+Feb  7 19:02:20 ccu3 user.err monit[1794]: 'rpi4usb3Check' status failed (1) -- no output
+Feb  7 19:02:20 ccu3 user.err monit[1794]: Filesystem '/media/usb1' not mounted
+Feb  7 19:02:20 ccu3 user.err monit[1794]: 'usb1' unable to read filesystem '/media/usb1' state
+Feb  7 19:02:20 ccu3 user.info monit[1794]: 'usb1' trying to restart
+Feb  7 19:02:38 ccu3 user.warn monit[1794]: 'hasUSB' status failed (1) -- no output
+Feb  7 19:02:38 ccu3 user.err monit[1794]: Filesystem '/media/usb1' not mounted
+Feb  7 19:02:38 ccu3 user.err monit[1794]: 'usb1' unable to read filesystem '/media/usb1' state
+Feb  7 19:02:38 ccu3 user.info monit[1794]: 'usb1' trying to restart
+Feb  7 19:02:42 ccu3 user.info qemu-ga: info: guest-ping called
+

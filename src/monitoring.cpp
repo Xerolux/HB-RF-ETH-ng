@@ -7,6 +7,7 @@
 
 #include "monitoring.h"
 #include "mqtt_handler.h"
+#include "nextcloud_client.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -17,6 +18,8 @@
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -27,6 +30,10 @@
 #endif
 
 static const char *TAG = "MONITORING";
+
+// Buffer size constants
+#define CHECKMK_OUTPUT_BUFFER_SIZE 2048
+#define CHECKMK_ALLOWED_HOSTS_SIZE 256
 
 static monitoring_config_t current_config = {};
 static bool snmp_running = false;
@@ -51,10 +58,16 @@ static TaskHandle_t checkmk_task_handle = NULL;
 #define NVS_MQTT_PREFIX "mqtt_pfx"
 #define NVS_MQTT_HA_ENABLED "mqtt_ha_en"
 #define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
+#define NVS_NC_ENABLED "nc_en"
+#define NVS_NC_SERVER "nc_srv"
+#define NVS_NC_USER "nc_usr"
+#define NVS_NC_PASS "nc_pw"
+#define NVS_NC_PATH "nc_path"
+#define NVS_NC_INTERVAL "nc_int"
+#define NVS_NC_KEEP_LOCAL "nc_keep"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
-static UpdateCheck* g_updateCheck = NULL;
 
 // Get firmware version from app descriptor
 static const char* get_firmware_version(void)
@@ -80,8 +93,30 @@ SysInfo* monitoring_get_sysinfo(void) {
     return g_sysInfo;
 }
 
-UpdateCheck* monitoring_get_updatecheck(void) {
-    return g_updateCheck;
+static bool is_ip_allowed(const char* allowed_hosts, const char* client_ip) {
+    if (strlen(allowed_hosts) == 0 || strcmp(allowed_hosts, "*") == 0) {
+        return true;
+    }
+
+    // Optimization: Use stack buffer to avoid heap fragmentation
+    char hosts_copy[CHECKMK_ALLOWED_HOSTS_SIZE];
+    strncpy(hosts_copy, allowed_hosts, sizeof(hosts_copy) - 1);
+    hosts_copy[sizeof(hosts_copy) - 1] = '\0';
+
+    bool match = false;
+    // Delimiters: comma, semicolon, space
+    char* saveptr = NULL;
+    char* token = strtok_r(hosts_copy, ",; ", &saveptr);
+
+    while (token != NULL) {
+        if (strcmp(token, client_ip) == 0) {
+            match = true;
+            break;
+        }
+        token = strtok_r(NULL, ",; ", &saveptr);
+    }
+
+    return match;
 }
 
 // CheckMK Agent Task
@@ -96,6 +131,7 @@ static void checkmk_agent_task(void *pvParameters)
     listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listen_sock < 0) {
         ESP_LOGE(TAG, "Unable to create socket");
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -110,6 +146,7 @@ static void checkmk_agent_task(void *pvParameters)
     if (bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         ESP_LOGE(TAG, "Socket bind failed");
         close(listen_sock);
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -117,11 +154,28 @@ static void checkmk_agent_task(void *pvParameters)
     if (listen(listen_sock, 5) < 0) {
         ESP_LOGE(TAG, "Socket listen failed");
         close(listen_sock);
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
+    // Set accept timeout to allow clean shutdown when checkmk_running becomes false
+    struct timeval accept_timeout;
+    accept_timeout.tv_sec = 1;
+    accept_timeout.tv_usec = 0;
+    setsockopt(listen_sock, SOL_SOCKET, SO_RCVTIMEO, &accept_timeout, sizeof(accept_timeout));
+
     ESP_LOGI(TAG, "CheckMK Agent listening on port %d", config->port);
+
+    // Allocate output buffer on heap to avoid stack overflow (2KB on 4KB stack is risky)
+    char *output = (char *)malloc(CHECKMK_OUTPUT_BUFFER_SIZE);
+    if (output == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate output buffer");
+        close(listen_sock);
+        checkmk_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
 
     while (checkmk_running) {
         struct sockaddr_in client_addr;
@@ -129,8 +183,12 @@ static void checkmk_agent_task(void *pvParameters)
 
         int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_sock < 0) {
+            // Timeout is expected when no client connects - just continue
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
             if (checkmk_running) {
-                ESP_LOGE(TAG, "Accept failed");
+                ESP_LOGE(TAG, "Accept failed: errno %d", errno);
             }
             continue;
         }
@@ -140,47 +198,56 @@ static void checkmk_agent_task(void *pvParameters)
         ESP_LOGI(TAG, "CheckMK client connected from %s", client_ip);
 
         // Check if client IP is allowed
-        bool allowed = false;
-        if (strlen(config->allowed_hosts) == 0 || strcmp(config->allowed_hosts, "*") == 0) {
-            allowed = true;
-        } else {
-            // Simple IP matching (can be improved)
-            if (strstr(config->allowed_hosts, client_ip) != NULL) {
-                allowed = true;
-            }
-        }
-
-        if (!allowed) {
+        if (!is_ip_allowed(config->allowed_hosts, client_ip)) {
             ESP_LOGW(TAG, "Client %s not in allowed hosts list", client_ip);
             close(client_sock);
             continue;
         }
 
         // Send CheckMK agent output
-        char output[2048];
-        int len = 0;
+        size_t len = 0;
+
+        // Helper for safe appending to buffer
+        auto safe_append = [&](const char* format, ...) {
+            if (len >= CHECKMK_OUTPUT_BUFFER_SIZE - 1) return; // Buffer full
+
+            va_list args;
+            va_start(args, format);
+            int ret = vsnprintf(output + len, CHECKMK_OUTPUT_BUFFER_SIZE - len, format, args);
+            va_end(args);
+
+            if (ret > 0) {
+                if (len + ret < CHECKMK_OUTPUT_BUFFER_SIZE) {
+                    len += ret;
+                } else {
+                    // Truncated - saturate to max
+                    len = CHECKMK_OUTPUT_BUFFER_SIZE - 1;
+                    output[len] = '\0';
+                }
+            }
+        };
 
         // Version section
-        len += snprintf(output + len, sizeof(output) - len, "<<<check_mk>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "Version: HB-RF-ETH-%s\n", get_firmware_version());
-        len += snprintf(output + len, sizeof(output) - len, "AgentOS: ESP-IDF\n");
+        safe_append("<<<check_mk>>>\n");
+        safe_append("Version: HB-RF-ETH-%s\n", get_firmware_version());
+        safe_append("AgentOS: ESP-IDF\n");
 
         // Uptime section
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
-        len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        safe_append("<<<uptime>>>\n");
+        safe_append("%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
-        len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
+        safe_append("<<<mem>>>\n");
+        safe_append("MemTotal: %lu kB\n",
                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
-        len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
+        safe_append("MemFree: %lu kB\n",
                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
-        len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "esp32 0 0 0\n");
+        safe_append("<<<cpu>>>\n");
+        safe_append("esp32 0 0 0\n");
 
         // Send data
         send(client_sock, output, len, 0);
@@ -189,8 +256,12 @@ static void checkmk_agent_task(void *pvParameters)
         ESP_LOGI(TAG, "CheckMK client disconnected");
     }
 
+    free(output);
     close(listen_sock);
     ESP_LOGI(TAG, "CheckMK Agent stopped");
+
+    // Mark task as deleted so stop() knows we are done
+    checkmk_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -268,9 +339,18 @@ esp_err_t checkmk_stop(void)
     ESP_LOGI(TAG, "Stopping CheckMK agent");
     checkmk_running = false;
 
+    // Wait for task to cleanup and exit (max 2 seconds)
+    int retries = 20;
+    while (checkmk_task_handle != NULL && retries-- > 0) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     if (checkmk_task_handle != NULL) {
+        ESP_LOGW(TAG, "CheckMK agent task stuck, forcing delete");
         vTaskDelete(checkmk_task_handle);
         checkmk_task_handle = NULL;
+    } else {
+        ESP_LOGI(TAG, "CheckMK agent task stopped cleanly");
     }
 
     return ESP_OK;
@@ -308,6 +388,15 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled);
     nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix);
 
+    // Save Nextcloud config
+    nvs_set_u8(nvs_handle, NVS_NC_ENABLED, config->nextcloud.enabled);
+    nvs_set_str(nvs_handle, NVS_NC_SERVER, config->nextcloud.server_url);
+    nvs_set_str(nvs_handle, NVS_NC_USER, config->nextcloud.username);
+    nvs_set_str(nvs_handle, NVS_NC_PASS, config->nextcloud.password);
+    nvs_set_str(nvs_handle, NVS_NC_PATH, config->nextcloud.backup_path);
+    nvs_set_u32(nvs_handle, NVS_NC_INTERVAL, config->nextcloud.backup_interval_hours);
+    nvs_set_u8(nvs_handle, NVS_NC_KEEP_LOCAL, config->nextcloud.keep_local_backup);
+
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
@@ -322,21 +411,34 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
-        config->snmp.enabled = false;
-        strcpy(config->snmp.community, "public");
-        strcpy(config->snmp.location, "");
-        strcpy(config->snmp.contact, "");
+        config->snmp.enabled = false;  // Disabled by default for security
+        // Empty community string forces user to set a custom value
+        config->snmp.community[0] = '\0';
+        config->snmp.location[0] = '\0';
+        config->snmp.contact[0] = '\0';
         config->snmp.port = 161;
 
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
-        strcpy(config->checkmk.allowed_hosts, "*");
+        strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
+        config->checkmk.allowed_hosts[sizeof(config->checkmk.allowed_hosts) - 1] = '\0';
 
         config->mqtt.enabled = false;
         config->mqtt.port = 1883;
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
         config->mqtt.ha_discovery_enabled = false;
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
+
+        config->nextcloud.enabled = false;
+        config->nextcloud.server_url[0] = '\0';
+        config->nextcloud.username[0] = '\0';
+        config->nextcloud.password[0] = '\0';
+        strncpy(config->nextcloud.backup_path, "/HB-RF-ETH/backups", sizeof(config->nextcloud.backup_path) - 1);
+        config->nextcloud.backup_path[sizeof(config->nextcloud.backup_path) - 1] = '\0';
+        config->nextcloud.backup_interval_hours = 24;  // Daily by default
+        config->nextcloud.keep_local_backup = true;
 
         return ESP_OK;
     }
@@ -403,7 +505,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.topic_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
     }
 
     if (nvs_get_u8(nvs_handle, NVS_MQTT_HA_ENABLED, &u8_val) == ESP_OK) {
@@ -414,7 +517,49 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.ha_discovery_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
+    }
+
+    // Load Nextcloud config
+    if (nvs_get_u8(nvs_handle, NVS_NC_ENABLED, &u8_val) == ESP_OK) {
+        config->nextcloud.enabled = u8_val;
+    } else {
+        config->nextcloud.enabled = false;
+    }
+
+    str_len = sizeof(config->nextcloud.server_url);
+    if (nvs_get_str(nvs_handle, NVS_NC_SERVER, config->nextcloud.server_url, &str_len) != ESP_OK) {
+        config->nextcloud.server_url[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.username);
+    if (nvs_get_str(nvs_handle, NVS_NC_USER, config->nextcloud.username, &str_len) != ESP_OK) {
+        config->nextcloud.username[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.password);
+    if (nvs_get_str(nvs_handle, NVS_NC_PASS, config->nextcloud.password, &str_len) != ESP_OK) {
+        config->nextcloud.password[0] = '\0';
+    }
+
+    str_len = sizeof(config->nextcloud.backup_path);
+    if (nvs_get_str(nvs_handle, NVS_NC_PATH, config->nextcloud.backup_path, &str_len) != ESP_OK) {
+        strncpy(config->nextcloud.backup_path, "/HB-RF-ETH/backups", sizeof(config->nextcloud.backup_path) - 1);
+        config->nextcloud.backup_path[sizeof(config->nextcloud.backup_path) - 1] = '\0';
+    }
+
+    uint32_t u32_val;
+    if (nvs_get_u32(nvs_handle, NVS_NC_INTERVAL, &u32_val) == ESP_OK) {
+        config->nextcloud.backup_interval_hours = u32_val;
+    } else {
+        config->nextcloud.backup_interval_hours = 24;
+    }
+
+    if (nvs_get_u8(nvs_handle, NVS_NC_KEEP_LOCAL, &u8_val) == ESP_OK) {
+        config->nextcloud.keep_local_backup = u8_val;
+    } else {
+        config->nextcloud.keep_local_backup = true;
     }
 
     nvs_close(nvs_handle);
@@ -422,12 +567,11 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 
     g_sysInfo = sysInfo;
-    g_updateCheck = updateCheck;
 
     // Initialize MQTT handler
     mqtt_handler_init();
@@ -455,6 +599,20 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         mqtt_handler_start(&current_config.mqtt);
     }
 
+    // Initialize Nextcloud client if enabled
+    if (current_config.nextcloud.enabled) {
+        esp_err_t ret = nextcloud_init(&current_config.nextcloud);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize Nextcloud client: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "Nextcloud client initialized");
+            // Start auto-backup if configured
+            if (current_config.nextcloud.backup_interval_hours > 0) {
+                nextcloud_start_auto_backup();
+            }
+        }
+    }
+
     return ESP_OK;
 }
 
@@ -471,6 +629,9 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     if (current_config.mqtt.enabled) {
         mqtt_handler_stop();
     }
+    if (current_config.nextcloud.enabled) {
+        nextcloud_stop_auto_backup();
+    }
 
     // Update config
     memcpy(&current_config, config, sizeof(monitoring_config_t));
@@ -485,6 +646,12 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     }
     if (current_config.mqtt.enabled) {
         mqtt_handler_start(&current_config.mqtt);
+    }
+    if (current_config.nextcloud.enabled) {
+        esp_err_t ret = nextcloud_init(&current_config.nextcloud);
+        if (ret == ESP_OK && current_config.nextcloud.backup_interval_hours > 0) {
+            nextcloud_start_auto_backup();
+        }
     }
 
     return ESP_OK;

@@ -10,7 +10,13 @@ export default {
     error: 'Erreur',
     success: 'Succès',
     yes: 'Oui',
-    no: 'Non'
+    no: 'Non',
+    showPassword: 'Afficher le mot de passe',
+    hidePassword: 'Masquer le mot de passe',
+    rebootingWait: 'Le système redémarre. Veuillez patienter environ 10 secondes...',
+    factoryResettingWait: 'Le système est en cours de réinitialisation aux paramètres d\'usine et redémarre. Veuillez patienter...',
+    confirmReboot: 'Êtes-vous sûr de vouloir redémarrer le système ?',
+    confirmFactoryReset: 'Êtes-vous sûr ? Tous les paramètres seront perdus !'
   },
 
   // Header Navigation
@@ -19,9 +25,11 @@ export default {
     settings: 'Paramètres',
     firmware: 'Micrologiciel',
     monitoring: 'Surveillance',
+    analyzer: 'Analyzer',
     about: 'À propos',
     login: 'Connexion',
-    logout: 'Déconnexion'
+    logout: 'Déconnexion',
+    toggleTheme: 'Changer de thème'
   },
 
   // Login Page
@@ -76,8 +84,56 @@ export default {
     // System Settings
     systemSettings: 'Paramètres système',
     ledBrightness: 'Luminosité LED',
-    checkUpdates: 'Vérifier les mises à jour',
     language: 'Langue',
+    analyzerSettings: 'Paramètres Analyzer Light',
+    enableAnalyzer: 'Activer Analyzer Light',
+    systemMaintenance: 'Maintenance du système',
+    reboot: 'Redémarrer',
+    factoryReset: 'Réinitialisation d\'usine',
+
+    // HMLGW
+    hmlgwSettings: 'Paramètres passerelle HomeMatic LAN (HMLGW)',
+    enableHmlgw: 'Activer le mode HMLGW',
+    hmlgwPort: 'Port de données (Par défaut : 2000)',
+    hmlgwKeepAlivePort: 'Port KeepAlive (Par défaut : 2001)',
+
+    // DTLS Security Settings
+    dtls: {
+      title: 'Chiffrement DTLS',
+      description: 'Chiffrement de transport sécurisé pour la communication entre la carte et CCU sur le port 3008.',
+      mode: 'Mode de chiffrement',
+      modeDisabled: 'Désactivé (par défaut)',
+      modePsk: 'Clé prépartagée (PSK)',
+      modeCert: 'Certificat X.509',
+      cipherSuite: 'Suite de chiffrement',
+      cipherAes128: 'AES-128-GCM-SHA256',
+      cipherAes256: 'AES-256-GCM-SHA384 (Recommandé)',
+      cipherChacha: 'ChaCha20-Poly1305-SHA256',
+      requireClientCert: 'Certificat client requis',
+      sessionResumption: 'Activer la reprise de session',
+      pskManagement: 'Gestion PSK',
+      pskIdentity: 'Identité PSK',
+      pskKey: 'Clé PSK (Hex)',
+      pskGenerate: 'Générer une nouvelle PSK',
+      pskGenerating: 'Génération PSK...',
+      pskGenerated: 'Nouvelle PSK générée',
+      pskCopyWarning: 'IMPORTANT: Copiez cette clé maintenant ! Elle ne sera affichée qu\'une seule fois.',
+      pskKeyLength: 'Longueur de clé',
+      psk128bit: '128 Bit',
+      psk256bit: '256 Bit (Recommandé)',
+      psk384bit: '384 Bit',
+      psk512bit: '512 Bit',
+      pskStatus: 'Statut PSK',
+      pskConfigured: 'Configuré',
+      pskNotConfigured: 'Non configuré',
+      warningDisabled: 'La communication n\'est PAS CHIFFRÉE. Tout le monde sur le réseau peut l\'intercepter.',
+      warningPsk: 'Assurez-vous que le PSK est stocké en toute sécurité sur la CCU.',
+      info: 'DTLS 1.2 chiffre la communication Raw-UART UDP de bout en bout. La CCU doit également prendre en charge DTLS.',
+      documentation: 'Documentation pour les développeurs CCU',
+      viewDocs: 'Voir le guide d\'implémentation',
+      restartNote: 'Les modifications des paramètres DTLS nécessitent un redémarrage du système.'
+    },
+
 
     // Messages
     saveSuccess: 'Les paramètres ont été enregistrés avec succès. Veuillez redémarrer le système pour les appliquer.',
@@ -115,11 +171,8 @@ export default {
     radioModuleHmIPRadioMAC: 'Adresse radio (HmIP)',
     radioModuleSGTIN: 'SGTIN',
     version: 'Version',
-    latestVersion: 'Dernière version',
     memory: 'Utilisation mémoire',
     cpu: 'Utilisation CPU',
-    temperature: 'Température',
-    voltage: 'Tension d\'alimentation',
     ethernet: 'Ethernet',
     connected: 'Connecté',
     disconnected: 'Déconnecté',
@@ -138,10 +191,6 @@ export default {
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
     versionInfo: 'Fork modernisé v2.1 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
-    updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
-    onlineUpdate: 'Mise à jour en ligne',
-    onlineUpdateConfirm: 'Voulez-vous vraiment télécharger et installer la mise à jour ? Le système redémarrera automatiquement.',
-    onlineUpdateStarted: 'Mise à jour commencée. L\'appareil redémarrera automatiquement une fois terminé.',
     updateFile: 'Fichier du micrologiciel',
     noFileChosen: 'Aucun fichier choisi',
     browse: 'Parcourir',
@@ -204,6 +253,28 @@ export default {
     },
     enable: 'Activer',
     allowedHosts: 'Hôtes autorisés'
+  },
+
+  // Analyzer
+  analyzer: {
+    title: 'Analyzer Light',
+    disabled: 'La fonction Analyzer Light est désactivée. Veuillez l\'activer dans les paramètres.',
+    connected: 'Connecté',
+    disconnected: 'Déconnecté',
+    clear: 'Effacer',
+    autoScroll: 'Défilement auto',
+    time: 'Temps',
+    len: 'Long.',
+    cnt: 'Cpt',
+    type: 'Type',
+    src: 'Source',
+    dst: 'Destination',
+    payload: 'Données',
+    rssi: 'RSSI',
+    deviceNames: 'Noms des appareils',
+    address: 'Adresse',
+    name: 'Nom',
+    storedNames: 'Noms enregistrés'
   },
 
   // About Page
