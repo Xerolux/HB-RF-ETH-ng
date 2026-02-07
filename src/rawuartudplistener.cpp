@@ -24,7 +24,6 @@
 #include "rawuartudplistener.h"
 #include "hmframe.h"
 #include "esp_log.h"
-#include <esp_timer.h>
 #include <string.h>
 #include "udphelper.h"
 
@@ -86,13 +85,9 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         return;
     }
 
-    // SAFETY: Use byte-by-byte comparison to avoid unaligned access
-    // CRC is stored as big-endian at the end of the packet
-    uint16_t received_crc = ((uint16_t)data[length - 2] << 8) | data[length - 1];
-    if (received_crc != HMFrame::crc(data, length - 2))
+    if (*((uint16_t *)(data + length - 2)) != htons(HMFrame::crc(data, length - 2)))
     {
-        ESP_LOGE(TAG, "Received raw-uart packet with invalid crc (expected %04x, got %04x).",
-                 HMFrame::crc(data, length - 2), received_crc);
+        ESP_LOGE(TAG, "Received raw-uart packet with invalid crc.");
         return;
     }
 
@@ -104,6 +99,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length == 5 && data[2] == 1)
         { // protocol version 1
             atomic_fetch_add(&_endpointConnectionIdentifier, 2);
+            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_connectionStarted, false);
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
@@ -117,24 +113,16 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
             if (data[3] == 0)
             {
-                // New connection requested
                 endpointConnectionIdentifier += 2;
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
                 atomic_store(&_connectionStarted, false);
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                // Client has different endpoint ID - accept it to force sync
-                // This happens when RaspberryMatic has a persistent session from before reboot
-                ESP_LOGI(TAG, "Accepting client endpoint identifier %d (was %d) to synchronize persistent session", data[3], endpointConnectionIdentifier);
-                endpointConnectionIdentifier = data[3];
-                atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
-                // Assume connection is already started since client has persistent session
-                // RaspberryMatic won't send "Start Connection" again for a reconnect
-                atomic_store(&_connectionStarted, true);
+                ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
-            // Update connection parameters and send response
+            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -150,8 +138,6 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         break;
 
     case 1: // disconnect
-        // FIX: Clear port first (checked by sendMessage), then state, then address.
-        // This ensures sendMessage won't send to a partially-cleared connection.
         atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_connectionStarted, false);
         atomic_store(&_remoteAddress, 0u);
@@ -219,10 +205,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
 ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 {
-    // SAFETY: Load both atomics before checking to get consistent snapshot
-    // Note: There's still a small race window, but it's acceptable for this use case
-    uint32_t address = _remoteAddress.load(std::memory_order_relaxed);
-    uint16_t port = _remotePort.load(std::memory_order_relaxed);
+    uint16_t port = atomic_load(&_remotePort);
+    uint32_t address = atomic_load(&_remoteAddress);
 
     if (port)
     {
@@ -237,9 +221,8 @@ ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 
 void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffer, size_t len)
 {
-    // SAFETY: Load atomics in a consistent order
-    uint32_t address = _remoteAddress.load(std::memory_order_relaxed);
-    uint16_t port = _remotePort.load(std::memory_order_relaxed);
+    uint16_t port = atomic_load(&_remotePort);
+    uint32_t address = atomic_load(&_remoteAddress);
 
     if (!port)
         return;
@@ -257,7 +240,7 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     addr.u_addr.ip4.addr = address;
 
     sendBuffer[0] = command;
-    sendBuffer[1] = (unsigned char)_counter.fetch_add(1, std::memory_order_relaxed);
+    sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);
 
     if (len)
         memcpy(sendBuffer + 2, buffer, len);
@@ -294,10 +277,9 @@ void RawUartUdpListener::start()
         return;
     }
 
-    // CRITICAL: Highest priority (19) for CCU communication - just below RadioModuleConnector (20)
-    // CCU messages must be processed with minimal latency for real-time signal relay
-    // Increased stack size to 6KB for stability during peak load
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 6144, this, 19, &_tHandle);
+    // CRITICAL: High priority (18) for CCU communication
+    // CCU messages must be processed quickly to maintain connection
+    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 18, &_tHandle);
 
     _pcb = udp_new();
     if (_pcb == NULL) {
@@ -326,13 +308,6 @@ void RawUartUdpListener::stop()
 
     // Clean up queue
     if (_udp_queue) {
-        // Drain any pending events to prevent memory leaks (pbufs need freeing)
-        udp_event_t event;
-        while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
-            if (event.pb) {
-                pbuf_free(event.pb);
-            }
-        }
         vQueueDelete(_udp_queue);
         _udp_queue = NULL;
     }
@@ -342,30 +317,25 @@ void RawUartUdpListener::_udpQueueHandler()
 {
     udp_event_t event;
     int64_t nextKeepAliveSentOut = esp_timer_get_time();
+    uint32_t loop_count = 0;
 
     for (;;)
     {
-        // 10ms timeout balances responsiveness with allowing IDLE task to run.
-        // UDP packets arriving in the queue trigger immediate wakeup regardless.
-        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(10)) == pdTRUE)
+        // OPTIMIZED: Reduced timeout from 100ms to 10ms for faster processing
+        if (xQueueReceive(_udp_queue, &event, (TickType_t)(10 / portTICK_PERIOD_MS)) == pdTRUE)
         {
             handlePacket(event.pb, event.addr, event.port);
             pbuf_free(event.pb);
-            // No yield here - process packets as fast as possible
-            continue;
         }
 
-        // Only check timeouts when no packets are pending
         if (atomic_load(&_remotePort) != 0)
         {
             int64_t now = esp_timer_get_time();
 
-            // OPTIMIZED: 2.5s timeout for faster disconnect detection
-            if (now > _lastReceivedKeepAlive + 2500000)
-            {
-                // FIX: Clear port first (checked by sendMessage as connection flag)
+            // OPTIMIZED: Reduced timeout from 5s to 3s for faster detection
+            if (now > _lastReceivedKeepAlive + 3000000)
+            { // 3 sec
                 atomic_store(&_remotePort, (ushort)0);
-                atomic_store(&_connectionStarted, false);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
                 ESP_LOGE(TAG, "Connection timed out");
@@ -378,8 +348,11 @@ void RawUartUdpListener::_udpQueueHandler()
             }
         }
 
-        // Yield when queue is empty to let other tasks run
-        taskYIELD();
+        // OPTIMIZED: Yield less frequently (every 100 iterations) to maintain priority
+        loop_count++;
+        if (loop_count % 100 == 0) {
+            taskYIELD();
+        }
     }
 
     vTaskDelete(NULL);
@@ -393,13 +366,8 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
     e.addr.addr = ip_addr_get_ip4_u32(addr);
     e.port = port;
 
-    // CRITICAL: Use portMAX_DELAY to ensure connection packets are never dropped.
-    // Connection establishment requires reliable packet delivery - dropping the
-    // initial connect packet prevents RaspberryMatic from ever establishing connection.
-    // The queue is large enough (32/64 entries) that blocking should be very rare.
     if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
-        ESP_LOGE(TAG, "Failed to queue UDP packet - this should never happen with portMAX_DELAY");
         return false;
     }
     return true;
