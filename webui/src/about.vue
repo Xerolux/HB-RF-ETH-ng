@@ -9,9 +9,6 @@
     >
       <BAlert variant="info" :model-value="true" class="mb-3">
         <strong>{{ t('about.version') }}</strong>
-        <div v-if="sysInfoStore.firmwareVariant" class="mt-2">
-          <strong>Firmware Variant:</strong> {{ sysInfoStore.firmwareVariant }}
-        </div>
       </BAlert>
       <p><strong>{{ t('about.fork') }}</strong></p>
       <p>{{ t('about.forkDescription') }}</p>
@@ -54,21 +51,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore } from './stores.js'
 
 const { t } = useI18n()
-const sysInfoStore = useSysInfoStore()
-
-onMounted(async () => {
-  try {
-    await sysInfoStore.update()
-  } catch (error) {
-    console.error('Failed to load system info:', error)
-    // Gracefully degrade - variant will just not be shown
-  }
-})
 
 const libs = ref([
   { name: 'Bootstrap 5', copyright: 'Copyright (c) 2011-2025 The Bootstrap Authors', license: 'MIT', website: 'https://www.getbootstrap.com/' },

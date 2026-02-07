@@ -81,10 +81,6 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     memcpy(&ntp, pb->payload, sizeof(ntp));
 
     pbuf *resp_pb = pbuf_alloc_reference(&ntp, sizeof(ntp_packet_t), PBUF_REF);
-    if (resp_pb == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate pbuf ref");
-        return;
-    }
 
     ip_addr_t resp_addr;
     resp_addr.type = IPADDR_TYPE_V4;
@@ -109,21 +105,10 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
 void NtpServer::start()
 {
-    // Reduce queue size to 16 for memory optimization (infrequent requests)
-    _udp_queue = xQueueCreate(16, sizeof(udp_event_t *));
-    if (_udp_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create UDP queue");
-        return;
-    }
-
-    // OPTIMIZED: Reduced stack from 4096 to 3072 bytes (saves 1KB RAM)
-    xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler", 3072, this, 10, &_tHandle);
+    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler", 4096, this, 10, &_tHandle);
 
     _pcb = udp_new();
-    if (_pcb == NULL) {
-        ESP_LOGE(TAG, "Failed to create UDP PCB");
-        return;
-    }
     udp_recv(_pcb, &_ntp_udpReceivePaket, (void *)this);
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 123);
@@ -177,10 +162,8 @@ bool NtpServer::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port
 
 #pragma GCC diagnostic pop
 
-    // Do not block if queue is full to prevent stalling the lwIP thread (DoS risk)
-    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
+    if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
-        ESP_LOGW(TAG, "UDP queue full, dropping NTP packet");
         free((void *)(e));
         return false;
     }

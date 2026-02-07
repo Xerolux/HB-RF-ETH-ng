@@ -25,8 +25,7 @@ def extract_changelog(version: str) -> str:
     content = changelog_file.read_text()
 
     # Try to find the version section
-    # Matches: "## 2.1.0", "## [2.1.0]", "## Version 2.1.0", "## Version [2.1.0]"
-    pattern = rf"##\s+(?:Version\s+)?\[?{re.escape(version)}\]?"
+    pattern = rf"## \[?{re.escape(version)}\]?"
     lines = content.split('\n')
 
     changelog_lines = []
@@ -113,7 +112,7 @@ def generate_release_notes(version: str) -> str:
         notes.append("| File | Description |")
         notes.append("|------|-------------|")
         for file in firmware_files:
-            if file.startswith('firmware'):
+            if file.startswith('firmware_'):
                 notes.append(f"| `{file}` | Main firmware binary |")
             elif file == 'bootloader.bin':
                 notes.append(f"| `{file}` | ESP32 bootloader |")
@@ -126,7 +125,7 @@ def generate_release_notes(version: str) -> str:
     notes.append("")
     notes.append("### Method 1: WebUI Update (Recommended)")
     notes.append("")
-    notes.append("1. Download the main firmware file (`firmware*.bin`)")
+    notes.append("1. Download the main firmware file (`firmware_*.bin`)")
     notes.append("2. Login to your HB-RF-ETH-ng WebUI")
     notes.append("3. Navigate to **Firmware Update**")
     notes.append("4. Select the downloaded `.bin` file")
@@ -144,7 +143,7 @@ def generate_release_notes(version: str) -> str:
     notes.append("  --flash_mode dio --flash_freq 40m --flash_size 4MB \\")
     notes.append("  0x1000 bootloader.bin \\")
     notes.append("  0x8000 partitions.bin \\")
-    notes.append("  0x10000 firmware*.bin")
+    notes.append("  0x10000 firmware_*.bin")
     notes.append("```")
     notes.append("")
 
@@ -160,7 +159,7 @@ def generate_release_notes(version: str) -> str:
     notes.append("")
     notes.append("**Windows (PowerShell):**")
     notes.append("```powershell")
-    notes.append("Get-FileHash firmware*.bin -Algorithm SHA256")
+    notes.append("Get-FileHash firmware_*.bin -Algorithm SHA256")
     notes.append("```")
     notes.append("")
 

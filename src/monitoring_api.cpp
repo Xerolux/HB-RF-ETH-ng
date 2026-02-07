@@ -7,7 +7,6 @@
 
 #include "monitoring_api.h"
 #include "monitoring.h"
-#include "security_headers.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -20,7 +19,6 @@ extern esp_err_t validate_auth(httpd_req_t *req);
 // GET /api/monitoring - Get monitoring configuration
 esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 {
-    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -70,8 +68,6 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_Delete(root);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-    httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_sendstr(req, json_string);
 
@@ -82,7 +78,6 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 // POST /api/monitoring - Update monitoring configuration
 esp_err_t post_monitoring_handler_func(httpd_req_t *req)
 {
-    add_security_headers(req);
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -243,16 +238,12 @@ httpd_uri_t get_monitoring_handler = {
     .uri = "/api/monitoring",
     .method = HTTP_GET,
     .handler = get_monitoring_handler_func,
-    .user_ctx = NULL,
-    .is_websocket = false,
-    .handle_ws_control_frames = false,
-    .supported_subprotocol = NULL};
+    .user_ctx = NULL
+};
 
 httpd_uri_t post_monitoring_handler = {
     .uri = "/api/monitoring",
     .method = HTTP_POST,
     .handler = post_monitoring_handler_func,
-    .user_ctx = NULL,
-    .is_websocket = false,
-    .handle_ws_control_frames = false,
-    .supported_subprotocol = NULL};
+    .user_ctx = NULL
+};

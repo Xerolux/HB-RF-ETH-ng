@@ -48,23 +48,13 @@ void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_
     }
 }
 
-RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector, Settings *settings, DTLSEncryption *dtls)
-    : _radioModuleConnector(radioModuleConnector), _settings(settings), _dtls(dtls),
-      _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
+RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
 {
     atomic_init(&_connectionStarted, false);
     atomic_init(&_remotePort, (ushort)0);
     atomic_init(&_remoteAddress, 0u);
     atomic_init(&_counter, 0);
     atomic_init(&_endpointConnectionIdentifier, 1);
-    atomic_init(&_dtlsEnabled, false);
-
-    // Check if DTLS is enabled
-    if (_settings && _dtls && _dtls->isEnabled())
-    {
-        atomic_store(&_dtlsEnabled, true);
-        ESP_LOGI(TAG, "DTLS encryption enabled for Raw UART UDP");
-    }
 }
 
 void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
@@ -119,7 +109,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
+                ESP_LOGE(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d", data[3], endpointConnectionIdentifier);
+                return;
             }
 
             atomic_store(&_remotePort, (ushort)0);
@@ -224,20 +215,15 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t port = atomic_load(&_remotePort);
     uint32_t address = atomic_load(&_remoteAddress);
 
-    if (!port)
-        return;
-
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
-    if (pb == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate pbuf for sendMessage");
-        return;
-    }
-
     unsigned char *sendBuffer = (unsigned char *)pb->payload;
 
     ip_addr_t addr;
     addr.type = IPADDR_TYPE_V4;
     addr.u_addr.ip4.addr = address;
+
+    if (!port)
+        return;
 
     sendBuffer[0] = command;
     sendBuffer[1] = (unsigned char)atomic_fetch_add(&_counter, 1);
@@ -267,33 +253,15 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
-    // Optimization: Store struct directly in queue to avoid malloc/free per packet
-    // Use larger queue for DTLS to handle potential processing delays
-    int queueSize = atomic_load(&_dtlsEnabled) ? 64 : 32;
-
-    _udp_queue = xQueueCreate(queueSize, sizeof(udp_event_t));
-    if (_udp_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create UDP queue");
-        return;
-    }
-
-    // CRITICAL: High priority (18) for CCU communication
-    // CCU messages must be processed quickly to maintain connection
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 18, &_tHandle);
+    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 
     _pcb = udp_new();
-    if (_pcb == NULL) {
-        ESP_LOGE(TAG, "Failed to create UDP queue");
-        vQueueDelete(_udp_queue);
-        _udp_queue = NULL;
-        return;
-    }
     udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
 
-    _radioModuleConnector->addFrameHandler(this);
-    _radioModuleConnector->setDecodeEscaped(false);
+    _radioModuleConnector->setFrameHandler(this, false);
 }
 
 void RawUartUdpListener::stop()
@@ -303,38 +271,30 @@ void RawUartUdpListener::stop()
     _udp_remove(_pcb);
     _pcb = NULL;
 
-    _radioModuleConnector->removeFrameHandler(this);
+    _radioModuleConnector->setFrameHandler(NULL, false);
     vTaskDelete(_tHandle);
-
-    // Clean up queue
-    if (_udp_queue) {
-        vQueueDelete(_udp_queue);
-        _udp_queue = NULL;
-    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()
 {
-    udp_event_t event;
+    udp_event_t *event = NULL;
     int64_t nextKeepAliveSentOut = esp_timer_get_time();
-    uint32_t loop_count = 0;
 
     for (;;)
     {
-        // OPTIMIZED: Reduced timeout from 100ms to 10ms for faster processing
-        if (xQueueReceive(_udp_queue, &event, (TickType_t)(10 / portTICK_PERIOD_MS)) == pdTRUE)
+        if (xQueueReceive(_udp_queue, &event, (TickType_t)(100 / portTICK_PERIOD_MS)) == pdTRUE)
         {
-            handlePacket(event.pb, event.addr, event.port);
-            pbuf_free(event.pb);
+            handlePacket(event->pb, event->addr, event->port);
+            pbuf_free(event->pb);
+            free(event);
         }
 
         if (atomic_load(&_remotePort) != 0)
         {
             int64_t now = esp_timer_get_time();
 
-            // OPTIMIZED: Reduced timeout from 5s to 3s for faster detection
-            if (now > _lastReceivedKeepAlive + 3000000)
-            { // 3 sec
+            if (now > _lastReceivedKeepAlive + 5000000)
+            { // 5 sec
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
@@ -347,12 +307,6 @@ void RawUartUdpListener::_udpQueueHandler()
                 sendMessage(2, NULL, 0);
             }
         }
-
-        // OPTIMIZED: Yield less frequently (every 100 iterations) to maintain priority
-        loop_count++;
-        if (loop_count % 100 == 0) {
-            taskYIELD();
-        }
     }
 
     vTaskDelete(NULL);
@@ -360,14 +314,28 @@ void RawUartUdpListener::_udpQueueHandler()
 
 bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
-    udp_event_t e;
+    udp_event_t *e = (udp_event_t *)malloc(sizeof(udp_event_t));
+    if (!e)
+    {
+        return false;
+    }
 
-    e.pb = pb;
-    e.addr.addr = ip_addr_get_ip4_u32(addr);
-    e.port = port;
+    e->pb = pb;
+
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpointer-arith"
+
+    ip_hdr *iphdr = reinterpret_cast<ip_hdr *>(pb->payload - UDP_HLEN - IP_HLEN);
+    e->addr.addr = iphdr->src.addr;
+
+    udp_hdr *udphdr = reinterpret_cast<udp_hdr *>(pb->payload - UDP_HLEN);
+    e->port = ntohs(udphdr->src);
+
+    #pragma GCC diagnostic pop
 
     if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
+        free((void *)(e));
         return false;
     }
     return true;

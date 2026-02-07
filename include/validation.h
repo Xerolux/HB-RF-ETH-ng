@@ -29,7 +29,6 @@
 
 // Validation limits
 #define MAX_HOSTNAME_LENGTH 63
-#define MAX_PASSWORD_LENGTH 32
 #define MIN_LED_BRIGHTNESS 0
 #define MAX_LED_BRIGHTNESS 100
 #define MIN_DCF_OFFSET -60000
@@ -43,4 +42,3 @@ bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
 bool validateNtpServer(const char *ntpServer);
-bool validatePassword(const char *password);

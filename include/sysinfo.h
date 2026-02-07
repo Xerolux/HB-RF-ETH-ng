@@ -38,14 +38,14 @@ class SysInfo
 {
 public:
     SysInfo();
-    double getCpuUsage() const;
-    double getMemoryUsage() const;
-    const char* getCurrentVersion() const;
-    const char* getFirmwareVariant() const;
-    const char* getSerialNumber() const;
-    board_type_t getBoardType() const;
-    const char* getBoardRevisionString() const;
-    uint64_t getUptimeSeconds() const;
-    const char* getResetReason() const;
-    void markSysInfoRequested();
+    double getCpuUsage();
+    double getMemoryUsage();
+    const char* getCurrentVersion();
+    const char *getSerialNumber();
+    board_type_t getBoardType();
+    const char* getBoardRevisionString();
+    double getSupplyVoltage();
+    double getTemperature();
+    uint64_t getUptimeSeconds();
+    const char* getResetReason();
 };

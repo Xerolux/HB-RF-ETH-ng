@@ -29,9 +29,6 @@
 #include "esp_flash.h"
 #include "driver/uart.h"
 #include "esp_log.h"
-#include "esp_heap_caps.h"
-#include "esp_pm.h"
-#include "esp_wifi.h"
 
 #include "pins.h"
 #include "led.h"
@@ -46,113 +43,14 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
-#if ENABLE_HMLGW
-#include "hmlgw.h"
-#endif
 #include "webui.h"
 #include "mdnsserver.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
+#include "updatecheck.h"
 #include "monitoring.h"
-#include "dtls_encryption.h"
-#include "log_manager.h"
 
 static const char *TAG = "HB-RF-ETH";
-
-// Heap monitoring task
-static void heap_monitor_task(void *pvParameters)
-{
-    (void)pvParameters;
-    uint32_t low_water_mark = UINT32_MAX;
-    const uint32_t critical_threshold = 30720;  // 30KB critical threshold (raised from 20KB)
-    const uint32_t warning_threshold = 51200;   // 50KB warning threshold
-    UBaseType_t stack_watermark_min = UINT32_MAX;
-
-    for (;;)
-    {
-        uint32_t free_heap = esp_get_free_heap_size();
-        uint32_t min_free_heap = esp_get_minimum_free_heap_size();
-
-        // Update low water mark
-        if (min_free_heap < low_water_mark) {
-            low_water_mark = min_free_heap;
-            ESP_LOGI(TAG, "Heap low water mark: %" PRIu32 " bytes", low_water_mark);
-        }
-
-        // Critical threshold - could indicate memory leak
-        if (free_heap < critical_threshold) {
-            ESP_LOGW(TAG, "CRITICAL: Low heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
-                     free_heap, min_free_heap);
-
-            // FIX: If heap drops dangerously low (below 10KB), restart to recover
-            // from potential memory fragmentation or leaks
-            if (free_heap < 10240) {
-                ESP_LOGE(TAG, "FATAL: Heap critically low (%" PRIu32 " bytes). Restarting to recover.", free_heap);
-                vTaskDelay(pdMS_TO_TICKS(100));
-                esp_restart();
-            }
-        }
-        // Warning threshold - early warning
-        else if (free_heap < warning_threshold) {
-            ESP_LOGI(TAG, "WARNING: Heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
-                     free_heap, min_free_heap);
-        }
-
-        // Monitor stack watermark for this task
-        UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
-        if (watermark < stack_watermark_min) {
-            stack_watermark_min = watermark;
-            ESP_LOGI(TAG, "heap_monitor stack watermark: %u words free (allocated: 2560)",
-                     watermark);
-        }
-
-        // Log heap stats every 5 minutes (60 x 5 seconds)
-        static uint32_t count = 0;
-        count++;
-        if (count % 60 == 0) {
-            uint32_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-            ESP_LOGI(TAG, "Heap status - Free: %" PRIu32 " B, Min: %" PRIu32 " B, Largest: %" PRIu32 " B",
-                     free_heap, min_free_heap, largest_block);
-            ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u words (%.1f%% used)",
-                     stack_watermark_min,
-                     100.0 * (2560 / sizeof(StackType_t) - stack_watermark_min) / (2560.0 / sizeof(StackType_t)));
-
-            // Stack watermark monitoring for critical tasks
-            // This helps identify tasks that need more stack space
-            ESP_LOGI(TAG, "--- Task Stack Watermarks ---");
-
-            // List all tasks and their stack watermarks
-            // FIX: Check available heap before allocating to prevent OOM
-            // during the monitoring that's supposed to detect low memory
-            UBaseType_t task_count = uxTaskGetNumberOfTasks();
-            size_t alloc_size = task_count * sizeof(TaskStatus_t);
-            if (free_heap > alloc_size + 4096) {
-                TaskStatus_t *task_status = (TaskStatus_t *)malloc(alloc_size);
-                if (task_status) {
-                    configRUN_TIME_COUNTER_TYPE total_runtime;
-                    UBaseType_t filled = uxTaskGetSystemState(task_status, task_count, &total_runtime);
-                    for (UBaseType_t i = 0; i < filled; i++) {
-                        UBaseType_t wm = task_status[i].usStackHighWaterMark;
-                        // Warn if watermark is below 128 words (512 bytes)
-                        if (wm < 128) {
-                            ESP_LOGW(TAG, "  Task %s: %u words free - WARNING LOW STACK!",
-                                     task_status[i].pcTaskName, (unsigned)wm);
-                        } else {
-                            ESP_LOGI(TAG, "  Task %s: %u words free",
-                                     task_status[i].pcTaskName, (unsigned)wm);
-                        }
-                    }
-                    free(task_status);
-                }
-            } else {
-                ESP_LOGW(TAG, "  Skipping task watermarks - low heap (%" PRIu32 " free)", free_heap);
-            }
-            ESP_LOGI(TAG, "-------------------------------");
-        }
-
-        vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds
-    }
-}
 
 extern "C"
 {
@@ -161,36 +59,6 @@ extern "C"
 
 void app_main()
 {
-    // Initialize logging immediately to capture startup events
-    LogManager::begin();
-
-    // CRITICAL: Mark OTA update as valid immediately after boot
-    // This must be done BEFORE any complex initialization that could cause a panic
-    // Otherwise, ESP-IDF will automatically rollback to the previous firmware
-    esp_ota_mark_app_valid_cancel_rollback();
-    ESP_LOGI(TAG, "OTA firmware validated successfully");
-
-    // CRITICAL: Disable all power management features for maximum performance
-    // Radio signals require immediate processing without delays
-    esp_pm_config_t pm_config = {
-        .max_freq_mhz = 240,  // Maximum CPU frequency
-        .min_freq_mhz = 240,  // No CPU frequency scaling
-        .light_sleep_enable = false  // Disable light sleep
-    };
-    esp_err_t pm_err = esp_pm_configure(&pm_config);
-    if (pm_err == ESP_OK) {
-        ESP_LOGI(TAG, "Power management disabled - running at full performance");
-    } else if (pm_err == ESP_ERR_NOT_SUPPORTED) {
-        // Power management not compiled in - system runs at full performance by default
-        ESP_LOGI(TAG, "Power management not available - running at full performance (default)");
-    } else {
-        ESP_LOGW(TAG, "Failed to configure power management: %s", esp_err_to_name(pm_err));
-    }
-
-    // Disable WiFi power saving (even though we use Ethernet)
-    // This ensures no interference from WiFi subsystem
-    esp_wifi_set_ps(WIFI_PS_NONE);
-
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -199,7 +67,10 @@ void app_main()
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {},
+        .flags = {
+            .allow_pd = 0,
+            .backup_before_sleep = 0,
+        },
     };
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -291,84 +162,30 @@ void app_main()
 
         const uint8_t *firmwareVersion = radioModuleDetector.getFirmwareVersion();
         ESP_LOGI(TAG, "  Firmware Version: %d.%d.%d", *firmwareVersion, *(firmwareVersion + 1), *(firmwareVersion + 2));
-
-        // Only reset module if one was detected
-        radioModuleConnector.resetModule();
     }
     else
     {
-        ESP_LOGW(TAG, "Radio module could not be detected. System will continue without radio functionality.");
+        ESP_LOGW(TAG, "Radio module could not be detected.");
     }
 
-    // Initialize DTLS encryption (works only in Raw UART mode)
-    DTLSEncryption dtlsEncryption;
-    dtls_mode_t dtls_mode = (dtls_mode_t)settings.getDTLSMode();
-    dtls_cipher_suite_t dtls_cipher = (dtls_cipher_suite_t)settings.getDTLSCipherSuite();
+    radioModuleConnector.resetModule();
 
-    RawUartUdpListener* rawUartUdpLister = NULL;
-#if ENABLE_HMLGW
-    Hmlgw* hmlgw = NULL;
-#endif
+    RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
+    rawUartUdpLister.start();
 
-    // INTENTIONAL MEMORY ALLOCATION PATTERN:
-    // The following objects (hmlgw, rawUartUdpLister) are allocated with 'new'
-    // and intentionally NOT deleted. They are singleton services that persist
-    // for the entire application lifetime (until device reset).
-    // This is by design - not a memory leak.
+    UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
+    updateCheck.start();
 
-#if ENABLE_HMLGW
-    if (settings.getHmlgwEnabled()) {
-        ESP_LOGI(TAG, "Starting HMLGW mode (DTLS not supported in HM-LGW)");
-        hmlgw = new Hmlgw(&radioModuleConnector, settings.getHmlgwPort(), settings.getHmlgwKeepAlivePort());
-        hmlgw->start();
-    } else
-#endif
-    {
-        ESP_LOGI(TAG, "Starting Raw UART UDP mode");
-
-#if ENABLE_ANALYZER
-        // DTLS only works in Raw UART mode (not compatible with HM-LGW or Analyzer)
-        if (settings.getAnalyzerEnabled() && dtls_mode != DTLS_MODE_DISABLED)
-        {
-            ESP_LOGW(TAG, "DTLS disabled: Analyzer requires unencrypted data");
-            dtls_mode = DTLS_MODE_DISABLED;
-        }
-#endif
-
-        if (dtls_mode != DTLS_MODE_DISABLED)
-        {
-            if (dtlsEncryption.init(dtls_mode, dtls_cipher))
-            {
-                dtlsEncryption.setSessionResumption(settings.getDTLSSessionResumption());
-                dtlsEncryption.setRequireClientCert(settings.getDTLSRequireClientCert());
-                ESP_LOGI(TAG, "DTLS encryption initialized successfully");
-            }
-            else
-            {
-                ESP_LOGW(TAG, "DTLS initialization failed, continuing without encryption");
-            }
-        }
-
-        rawUartUdpLister = new RawUartUdpListener(&radioModuleConnector, &settings, &dtlsEncryption);
-        rawUartUdpLister->start();
-    }
-
-    WebUI webUI(&settings, &statusLED, &sysInfo, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector, &dtlsEncryption);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
-    monitoring_init(NULL, &sysInfo);
+    monitoring_init(NULL, &sysInfo, &updateCheck);
 
     powerLED.setState(LED_STATE_ON);
     statusLED.setState(LED_STATE_OFF);
 
-    // Log initial heap status
-    ESP_LOGI(TAG, "System initialized. Free heap: %lu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Largest free block: %lu bytes", heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-
-    // Start heap monitoring task
-    // Increased to 2560 bytes to accommodate ESP_LOG* macro stack usage
-    xTaskCreate(heap_monitor_task, "heap_monitor", 2560, &statusLED, 1, NULL);
+    esp_ota_mark_app_valid_cancel_rollback();
 
     vTaskSuspend(NULL);
 }

@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
 import { useLoginStore, useThemeStore } from './stores.js'
 
@@ -15,21 +15,16 @@ import Login from './login.vue'
 import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
-import Analyzer from './analyzer.vue'
-import Log from './log.vue'
 
 
 // Router
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: [
     { path: '/', component: Home },
-    { path: '/config', redirect: '/settings' },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
-    { path: '/analyzer', component: Analyzer, meta: { requiresAuth: true } },
-    { path: '/log', component: Log, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
     { path: '/login', component: Login },
@@ -97,16 +92,7 @@ const i18n = createI18n({
 
 // Create Bootstrap Vue Next
 import { createBootstrap } from 'bootstrap-vue-next'
-// Tree-shaking: Import only used components instead of *
-import {
-  BAlert, BButton, BCard, BCollapse, BDropdownItem, BForm,
-  BFormCheckbox, BFormFile, BFormGroup, BFormInput,
-  BFormInvalidFeedback, BFormRadio, BFormRadioGroup,
-  BFormSelect, BFormSelectOption, BFormText, BInputGroup,
-  BListGroup, BListGroupItem, BModal, BNavItem,
-  BNavItemDropdown, BNavbar, BNavbarBrand, BNavbarNav,
-  BNavbarToggle, BProgress, BProgressBar, BSpinner
-} from 'bootstrap-vue-next'
+import * as BootstrapVueNext from 'bootstrap-vue-next'
 
 // Create and mount app
 const app = createApp(App)
@@ -120,19 +106,11 @@ app.use(createBootstrap({
     directives: true,
 }))
 
-// Register used BootstrapVueNext components globally
-const components = {
-  BAlert, BButton, BCard, BCollapse, BDropdownItem, BForm,
-  BFormCheckbox, BFormFile, BFormGroup, BFormInput,
-  BFormInvalidFeedback, BFormRadio, BFormRadioGroup,
-  BFormSelect, BFormSelectOption, BFormText, BInputGroup,
-  BListGroup, BListGroupItem, BModal, BNavItem,
-  BNavItemDropdown, BNavbar, BNavbarBrand, BNavbarNav,
-  BNavbarToggle, BProgress, BProgressBar, BSpinner
-}
-
-for (const [key, component] of Object.entries(components)) {
-  app.component(key, component)
+// Register all BootstrapVueNext components globally
+for (const key in BootstrapVueNext) {
+  if (key.startsWith('B')) {
+    app.component(key, BootstrapVueNext[key])
+  }
 }
 
 // Initialize theme

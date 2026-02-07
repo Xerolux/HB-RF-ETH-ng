@@ -26,12 +26,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "freertos/semphr.h"
 #include "driver/uart.h"
 #include "led.h"
 #include "streamparser.h"
-#include <vector>
-#include <algorithm>
+#include <atomic>
+#define _Atomic(X) std::atomic<X>
 
 class FrameHandler
 {
@@ -46,10 +45,7 @@ private:
     LED *_greenLED;
     LED *_blueLED;
     StreamParser *_streamParser;
-
-    std::vector<FrameHandler *> _frameHandlers;
-    SemaphoreHandle_t _handlersMutex;
-
+    std::atomic<FrameHandler *> _frameHandler = ATOMIC_VAR_INIT(0);
     QueueHandle_t _uart_queue;
     TaskHandle_t _tHandle = NULL;
 
@@ -57,7 +53,6 @@ private:
 
 public:
     RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed);
-    ~RadioModuleConnector();
     RadioModuleConnector(const RadioModuleConnector&) = delete;
     RadioModuleConnector& operator=(const RadioModuleConnector&) = delete;
 
@@ -66,9 +61,7 @@ public:
 
     void setLED(bool red, bool green, bool blue);
 
-    void addFrameHandler(FrameHandler *handler);
-    void removeFrameHandler(FrameHandler *handler);
-    void setDecodeEscaped(bool decodeEscaped);
+    void setFrameHandler(FrameHandler *handler, bool decodeEscaped);
 
     void resetModule();
 

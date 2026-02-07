@@ -12,10 +12,10 @@
       </BAlert>
 
       <BFormGroup :label="t('changePassword.newPassword')" label-cols-sm="4">
-        <PasswordInput
+        <BFormInput
+          type="password"
           v-model="newPassword"
           :state="v$.newPassword.$error ? false : null"
-          :placeholder="''"
         />
         <BFormInvalidFeedback v-if="v$.newPassword.minLength.$invalid">
           {{ t('changePassword.passwordTooShort') }}
@@ -23,10 +23,10 @@
       </BFormGroup>
 
       <BFormGroup :label="t('changePassword.confirmPassword')" label-cols-sm="4">
-        <PasswordInput
+        <BFormInput
+          type="password"
           v-model="confirmPassword"
           :state="v$.confirmPassword.$error ? false : null"
-          :placeholder="''"
         />
         <BFormInvalidFeedback v-if="v$.confirmPassword.sameAs.$invalid">
           {{ t('changePassword.passwordsDoNotMatch') }}
@@ -46,11 +46,8 @@
           variant="primary"
           block
           @click="changePassword"
-          :disabled="v$.$invalid || loading"
-        >
-          <BSpinner small v-if="loading" class="me-2" />
-          {{ loading ? t('common.saving') : t('changePassword.changePassword') }}
-        </BButton>
+          :disabled="v$.$invalid"
+        >{{ t('changePassword.changePassword') }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -64,7 +61,6 @@ import { useVuelidate } from '@vuelidate/core'
 import { required, minLength, sameAs, helpers } from '@vuelidate/validators'
 import axios from 'axios'
 import { useLoginStore } from './stores.js'
-import PasswordInput from './components/PasswordInput.vue'
 
 const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
 
@@ -76,7 +72,6 @@ const loginStore = useLoginStore()
 const newPassword = ref('')
 const confirmPassword = ref('')
 const error = ref(null)
-const loading = ref(false)
 
 const rules = computed(() => ({
   newPassword: { required, minLength: minLength(6), password_validator },
@@ -88,7 +83,6 @@ const v$ = useVuelidate(rules, { newPassword, confirmPassword })
 const changePassword = async () => {
   if (v$.value.$invalid) return
 
-  loading.value = true
   error.value = null
 
   try {
@@ -109,8 +103,6 @@ const changePassword = async () => {
     }
   } catch (e) {
     error.value = e.response?.data?.message || e.message
-  } finally {
-    loading.value = false
   }
 }
 </script>
