@@ -104,10 +104,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length == 5 && data[2] == 1)
         { // protocol version 1
             atomic_fetch_add(&_endpointConnectionIdentifier, 2);
-            // FIX: Clear old connection first by setting port to 0
-            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_connectionStarted, false);
-            // Then set new connection (address before port as port is the valid flag)
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -129,8 +126,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
                 ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
-            // FIX: Clear old connection first, then set new one
-            atomic_store(&_remotePort, (ushort)0);
+            // Update connection parameters and send response
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
