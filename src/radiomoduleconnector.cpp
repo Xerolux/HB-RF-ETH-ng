@@ -223,24 +223,16 @@ void RadioModuleConnector::_serialQueueHandler()
 
 void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len)
 {
-    // OPTIMIZATION: Use short timeout (5ms) instead of portMAX_DELAY
-    // to prevent blocking the high-priority UART task indefinitely.
-    // If mutex cannot be acquired quickly, skip this frame to maintain
-    // real-time signal processing capability.
-    if (xSemaphoreTake(_handlersMutex, pdMS_TO_TICKS(5))) {
+    // Use portMAX_DELAY to ensure no radio frames are silently dropped.
+    // The mutex is only held briefly (vector copy), so this won't block
+    // the UART task for any significant time. Dropping frames causes
+    // HomeMatic devices to not appear in RaspberryMatic.
+    if (xSemaphoreTake(_handlersMutex, portMAX_DELAY)) {
         std::vector<FrameHandler *> handlers = _frameHandlers;
         xSemaphoreGive(_handlersMutex);
 
-        // Direct iteration without copy overhead for small handler counts
         for (auto handler : handlers) {
             handler->handleFrame(buffer, len);
-        }
-    } else {
-        // Mutex contention - log at debug level to avoid log spam
-        static uint32_t mutex_timeout_count = 0;
-        mutex_timeout_count++;
-        if (mutex_timeout_count % 100 == 1) {
-            ESP_LOGD("RadioModuleConnector", "Mutex timeout in handleFrame (count: %lu)", mutex_timeout_count);
         }
     }
 }
