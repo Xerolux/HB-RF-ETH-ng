@@ -13,7 +13,7 @@ info:
     ## Security Note
     The default password is `admin`. **Change this immediately after first login.**
 
-  version: '2.1.4'
+  version: '2.1.3'
   contact:
     name: HB-RF-ETH Project
     url: https://github.com/Xerolux/HB-RF-ETH-ng
