@@ -26,6 +26,16 @@
 #include <stdint.h>
 #include <functional>
 
+// Performance optimization: Place frequently accessed code in IRAM
+#ifndef IRAM_ATTR
+#define IRAM_ATTR __attribute__((section(".iram1")))
+#endif
+
+// Compiler hints for hot path optimization
+#ifndef HOT_FUNCTION
+#define HOT_FUNCTION __attribute__((hot))
+#endif
+
 typedef enum
 {
     NO_DATA,
@@ -38,7 +48,8 @@ typedef enum
 class StreamParser
 {
 private:
-    unsigned char _buffer[2048];
+    // Increased buffer size for larger frames and burst handling
+    unsigned char _buffer[4096];
     uint16_t _bufferPos;
     uint16_t _framePos;
     uint16_t _frameLength;
@@ -50,8 +61,9 @@ private:
 public:
     StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor);
 
-    void append(unsigned char chr);
-    void append(unsigned char *buffer, uint16_t len);
+    // HOT_FUNCTION hint for compiler optimization on frequently called methods
+    HOT_FUNCTION void append(unsigned char chr);
+    HOT_FUNCTION void append(unsigned char *buffer, uint16_t len);
     void flush();
 
     bool getDecodeEscaped();

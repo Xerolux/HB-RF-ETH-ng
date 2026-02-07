@@ -103,11 +103,12 @@ def update_openapi_yaml(version: str):
 
     content = openapi_file.read_text()
 
-    # Update version in openapi spec
+    # Update version in openapi spec (handles both quoted and unquoted versions)
     content = re.sub(
-        r"version: '[\d.]+'",
+        r"version: '?[\d.]+'?",
         f"version: '{version}'",
-        content
+        content,
+        count=1
     )
 
     openapi_file.write_text(content)

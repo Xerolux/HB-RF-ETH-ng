@@ -52,6 +52,8 @@ private:
   eth_speed_t _linkSpeed;
   eth_duplex_t _duplexMode;
 
+  void _configurePHYLEDs();
+
 public:
   Ethernet(Settings *settings);
 

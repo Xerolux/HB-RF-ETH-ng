@@ -1,5 +1,5 @@
 """
-Script to rename Parcel 2 output files with content hashes to fixed names
+Script to rename Parcel 2 output files with content hashes to fixed names.
 """
 from pathlib import Path
 import shutil
@@ -39,6 +39,7 @@ def rename_webui_files():
         # Store replacement mapping (without .gz extension for HTML)
         old_name = source.name.replace('.gz', '')
         new_name = target.replace('.gz', '')
+
         replacements[old_name] = new_name
 
         # Remove old target if exists

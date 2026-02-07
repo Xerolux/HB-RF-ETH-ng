@@ -62,12 +62,10 @@ export const useSysInfoStore = defineStore('sysInfo', {
   state: () => ({
     serial: "",
     currentVersion: "",
-    latestVersion: "",
+    firmwareVariant: "",
     rawUartRemoteAddress: "",
     memoryUsage: 0.0,
     cpuUsage: 0.0,
-    supplyVoltage: 0.0,
-    temperature: 0.0,
     uptimeSeconds: 0,
     boardRevision: "",
     resetReason: "",
@@ -79,7 +77,10 @@ export const useSysInfoStore = defineStore('sysInfo', {
     radioModuleFirmwareVersion: "",
     radioModuleBidCosRadioMAC: "",
     radioModuleHmIPRadioMAC: "",
-    radioModuleSGTIN: ""
+    radioModuleSGTIN: "",
+    enableHmlgw: false,
+    enableAnalyzer: false,
+    availableVersion: ""
   }),
   actions: {
     async update() {
@@ -116,8 +117,15 @@ export const useSettingsStore = defineStore('settings', {
     gpsBaudrate: 9600,
     ntpServer: "",
     ledBrightness: 100,
-    checkUpdates: true,
-    allowPrerelease: false,
+    hmlgwEnabled: false,
+    hmlgwPort: 2000,
+    hmlgwKeepAlivePort: 2001,
+    analyzerEnabled: false,
+    // DTLS settings
+    dtlsMode: 0,
+    dtlsCipherSuite: 1,
+    dtlsRequireClientCert: false,
+    dtlsSessionResumption: true
   }),
   actions: {
     async load() {
@@ -176,7 +184,7 @@ export const useMonitoringStore = defineStore('monitoring', {
     snmp: {
       enabled: false,
       port: 161,
-      community: 'public',
+      community: '',  // Empty by default - user must set custom value
       location: '',
       contact: ''
     },

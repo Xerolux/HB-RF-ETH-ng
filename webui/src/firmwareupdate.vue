@@ -17,36 +17,11 @@
       >
         {{ t('firmware.versionInfo') }}
         <a
-          href="https://github.com/Xerolux/HB-RF-ETH-ng"
+          href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"
           class="alert-link"
           target="_new"
-        >GitHub (Fork v2.1)</a>
+        >GitHub Releases</a>
       </BAlert>
-      <BAlert
-        variant="warning"
-        :model-value="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
-      >
-        {{ t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}
-      </BAlert>
-
-      <BFormGroup
-        v-if="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
-        label-cols-sm="9"
-        class="mb-3"
-      >
-        <BButton
-          variant="info"
-          block
-          class="mb-2"
-          @click="showReleaseNotes = true"
-        >{{ t('firmware.showReleaseNotes') }}</BButton>
-        <BButton
-          variant="success"
-          block
-          :disabled="firmwareUpdateStore.progress > 0"
-          @click="onlineUpdateClick"
-        >{{ t('firmware.onlineUpdate') }}</BButton>
-      </BFormGroup>
 
       <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
         <BFormFile
@@ -57,33 +32,6 @@
         />
       </BFormGroup>
 
-    <BModal
-      v-model="showReleaseNotes"
-      :title="t('firmware.releaseNotesTitle', { version: sysInfoStore.latestVersion })"
-      size="lg"
-      scrollable
-      ok-only
-      :ok-title="t('common.close')"
-      @show="fetchReleaseNotes"
-    >
-      <div v-if="loadingNotes" class="text-center p-4">
-        <BSpinner label="Loading..." />
-      </div>
-      <div v-else-if="releaseNotesError" class="text-danger">
-        {{ t('firmware.releaseNotesError') }}
-      </div>
-      <div v-else>
-        <!-- Use v-html carefully, ideally use a markdown renderer but for now pre-wrap -->
-        <pre class="release-notes-content">{{ releaseNotes }}</pre>
-        <BButton
-          variant="success"
-          block
-          class="mt-3"
-          :disabled="firmwareUpdateStore.progress > 0"
-          @click="onlineUpdateClickFromModal"
-        >{{ t('firmware.onlineUpdate') }}</BButton>
-      </div>
-    </BModal>
       <BProgress
         :value="firmwareUpdateStore.progress"
         :max="100"
@@ -111,15 +59,25 @@
           block
           :disabled="file == null || firmwareUpdateStore.progress > 0"
           @click="firmwareUpdateClick"
-        >{{ t('firmware.upload') }}</BButton>
+        >
+          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
+          {{ firmwareUpdateStore.progress > 0 ? t('firmware.uploading') : t('firmware.upload') }}
+        </BButton>
       </BFormGroup>
       <BFormGroup label-cols-sm="9">
         <BButton
           variant="warning"
           block
-          :disabled="firmwareUpdateStore.progress > 0"
+          :disabled="firmwareUpdateStore.progress > 0 || restartLoading"
           @click="restartClick"
-        >{{ t('firmware.restart') }}</BButton>
+        >
+          <BSpinner small v-if="restartLoading" class="me-2" />
+          <svg v-else aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise me-2" viewBox="0 0 16 16">
+            <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/>
+            <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466z"/>
+          </svg>
+          {{ t('firmware.restart') }}
+        </BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -139,57 +97,7 @@ const firmwareUpdateStore = useFirmwareUpdateStore()
 const file = ref(null)
 const showError = ref(false)
 const showSuccess = ref(false)
-
-const showReleaseNotes = ref(false)
-const releaseNotes = ref('')
-const loadingNotes = ref(false)
-const releaseNotesError = ref(false)
-
-const fetchReleaseNotes = async () => {
-  loadingNotes.value = true
-  releaseNotesError.value = false
-  releaseNotes.value = ''
-  try {
-    // GitHub API to get release notes
-    // Note: This relies on client-side internet access
-    const response = await axios.get(`https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/tags/v${sysInfoStore.latestVersion}`)
-    releaseNotes.value = response.data.body
-  } catch (error) {
-    console.error('Failed to fetch release notes:', error)
-    releaseNotesError.value = true
-  } finally {
-    loadingNotes.value = false
-  }
-}
-
-const onlineUpdateClickFromModal = () => {
-    showReleaseNotes.value = false
-    onlineUpdateClick()
-}
-
-const onlineUpdateClick = async () => {
-  if (confirm(t('firmware.onlineUpdateConfirm'))) {
-    showError.value = null
-    showSuccess.value = null
-
-    // Set a fake progress to show activity or use a different indicator
-    firmwareUpdateStore.progress = 1
-
-    try {
-        const response = await fetch('/api/online_update', { method: 'POST' })
-        if (response.ok) {
-            // The device will restart, so maybe show a message "Update started, device will restart..."
-            alert(t('firmware.onlineUpdateStarted'))
-        } else {
-            showError.value = true
-        }
-        firmwareUpdateStore.progress = 0
-    } catch (error) {
-        showError.value = true
-        firmwareUpdateStore.progress = 0
-    }
-  }
-}
+const restartLoading = ref(false)
 
 const firmwareUpdateClick = async () => {
   showError.value = null
@@ -206,8 +114,13 @@ const firmwareUpdateClick = async () => {
 
 const restartClick = async () => {
   if (confirm(t('firmware.restartConfirm'))) {
+    restartLoading.value = true
     try {
       await fetch('/api/restart', { method: 'POST' })
+      alert(t('common.rebootingWait'))
+      setTimeout(() => {
+          window.location.reload()
+      }, 10000)
     } catch (error) {
       // Expected - device will restart and connection will be lost
     }
@@ -218,14 +131,3 @@ onMounted(() => {
   sysInfoStore.update()
 })
 </script>
-
-<style scoped>
-.release-notes-content {
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: inherit;
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 0.25rem;
-}
-</style>
