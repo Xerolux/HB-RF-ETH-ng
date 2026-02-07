@@ -175,8 +175,6 @@ export default {
     latestVersion: 'Senaste version',
     memory: 'Minnesanvändning',
     cpu: 'CPU-användning',
-    temperature: 'Temperatur',
-    voltage: 'Matningsspänning',
     ethernet: 'Ethernet',
     connected: 'Ansluten',
     disconnected: 'Frånkopplad',

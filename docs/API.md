@@ -63,8 +63,6 @@ Retrieve system information including firmware version, hardware details, and ra
     "rawUartRemoteAddress": "string",
     "memoryUsage": 0.0,
     "cpuUsage": 0.0,
-    "supplyVoltage": 0.0,
-    "temperature": 0.0,
     "uptimeSeconds": 0,
     "boardRevision": "string",
     "resetReason": "string",
@@ -94,14 +92,6 @@ Retrieve system information including firmware version, hardware details, and ra
 **Performance Metrics:**
 - `memoryUsage`: Memory usage percentage (0-100)
 - `cpuUsage`: CPU usage percentage (0-100)
-- `supplyVoltage`: Supply voltage in volts (PoE or USB power source)
-  - **Normal range**: 4.75V - 5.25V (Green indicator)
-  - **Warning range**: 4.5V - 4.75V or 5.25V - 5.5V (Yellow indicator)
-  - **Critical range**: < 4.5V or > 5.75V (Red indicator)
-- `temperature`: ESP32 internal temperature in °C
-  - **Normal**: < 65°C (Green indicator)
-  - **Warning**: 65°C - 75°C (Yellow indicator)
-  - **Critical**: > 75°C (Red indicator - check cooling/ventilation)
 
 **Network Status:**
 - `ethernetConnected`: Boolean - Ethernet link status
@@ -136,8 +126,6 @@ curl -X GET http://192.168.1.100/sysinfo.json \
     "rawUartRemoteAddress": "192.168.1.50:2001",
     "memoryUsage": 45.32,
     "cpuUsage": 12.56,
-    "supplyVoltage": 5.02,
-    "temperature": 52.3,
     "ethernetConnected": true,
     "ethernetSpeed": 100,
     "ethernetDuplex": "Full",
@@ -150,43 +138,6 @@ curl -X GET http://192.168.1.100/sysinfo.json \
   }
 }
 ```
-
-**Supply Voltage Monitoring:**
-
-The `supplyVoltage` field provides real-time monitoring of the device's power supply (PoE or USB). This value is measured from GPIO37 via ADC with a 2:1 voltage divider.
-
-**Voltage Ranges:**
-- **Normal** (Green): 4.75V - 5.25V - Power supply is stable
-- **Warning** (Yellow): 4.5V - 4.75V or 5.25V - 5.5V - Power supply may be unstable
-- **Critical** (Red): < 4.5V or > 5.75V - Power supply issue, check PSU or PoE
-
-**Troubleshooting Low Voltage:**
-- If using PoE: Check PoE injector/switch specifications, cable quality, and cable length
-- If using USB: Replace power adapter with a quality 5V/2A or higher USB power supply
-- Check for voltage drops under load
-
-**Troubleshooting High Voltage:**
-- Check PoE injector/switch output voltage specification
-- Replace non-compliant power supply
-- Verify voltage regulation circuitry
-
-**Temperature Monitoring:**
-
-The `temperature` field provides the ESP32 internal die temperature. This is useful for:
-- Detecting inadequate cooling or ventilation
-- Identifying overheating issues with PoE installations
-- Monitoring long-term thermal performance
-
-**Temperature Ranges:**
-- **Normal** (Green): < 65°C - Device operating normally
-- **Warning** (Yellow): 65°C - 75°C - Check ventilation, may throttle
-- **Critical** (Red): > 75°C - Risk of thermal shutdown, improve cooling immediately
-
-**Temperature Troubleshooting:**
-- High temperature with PoE: Ensure adequate ventilation around device
-- Check for blocked air vents or heat dissipation
-- Consider adding active cooling for enclosed installations
-- Verify ambient temperature is within specifications
 
 **System Monitoring:**
 

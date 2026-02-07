@@ -69,8 +69,6 @@ export const useSysInfoStore = defineStore('sysInfo', {
     rawUartRemoteAddress: "",
     memoryUsage: 0.0,
     cpuUsage: 0.0,
-    supplyVoltage: 0.0,
-    temperature: 0.0,
     uptimeSeconds: 0,
     boardRevision: "",
     resetReason: "",

@@ -258,11 +258,12 @@ void UpdateCheck::_updateLatestVersion()
       char variant_pattern[64];
       snprintf(variant_pattern, sizeof(variant_pattern), "firmware-%s-", current_variant);
 
-      ESP_LOGI(TAG, "Looking for firmware variant: %s", current_variant);
+      ESP_LOGI(TAG, "Current firmware variant: %s, searching for pattern: %s", current_variant, variant_pattern);
 
       cJSON *assets = cJSON_GetObjectItem(release, "assets");
       if (assets && cJSON_IsArray(assets)) {
           int asset_count = cJSON_GetArraySize(assets);
+          ESP_LOGI(TAG, "Release has %d assets", asset_count);
           for (int j = 0; j < asset_count; j++) {
               cJSON *asset = cJSON_GetArrayItem(assets, j);
               if (!asset) {
@@ -273,6 +274,7 @@ void UpdateCheck::_updateLatestVersion()
               cJSON *browser_download_url = cJSON_GetObjectItem(asset, "browser_download_url");
 
               if (name && cJSON_IsString(name) && browser_download_url && cJSON_IsString(browser_download_url)) {
+                  ESP_LOGI(TAG, "  Asset %d: %s", j, name->valuestring);
                   // Match firmware-{variant}-*.bin pattern
                   if (strstr(name->valuestring, variant_pattern) != NULL && strstr(name->valuestring, ".bin") != NULL) {
                       strncpy(_downloadUrl, browser_download_url->valuestring, DOWNLOAD_URL_SIZE - 1);
@@ -282,6 +284,8 @@ void UpdateCheck::_updateLatestVersion()
                   }
               }
           }
+      } else {
+          ESP_LOGW(TAG, "No assets found in release");
       }
 
       // Fallback: construct default download URL with variant if not found in assets
@@ -289,7 +293,7 @@ void UpdateCheck::_updateLatestVersion()
           snprintf(_downloadUrl, DOWNLOAD_URL_SIZE,
                    "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware-%s-v%s.bin",
                    _latestVersion, current_variant, _latestVersion);
-          ESP_LOGW(TAG, "Asset download URL not found, using fallback: %s", _downloadUrl);
+          ESP_LOGW(TAG, "No matching asset found, using fallback URL: %s", _downloadUrl);
       }
 
       break;

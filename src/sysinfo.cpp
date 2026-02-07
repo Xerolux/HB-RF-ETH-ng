@@ -30,21 +30,18 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_system.h"
-#include "driver/temperature_sensor.h"
 #include "pins.h"
 
 static const char *TAG = "SysInfo";
 
 static volatile float _cpuUsage = 0.0f;
 static volatile float _memoryUsage = 0.0f;
-static volatile float _temperature = -127.0f;
 static volatile uint32_t _lastSysInfoRequestTime = 0;
 static char _serial[13];
 static const char *_currentVersion;
 static const char *_firmwareVariant;
 static board_type_t _board;
 static uint64_t _bootTime;
-static temperature_sensor_handle_t _temp_sensor = NULL;
 
 void updateCPUUsageTask(void *arg)
 {
@@ -97,18 +94,6 @@ void updateCPUUsageTask(void *arg)
         multi_heap_info_t info;
         heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
         _memoryUsage = 100.0f - (info.total_free_bytes * 100.0f / (info.total_free_bytes + info.total_allocated_bytes));
-
-        // Temperature
-#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
-        if (_temp_sensor) {
-            float temp_celsius = 0.0f;
-            if (temperature_sensor_get_celsius(_temp_sensor, &temp_celsius) == ESP_OK) {
-                _temperature = temp_celsius;
-            } else {
-                _temperature = -127.0f;
-            }
-        }
-#endif
     }
 
     free(taskStatus);
@@ -145,19 +130,6 @@ SysInfo::SysInfo()
 
     // Store boot time for uptime calculation
     _bootTime = esp_timer_get_time() / 1000000; // Convert to seconds
-
-    // Initialize temperature sensor
-    // Note: ESP32 (classic) does not have an internal temperature sensor
-    // Only ESP32-S2, ESP32-S3, ESP32-C3, etc. have internal temperature sensors
-#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
-    temperature_sensor_config_t temp_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(temperature_sensor_install(&temp_config, &_temp_sensor));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(temperature_sensor_enable(_temp_sensor));
-    ESP_LOGI(TAG, "Internal temperature sensor initialized");
-#else
-    ESP_LOGI(TAG, "ESP32 classic has no internal temperature sensor - external sensor required");
-    _temp_sensor = NULL;
-#endif
 }
 
 double SysInfo::getCpuUsage() const
@@ -190,12 +162,6 @@ const char *SysInfo::getFirmwareVariant() const
     return _firmwareVariant;
 }
 
-double SysInfo::getSupplyVoltage() const
-{
-    // ADC voltage measurement disabled (not functional)
-    return 0.0;
-}
-
 const char* SysInfo::getBoardRevisionString() const
 {
     switch (_board)
@@ -211,12 +177,6 @@ const char* SysInfo::getBoardRevisionString() const
     default:
         return "Unknown";
     }
-}
-
-double SysInfo::getTemperature() const
-{
-    // Return cached value updated by background task
-    return (double)_temperature;
 }
 
 uint64_t SysInfo::getUptimeSeconds() const

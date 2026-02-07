@@ -175,8 +175,6 @@ export default {
     latestVersion: 'Ultima versione',
     memory: 'Utilizzo memoria',
     cpu: 'Utilizzo CPU',
-    temperature: 'Temperatura',
-    voltage: 'Tensione di alimentazione',
     ethernet: 'Ethernet',
     connected: 'Connesso',
     disconnected: 'Disconnesso',
