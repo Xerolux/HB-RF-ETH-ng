@@ -8,7 +8,6 @@
 #include "mqtt_handler.h"
 #include "monitoring.h"
 #include "sysinfo.h"
-#include "updatecheck.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "freertos/FreeRTOS.h"
@@ -24,7 +23,6 @@ static mqtt_config_t current_mqtt_config;
 
 // Forward declarations
 extern SysInfo* monitoring_get_sysinfo(void);
-extern UpdateCheck* monitoring_get_updatecheck(void);
 
 void mqtt_handler_publish_ha_discovery(void);
 
@@ -105,7 +103,6 @@ void mqtt_handler_publish_status(void)
     }
 
     SysInfo* sysInfo = monitoring_get_sysinfo();
-    UpdateCheck* updateCheck = monitoring_get_updatecheck();
 
     if (sysInfo == NULL) {
         ESP_LOGW(TAG, "SysInfo not available");
@@ -137,14 +134,6 @@ void mqtt_handler_publish_status(void)
     // Status Page Topics
     PUBLISH_STR("status/serial", sysInfo->getSerialNumber());
     PUBLISH_STR("status/version", sysInfo->getCurrentVersion());
-
-    if (updateCheck) {
-        const char* latest = updateCheck->getLatestVersion();
-        PUBLISH_STR("status/latest_version", latest);
-
-        bool updateAvailable = (strcmp(sysInfo->getCurrentVersion(), latest) != 0 && strcmp(latest, "n/a") != 0);
-        PUBLISH_STR("status/update_available", updateAvailable ? "true" : "false");
-    }
 
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
     PUBLISH_DOUBLE("status/memory_usage", sysInfo->getMemoryUsage(), 1);
@@ -249,42 +238,8 @@ void mqtt_handler_publish_ha_discovery(void)
     // Uptime (text)
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
 
-    // Update Available
-    // Binary sensor for update available
-    // For binary sensor, we need payload_on="true", payload_off="false"
-    {
-         cJSON *root = cJSON_CreateObject();
-        cJSON_AddStringToObject(root, "name", "Update Available");
-        char unique_id[128];
-        snprintf(unique_id, sizeof(unique_id), "%s_update_available", identifiers);
-        cJSON_AddStringToObject(root, "unique_id", unique_id);
-
-        char state_topic[128];
-        snprintf(state_topic, sizeof(state_topic), "%s/status/update_available", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "state_topic", state_topic);
-
-        cJSON_AddStringToObject(root, "device_class", "update");
-        cJSON_AddStringToObject(root, "entity_category", "diagnostic");
-        cJSON_AddStringToObject(root, "payload_on", "true");
-        cJSON_AddStringToObject(root, "payload_off", "false");
-
-        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
-
-        char *json_str = cJSON_PrintUnformatted(root);
-        char topic[256];
-        snprintf(topic, sizeof(topic), "%s/binary_sensor/hb-rf-eth-%s/update_available/config",
-                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
-
-        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
-        free(json_str);
-        cJSON_Delete(root);
-    }
-
     // Current Version
     publish_config("sensor", "version", "Current Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
-
-    // Latest Version
-    publish_config("sensor", "latest_version", "Latest Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
 
     // Board Revision
     publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");

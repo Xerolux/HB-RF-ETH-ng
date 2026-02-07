@@ -1,5 +1,5 @@
 <template>
-  <BNavbar type="dark" variant="primary" toggleable="sm" class="mb-3 mt-3">
+  <BNavbar type="dark" variant="primary" toggleable="md" class="mb-3 mt-3">
     <BNavbarBrand tag="h1" class="font-weight-bold">HB-RF-ETH-ng</BNavbarBrand>
     <BNavbarToggle target="nav-collapse" />
     <BCollapse id="nav-collapse" is-nav>
@@ -8,7 +8,7 @@
         <BNavItem to="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
         <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
         <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BNavItem>
+        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn && sysInfoStore.enableAnalyzer && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BNavItem>
         <BNavItem to="/log" v-if="loginStore.isLoggedIn">{{ t('nav.log') }}</BNavItem>
         <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
@@ -46,7 +46,7 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore, useSettingsStore } from './stores.js'
+import { useLoginStore, useThemeStore, useSettingsStore, useSysInfoStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 
 const { t, locale } = useI18n()
@@ -54,10 +54,11 @@ const router = useRouter()
 const loginStore = useLoginStore()
 const themeStore = useThemeStore()
 const settingsStore = useSettingsStore()
+const sysInfoStore = useSysInfoStore()
 
 onMounted(async () => {
     if (loginStore.isLoggedIn) {
-        await settingsStore.load()
+        await Promise.all([settingsStore.load(), sysInfoStore.update()])
     }
 })
 

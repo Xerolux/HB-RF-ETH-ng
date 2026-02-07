@@ -63,9 +63,6 @@ export const useSysInfoStore = defineStore('sysInfo', {
     serial: "",
     currentVersion: "",
     firmwareVariant: "",
-    latestVersion: "",
-    releaseNotes: "",
-    downloadUrl: "",
     rawUartRemoteAddress: "",
     memoryUsage: 0.0,
     cpuUsage: 0.0,
@@ -80,7 +77,9 @@ export const useSysInfoStore = defineStore('sysInfo', {
     radioModuleFirmwareVersion: "",
     radioModuleBidCosRadioMAC: "",
     radioModuleHmIPRadioMAC: "",
-    radioModuleSGTIN: ""
+    radioModuleSGTIN: "",
+    enableHmlgw: false,
+    enableAnalyzer: false
   }),
   actions: {
     async update() {
@@ -117,8 +116,6 @@ export const useSettingsStore = defineStore('settings', {
     gpsBaudrate: 9600,
     ntpServer: "",
     ledBrightness: 100,
-    checkUpdates: true,
-    allowPrerelease: false,
     hmlgwEnabled: false,
     hmlgwPort: 2000,
     hmlgwKeepAlivePort: 2001,

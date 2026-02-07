@@ -83,155 +83,109 @@ bool UpdateCheck::hasDownloadUrl()
   return strlen(_downloadUrl) > 0;
 }
 
+// Extract a JSON string value by key from raw JSON text (lightweight, no full parse needed)
+static bool _extractJsonString(const char *json, const char *key, char *out, size_t out_size)
+{
+    char search[64];
+    snprintf(search, sizeof(search), "\"%s\"", key);
+    const char *pos = strstr(json, search);
+    if (!pos) return false;
+
+    // Skip past key and find the colon + opening quote
+    pos += strlen(search);
+    while (*pos == ' ' || *pos == ':' || *pos == '\t' || *pos == '\n' || *pos == '\r') pos++;
+    if (*pos != '"') return false;
+    pos++; // skip opening quote
+
+    size_t i = 0;
+    while (*pos && *pos != '"' && i < out_size - 1) {
+        if (*pos == '\\' && *(pos + 1)) {
+            pos++; // skip escape char
+        }
+        out[i++] = *pos++;
+    }
+    out[i] = '\0';
+    return i > 0;
+}
+
 void UpdateCheck::_updateLatestVersion()
 {
-  // Always fetch releases list to properly filter by type
-  char url[256];
-  snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=5");
+  ESP_LOGI(TAG, "Free heap before update check: %lu bytes", esp_get_free_heap_size());
 
+  // Use /releases/latest - tag_name appears in the first ~500 bytes of response
   esp_http_client_config_t config = {};
-  config.url = url;
+  config.url = "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/latest";
   config.crt_bundle_attach = esp_crt_bundle_attach;
   config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-  config.buffer_size = 4096;  // Internal buffer for chunks
-  config.buffer_size_tx = 2048;
-  config.timeout_ms = 15000;   // 15 second timeout
+  config.buffer_size = 1536;
+  config.buffer_size_tx = 512;
+  config.timeout_ms = 15000;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
-
   if (!client) {
-      ESP_LOGE(TAG, "Failed to initialize HTTP client for update check");
+      ESP_LOGE(TAG, "Failed to initialize HTTP client");
       return;
   }
 
-  // Set required headers for GitHub API
   esp_http_client_set_header(client, "Accept", "application/vnd.github.v3+json");
   esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
 
-  esp_err_t err = esp_http_client_perform(client);
+  esp_err_t err = esp_http_client_open(client, 0);
   if (err != ESP_OK) {
-      ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
+      ESP_LOGE(TAG, "HTTP connection failed: %s", esp_err_to_name(err));
       esp_http_client_cleanup(client);
       return;
   }
 
+  esp_http_client_fetch_headers(client);
   int status_code = esp_http_client_get_status_code(client);
+
   if (status_code != 200) {
       ESP_LOGE(TAG, "GitHub API returned status code: %d", status_code);
+      esp_http_client_close(client);
       esp_http_client_cleanup(client);
       return;
   }
 
-  int content_length = esp_http_client_get_content_length(client);
-  ESP_LOGI(TAG, "GitHub API response: status=%d, content_length=%d", status_code, content_length);
-
-  // Allocate buffer for response
-  // Reduced from 32KB to 16KB to ensure allocation succeeds even when heap is fragmented
-  // GitHub API responses for 5 releases are typically 10-15KB
-  const int MAX_BUFFER_SIZE = 16384;
-  char *buffer = (char*)malloc(MAX_BUFFER_SIZE);
+  // Only read first 2KB - tag_name is near the top of the JSON response
+  const int BUFFER_SIZE = 2048;
+  char *buffer = (char*)malloc(BUFFER_SIZE);
   if (!buffer) {
-      ESP_LOGE(TAG, "Failed to allocate buffer for update check (needed %d bytes)", MAX_BUFFER_SIZE);
-      ESP_LOGE(TAG, "Free heap: %lu bytes, largest block: %lu bytes",
-               esp_get_free_heap_size(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      ESP_LOGE(TAG, "Failed to allocate %d bytes (free: %lu)", BUFFER_SIZE, esp_get_free_heap_size());
+      esp_http_client_close(client);
       esp_http_client_cleanup(client);
       return;
   }
 
   int total_read = 0;
-  int read_len = 0;
-
-  // Read response in chunks
-  while (total_read < (MAX_BUFFER_SIZE - 1) && (read_len = esp_http_client_read(client, buffer + total_read, (MAX_BUFFER_SIZE - 1) - total_read)) > 0) {
+  int read_len;
+  while (total_read < (BUFFER_SIZE - 1)) {
+      read_len = esp_http_client_read(client, buffer + total_read, (BUFFER_SIZE - 1) - total_read);
+      if (read_len <= 0) break;
       total_read += read_len;
   }
   buffer[total_read] = '\0';
 
+  // Close TLS connection immediately to free ~40KB
+  esp_http_client_close(client);
+  esp_http_client_cleanup(client);
+
   if (total_read <= 0) {
       ESP_LOGE(TAG, "Failed to read response from GitHub API");
       free(buffer);
-      esp_http_client_cleanup(client);
       return;
   }
 
-  ESP_LOGI(TAG, "Read %d bytes from GitHub API", total_read);
+  ESP_LOGI(TAG, "Read %d bytes from GitHub API (heap: %lu)", total_read, esp_get_free_heap_size());
 
-  // Parse JSON response
-  cJSON *json = cJSON_Parse(buffer);
-  free(buffer);  // Free buffer after parsing
-
-  if (!json) {
-      ESP_LOGE(TAG, "Failed to parse JSON response from GitHub API");
-      esp_http_client_cleanup(client);
-      return;
-  }
-
-  if (!cJSON_IsArray(json)) {
-      ESP_LOGE(TAG, "GitHub API response is not an array");
-      cJSON_Delete(json);
-      esp_http_client_cleanup(client);
-      return;
-  }
-
-  int array_size = cJSON_GetArraySize(json);
-  ESP_LOGI(TAG, "Found %d releases on GitHub", array_size);
-
-  bool allow_prerelease = _settings->getAllowPrerelease();
-  bool found_release = false;
-
-  // Reset cached data
+  // Extract tag_name using lightweight string search (no JSON parser needed)
   _releaseNotes[0] = '\0';
   _downloadUrl[0] = '\0';
 
-  // Iterate through releases to find the appropriate one
-  for (int i = 0; i < array_size; i++) {
-      cJSON *release = cJSON_GetArrayItem(json, i);
-      if (!release) {
-          ESP_LOGW(TAG, "Release at index %d is null", i);
-          continue;
-      }
+  char tag_name[33] = {0};
+  if (_extractJsonString(buffer, "tag_name", tag_name, sizeof(tag_name))) {
+      ESP_LOGI(TAG, "Latest release: %s", tag_name);
 
-      cJSON *draft_obj = cJSON_GetObjectItem(release, "draft");
-      cJSON *prerelease_obj = cJSON_GetObjectItem(release, "prerelease");
-      cJSON *tag_name_obj = cJSON_GetObjectItem(release, "tag_name");
-
-      if (!tag_name_obj || !cJSON_IsString(tag_name_obj)) {
-          ESP_LOGW(TAG, "Release at index %d has no valid tag_name", i);
-          continue;
-      }
-
-      const char *tag_name = tag_name_obj->valuestring;
-
-      // Check draft status - default to false if not present
-      bool is_draft = false;
-      if (draft_obj && cJSON_IsBool(draft_obj)) {
-          is_draft = cJSON_IsTrue(draft_obj);
-      }
-
-      // Check prerelease status - default to false if not present
-      bool is_prerelease = false;
-      if (prerelease_obj && cJSON_IsBool(prerelease_obj)) {
-          is_prerelease = cJSON_IsTrue(prerelease_obj);
-      }
-
-      ESP_LOGI(TAG, "Examining release %d: %s (draft=%d, prerelease=%d)", i, tag_name, is_draft, is_prerelease);
-
-      // Skip drafts (they're not meant for public consumption)
-      if (is_draft) {
-          ESP_LOGI(TAG, "Skipping draft release: %s", tag_name);
-          continue;
-      }
-
-      // Filter based on prerelease setting
-      if (!allow_prerelease && is_prerelease) {
-          ESP_LOGI(TAG, "Skipping prerelease: %s (allow_prerelease=%d)", tag_name, allow_prerelease);
-          continue;
-      }
-
-      // Found a suitable release
-      ESP_LOGI(TAG, "Found suitable release: %s (prerelease=%d)", tag_name, is_prerelease);
-
-      // Remove 'v' prefix if present
       const char* version_str = tag_name;
       if ((tag_name[0] == 'v' || tag_name[0] == 'V') && tag_name[1] != '\0') {
           version_str = tag_name + 1;
@@ -239,86 +193,33 @@ void UpdateCheck::_updateLatestVersion()
 
       strncpy(_latestVersion, version_str, sizeof(_latestVersion) - 1);
       _latestVersion[sizeof(_latestVersion) - 1] = '\0';
-      found_release = true;
-      ESP_LOGI(TAG, "Set latest version to: %s", _latestVersion);
 
-      // Read release notes (body) if present
-      cJSON *body_obj = cJSON_GetObjectItem(release, "body");
-      if (body_obj && cJSON_IsString(body_obj) && body_obj->valuestring) {
-          strncpy(_releaseNotes, body_obj->valuestring, RELEASE_NOTES_SIZE - 1);
-          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
-      } else {
-          strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
-          _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
-      }
-
-      // Find firmware asset download URL matching current firmware variant
-      _downloadUrl[0] = '\0';
+      // Construct download URL from version and variant
       const char* current_variant = _sysInfo->getFirmwareVariant();
-      char variant_pattern[64];
-      snprintf(variant_pattern, sizeof(variant_pattern), "firmware-%s-", current_variant);
+      snprintf(_downloadUrl, DOWNLOAD_URL_SIZE,
+               "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware-%s-v%s.bin",
+               _latestVersion, current_variant, _latestVersion);
 
-      ESP_LOGI(TAG, "Current firmware variant: %s, searching for pattern: %s", current_variant, variant_pattern);
+      strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
+      _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
 
-      cJSON *assets = cJSON_GetObjectItem(release, "assets");
-      if (assets && cJSON_IsArray(assets)) {
-          int asset_count = cJSON_GetArraySize(assets);
-          ESP_LOGI(TAG, "Release has %d assets", asset_count);
-          for (int j = 0; j < asset_count; j++) {
-              cJSON *asset = cJSON_GetArrayItem(assets, j);
-              if (!asset) {
-                  continue;
-              }
-
-              cJSON *name = cJSON_GetObjectItem(asset, "name");
-              cJSON *browser_download_url = cJSON_GetObjectItem(asset, "browser_download_url");
-
-              if (name && cJSON_IsString(name) && browser_download_url && cJSON_IsString(browser_download_url)) {
-                  ESP_LOGI(TAG, "  Asset %d: %s", j, name->valuestring);
-                  // Match firmware-{variant}-*.bin pattern
-                  if (strstr(name->valuestring, variant_pattern) != NULL && strstr(name->valuestring, ".bin") != NULL) {
-                      strncpy(_downloadUrl, browser_download_url->valuestring, DOWNLOAD_URL_SIZE - 1);
-                      _downloadUrl[DOWNLOAD_URL_SIZE - 1] = '\0';
-                      ESP_LOGI(TAG, "Found matching firmware asset: %s", name->valuestring);
-                      break;
-                  }
-              }
-          }
-      } else {
-          ESP_LOGW(TAG, "No assets found in release");
-      }
-
-      // Fallback: construct default download URL with variant if not found in assets
-      if (strlen(_downloadUrl) == 0) {
-          snprintf(_downloadUrl, DOWNLOAD_URL_SIZE,
-                   "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware-%s-v%s.bin",
-                   _latestVersion, current_variant, _latestVersion);
-          ESP_LOGW(TAG, "No matching asset found, using fallback URL: %s", _downloadUrl);
-      }
-
-      break;
-  }
-
-  if (!found_release) {
-      ESP_LOGW(TAG, "No suitable release found (allow_prerelease=%d)", allow_prerelease);
+      ESP_LOGI(TAG, "Latest version: %s, download URL: %s", _latestVersion, _downloadUrl);
+  } else {
+      ESP_LOGW(TAG, "Could not find tag_name in API response");
       strncpy(_latestVersion, "n/a", sizeof(_latestVersion) - 1);
       _latestVersion[sizeof(_latestVersion) - 1] = '\0';
       strncpy(_releaseNotes, FALLBACK_RELEASE_NOTES, RELEASE_NOTES_SIZE - 1);
       _releaseNotes[RELEASE_NOTES_SIZE - 1] = '\0';
       _downloadUrl[0] = '\0';
-  } else {
-      ESP_LOGI(TAG, "Latest version: %s", _latestVersion);
   }
 
-  cJSON_Delete(json);
-  esp_http_client_cleanup(client);
+  free(buffer);
 }
 
 void UpdateCheck::_taskFunc()
 {
-  // Reduced initial delay from 30s to 10s to improve startup responsiveness
-  // Network should be ready by then
-  vTaskDelay(10000 / portTICK_PERIOD_MS);
+  // Wait 30s before first check to let system stabilize and free heap
+  vTaskDelay(30000 / portTICK_PERIOD_MS);
 
   uint32_t check_count = 0;
 

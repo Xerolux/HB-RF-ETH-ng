@@ -90,6 +90,8 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;
     esp32_emac_config.smi_gpio.mdc_num = ETH_MDC_PIN;
+    esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_OUT;
+    esp32_emac_config.clock_config.rmii.clock_gpio = EMAC_CLK_OUT_180_GPIO;
     _mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
 
     _eth_config = ETH_DEFAULT_CONFIG(_mac, _phy);
@@ -116,18 +118,12 @@ void Ethernet::_configurePHYLEDs()
     // Register 31 (0x1F): Special Control/Status Register
     // Bits [14:12] control LED mode:
     //   001b: LED1=Link, LED2=Activity
-    //   010b: LED1=Link/Activity, LED2=100Mbps
-    //   111b: LED1=Link/Activity, LED2=Link/Activity
 
-    // Structure for PHY register read/write
-    struct {
-        uint32_t reg_addr;
-        uint32_t reg_value;
-    } phy_reg;
-
-    // Read current value of register 31 (0x1F)
-    phy_reg.reg_addr = 0x1F;
-    phy_reg.reg_value = 0;
+    uint32_t reg_value = 0;
+    esp_eth_phy_reg_rw_data_t phy_reg = {
+        .reg_addr = 0x1F,
+        .reg_value_p = &reg_value,
+    };
 
     esp_err_t err = esp_eth_ioctl(_eth_handle, ETH_CMD_READ_PHY_REG, &phy_reg);
     if (err != ESP_OK)
@@ -136,12 +132,11 @@ void Ethernet::_configurePHYLEDs()
         return;
     }
 
-    ESP_LOGI(TAG, "PHY register 31 current value: 0x%04X", phy_reg.reg_value);
+    ESP_LOGI(TAG, "PHY register 31 current value: 0x%04X", reg_value);
 
     // Clear LED_CFG bits [14:12] and set to mode 001b (Link on LED1, Activity on LED2)
-    phy_reg.reg_value = (phy_reg.reg_value & ~(0x7 << 12)) | (0x1 << 12);
+    reg_value = (reg_value & ~(0x7 << 12)) | (0x1 << 12);
 
-    // Write back to register 31
     err = esp_eth_ioctl(_eth_handle, ETH_CMD_WRITE_PHY_REG, &phy_reg);
     if (err != ESP_OK)
     {
@@ -149,7 +144,7 @@ void Ethernet::_configurePHYLEDs()
         return;
     }
 
-    ESP_LOGI(TAG, "PHY LED mode configured: LED1=Link, LED2=Activity (reg 31 = 0x%04X)", phy_reg.reg_value);
+    ESP_LOGI(TAG, "PHY LED mode configured: LED1=Link, LED2=Activity (reg 31 = 0x%04X)", reg_value);
 }
 
 void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2)

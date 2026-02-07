@@ -68,7 +68,6 @@ static TaskHandle_t checkmk_task_handle = NULL;
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
-static UpdateCheck* g_updateCheck = NULL;
 
 // Get firmware version from app descriptor
 static const char* get_firmware_version(void)
@@ -92,10 +91,6 @@ static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes
 // Helper to access global pointers from other files (like mqtt_handler)
 SysInfo* monitoring_get_sysinfo(void) {
     return g_sysInfo;
-}
-
-UpdateCheck* monitoring_get_updatecheck(void) {
-    return g_updateCheck;
 }
 
 static bool is_ip_allowed(const char* allowed_hosts, const char* client_ip) {
@@ -572,12 +567,11 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 
     g_sysInfo = sysInfo;
-    g_updateCheck = updateCheck;
 
     // Initialize MQTT handler
     mqtt_handler_init();

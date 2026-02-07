@@ -56,9 +56,9 @@ void ledSwitcherTask(void *parameter)
             UBaseType_t watermark = uxTaskGetStackHighWaterMark(NULL);
             if (watermark < stack_watermark_min) {
                 stack_watermark_min = watermark;
-                ESP_LOGI("LED", "LED_Switcher stack watermark: %u bytes free (allocated: 1280, usage: %.1f%%)",
+                ESP_LOGI("LED", "LED_Switcher stack watermark: %u bytes free (allocated: 2048, usage: %.1f%%)",
                          watermark * sizeof(StackType_t),
-                         100.0 * (1280 - watermark * sizeof(StackType_t)) / 1280.0);
+                         100.0 * (2048 - watermark * sizeof(StackType_t)) / 2048.0);
             }
         }
 
@@ -85,9 +85,8 @@ void LED::start(Settings *settings)
 
     if (!_switchTaskHandle)
     {
-        // OPTIMIZED: Reduced from 4096 to 1280 bytes - simple task using hardware LEDC PWM
-        // Task only updates LED states via LEDC registers - minimal stack needed
-        xTaskCreate(ledSwitcherTask, "LED_Switcher", 1280, NULL, 10, &_switchTaskHandle);
+        // Stack: 2048 bytes - needs headroom for ESP_LOG calls and LEDC PWM updates
+        xTaskCreate(ledSwitcherTask, "LED_Switcher", 2048, NULL, 10, &_switchTaskHandle);
     }
 }
 

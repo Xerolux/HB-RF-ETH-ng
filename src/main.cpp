@@ -53,7 +53,6 @@
 #include "mdnsserver.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
-#include "updatecheck.h"
 #include "monitoring.h"
 #include "dtls_encryption.h"
 #include "log_manager.h"
@@ -354,14 +353,11 @@ void app_main()
         rawUartUdpLister->start();
     }
 
-    UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
-    updateCheck.start();
-
-    WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector, &dtlsEncryption);
+    WebUI webUI(&settings, &statusLED, &sysInfo, &ethernet, rawUartUdpLister, &radioModuleConnector, &radioModuleDetector, &dtlsEncryption);
     webUI.start();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
-    monitoring_init(NULL, &sysInfo, &updateCheck);
+    monitoring_init(NULL, &sysInfo);
 
     powerLED.setState(LED_STATE_ON);
     statusLED.setState(LED_STATE_OFF);

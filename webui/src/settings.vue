@@ -184,54 +184,46 @@
           </BFormSelect>
         </BInputGroup>
       </BFormGroup>
-      <BFormGroup :label="t('settings.checkUpdates')" label-cols-sm="4">
-        <BFormRadioGroup buttons v-model="checkUpdates" required>
-          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
-          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
-        </BFormRadioGroup>
-      </BFormGroup>
-      <BFormGroup :label="t('settings.allowPrerelease')" label-cols-sm="4">
-        <BFormRadioGroup buttons v-model="allowPrerelease" required>
-          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
-          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
-        </BFormRadioGroup>
-      </BFormGroup>
-      <hr />
-      <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
-      <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
-        <BFormRadioGroup buttons v-model="hmlgwEnabled" required>
-          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
-          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
-        </BFormRadioGroup>
-      </BFormGroup>
-      <template v-if="hmlgwEnabled">
-        <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
-          <BFormInput
-            type="number"
-            v-model.number="hmlgwPort"
-            min="1"
-            max="65535"
-            :state="v$.hmlgwPort.$error ? false : null"
-          />
+      <template v-if="sysInfoStore.enableHmlgw">
+        <hr />
+        <h6 class="text-secondary">{{ t('settings.hmlgwSettings') }}</h6>
+        <BFormGroup :label="t('settings.enableHmlgw')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="hmlgwEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
         </BFormGroup>
-        <BFormGroup :label="t('settings.hmlgwKeepAlivePort')" label-cols-sm="4">
-          <BFormInput
-            type="number"
-            v-model.number="hmlgwKeepAlivePort"
-            min="1"
-            max="65535"
-            :state="v$.hmlgwKeepAlivePort.$error ? false : null"
-          />
+        <template v-if="hmlgwEnabled">
+          <BFormGroup :label="t('settings.hmlgwPort')" label-cols-sm="4">
+            <BFormInput
+              type="number"
+              v-model.number="hmlgwPort"
+              min="1"
+              max="65535"
+              :state="v$.hmlgwPort.$error ? false : null"
+            />
+          </BFormGroup>
+          <BFormGroup :label="t('settings.hmlgwKeepAlivePort')" label-cols-sm="4">
+            <BFormInput
+              type="number"
+              v-model.number="hmlgwKeepAlivePort"
+              min="1"
+              max="65535"
+              :state="v$.hmlgwKeepAlivePort.$error ? false : null"
+            />
+          </BFormGroup>
+        </template>
+      </template>
+      <template v-if="sysInfoStore.enableAnalyzer">
+        <hr />
+        <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
+        <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
+          <BFormRadioGroup buttons v-model="analyzerEnabled" required>
+            <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
+            <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
+          </BFormRadioGroup>
         </BFormGroup>
       </template>
-      <hr />
-      <h6 class="text-secondary">{{ t('settings.analyzerSettings') }}</h6>
-      <BFormGroup :label="t('settings.enableAnalyzer')" label-cols-sm="4">
-        <BFormRadioGroup buttons v-model="analyzerEnabled" required>
-          <BFormRadio :value="true">{{ t('common.enabled') }}</BFormRadio>
-          <BFormRadio :value="false">{{ t('common.disabled') }}</BFormRadio>
-        </BFormRadioGroup>
-      </BFormGroup>
 
       <hr />
       <h6 class="text-secondary">{{ t('settings.dtls.title') }}</h6>
@@ -433,7 +425,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore } from './stores.js'
+import { useSettingsStore, useSysInfoStore } from './stores.js'
 import PasswordInput from './components/PasswordInput.vue'
 
 const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
@@ -443,6 +435,7 @@ const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}
 const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
+const sysInfoStore = useSysInfoStore()
 
 // Local form state
 const restoreFile = ref(null)
@@ -470,9 +463,6 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
-const checkUpdates = ref(true)
-const allowPrerelease = ref(false)
-
 const hmlgwEnabled = ref(false)
 const hmlgwPort = ref(2000)
 const hmlgwKeepAlivePort = ref(2001)
@@ -627,8 +617,6 @@ const loadSettings = () => {
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
-  checkUpdates.value = settingsStore.checkUpdates
-  allowPrerelease.value = settingsStore.allowPrerelease
 
   if (settingsStore.hmlgwEnabled !== undefined) {
       hmlgwEnabled.value = settingsStore.hmlgwEnabled
@@ -666,7 +654,7 @@ watch(() => settingsStore.$state, () => {
 }, { deep: true })
 
 onMounted(async () => {
-  await settingsStore.load()
+  await Promise.all([settingsStore.load(), sysInfoStore.update()])
   loadSettings()
 })
 
@@ -692,8 +680,6 @@ const saveSettingsClick = async () => {
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
-      checkUpdates: checkUpdates.value,
-      allowPrerelease: allowPrerelease.value,
       // HMLGW
       hmlgwEnabled: hmlgwEnabled.value,
       hmlgwPort: hmlgwPort.value,

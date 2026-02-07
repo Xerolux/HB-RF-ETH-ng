@@ -10,9 +10,6 @@
       <BFormGroup :label="t('firmware.installedVersion')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.currentVersion" disabled />
       </BFormGroup>
-      <BFormGroup :label="t('firmware.latestVersion')" label-cols-sm="4">
-        <BFormInput type="text" :model-value="sysInfoStore.latestVersion" disabled />
-      </BFormGroup>
       <BAlert
         variant="info"
         :model-value="true"
@@ -25,62 +22,6 @@
           target="_new"
         >GitHub Releases</a>
       </BAlert>
-      <BAlert
-        variant="success"
-        :model-value="sysInfoStore.currentVersion >= sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
-      >
-        {{ t('firmware.upToDate') }}
-      </BAlert>
-      <BAlert
-        variant="warning"
-        :model-value="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
-      >
-        {{ t('firmware.updateAvailable', { currentVersion: sysInfoStore.currentVersion, latestVersion: sysInfoStore.latestVersion }) }}
-      </BAlert>
-      <BAlert
-        variant="danger"
-        :model-value="sysInfoStore.latestVersion == 'n/a'"
-      >
-        {{ t('firmware.versionCheckFailed') }}
-      </BAlert>
-
-      <BFormGroup
-        v-if="sysInfoStore.currentVersion < sysInfoStore.latestVersion && sysInfoStore.latestVersion != 'n/a'"
-        label-cols-sm="9"
-        class="mb-3"
-      >
-        <BButton
-          variant="info"
-          block
-          class="mb-2"
-          @click="showReleaseNotes = true"
-        >{{ t('firmware.showReleaseNotes') }}</BButton>
-        <BButton
-          variant="success"
-          block
-          :disabled="firmwareUpdateStore.progress > 0"
-          @click="onlineUpdateClick"
-        >
-          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
-          {{ firmwareUpdateStore.progress > 0 ? t('firmware.updating') : t('firmware.onlineUpdate') }}
-        </BButton>
-      </BFormGroup>
-
-      <BFormGroup
-        v-if="sysInfoStore.currentVersion >= sysInfoStore.latestVersion || sysInfoStore.latestVersion == 'n/a'"
-        label-cols-sm="9"
-        class="mb-3"
-      >
-        <BButton
-            variant="primary"
-            block
-            @click="checkUpdateClick"
-            :disabled="checkUpdateLoading"
-        >
-          <BSpinner small v-if="checkUpdateLoading" class="me-2" />
-          {{ t('firmware.checkUpdate') }}
-        </BButton>
-      </BFormGroup>
 
       <BFormGroup :label="t('firmware.updateFile')" label-cols-sm="4">
         <BFormFile
@@ -91,44 +32,6 @@
         />
       </BFormGroup>
 
-    <BModal
-      v-model="showReleaseNotes"
-      :title="t('firmware.releaseNotesTitle', { version: sysInfoStore.latestVersion })"
-      size="lg"
-      scrollable
-      ok-only
-      :ok-title="t('common.close')"
-      @show="fetchReleaseNotes"
-    >
-      <div v-if="loadingNotes" class="text-center p-4">
-        <BSpinner label="Loading..." />
-      </div>
-      <div v-else-if="releaseNotesError" class="text-danger">
-        {{ t('firmware.releaseNotesError') }}
-      </div>
-      <div v-else>
-        <!-- Use v-html carefully, ideally use a markdown renderer but for now pre-wrap -->
-        <pre class="release-notes-content">{{ releaseNotes }}</pre>
-        <BButton
-          v-if="releaseDownloadUrl"
-          :href="releaseDownloadUrl"
-          target="_blank"
-          variant="primary"
-          block
-          class="mt-2"
-        >{{ t('firmware.downloadFirmware') }}</BButton>
-        <BButton
-          variant="success"
-          block
-          class="mt-3"
-          :disabled="firmwareUpdateStore.progress > 0"
-          @click="onlineUpdateClickFromModal"
-        >
-          <BSpinner small v-if="firmwareUpdateStore.progress > 0" class="me-2" />
-          {{ firmwareUpdateStore.progress > 0 ? t('firmware.updating') : t('firmware.onlineUpdate') }}
-        </BButton>
-      </div>
-    </BModal>
       <BProgress
         :value="firmwareUpdateStore.progress"
         :max="100"
@@ -194,71 +97,7 @@ const firmwareUpdateStore = useFirmwareUpdateStore()
 const file = ref(null)
 const showError = ref(false)
 const showSuccess = ref(false)
-const checkUpdateLoading = ref(false)
 const restartLoading = ref(false)
-
-const showReleaseNotes = ref(false)
-const releaseNotes = ref('')
-const releaseDownloadUrl = ref('')
-const loadingNotes = ref(false)
-const releaseNotesError = ref(false)
-
-const fetchReleaseNotes = async () => {
-  loadingNotes.value = true
-  releaseNotesError.value = false
-  releaseNotes.value = ''
-  releaseDownloadUrl.value = ''
-  try {
-    const response = await axios.post('/api/check_update')
-    if (response.data) {
-      sysInfoStore.latestVersion = response.data.latestVersion || sysInfoStore.latestVersion
-      if (response.data.releaseNotes) {
-        releaseNotes.value = response.data.releaseNotes
-        sysInfoStore.releaseNotes = response.data.releaseNotes
-      } else {
-        releaseNotes.value = t('firmware.releaseNotesError')
-      }
-      if (response.data.downloadUrl) {
-        releaseDownloadUrl.value = response.data.downloadUrl
-        sysInfoStore.downloadUrl = response.data.downloadUrl
-      }
-    }
-  } catch (error) {
-    console.error('Failed to fetch release notes:', error)
-    releaseNotesError.value = true
-  } finally {
-    loadingNotes.value = false
-  }
-}
-
-const onlineUpdateClickFromModal = () => {
-    showReleaseNotes.value = false
-    onlineUpdateClick()
-}
-
-const onlineUpdateClick = async () => {
-  if (confirm(t('firmware.onlineUpdateConfirm'))) {
-    showError.value = null
-    showSuccess.value = null
-
-    // Set a fake progress to show activity or use a different indicator
-    firmwareUpdateStore.progress = 1
-
-    try {
-        const response = await fetch('/api/online_update', { method: 'POST' })
-        if (response.ok) {
-            // The device will restart, so maybe show a message "Update started, device will restart..."
-            alert(t('firmware.onlineUpdateStarted'))
-        } else {
-            showError.value = true
-        }
-        firmwareUpdateStore.progress = 0
-    } catch (error) {
-        showError.value = true
-        firmwareUpdateStore.progress = 0
-    }
-  }
-}
 
 const firmwareUpdateClick = async () => {
   showError.value = null
@@ -284,48 +123,11 @@ const restartClick = async () => {
       }, 10000)
     } catch (error) {
       // Expected - device will restart and connection will be lost
-    } finally {
-      // restartLoading.value = false // No need to reset if page reloads, but good practice if it fails
     }
   }
-}
-
-const checkUpdateClick = async () => {
-    checkUpdateLoading.value = true
-    try {
-        const response = await axios.post('/api/check_update')
-        if (response.data && response.data.latestVersion) {
-            sysInfoStore.latestVersion = response.data.latestVersion
-            sysInfoStore.releaseNotes = response.data.releaseNotes || sysInfoStore.releaseNotes
-            sysInfoStore.downloadUrl = response.data.downloadUrl || sysInfoStore.downloadUrl
-            if (sysInfoStore.currentVersion < sysInfoStore.latestVersion) {
-                releaseNotes.value = response.data.releaseNotes || ''
-                releaseDownloadUrl.value = response.data.downloadUrl || ''
-                alert(t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }))
-            } else {
-                alert(t('firmware.noUpdateAvailable'))
-            }
-        }
-    } catch (e) {
-        console.error(e)
-        alert('Failed to check updates')
-    } finally {
-        checkUpdateLoading.value = false
-    }
 }
 
 onMounted(() => {
   sysInfoStore.update()
 })
 </script>
-
-<style scoped>
-.release-notes-content {
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-family: inherit;
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 0.25rem;
-}
-</style>

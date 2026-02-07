@@ -49,7 +49,8 @@
 #include "security_headers.h"
 #include "log_manager.h"
 #include "secure_utils.h"
-// #include "prometheus.h"
+#include "esp_http_client.h"
+#include "esp_crt_bundle.h"
 
 static const char *TAG = "WebUI";
 
@@ -171,7 +172,6 @@ static void trigger_restart() {
 static Settings *_settings;
 static LED *_statusLED;
 static SysInfo *_sysInfo;
-static UpdateCheck *_updateCheck;
 static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
@@ -392,7 +392,6 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(sysInfo, "serial", _sysInfo->getSerialNumber());
     cJSON_AddStringToObject(sysInfo, "currentVersion", _sysInfo->getCurrentVersion());
     cJSON_AddStringToObject(sysInfo, "firmwareVariant", _sysInfo->getFirmwareVariant());
-    cJSON_AddStringToObject(sysInfo, "latestVersion", _updateCheck->getLatestVersion());
     cJSON_AddNumberToObject(sysInfo, "memoryUsage", _sysInfo->getMemoryUsage());
     cJSON_AddNumberToObject(sysInfo, "cpuUsage", _sysInfo->getCpuUsage());
     cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
@@ -408,6 +407,18 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(sysInfo, "radioModuleBidCosRadioMAC", bidCosMAC);
     cJSON_AddStringToObject(sysInfo, "radioModuleHmIPRadioMAC", hmIPMAC);
     cJSON_AddStringToObject(sysInfo, "radioModuleSGTIN", _radioModuleDetector->getSGTIN());
+
+    // Feature capabilities (compile-time)
+#if ENABLE_HMLGW
+    cJSON_AddBoolToObject(sysInfo, "enableHmlgw", true);
+#else
+    cJSON_AddBoolToObject(sysInfo, "enableHmlgw", false);
+#endif
+#if ENABLE_ANALYZER
+    cJSON_AddBoolToObject(sysInfo, "enableAnalyzer", true);
+#else
+    cJSON_AddBoolToObject(sysInfo, "enableAnalyzer", false);
+#endif
 
     const char *json = cJSON_PrintUnformatted(root);
     if (json) {
@@ -456,9 +467,6 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
-
-    cJSON_AddBoolToObject(settings, "checkUpdates", _settings->getCheckUpdates());
-    cJSON_AddBoolToObject(settings, "allowPrerelease", _settings->getAllowPrerelease());
 
     // IPv6 Settings
     cJSON_AddBoolToObject(settings, "enableIPv6", _settings->getEnableIPv6());
@@ -688,16 +696,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     _settings->setGpsBaudrate(gpsBaudrate);
     _settings->setNtpServer(ntpServer);
     _settings->setLEDBrightness(ledBrightness);
-
-    cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
-    if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
-        _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
-    }
-
-    cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
-    if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
-        _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
-    }
 
     // Handle IPv6 (checking for nulls)
     if (ipv6Mode) {
@@ -957,6 +955,154 @@ httpd_uri_t get_log_download_handler = {
     .uri = "/api/log/download",
     .method = HTTP_GET,
     .handler = get_log_download_handler_func,
+    .user_ctx = NULL,
+    .is_websocket = false,
+    .handle_ws_control_frames = false,
+    .supported_subprotocol = NULL
+};
+
+// Paste proxy - uploads log content to paste.blueml.eu (MicroBin) from the backend
+// to avoid CORS issues with direct browser-to-paste requests
+esp_err_t post_log_paste_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    // Get the log content
+    std::string log_content = LogManager::instance().getLogContent();
+    if (log_content.empty()) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No log content available\"}");
+        return ESP_OK;
+    }
+
+    // Build multipart form data for MicroBin upload
+    const char *boundary = "----HbRfEthBoundary";
+
+    // Build the multipart body
+    std::string body;
+    body.reserve(log_content.size() + 512);
+
+    // content field
+    body += "--"; body += boundary; body += "\r\n";
+    body += "Content-Disposition: form-data; name=\"content\"\r\n\r\n";
+    body += log_content;
+    body += "\r\n";
+
+    // expiration field
+    body += "--"; body += boundary; body += "\r\n";
+    body += "Content-Disposition: form-data; name=\"expiration\"\r\n\r\n";
+    body += "1week\r\n";
+
+    // privacy field
+    body += "--"; body += boundary; body += "\r\n";
+    body += "Content-Disposition: form-data; name=\"privacy\"\r\n\r\n";
+    body += "unlisted\r\n";
+
+    // syntax_highlight field
+    body += "--"; body += boundary; body += "\r\n";
+    body += "Content-Disposition: form-data; name=\"syntax_highlight\"\r\n\r\n";
+    body += "\r\n";
+
+    // Final boundary
+    body += "--"; body += boundary; body += "--\r\n";
+
+    // Configure HTTP client
+    esp_http_client_config_t config = {};
+    config.url = "https://paste.blueml.eu/upload";
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.buffer_size = 1536;
+    config.buffer_size_tx = 512;
+    config.timeout_ms = 15000;
+    config.disable_auto_redirect = true;  // We handle redirects manually
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (!client) {
+        ESP_LOGE(TAG, "Paste: Failed to initialize HTTP client");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to connect to paste service\"}");
+        return ESP_OK;
+    }
+
+    // Set headers
+    char content_type[80];
+    snprintf(content_type, sizeof(content_type), "multipart/form-data; boundary=%s", boundary);
+    esp_http_client_set_method(client, HTTP_METHOD_POST);
+    esp_http_client_set_header(client, "Content-Type", content_type);
+    esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
+    esp_http_client_set_post_field(client, body.c_str(), body.size());
+
+    ESP_LOGI(TAG, "Paste: Uploading %d bytes to paste.blueml.eu", (int)body.size());
+
+    esp_err_t err = esp_http_client_perform(client);
+
+    if (err == ESP_OK) {
+        int status_code = esp_http_client_get_status_code(client);
+        ESP_LOGI(TAG, "Paste: HTTP status %d", status_code);
+
+        if (status_code == 302 || status_code == 301 || status_code == 303) {
+            // MicroBin redirects to the paste URL on success
+            char location[256] = {0};
+            // Read the Location header from the redirect response
+            char *location_ptr = NULL;
+            esp_http_client_get_header(client, "Location", &location_ptr);
+
+            if (location_ptr && strlen(location_ptr) > 0) {
+                // Location may be relative (e.g., "/paste/abc123") or absolute
+                if (location_ptr[0] == '/') {
+                    snprintf(location, sizeof(location), "https://paste.blueml.eu%s", location_ptr);
+                } else {
+                    strncpy(location, location_ptr, sizeof(location) - 1);
+                }
+                ESP_LOGI(TAG, "Paste: Success, URL: %s", location);
+
+                char response[384];
+                snprintf(response, sizeof(response), "{\"success\":true,\"url\":\"%s\"}", location);
+                httpd_resp_set_type(req, "application/json");
+                httpd_resp_sendstr(req, response);
+            } else {
+                ESP_LOGW(TAG, "Paste: Redirect but no Location header");
+                httpd_resp_set_type(req, "application/json");
+                httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Paste service returned redirect without location\"}");
+            }
+        } else if (status_code == 200) {
+            // Some MicroBin configs return 200 with the URL in the response body
+            char resp_body[256] = {0};
+            int read_len = esp_http_client_read(client, resp_body, sizeof(resp_body) - 1);
+            if (read_len > 0) {
+                resp_body[read_len] = '\0';
+                ESP_LOGI(TAG, "Paste: 200 response: %s", resp_body);
+            }
+            // Return the final URL from the client
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"success\":true,\"url\":\"https://paste.blueml.eu\"}");
+        } else {
+            ESP_LOGE(TAG, "Paste: Unexpected status code %d", status_code);
+            char error_resp[128];
+            snprintf(error_resp, sizeof(error_resp), "{\"success\":false,\"error\":\"Paste service returned status %d\"}", status_code);
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, error_resp);
+        }
+    } else {
+        ESP_LOGE(TAG, "Paste: HTTP request failed: %s", esp_err_to_name(err));
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to connect to paste service\"}");
+    }
+
+    esp_http_client_cleanup(client);
+    return ESP_OK;
+}
+
+httpd_uri_t post_log_paste_handler = {
+    .uri = "/api/log/paste",
+    .method = HTTP_POST,
+    .handler = post_log_paste_handler_func,
     .user_ctx = NULL,
     .is_websocket = false,
     .handle_ws_control_frames = false,
@@ -1353,122 +1499,6 @@ httpd_uri_t post_restart_handler = {
     .handle_ws_control_frames = false,
     .supported_subprotocol = NULL};
 
-static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
-{
-  add_security_headers(req);
-  if (validate_auth(req) != ESP_OK)
-  {
-      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-  }
-
-  ESP_LOGI(TAG, "Online update requested via WebUI");
-
-  // First check for updates to ensure we have the latest version info
-  _updateCheck->checkNow();
-
-  // Verify that we have a valid version and download URL
-  const char* latest_version = _updateCheck->getLatestVersion();
-  bool has_url = _updateCheck->hasDownloadUrl();
-
-  ESP_LOGI(TAG, "Latest version: %s, Has download URL: %d", latest_version, has_url);
-
-  if (strcmp(latest_version, "n/a") == 0) {
-      ESP_LOGW(TAG, "No update available - version check returned 'n/a'");
-      httpd_resp_set_type(req, "application/json");
-      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No update available. Please check your internet connection and try again.\"}");
-      return ESP_OK;
-  }
-
-  if (!has_url) {
-      ESP_LOGW(TAG, "No download URL available for version %s", latest_version);
-      httpd_resp_set_type(req, "application/json");
-      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No download URL found for the update. Please try again later.\"}");
-      return ESP_OK;
-  }
-
-  ESP_LOGI(TAG, "Starting online update to version %s", latest_version);
-
-  // Create a task to perform the update because it's blocking
-  struct TaskArgs {
-      UpdateCheck* updateCheck;
-  };
-
-  TaskArgs* args = new TaskArgs();
-  args->updateCheck = _updateCheck;
-
-  BaseType_t task_created = xTaskCreate([](void* p) {
-      TaskArgs* a = (TaskArgs*)p;
-      ESP_LOGI(TAG, "Online update task started");
-      a->updateCheck->performOnlineUpdate();
-      // Note: If update succeeds, device will restart and this code won't execute
-      ESP_LOGW(TAG, "Online update task completed (update may have failed - check logs)");
-      delete a;
-      vTaskDelete(NULL);
-  }, "online_update", 8192, args, 5, NULL);
-
-  if (task_created != pdPASS) {
-      ESP_LOGE(TAG, "Failed to create online update task");
-      delete args;
-      httpd_resp_set_type(req, "application/json");
-      httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to start update task. Please try again.\"}");
-      return ESP_OK;
-  }
-
-  ESP_LOGI(TAG, "Online update task created successfully");
-
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Update started. Device will restart automatically when complete.\"}");
-  return ESP_OK;
-}
-
-httpd_uri_t _post_firmware_online_update_handler = {
-    .uri = "/api/online_update",
-    .method = HTTP_POST,
-    .handler = _post_firmware_online_update_handler_func,
-    .user_ctx = NULL,
-    .is_websocket = false,
-    .handle_ws_control_frames = false,
-    .supported_subprotocol = NULL};
-
-esp_err_t post_check_update_handler_func(httpd_req_t *req)
-{
-  add_security_headers(req);
-  if (validate_auth(req) != ESP_OK)
-  {
-      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-  }
-
-  // Perform check in this task (it might block for a few seconds)
-  _updateCheck->checkNow();
-
-  httpd_resp_set_type(req, "application/json");
-
-  cJSON *root = cJSON_CreateObject();
-  cJSON_AddStringToObject(root, "latestVersion", _updateCheck->getLatestVersion());
-  cJSON_AddStringToObject(root, "releaseNotes", _updateCheck->getReleaseNotes());
-  cJSON_AddStringToObject(root, "downloadUrl", _updateCheck->getDownloadUrl());
-
-  const char *json = cJSON_PrintUnformatted(root);
-    if (json) {
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-    } else {
-        httpd_resp_send_500(req);
-    }
-  cJSON_Delete(root);
-
-  return ESP_OK;
-}
-
-httpd_uri_t post_check_update_handler = {
-    .uri = "/api/check_update",
-    .method = HTTP_POST,
-    .handler = post_check_update_handler_func,
-    .user_ctx = NULL,
-    .is_websocket = false,
-    .handle_ws_control_frames = false,
-    .supported_subprotocol = NULL};
-
 esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -1578,13 +1608,12 @@ httpd_uri_t get_analyzer_ws_handler = {
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
-WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector, DTLSEncryption *dtlsEncryption)
+WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector, DTLSEncryption *dtlsEncryption)
 {
     _settings = settings;
     _statusLED = statusLED;
     _sysInfo = sysInfo;
     _ethernet = ethernet;
-    _updateCheck = updateCheck;
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
@@ -1605,6 +1634,7 @@ void WebUI::start()
     rate_limiter_init();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.stack_size = 8192;
     config.lru_purge_enable = true;
     config.max_uri_handlers = 32;
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -1619,8 +1649,6 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
-        httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
-        httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
@@ -1634,6 +1662,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_log_paste_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 
