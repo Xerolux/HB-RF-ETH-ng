@@ -29,6 +29,11 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
 * **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
 * **Werksreset** auch über WebUI möglich
 * **Moderne, responsive WebUI** mit Mobile-Support
+* **Technische Updates**
+  * Espressif32 Platform 6.12.0 (neuestes ESP-IDF)
+  * Vue.js 3.5.27, Vue Router 5, Pinia 3, Vue i18n 11
+  * Bootstrap Vue Next 0.43.0
+  * Alle npm-Pakete auf dem neuesten Stand
 
 **Version 2.1.1 Änderungen:**
 * Aktualisierung auf ESP-IDF 5.x
