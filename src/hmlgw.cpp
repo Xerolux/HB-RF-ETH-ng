@@ -356,8 +356,9 @@ void Hmlgw::runKeepAlive() {
         // Set recv timeout on client socket
         setsockopt(clientSock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
-        // KeepAlive protocol: accept connection and hold it open
-        // Read and discard any data (protocol doesn't require echo)
+        // KeepAlive protocol: accept connection, hold it open, and echo data back.
+        // The HM-LGW protocol uses port 2001 as an echo channel - the CCU sends
+        // data and expects it echoed back to confirm the connection is alive.
         char rx_buffer[128];
         while (_running) {
             int len = recv(clientSock, rx_buffer, sizeof(rx_buffer) - 1, 0);
@@ -370,7 +371,11 @@ void Hmlgw::runKeepAlive() {
             } else if (len == 0) {
                 break;  // Client closed connection
             }
-            // Data received but ignored (KeepAlive doesn't echo)
+            // Echo received data back (HM-LGW KeepAlive protocol)
+            if (send(clientSock, rx_buffer, len, 0) < 0) {
+                ESP_LOGW(TAG, "KeepAlive echo send failed: errno %d", errno);
+                break;
+            }
         }
         close(clientSock);
         // Only update if still the same socket (avoid race with cleanup)
@@ -506,15 +511,13 @@ void Hmlgw::sendDataToClient(const uint8_t* data, size_t len) {
         return;
     }
 
-    // Use MSG_DONTWAIT to avoid blocking on dead connections
-    ssize_t sent = send(sock, data, len, MSG_DONTWAIT);
+    // Use blocking send (flag 0) - the socket has a 1s recv timeout set,
+    // and send() will block until buffer space is available.
+    // MSG_DONTWAIT was causing premature connection closure when the TCP
+    // send buffer was temporarily full (EAGAIN), which is normal on ESP32.
+    ssize_t sent = send(sock, data, len, 0);
     if (sent < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EPIPE) {
-            // Connection broken or would block - close it
-            ESP_LOGW(TAG, "Send failed (errno %d), closing client", errno);
-        } else {
-            ESP_LOGW(TAG, "Send failed, closing client: errno %d", errno);
-        }
+        ESP_LOGW(TAG, "Send failed, closing client: errno %d", errno);
         // Only close if still the same socket (avoid closing a new connection)
         int expected = sock;
         if (_clientSocket.compare_exchange_strong(expected, -1)) {
@@ -545,13 +548,11 @@ void Hmlgw::handleFrame(unsigned char* buffer, uint16_t len) {
     frame[2] = len & 0xFF;
     memcpy(frame + 3, buffer, len);
 
-    ssize_t sent = send(sock, frame, 3 + len, MSG_DONTWAIT);
+    // Use blocking send - MSG_DONTWAIT was causing premature disconnects
+    // when the TCP buffer was temporarily full (EAGAIN is normal on ESP32)
+    ssize_t sent = send(sock, frame, 3 + len, 0);
     if (sent < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EPIPE) {
-            ESP_LOGW(TAG, "Send frame failed (errno %d), closing client", errno);
-        } else {
-            ESP_LOGW(TAG, "Send frame failed: errno %d", errno);
-        }
+        ESP_LOGW(TAG, "Send frame failed: errno %d", errno);
         // Only close if still the same socket (avoid closing a new connection)
         int expected = sock;
         if (_clientSocket.compare_exchange_strong(expected, -1)) {
