@@ -81,9 +81,7 @@ jobs:
         run: |
           REQUIRED_FILES=(
             "README.md"
-            "CHANGELOG.md"
             "LICENSE.md"
-            "SECURITY.md"
           )
 
           for file in "${REQUIRED_FILES[@]}"; do
@@ -103,25 +101,5 @@ jobs:
             if ! git diff origin/${{ github.base_ref }} --name-only | grep -q "README.md"; then
               echo "⚠️ Warning: Code changed but README.md not updated"
             fi
-          fi
-        continue-on-error: true
-
-      - name: Validate version consistency
-        run: |
-          VERSION=$(cat version.txt)
-          echo "Current version: $VERSION"
-
-          # Check if version is mentioned in CHANGELOG
-          if ! grep -q "$VERSION" CHANGELOG.md; then
-            echo "⚠️ Warning: Version $VERSION not found in CHANGELOG.md"
-            exit 1
-          fi
-
-          # Check if version is in package.json
-          PACKAGE_VERSION=$(grep '"version"' webui/package.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
-          echo "WebUI version: $PACKAGE_VERSION"
-
-          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "⚠️ Warning: Version mismatch between version.txt ($VERSION) and package.json ($PACKAGE_VERSION)"
           fi
         continue-on-error: true

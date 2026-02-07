@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v2.1.0)'
+        description: 'Release tag (e.g., v2.1.2)'
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release (alpha, beta, rc)'
+        description: 'Mark as pre-release'
         required: false
         type: boolean
         default: false
@@ -20,17 +20,6 @@ on:
         required: false
         type: boolean
         default: false
-      firmware_variants:
-        description: 'Firmware variants to build'
-        required: false
-        type: choice
-        options:
-          - 'all'
-          - 'standard'
-          - 'hmlgw'
-          - 'analyzer'
-          - 'full'
-        default: 'all'
 
 jobs:
   build-and-release:
@@ -59,19 +48,6 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION_TAG=v$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Update version numbers
-        run: |
-          python3 update_version.py ${{ steps.get_version.outputs.VERSION }}
-          python3 update_changelog.py ${{ steps.get_version.outputs.VERSION }}
-
-      - name: Commit version updates
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add version.txt README.md webui/src/about.vue webui/package.json docs/openapi.yaml docs/TROUBLESHOOTING.md CHANGELOG.md
-          git diff --staged --quiet || git commit -m "chore: Update version to ${{ steps.get_version.outputs.VERSION }}"
-          git push origin HEAD:${GITHUB_REF#refs/heads/} || echo "No changes to push or already on tag"
-
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -89,6 +65,9 @@ jobs:
           cd webui
           npm run build
 
+      - name: Rename WebUI files
+        run: python rename_webui_files.py
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -99,79 +78,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio
 
-      - name: Determine variants to build
-        id: variants
+      - name: Build firmware
         run: |
-          VARIANT="${{ github.event_name == 'workflow_dispatch' && inputs.firmware_variants || 'all' }}"
+          pio run
 
-          if [ "$VARIANT" = "all" ]; then
-            echo "VARIANTS=standard hmlgw analyzer full" >> $GITHUB_OUTPUT
-          else
-            echo "VARIANTS=$VARIANT" >> $GITHUB_OUTPUT
-          fi
-
-          echo "Building variants: $(cat $GITHUB_OUTPUT | grep VARIANTS | cut -d= -f2)"
-
-      - name: Build firmware variants
+      - name: Create release directory
         run: |
           mkdir -p release
+
+      - name: Copy firmware files
+        run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
 
-          for variant in ${{ steps.variants.outputs.VARIANTS }}; do
-            echo "Building variant: $variant"
-            pio run -e hb-rf-eth-ng-$variant
+          # Copy firmware
+          if [ -f ".pio/build/hb-rf-eth-ng/firmware_${VERSION}.bin" ]; then
+            cp ".pio/build/hb-rf-eth-ng/firmware_${VERSION}.bin" "release/firmware_${VERSION}.bin"
+          elif [ -f ".pio/build/hb-rf-eth-ng/firmware.bin" ]; then
+            cp ".pio/build/hb-rf-eth-ng/firmware.bin" "release/firmware_${VERSION}.bin"
+          fi
 
-            # Copy and rename firmware with variant name
-            if [ -f ".pio/build/hb-rf-eth-ng-$variant/firmware_${VERSION}.bin" ]; then
-              cp ".pio/build/hb-rf-eth-ng-$variant/firmware_${VERSION}.bin" "release/firmware-${variant}-v${VERSION}.bin"
-            elif [ -f ".pio/build/hb-rf-eth-ng-$variant/firmware.bin" ]; then
-              cp ".pio/build/hb-rf-eth-ng-$variant/firmware.bin" "release/firmware-${variant}-v${VERSION}.bin"
-            fi
+          # Copy bootloader and partitions
+          cp ".pio/build/hb-rf-eth-ng/bootloader.bin" release/ 2>/dev/null || true
+          cp ".pio/build/hb-rf-eth-ng/partitions.bin" release/ 2>/dev/null || true
 
-            # Copy bootloader and partitions (same for all variants) - only once
-            if [ ! -f "release/bootloader.bin" ]; then
-              cp ".pio/build/hb-rf-eth-ng-$variant/bootloader.bin" release/ 2>/dev/null || true
-            fi
-            if [ ! -f "release/partitions.bin" ]; then
-              cp ".pio/build/hb-rf-eth-ng-$variant/partitions.bin" release/ 2>/dev/null || true
-            fi
-          done
-
-      - name: Prepare release metadata
-        run: |
+          # Copy documentation
           cp version.txt release/
-          cp CHANGELOG.md release/
           cp README.md release/
-
-          # Create variant info file
-          cat > release/VARIANTS.md << 'EOF'
-          # Firmware Variants
-
-          This release includes multiple firmware variants:
-
-          - **standard**: No HMLGW, No Analyzer (smallest, maximum RAM)
-          - **hmlgw**: With HomeMatic LAN Gateway support
-          - **analyzer**: With Protocol Analyzer support
-          - **full**: All features enabled (largest)
-
-          Choose the variant that matches your use case.
-          EOF
 
       - name: Create checksums
         run: |
           cd release
           sha256sum *.bin > SHA256SUMS.txt
-
-      - name: Create release archive
-        run: |
-          cd release
-          zip -r ../hb-rf-eth-ng-firmware-${{ steps.get_version.outputs.VERSION_TAG }}.zip .
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          python3 generate_release_notes.py ${{ steps.get_version.outputs.VERSION }} release_notes.md
-          echo "Release notes generated successfully"
 
       - name: Determine release type
         id: release_type
@@ -205,14 +142,13 @@ jobs:
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
           name: 🚀 HB-RF-ETH-ng Firmware ${{ steps.get_version.outputs.VERSION_TAG }}
-          body_path: release_notes.md
+          body_path: release/README.md
           files: |
-            hb-rf-eth-ng-firmware-${{ steps.get_version.outputs.VERSION_TAG }}.zip
-            release/firmware-*.bin
+            release/firmware_*.bin
             release/bootloader.bin
             release/partitions.bin
             release/SHA256SUMS.txt
-            release/VARIANTS.md
+            release/version.txt
           draft: ${{ steps.release_type.outputs.IS_DRAFT }}
           prerelease: ${{ steps.release_type.outputs.IS_PRERELEASE }}
           make_latest: ${{ steps.release_type.outputs.IS_PRERELEASE == 'false' && steps.release_type.outputs.IS_DRAFT == 'false' }}

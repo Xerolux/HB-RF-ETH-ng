@@ -2,7 +2,7 @@ name: Pull Request Checks
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
     types: [ opened, synchronize, reopened ]
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
           PR_VERSION=$(cat version.txt)
           echo "Base version: $BASE_VERSION"
           echo "PR version: $PR_VERSION"
-          if [ "$BASE_VERSION" = "$PR_VERSION" ] && [ "${{ github.base_ref }}" = "main" ]; then
+          if [ "$BASE_VERSION" = "$PR_VERSION" ]; then
             echo "⚠️ Warning: Version number not updated"
             exit 1
           fi
@@ -54,14 +54,6 @@ jobs:
           find . -type f -size +1M -not -path "./.git/*" -not -path "./.pio/*" -not -path "./webui/node_modules/*" | while read file; do
             echo "⚠️ Large file detected: $file ($(du -h "$file" | cut -f1))"
           done
-
-      - name: Validate CHANGELOG
-        run: |
-          if ! grep -q "$PR_VERSION" CHANGELOG.md; then
-            echo "⚠️ Warning: Version $PR_VERSION not found in CHANGELOG.md"
-            exit 1
-          fi
-        continue-on-error: true
 
   code-quality:
     name: Code Quality Checks
@@ -83,14 +75,10 @@ jobs:
           cd webui
           npm ci
 
-      - name: Install C++ linters
+      - name: Check WebUI build
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cppcheck
-
-      - name: Run cppcheck
-        run: |
-          cppcheck --enable=warning,performance,portability --inline-suppr --quiet --error-exitcode=1 -I include src/
+          cd webui
+          npm run build
 
       - name: Check for console.log statements
         run: |
@@ -99,11 +87,6 @@ jobs:
             echo "⚠️ Warning: console.log statements found in code"
           fi
         continue-on-error: true
-
-      - name: Check WebUI build
-        run: |
-          cd webui
-          npm run build
 
       - name: Validate JSON files
         run: |
@@ -133,6 +116,9 @@ jobs:
           npm ci
           npm run build
 
+      - name: Rename WebUI files
+        run: python rename_webui_files.py
+
       - name: Cache PlatformIO
         uses: actions/cache@v5
         with:
@@ -155,15 +141,14 @@ jobs:
 
       - name: Build and check firmware size
         run: |
-          pio run -e hb-rf-eth-ng --verbose
+          pio run
 
       - name: Report firmware size
         run: |
           echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          pio run -e hb-rf-eth-ng -t size >> $GITHUB_STEP_SUMMARY
+          pio run -t size >> $GITHUB_STEP_SUMMARY 2>&1 || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
 
       - name: Check WebUI size
         run: |

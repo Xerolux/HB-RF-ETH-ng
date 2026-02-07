@@ -2,14 +2,14 @@ name: Build Firmware
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-webui:
-    name: Build WebUI
+  build:
+    name: Build Firmware
     runs-on: ubuntu-latest
 
     steps:
@@ -36,49 +36,14 @@ jobs:
       - name: Rename WebUI files
         run: python rename_webui_files.py
 
-      - name: Upload WebUI artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: webui-dist
-          path: webui/dist/
-          retention-days: 7
-
-  build-firmware:
-    name: Build ${{ matrix.variant }} variant
-    needs: build-webui
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        include:
-          - variant: standard
-            env_name: hb-rf-eth-ng-standard
-          - variant: hmlgw
-            env_name: hb-rf-eth-ng-hmlgw
-          - variant: analyzer
-            env_name: hb-rf-eth-ng-analyzer
-          - variant: full
-            env_name: hb-rf-eth-ng-full
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Download WebUI artifacts
-        uses: actions/download-artifact@v7
-        with:
-          name: webui-dist
-          path: webui/dist/
-
       - name: Cache PlatformIO
         uses: actions/cache@v5
         with:
           path: |
             ~/.platformio
             .pio
-          key: ${{ runner.os }}-pio-${{ matrix.env_name }}-${{ hashFiles('**/platformio.ini') }}
+          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
           restore-keys: |
-            ${{ runner.os }}-pio-${{ matrix.env_name }}-
             ${{ runner.os }}-pio-
 
       - name: Setup Python
@@ -93,24 +58,28 @@ jobs:
 
       - name: Build firmware
         run: |
-          pio run -e ${{ matrix.env_name }}
+          pio run
+
+      - name: Report firmware size
+        run: |
+          echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          pio run -t size >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: firmware-${{ matrix.variant }}
+          name: firmware
           path: |
-            .pio/build/${{ matrix.env_name }}/firmware*.bin
-            .pio/build/${{ matrix.env_name }}/bootloader.bin
-            .pio/build/${{ matrix.env_name }}/partitions.bin
+            .pio/build/hb-rf-eth-ng/firmware*.bin
+            .pio/build/hb-rf-eth-ng/bootloader.bin
+            .pio/build/hb-rf-eth-ng/partitions.bin
           retention-days: 30
 
-      - name: Upload build info
-        if: matrix.variant == 'standard'
+      - name: Upload WebUI artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: build-info
-          path: |
-            version.txt
-            CHANGELOG.md
-          retention-days: 30
+          name: webui-dist
+          path: webui/dist/
+          retention-days: 7

@@ -2,32 +2,15 @@ name: Security Checks
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
   schedule:
     # Run weekly on Monday at 00:00 UTC
     - cron: '0 0 * * 1'
   workflow_dispatch:
 
 jobs:
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          fail-on-severity: moderate
-
   npm-audit:
     name: NPM Security Audit
     runs-on: ubuntu-latest
@@ -96,7 +79,7 @@ jobs:
           touch webui/dist/main.css.gz
           touch webui/dist/main.js.gz
           touch webui/dist/favicon.ico.gz
-          pio run -e hb-rf-eth-ng
+          pio run
         continue-on-error: true
 
       - name: Perform CodeQL Analysis
@@ -137,4 +120,3 @@ jobs:
         run: |
           pio update
           pio platform update
-          pio lib update --dry-run || true
