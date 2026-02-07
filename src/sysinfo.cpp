@@ -34,6 +34,7 @@
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "reset_info.h"
 #include "pins.h"
 
 #define DEFAULT_VREF 1100
@@ -316,31 +317,6 @@ uint64_t SysInfo::getUptimeSeconds()
 
 const char* SysInfo::getResetReason()
 {
-    esp_reset_reason_t reason = esp_reset_reason();
-
-    switch (reason)
-    {
-    case ESP_RST_POWERON:
-        return "Power-On Reset";
-    case ESP_RST_SW:
-        return "Software Reset";
-    case ESP_RST_PANIC:
-        return "Exception/Panic";
-    case ESP_RST_INT_WDT:
-        return "Interrupt Watchdog";
-    case ESP_RST_TASK_WDT:
-        return "Task Watchdog";
-    case ESP_RST_WDT:
-        return "Other Watchdog";
-    case ESP_RST_DEEPSLEEP:
-        return "Deep Sleep Reset";
-    case ESP_RST_BROWNOUT:
-        return "Brownout Reset";
-    case ESP_RST_SDIO:
-        return "SDIO Reset";
-    case ESP_RST_EXT:
-        return "External Reset";
-    default:
-        return "Unknown";
-    }
+    // Use ResetInfo for detailed reset reasons
+    return ResetInfo::getResetDetails();
 }

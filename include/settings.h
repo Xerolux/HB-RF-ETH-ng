@@ -39,6 +39,7 @@ class Settings
 private:
   char _adminPassword[33] = {0};
   bool _passwordChanged;
+  char _otaPassword[33] = {0};  // Separate password for firmware updates
 
   char _hostname[33] = {0};
   bool _useDHCP;
@@ -77,6 +78,10 @@ public:
   char *getAdminPassword();
   void setAdminPassword(char* password);
   bool getPasswordChanged();
+
+  char *getOtaPassword();
+  void setOtaPassword(char* password);
+  bool verifyOtaPassword(const char* password);
 
   char *getHostname();
   bool getUseDHCP();

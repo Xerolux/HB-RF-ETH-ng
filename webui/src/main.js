@@ -7,6 +7,9 @@ import { useLoginStore, useThemeStore } from './stores.js'
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 
+// Custom design system
+import './styles/main.css'
+
 import App from './app.vue'
 import Home from './home.vue'
 import Settings from "./settings.vue"

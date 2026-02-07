@@ -28,6 +28,7 @@
 #include "esp_crt_bundle.h"
 #include "string.h"
 #include "cJSON.h"
+#include "reset_info.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -210,9 +211,11 @@ void UpdateCheck::performOnlineUpdate()
     esp_err_t ret = esp_https_ota(&ota_config);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update successful, restarting...");
+        ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
         esp_restart();
     } else {
         ESP_LOGE(TAG, "OTA Update failed");
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         _statusLED->setState(LED_STATE_ON); // Reset LED or to previous state?
     }
 }

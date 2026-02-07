@@ -27,6 +27,7 @@
 #include "nvs_flash.h"
 #include "esp_mac.h"
 #include "esp_log.h"
+#include "secure_utils.h"
 #include <string.h>
 
 Settings::Settings()
@@ -98,6 +99,14 @@ void Settings::load()
       GET_BOOL(handle, "passwordChanged", _passwordChanged, currentVal);
   }
 
+  // Load OTA password (separate password for firmware updates)
+  size_t otaPasswordLength = sizeof(_otaPassword);
+  if (nvs_get_str(handle, "otaPassword", _otaPassword, &otaPasswordLength) != ESP_OK)
+  {
+    // No OTA password set yet - empty means must be set first
+    _otaPassword[0] = '\0';
+  }
+
   size_t hostnameLength = sizeof(_hostname);
   if (nvs_get_str(handle, "hostname", _hostname, &hostnameLength) != ESP_OK)
   {
@@ -163,6 +172,9 @@ void Settings::save()
   SET_STR(handle, "adminPassword", _adminPassword);
   SET_BOOL(handle, "passwordChanged", _passwordChanged);
 
+  // Save OTA password
+  SET_STR(handle, "otaPassword", _otaPassword);
+
   SET_STR(handle, "hostname", _hostname);
   SET_BOOL(handle, "useDHCP", _useDHCP);
   SET_IP_ADDR(handle, "localIP", _localIP);
@@ -223,6 +235,27 @@ void Settings::setAdminPassword(char *adminPassword)
 bool Settings::getPasswordChanged()
 {
   return _passwordChanged;
+}
+
+char *Settings::getOtaPassword()
+{
+  return _otaPassword;
+}
+
+void Settings::setOtaPassword(char *otaPassword)
+{
+  strncpy(_otaPassword, otaPassword, sizeof(_otaPassword) - 1);
+  _otaPassword[sizeof(_otaPassword) - 1] = '\0';
+}
+
+bool Settings::verifyOtaPassword(const char *password)
+{
+  // If OTA password is not set, deny access (must be explicitly set)
+  if (_otaPassword[0] == '\0') {
+    return false;
+  }
+  // Use secure_strcmp to prevent timing attacks
+  return (secure_strcmp(_otaPassword, password) == 0);
 }
 
 char *Settings::getHostname()

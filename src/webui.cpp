@@ -34,6 +34,11 @@
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
 #include "rate_limiter.h"
+#include "security_headers.h"
+#include "reset_info.h"
+#include "esp_http_client.h"
+#include "esp_https_ota.h"
+#include "esp_crt_bundle.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -43,6 +48,7 @@ static const char *TAG = "WebUI";
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
+        add_security_headers(req);                                     \
         httpd_resp_set_type(req, _contentType);                        \
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");           \
         httpd_resp_send(req, _resource, _resource##_length);           \
@@ -163,8 +169,42 @@ esp_err_t validate_auth(httpd_req_t *req)
     return ESP_OK;
 }
 
+// Validate OTA password for firmware updates
+// Can be passed via "X-OTA-Password" header or in JSON body
+esp_err_t validate_ota_password(httpd_req_t *req, const char* json_password)
+{
+    // First check if OTA password is set
+    const char* storedOtaPassword = _settings->getOtaPassword();
+    if (storedOtaPassword == NULL || storedOtaPassword[0] == '\0') {
+        ESP_LOGW(TAG, "OTA password not set, denying update");
+        return ESP_FAIL;
+    }
+
+    // Try header first
+    char otaAuth[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-OTA-Password", otaAuth, sizeof(otaAuth)) == ESP_OK)
+    {
+        if (_settings->verifyOtaPassword(otaAuth)) {
+            return ESP_OK;
+        }
+    }
+
+    // Try JSON password if provided
+    if (json_password != NULL && json_password[0] != '\0')
+    {
+        if (_settings->verifyOtaPassword(json_password)) {
+            return ESP_OK;
+        }
+    }
+
+    ESP_LOGW(TAG, "OTA password validation failed");
+    return ESP_FAIL;
+}
+
 esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     // Check rate limit
     if (!rate_limiter_check_login(req))
     {
@@ -220,6 +260,7 @@ httpd_uri_t post_login_json_handler = {
 
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
     httpd_resp_set_type(req, "application/json");
 
     // Optimization: Use stack buffer and snprintf instead of cJSON to reduce heap allocations
@@ -354,6 +395,8 @@ void add_settings(cJSON *root)
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -404,6 +447,8 @@ bool cJSON_GetBoolValue(const cJSON *item)
 
 esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -509,6 +554,8 @@ httpd_uri_t post_settings_json_handler = {
 
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -582,6 +629,8 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 // Actually, let's implement a dedicated restore handler that restarts.
 esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
@@ -693,10 +742,21 @@ httpd_uri_t post_restore_handler = {
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    // Validate OTA password
+    if (validate_ota_password(req, NULL) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA password required or invalid\"}");
         return ESP_OK;
     }
 
@@ -771,6 +831,9 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
     _statusLED->setState(LED_STATE_OFF);
 
+    // Store reset reason for successful firmware update
+    ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
+
     // Automatic restart after successful OTA update
     vTaskDelay(3000 / portTICK_PERIOD_MS);
     esp_restart();
@@ -779,6 +842,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
 err:
     _statusLED->setState(LED_STATE_OFF);
+    // Store reset reason for failed firmware update
+    ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
     return ESP_FAIL;
 }
 
@@ -790,6 +855,8 @@ httpd_uri_t post_ota_update_handler = {
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -798,6 +865,9 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_sendstr(req, "{\"success\":true}");
+
+    // Store reset reason before restart
+    ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
 
     // Restart after a short delay to allow response to be sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -812,41 +882,154 @@ httpd_uri_t post_restart_handler = {
     .handler = post_restart_handler_func,
     .user_ctx = NULL};
 
-static esp_err_t _post_firmware_online_update_handler_func(httpd_req_t *req)
+esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 {
-  if (validate_auth(req) != ESP_OK)
-  {
-      return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-  }
+    add_security_headers(req);
 
-  // Create a task to perform the update because it's blocking
-  struct TaskArgs {
-      UpdateCheck* updateCheck;
-  };
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
 
-  TaskArgs* args = new TaskArgs();
-  args->updateCheck = _updateCheck;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_sendstr(req, "{\"success\":true}");
 
-  xTaskCreate([](void* p) {
-      TaskArgs* a = (TaskArgs*)p;
-      a->updateCheck->performOnlineUpdate();
-      delete a;
-      vTaskDelete(NULL);
-  }, "online_update", 8192, args, 5, NULL);
+    // Store reset reason before factory reset
+    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
 
-  httpd_resp_set_type(req, "application/json");
-  httpd_resp_sendstr(req, "{\"success\":true}");
-  return ESP_OK;
+    // Perform factory reset - clear settings
+    _settings->clear();
+
+    // Restart after a short delay to allow response to be sent
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
+
+    return ESP_OK;
 }
 
-httpd_uri_t _post_firmware_online_update_handler = {
-    .uri = "/api/online_update",
+httpd_uri_t post_factory_reset_handler = {
+    .uri = "/api/factory-reset",
     .method = HTTP_POST,
-    .handler = _post_firmware_online_update_handler_func,
+    .handler = post_factory_reset_handler_func,
+    .user_ctx = NULL};
+
+// OTA update from URL handler
+static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    // Read request body to get URL
+    char buffer[512];
+    int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
+
+    if (len <= 0)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Invalid request\"}");
+        return ESP_OK;
+    }
+
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    if (root == NULL)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Invalid JSON\"}");
+        return ESP_OK;
+    }
+
+    char *url = cJSON_GetStringValue(cJSON_GetObjectItem(root, "url"));
+    char *otaPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "otaPassword"));
+
+    // Validate OTA password BEFORE deleting the JSON
+    if (validate_ota_password(req, otaPassword) != ESP_OK)
+    {
+        cJSON_Delete(root);
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA password required or invalid\"}");
+        return ESP_OK;
+    }
+
+    cJSON_Delete(root);
+
+    if (url == NULL || strlen(url) == 0)
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"URL is required\"}");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Starting OTA update from URL: %s", url);
+
+    // Send success response immediately
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"OTA update started\"}");
+
+    // Create a task to perform the update (it's blocking)
+    struct TaskArgs {
+        char* url;
+        LED* statusLED;
+    };
+
+    TaskArgs* args = new TaskArgs();
+    args->url = strdup(url);
+    args->statusLED = _statusLED;
+
+    xTaskCreate([](void* p) {
+        TaskArgs* a = (TaskArgs*)p;
+
+        esp_http_client_config_t config = {};
+        config.url = a->url;
+        config.crt_bundle_attach = esp_crt_bundle_attach;
+        config.keep_alive_enable = true;
+        config.timeout_ms = 10000;  // 10 second timeout
+        config.buffer_size = 1024;
+
+        esp_https_ota_config_t ota_config = {};
+        ota_config.http_config = &config;
+
+        a->statusLED->setState(LED_STATE_BLINK_FAST);
+
+        esp_err_t ret = esp_https_ota(&ota_config);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "OTA Update successful, restarting...");
+            ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
+            a->statusLED->setState(LED_STATE_OFF);
+            free(a->url);
+            delete a;
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            esp_restart();
+        } else {
+            ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+            ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+            a->statusLED->setState(LED_STATE_ON);
+            free(a->url);
+            delete a;
+        }
+        vTaskDelete(NULL);
+    }, "ota_url_update", 8192, args, 5, NULL);
+
+    return ESP_OK;
+}
+
+httpd_uri_t post_ota_url_handler = {
+    .uri = "/api/ota_url",
+    .method = HTTP_POST,
+    .handler = post_ota_url_handler_func,
     .user_ctx = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
+    add_security_headers(req);
+
     if (validate_auth(req) != ESP_OK)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
@@ -919,6 +1102,129 @@ httpd_uri_t post_change_password_handler = {
     .handler = post_change_password_handler_func,
     .user_ctx = NULL};
 
+// Set OTA password handler
+esp_err_t post_set_ota_password_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    char buffer[256];
+    int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
+
+    if (len <= 0)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+    }
+
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    if (root == NULL)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    char *otaPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "otaPassword"));
+
+    // Validate OTA password format
+    bool has_letter = false;
+    bool has_digit = false;
+    bool is_valid_length = (otaPassword != NULL) && (strlen(otaPassword) >= 6);
+
+    if (is_valid_length) {
+        for (int i = 0; otaPassword[i] != 0; i++) {
+            if ((otaPassword[i] >= 'a' && otaPassword[i] <= 'z') || (otaPassword[i] >= 'A' && otaPassword[i] <= 'Z')) {
+                has_letter = true;
+            } else if (otaPassword[i] >= '0' && otaPassword[i] <= '9') {
+                has_digit = true;
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+
+    if (!is_valid_length || !has_letter || !has_digit) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Password must be at least 6 characters with letters and numbers\"}");
+        return ESP_OK;
+    }
+
+    _settings->setOtaPassword(otaPassword);
+    _settings->save();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    return ESP_OK;
+}
+
+httpd_uri_t post_set_ota_password_handler = {
+    .uri = "/api/set-ota-password",
+    .method = HTTP_POST,
+    .handler = post_set_ota_password_handler_func,
+    .user_ctx = NULL};
+
+// Get OTA password status handler
+esp_err_t get_ota_password_status_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    const char* otaPassword = _settings->getOtaPassword();
+    bool isSet = (otaPassword != NULL && otaPassword[0] != '\0');
+
+    char response[64];
+    snprintf(response, sizeof(response), "{\"isSet\":%s}", isSet ? "true" : "false");
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_sendstr(req, response);
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_ota_password_status_handler = {
+    .uri = "/api/ota-password-status",
+    .method = HTTP_GET,
+    .handler = get_ota_password_status_handler_func,
+    .user_ctx = NULL};
+
+// Clear OTA password handler
+esp_err_t post_clear_ota_password_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    // Clear OTA password by setting it to empty string
+    char emptyPassword[] = "";
+    _settings->setOtaPassword(emptyPassword);
+    _settings->save();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    ESP_LOGI(TAG, "OTA password cleared by authenticated user");
+
+    return ESP_OK;
+}
+
+httpd_uri_t post_clear_ota_password_handler = {
+    .uri = "/api/clear-ota-password",
+    .method = HTTP_POST,
+    .handler = post_clear_ota_password_handler_func,
+    .user_ctx = NULL};
+
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
 WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
@@ -942,7 +1248,7 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 21;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     _httpd_handle = NULL;
@@ -955,8 +1261,12 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
-        httpd_register_uri_handler(_httpd_handle, &_post_firmware_online_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_ota_url_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_set_ota_password_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_ota_password_status_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_clear_ota_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
 

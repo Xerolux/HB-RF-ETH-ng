@@ -49,6 +49,8 @@
 #include "esp_ota_ops.h"
 #include "updatecheck.h"
 #include "monitoring.h"
+#include "log_manager.h"
+#include "reset_info.h"
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -178,6 +180,12 @@ void app_main()
 
     WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
+
+    // Initialize log manager (8KB ring buffer)
+    LogManager::begin(8192);
+
+    // Initialize reset info system
+    ResetInfo::init();
 
     // Initialize monitoring (SNMP, CheckMK, MQTT)
     monitoring_init(NULL, &sysInfo, &updateCheck);

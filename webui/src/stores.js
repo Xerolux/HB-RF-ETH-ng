@@ -171,6 +171,61 @@ export const useFirmwareUpdateStore = defineStore('firmwareUpdate', {
   }
 })
 
+export const useUpdateStore = defineStore('update', {
+  state: () => ({
+    latestVersion: null,
+    isChecking: false,
+    updateAvailable: false,
+    lastCheck: null,
+    checkError: null
+  }),
+  getters: {
+    shouldShowUpdateBadge: (state) => {
+      return state.updateAvailable && state.latestVersion !== null
+    }
+  },
+  actions: {
+    async checkForUpdate(currentVersion) {
+      if (this.isChecking) return
+
+      this.isChecking = true
+      this.checkError = null
+
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version.txt')
+        if (!response.ok) throw new Error('Failed to fetch version')
+
+        const latestVersion = await response.text()
+        this.latestVersion = latestVersion.trim()
+        this.lastCheck = new Date().toISOString()
+
+        // Compare versions
+        this.updateAvailable = this.compareVersions(currentVersion, this.latestVersion) < 0
+      } catch (error) {
+        console.error('Update check failed:', error)
+        this.checkError = error.message
+      } finally {
+        this.isChecking = false
+      }
+    },
+
+    compareVersions(current, latest) {
+      const parseVersion = (v) => {
+        const match = v.match(/(\d+)\.(\d+)\.(\d+)/)
+        if (!match) return [0, 0, 0]
+        return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])]
+      }
+
+      const [major1, minor1, patch1] = parseVersion(current)
+      const [major2, minor2, patch2] = parseVersion(latest)
+
+      if (major1 !== major2) return major1 - major2
+      if (minor1 !== minor2) return minor1 - minor2
+      return patch1 - patch2
+    }
+  }
+})
+
 export const useMonitoringStore = defineStore('monitoring', {
   state: () => ({
     snmp: {

@@ -1,7 +1,14 @@
 <template>
-  <div id="app" class="container" style="max-width: 800px">
-    <Header />
-    <RouterView />
+  <div id="app">
+    <div class="app-container">
+      <Header />
+      <main class="main-content">
+        <RouterView />
+      </main>
+      <footer class="app-footer">
+        <small class="text-muted">HB-RF-ETH-ng v2.1.1 &copy; 2025</small>
+      </footer>
+    </div>
   </div>
 </template>
 
@@ -65,3 +72,39 @@ onUnmounted(() => {
   removeIdleListeners()
 })
 </script>
+
+<style scoped>
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-container {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .app-container {
+    padding: var(--spacing-lg);
+  }
+}
+
+.main-content {
+  flex: 1;
+  margin-bottom: var(--spacing-lg);
+}
+
+.app-footer {
+  text-align: center;
+  padding: var(--spacing-lg) 0;
+  border-top: 1px solid var(--color-border);
+  margin-top: auto;
+}
+</style>
