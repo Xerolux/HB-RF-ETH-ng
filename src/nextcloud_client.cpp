@@ -147,7 +147,7 @@ esp_err_t nextcloud_upload_backup(const char *json_data, size_t json_len, const 
     }
 
     // Get response
-    int content_length = esp_http_client_fetch_headers(client);
+    (void)esp_http_client_fetch_headers(client);
     int status_code = esp_http_client_get_status_code(client);
 
     esp_http_client_close(client);

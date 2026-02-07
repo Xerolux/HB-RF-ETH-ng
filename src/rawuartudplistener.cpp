@@ -340,9 +340,9 @@ void RawUartUdpListener::_udpQueueHandler()
 
     for (;;)
     {
-        // OPTIMIZED: 5ms timeout for ultra-fast packet processing
-        // This ensures minimal latency for real-time signal relay
-        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(5)) == pdTRUE)
+        // OPTIMIZED: 100ms timeout to allow IDLE task to feed watchdog
+        // Still fast enough for real-time signal relay (UDP packets trigger immediate wakeup)
+        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             handlePacket(event.pb, event.addr, event.port);
             pbuf_free(event.pb);
@@ -374,7 +374,9 @@ void RawUartUdpListener::_udpQueueHandler()
         }
 
         // Yield only when queue is empty (no pending work)
+        // Add small delay to ensure IDLE task gets CPU time to feed watchdog
         taskYIELD();
+        vTaskDelay(1);
     }
 
     vTaskDelete(NULL);
