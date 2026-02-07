@@ -172,11 +172,10 @@ void Hmlgw::start() {
     _running = true;
 
     // Start Main Task
-    // OPTIMIZED: Increased priority from 15 to 17 for faster CCU communication
-    // Increased stack size from 4KB to 6KB for stability
+    // Priority 5: Below network stack to avoid starving TCP/IP processing.
     BaseType_t taskCreated = xTaskCreate([](void* arg) {
         static_cast<Hmlgw*>(arg)->run();
-    }, "hmlgw_task", 6144, this, 17, &_taskHandle);
+    }, "hmlgw_task", 6144, this, 5, &_taskHandle);
 
     if (taskCreated != pdPASS) {
         _taskHandle = NULL;
@@ -185,10 +184,10 @@ void Hmlgw::start() {
     }
 
     // Start KeepAlive Task
-    // OPTIMIZED: Increased priority from 15 to 16 for reliable keepalive
+    // Priority 5: Same as main HMLGW task, below network stack.
     BaseType_t keepAliveCreated = xTaskCreate([](void* arg) {
         static_cast<Hmlgw*>(arg)->runKeepAlive();
-    }, "hmlgw_ka_task", 2048, this, 16, &_keepAliveTaskHandle);
+    }, "hmlgw_ka_task", 2048, this, 5, &_keepAliveTaskHandle);
 
     if (keepAliveCreated != pdPASS) {
         _keepAliveTaskHandle = NULL;

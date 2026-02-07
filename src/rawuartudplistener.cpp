@@ -289,10 +289,9 @@ void RawUartUdpListener::start()
         return;
     }
 
-    // CRITICAL: Highest priority (19) for CCU communication - just below RadioModuleConnector (20)
-    // CCU messages must be processed with minimal latency for real-time signal relay
-    // Increased stack size to 6KB for stability during peak load
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 6144, this, 19, &_tHandle);
+    // Priority 10: Below RadioModuleConnector (12) and below lwIP TCPIP task (18)
+    // to avoid starving the network stack.
+    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 6144, this, 10, &_tHandle);
 
     _pcb = udp_new();
     if (_pcb == NULL) {
@@ -340,9 +339,8 @@ void RawUartUdpListener::_udpQueueHandler()
 
     for (;;)
     {
-        // 10ms timeout balances responsiveness with allowing IDLE task to run.
-        // UDP packets arriving in the queue trigger immediate wakeup regardless.
-        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(10)) == pdTRUE)
+        // 100ms timeout (original value) - UDP packets trigger immediate wakeup regardless.
+        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(100)) == pdTRUE)
         {
             handlePacket(event.pb, event.addr, event.port);
             pbuf_free(event.pb);
@@ -355,8 +353,8 @@ void RawUartUdpListener::_udpQueueHandler()
         {
             int64_t now = esp_timer_get_time();
 
-            // OPTIMIZED: 2.5s timeout for faster disconnect detection
-            if (now > _lastReceivedKeepAlive + 2500000)
+            // 5s timeout for disconnect detection (original value)
+            if (now > _lastReceivedKeepAlive + 5000000)
             {
                 // FIX: Clear port first (checked by sendMessage as connection flag)
                 atomic_store(&_remotePort, (ushort)0);

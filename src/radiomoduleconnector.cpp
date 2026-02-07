@@ -83,9 +83,9 @@ void RadioModuleConnector::start()
     // Queue: 40 events (was 20) for better buffering
     uart_driver_install(UART_NUM_1, 4096, 0, 40, &_uart_queue, 0);
 
-    // CRITICAL: Highest priority (20) for radio signal reception
-    // Radio signals must be processed immediately to prevent loss
-    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 6144, this, 20, &_tHandle);
+    // Priority 12: Must be above application tasks but below lwIP TCPIP task (18)
+    // to avoid starving the network stack during radio traffic bursts.
+    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 6144, this, 12, &_tHandle);
     resetModule();
 }
 
@@ -209,10 +209,8 @@ void RadioModuleConnector::_serialQueueHandler()
                 break;
             }
 
-            // Yield only on errors to maintain high-priority processing
-            if (event.type == UART_FIFO_OVF || event.type == UART_BUFFER_FULL) {
-                taskYIELD();
-            }
+            // Yield after every event to give other tasks CPU time
+            taskYIELD();
         }
     }
 
