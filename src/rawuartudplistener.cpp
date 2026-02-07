@@ -104,9 +104,10 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length == 5 && data[2] == 1)
         { // protocol version 1
             atomic_fetch_add(&_endpointConnectionIdentifier, 2);
+            // FIX: Clear old connection first by setting port to 0
+            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_connectionStarted, false);
-            // FIX: Update address before port to prevent sendMessage from sending
-            // to old address with new port. Port acts as the "connection valid" flag.
+            // Then set new connection (address before port as port is the valid flag)
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -128,8 +129,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
                 ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
-            // FIX: Update address before port to prevent sendMessage from using
-            // stale address with new port.
+            // FIX: Clear old connection first, then set new one
+            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -388,10 +389,13 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
     e.addr.addr = ip_addr_get_ip4_u32(addr);
     e.port = port;
 
-    // Do not block if queue is full to prevent stalling the lwIP thread (DoS risk)
-    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
+    // CRITICAL: Use portMAX_DELAY to ensure connection packets are never dropped.
+    // Connection establishment requires reliable packet delivery - dropping the
+    // initial connect packet prevents RaspberryMatic from ever establishing connection.
+    // The queue is large enough (32/64 entries) that blocking should be very rare.
+    if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
     {
-        ESP_LOGW(TAG, "UDP queue full, dropping Raw UART packet");
+        ESP_LOGE(TAG, "Failed to queue UDP packet - this should never happen with portMAX_DELAY");
         return false;
     }
     return true;
