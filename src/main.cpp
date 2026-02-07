@@ -31,7 +31,6 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "esp_pm.h"
-#include "esp_wifi.h"
 
 #include "pins.h"
 #include "led.h"
@@ -188,9 +187,9 @@ void app_main()
         ESP_LOGW(TAG, "Failed to configure power management: %s", esp_err_to_name(pm_err));
     }
 
-    // Disable WiFi power saving (even though we use Ethernet)
-    // This ensures no interference from WiFi subsystem
-    esp_wifi_set_ps(WIFI_PS_NONE);
+    // FIX: Removed esp_wifi_set_ps() call - WiFi is not initialized in this Ethernet-only project
+    // Calling WiFi functions without initialization causes a crash/panic during boot
+    // This was the root cause of the boot failure in version 2.1.4
 
     uart_config_t uart_config = {
         .baud_rate = 115200,
