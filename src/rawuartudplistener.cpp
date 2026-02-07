@@ -126,10 +126,12 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             {
                 // Client has different endpoint ID - accept it to force sync
                 // This happens when RaspberryMatic has a persistent session from before reboot
-                ESP_LOGI(TAG, "Accepting client endpoint identifier %d (was %d) to synchronize session", data[3], endpointConnectionIdentifier);
+                ESP_LOGI(TAG, "Accepting client endpoint identifier %d (was %d) to synchronize persistent session", data[3], endpointConnectionIdentifier);
                 endpointConnectionIdentifier = data[3];
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
-                atomic_store(&_connectionStarted, false);
+                // Assume connection is already started since client has persistent session
+                // RaspberryMatic won't send "Start Connection" again for a reconnect
+                atomic_store(&_connectionStarted, true);
             }
 
             // Update connection parameters and send response
