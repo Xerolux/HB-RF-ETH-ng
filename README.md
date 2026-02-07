@@ -16,13 +16,13 @@
 
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
 
-**Version 2.1.2 Highlights:**
-* **Framework**: ESP-IDF 5.5.1 (Platform espressif32@6.12.0) mit GCC 14.2.0 Toolchain
-* **WebUI**: Vue 3.5.25, Parcel 2.16.3, Bootstrap 5.3.8
+**Version 2.1.4 Highlights:**
+* **Framework**: ESP-IDF 5.5.0 (Platform espressif32@6.12.0) mit GCC 14.2.0 Toolchain
+* **WebUI**: Vue 3.5.27, Parcel 2.16.3, Bootstrap 5.3.8 mit optimierter Navigation
 * **Sicherheit**: DTLS 1.2 Verschlüsselung, erzwungene Passwortänderung, Rate Limiting
 * **Monitoring**: SNMP, Check_MK, MQTT Integration
-* **Features**: HMLGW-Modus, Analyzer Light, IPv6 Support
-* **Stabilität**: Optimierte Performance, Supply Voltage Monitoring, mbedTLS 3.6.4
+* **Features**: HMLGW-Modus (varianten-spezifisch), Analyzer Light (varianten-spezifisch), IPv6 Support
+* **Stabilität**: Optimierte Performance und Heap-Management, mbedTLS 3.6.4
 
 ### Firmware-Varianten
 
@@ -41,7 +41,7 @@ Ab Version 2.1.2 bietet die Firmware **vier verschiedene Varianten** an, um den 
 - Nutze **analyzer**, wenn du Funkprobleme diagnostizieren möchtest
 - Nutze **full**, wenn du alle Features benötigst und genug RAM hast
 
-**Update-Sicherheit:** Das Firmware-Update-System erkennt automatisch deine installierte Variante und lädt nur kompatible Updates herunter. Ein versehentliches Cross-Update zwischen Varianten wird verhindert.
+**Versionscheck:** Die Firmware prueft alle 24 Stunden automatisch auf neue Versionen (leichtgewichtiger Check, nur ~6 Bytes) und zeigt das Ergebnis auf der Status-Seite an.
 
 ### Worum es geht
 Dieses Repository enhält die Firmware für die HB-RF-ETH Platine, welches es ermöglicht, ein Homematic Funkmodul HM-MOD-RPI-PCB oder RPI-RF-MOD per Netzwerk an eine debmatic oder piVCCU3 Installation anzubinden.
@@ -105,30 +105,30 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
   * Status-Publishing
 
 #### WebUI & Verwaltung
-* **Moderne Web-Oberfläche** (Vue 3.5.25 + Bootstrap 5.3.8):
+* **Moderne Web-Oberfläche** (Vue 3.5.27 + Bootstrap 5.3.8):
   * 10 Sprachen: EN, DE, ES, FR, IT, NL, PL, CS, NO, SV
   * Responsive Design für Desktop und Mobile
+  * Aufgeräumte Navigation mit Dropdown-Menü
   * Initialpasswort: **admin** (muss nach dem ersten Login geändert werden)
 * **Funktionen**:
-  * Dashboard mit System-Übersicht
+  * Dashboard mit System-Übersicht und automatischem Versionscheck
   * Umfassende Einstellungen (Netzwerk, Zeit, Sicherheit, Monitoring)
-  * **Firmware-Update**: OTA-Updates per Webinterface mit Online-Update-Check
+  * **Firmware-Update**: OTA-Updates per Webinterface
   * **Backup & Restore**: Komplette Konfiguration exportieren/importieren
-  * **Analyzer Light**: Echtzeit-Funkrahmen-Analyse via WebSocket
+  * **Analyzer Light**: Echtzeit-Funkrahmen-Analyse via WebSocket (nur analyzer/full Variante)
   * **System-Neustart**: Direkter Restart aus dem WebUI
-  * **System-Info**: CPU, RAM, Temperatur, Spannung, Ethernet-Status
-  * **Supply Voltage Monitoring**: Farbcodierte Spannungsanzeige mit Warnungen
+  * **System-Info**: CPU, RAM, Uptime, Ethernet-Status, Funkmodul-Details
 
 #### Diagnose & Wartung
-* **Analyzer Light Feature**:
+* **Analyzer Light Feature** (nur analyzer/full Variante):
   * Echtzeit-Analyse von HomeMatic-Funkrahmen
   * WebSocket-basiertes Streaming
   * RSSI-Anzeige und Frame-Details
   * Mehrere gleichzeitige Clients unterstützt
-* **Automatische Update-Prüfung**:
-  * Regelmäßige Versionsüberprüfung
-  * LED-Indikation bei verfügbaren Updates (langsames Blinken)
-  * Optional: Prerelease-Versionen aktivierbar
+* **Automatischer Versionscheck**:
+  * Leichtgewichtiger Check alle 24 Stunden (nur ~6 Bytes von GitHub)
+  * Anzeige der verfügbaren Version auf der Status-Seite mit Update-Badge
+  * Minimaler Heap-Verbrauch durch temporären Task
 * **Werksreset per Taster**: Physischer Button für Zurücksetzen auf Werkseinstellungen
 * **LED-Status-Anzeige**: 5 LEDs (Power, Status, RGB für Funkmodul) mit konfigurierbarer Helligkeit (0-100%)
 * **Detaillierte Systeminfo**:
@@ -149,16 +149,17 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * **Board Revisionen**: REV 1.8, REV 1.10 (Public/SK Varianten)
 
 #### Software
-* **Framework**: ESP-IDF 5.5.1 (framework-espidf ~3.50501.0)
+* **Framework**: ESP-IDF 5.5.0 (framework-espidf ~3.50500.0)
 * **Platform**: espressif32 6.12.0
 * **Toolchain**: xtensa-esp-elf 14.2.0
 * **Build System**: PlatformIO + CMake
-* **WebUI**: Vue 3.5.25, Parcel 2.16.3, Bootstrap 5.3.8
-* **Security**: mbedTLS 3.6.4, OpenSSL 3.x compatible
+* **WebUI**: Vue 3.5.27, Parcel 2.16.3, Bootstrap 5.3.8
+* **Security**: mbedTLS 3.6.4
 
-#### Speicher
-* **RAM-Nutzung**: ~18.9 KB von 327.7 KB (5.8%)
-* **Flash-Nutzung**: ~918 KB von 1.9 MB (48.3%)
+#### Speicher (Standard-Variante)
+* **RAM-Nutzung**: ~21% von 327.7 KB
+* **Flash-Nutzung**: ~60% von 1.9 MB
+* **Freier Heap**: ~70 KB nach Systemstart
 * **Partitionierung**: Custom (Bootloader, Partitions, OTA, Firmware)
 
 #### Netzwerk
@@ -198,24 +199,19 @@ Siehe Hilfe zum RPI-RF-MOD
 * Blinken abwechselnd mit grüner Power LED: System bootet
 * Schnelles Blinken der roten Status LED, grüne Power LED leuchtet nicht: Siehe Werksreset
 * Schnelles Blinken der roten Status LED, grüne Power LED leuchtet dauerhaft: Firmware Update wird eingespielt
-* Langsames Blinken der roten Status LED, grüne Power LED leuchtet dauerhaft: Es ist ein Firmware Update verfügbar
-* Dauerhaftes Leuchten der grünen Power LED: Sytem ist gestartet
+* Dauerhaftes Leuchten der grünen Power LED: System ist gestartet
 
 ### Firmware Updates
 Firmware Updates sind fertig kompiliert in den [Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) zu finden und können per Webinterface eingespielt werden. Zum Übernehmen der Firmware muss die Platine neu gestartet werden (mittels Power-On Reset oder über den Neustart-Button im WebUI).
 
 #### Update-Methoden
-1. **Online-Update** (empfohlen):
-   * Im WebUI unter "Firmware-Update" auf "Nach Updates suchen" klicken
-   * Bei verfügbarem Update auf "Update installieren" klicken
-   * Platine startet automatisch neu und installiert die neue Firmware
-
-2. **Manuelles Update**:
-   * Firmware-Datei (`firmware_X_X_X.bin`) von [Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) herunterladen
-   * Im WebUI unter "Firmware-Update" hochladen
+1. **Manuelles Update** (empfohlen):
+   * Die Status-Seite zeigt automatisch an, ob ein Update verfügbar ist
+   * Firmware-Datei (`.bin`) von [Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) herunterladen
+   * Im WebUI unter Einstellungen > Firmware-Update hochladen
    * Platine neu starten
 
-3. **Serielle Programmierung** (für Entwickler):
+2. **Serielle Programmierung** (für Entwickler):
    * Über USB-Serial-Adapter mit esptool.py oder PlatformIO
 
 ### Kompatible CCU-Systeme
