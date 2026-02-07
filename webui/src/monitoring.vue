@@ -92,7 +92,7 @@
         </BFormGroup>
 
         <BFormGroup label-cols-sm="4" :label="t('monitoring.mqtt.password')">
-          <BFormInput v-model="mqttConfig.password" type="password" />
+          <PasswordInput v-model="mqttConfig.password" :placeholder="''" />
           <BFormText>{{ t('monitoring.mqtt.passwordHelp') }}</BFormText>
         </BFormGroup>
 
@@ -132,6 +132,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMonitoringStore } from './stores.js'
 import { storeToRefs } from 'pinia'
+import PasswordInput from './components/PasswordInput.vue'
 
 const { t } = useI18n()
 

@@ -10,10 +10,10 @@
 
 #include <stdint.h>
 #include "esp_err.h"
+#include "nextcloud_client.h"
 
 // Forward declarations
 class SysInfo;
-class UpdateCheck;
 
 // SNMP Configuration
 typedef struct {
@@ -48,10 +48,11 @@ typedef struct {
     snmp_config_t snmp;
     checkmk_config_t checkmk;
     mqtt_config_t mqtt;
+    nextcloud_config_t nextcloud;
 } monitoring_config_t;
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo);
 
 // Update configuration
 esp_err_t monitoring_update_config(const monitoring_config_t *config);

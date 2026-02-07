@@ -4,7 +4,19 @@ import os
 import platform
 from pathlib import Path
 
-Import("env")
+# Add current directory to path to ensure we can import local modules
+sys.path.append(os.getcwd())
+
+try:
+    import update_version
+except ImportError:
+    print("WARNING: Could not import update_version.py. Version sync might fail.")
+    update_version = None
+
+try:
+    Import("env")
+except NameError:
+    pass
 
 def is_tool(name):
     """Check if a tool is available in PATH."""
@@ -14,6 +26,32 @@ def is_tool(name):
         return result.returncode == 0
     except Exception:
         return False
+
+def update_version_in_files():
+    """
+    Read version from version.txt and update WebUI files using update_version.py logic.
+    This ensures local builds match the version in version.txt.
+    """
+    if not update_version:
+        return
+
+    try:
+        # Read version from version.txt in the project root
+        version_file = Path("version.txt")
+        if not version_file.exists():
+            print("WARNING: version.txt not found! Skipping version update.")
+            return
+
+        version = version_file.read_text().strip()
+        print(f"Syncing WebUI version to: {version}")
+
+        # Update WebUI specific files
+        update_version.update_locales(version)
+        update_version.update_about_vue(version)
+        update_version.update_package_json(version)
+
+    except Exception as e:
+        print(f"WARNING: Failed to update WebUI version: {e}")
 
 def build_web():
     """Build the web UI using npm."""
@@ -26,6 +64,9 @@ def build_web():
     if not webui_dir.exists():
         print("ERROR: webui directory not found!")
         return
+
+    # Sync version before building
+    update_version_in_files()
 
     original_dir = os.getcwd()
     try:

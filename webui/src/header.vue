@@ -1,17 +1,21 @@
 <template>
-  <BNavbar type="dark" variant="primary" toggleable="sm" class="mb-3 mt-3 rounded">
+  <BNavbar type="dark" variant="primary" toggleable="md" class="mb-3 mt-3">
     <BNavbarBrand tag="h1" class="font-weight-bold">HB-RF-ETH-ng</BNavbarBrand>
     <BNavbarToggle target="nav-collapse" />
     <BCollapse id="nav-collapse" is-nav>
       <BNavbarNav>
-        <BNavItem href="/">{{ t('nav.home') }}</BNavItem>
-        <BNavItem href="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
-        <BNavItem href="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
-        <BNavItem href="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-        <BNavItem href="/about">{{ t('nav.about') }}</BNavItem>
+        <BNavItem to="/">{{ t('nav.home') }}</BNavItem>
+        <BNavItemDropdown :text="t('nav.settings')" v-if="loginStore.isLoggedIn">
+          <BDropdownItem to="/settings">{{ t('nav.networkSystem') }}</BDropdownItem>
+          <BDropdownItem to="/firmware">{{ t('nav.firmware') }}</BDropdownItem>
+          <BDropdownItem to="/monitoring">{{ t('nav.monitoring') }}</BDropdownItem>
+          <BDropdownItem to="/analyzer" v-if="sysInfoStore.enableAnalyzer && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BDropdownItem>
+        </BNavItemDropdown>
+        <BNavItem to="/log" v-if="loginStore.isLoggedIn">{{ t('nav.log') }}</BNavItem>
+        <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>
       <BNavbarNav class="ms-auto">
-        <BNavItem href="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
+        <BNavItem to="/login" v-if="!loginStore.isLoggedIn" class="me-2">{{ t('nav.login') }}</BNavItem>
         <BNavItemDropdown :text="currentLocaleName" size="sm" variant="outline-light" class="me-2">
           <BDropdownItem
             v-for="locale in availableLocales"
@@ -32,25 +36,33 @@
         >
           {{ themeStore.theme === 'light' ? '🌙' : '☀️' }}
         </BNavItem>
-        <BNavForm v-if="loginStore.isLoggedIn">
-          <BButton size="sm" variant="outline-light" @click.prevent="logout">{{ t('nav.logout') }}</BButton>
-        </BNavForm>
+        <BNavItem v-if="loginStore.isLoggedIn" @click.prevent="logout" href="#" class="me-2 text-warning font-weight-bold">
+            {{ t('nav.logout') }}
+        </BNavItem>
       </BNavbarNav>
     </BCollapse>
   </BNavbar>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore } from './stores.js'
+import { useLoginStore, useThemeStore, useSettingsStore, useSysInfoStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const loginStore = useLoginStore()
 const themeStore = useThemeStore()
+const settingsStore = useSettingsStore()
+const sysInfoStore = useSysInfoStore()
+
+onMounted(async () => {
+    if (loginStore.isLoggedIn) {
+        await Promise.all([settingsStore.load(), sysInfoStore.update()])
+    }
+})
 
 const currentLocale = computed(() => locale.value)
 const currentLocaleName = computed(() => {
