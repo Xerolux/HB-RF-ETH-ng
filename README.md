@@ -19,10 +19,21 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
 **Version 2.1.1 Änderungen:**
 * Aktualisierung auf ESP-IDF 5.x
 * Kompatibilität mit modernen Toolchains (GCC 14.2.0)
-* Aktualisierte WebUI mit Vue 3.5 und Parcel 2
+* Aktualisierte WebUI mit Vue 3.5 und modernem Design
 * Verbesserte Stabilität und Performance
 * Modernisierte API-Verwendung (ADC, SNTP, mDNS)
-* Erzwungene Passwortänderung beim ersten Login für erhöhte Sicherheit
+* **Neues Sicherheitskonzept**
+  * Erzwungene Passwortänderung beim ersten Login
+  * **Separates OTA-Passwort** für Firmware-Updates
+  * Timing-attacken-geschützte Passwortvergleiche
+* **Detaillierte Neustart-Gründe** in der WebUI
+  * Zeigt Ursache des letzten Neustarts (Update, Werksreset, Fehler, etc.)
+* **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
+* **Verbesserte Firmware-Update-UX**
+  * Passwort-Stärke-Anzeige beim Setzen
+  * Warnhinweis wenn OTA-Passwort nicht gesetzt
+  * Automatischer Neustart nach erfolgreichem Update
+* **Moderne, responsive WebUI** mit Mobile-Support
 
 ### Worum es geht
 Dieses Repository enhält die Firmware für die HB-RF-ETH Platine, welches es ermöglicht, ein Homematic Funkmodul HM-MOD-RPI-PCB oder RPI-RF-MOD per Netzwerk an eine debmatic oder piVCCU3 Installation anzubinden.
@@ -47,15 +58,29 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
     * Pin 3: Gnd
 * MDNS Server um Platine im Netzwerk bekannt zu machen
 * Netzwerkeinsellungen per DHCP oder statisch konfigurierbar
-* WebUI zur Konfiguration
-  * Intialpasswort: admin (muss nach dem ersten Login geändert werden)
-* Firmware Update per Webinterface
+* **IPv6 Support** (Auto-Konfiguration oder statisch)
+* **Moderne WebUI zur Konfiguration**
+  * Initiales Passwort: `admin` (muss nach dem ersten Login geändert werden)
+  * Separates **OTA-Passwort** für Firmware-Updates (optional, aber empfohlen)
+  * Responsive Design für Desktop und Mobile
+  * Detaillierte Systeminformationen und Neustart-Gründe
+* **Firmware Updates**
+  * Upload als .bin Datei
+  * **Download per URL** (z.B. direkt von GitHub Releases)
+  * OTA-Passwort-Schutz für Updates
+  * Automatischer Neustart nach erfolgreichem Update
+  * Anzeige verfügbarer Updates in der WebUI
 * Erkennung des Funkmoduls und Ausgabe von Typ, Seriennummer, Funkadresse und SGTIN in der WebUI
 * Regelmäßige Prüfung auf Firmwareupdates
-* Werksreset per Taster
+* Werksreset per Taster oder über die WebUI
+* **Backup & Restore** der Einstellungen über die WebUI
+* **Sicherheits-Features**
+  * Timing-attacken-geschützte Passwortvergleiche
+  * Rate Limiting bei Login-Versuchen
+  * Moderne Security Headers
 * **Monitoring und Überwachung**
   * **SNMP Support** (Simple Network Management Protocol)
-    * Überwachung von Systemmetriken (CPU, Speicher, Uptime)
+    * Überwachung von Systemmetriken (CPU, Speicher, Uptime, Temperatur)
     * Standard MIB-2 Unterstützung
     * Konfigurierbarer SNMP Community String
     * Konfigurierbare Location und Contact Informationen
@@ -70,7 +95,9 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * Die Stromversorgung mittels des Funkmoduls RPI-RF-MOD darf nur erfolgen, wenn keine andere Stromversorgung (USB oder PoE) angeschlossen ist.
 
 ### Werksreset
-Die Firmware kann per Taster auf Werkseinstellungen zurückgesetzt werden:
+Die Firmware kann auf zwei Arten auf Werkseinstellungen zurückgesetzt werden:
+
+**Per Taster:**
 1. Platine vom Strom trennen
 2. Taster drücken und gedrückt halten
 3. Stromversorgung wiederherstellen
@@ -78,6 +105,12 @@ Die Firmware kann per Taster auf Werkseinstellungen zurückgesetzt werden:
 5. Taster kurz loslassen und wieder drücken und gedrückt halten
 6. Nach ca. 4 Sekunden leuchten die grüne Power LED und die rote Status LED für eine Sekunde
 7. Danach ist der Werkreset abgeschlossen und es folgt der normale Bootvorgang
+
+**Über die WebUI:**
+1. Anmelden in der WebUI
+2. Zur Seite "Firmware Update" navigieren
+3. Button "Factory Reset" klicken
+4. Bestätigen und Neustart abwarten
 
 ### Blinkcodes der LEDs
 #### RPI-RF-MOD
@@ -91,7 +124,27 @@ Siehe Hilfe zum RPI-RF-MOD
 * Dauerhaftes Leuchten der grünen Power LED: Sytem ist gestartet
 
 ### Firmware Updates
-Firmware Updates sind fertig kompiliert und Releases zu finden und können per Webinterface eingespielt werden. Zum Übernehmen der Firmware muss die Platine neu gestartet werden (mittel Power-On Reset).
+Firmware Updates sind fertig kompiliert in den [Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) zu finden und können auf zwei Arten eingespielt werden:
+
+**Per Webinterface (File Upload):**
+1. Herunterladen der `firmware.bin` Datei aus dem Release
+2. In der WebUI zur Seite "Firmware Update" navigieren
+3. Die .bin Datei hochladen
+4. OTA-Passwort eingeben (falls konfiguriert)
+5. Update wird automatisch eingespielt und die Platine neu gestartet
+
+**Per Webinterface (URL Download):**
+1. In der WebUI zur Seite "Firmware Update" navigieren
+2. Direkte URL zur .bin Datei eingeben (z.B. von GitHub)
+3. Quick-Button für die neueste GitHub-Version nutzen
+4. OTA-Passwort eingeben (falls konfiguriert)
+5. Firmware wird heruntergeladen, installiert und die Platine neu gestartet
+
+**OTA-Passwort:**
+- Ein separates OTA-Passwort kann in den Einstellungen festgelegt werden
+- Dieses Passwort ist für alle Firmware-Updates erforderlich
+- Es dient als zusätzlicher Schutz vor unbefugten Updates
+- Wird das Passwort vergessen, kann es nur über die Konsole gelöscht werden
 
 ### Kompatible CCU-Systeme
 
