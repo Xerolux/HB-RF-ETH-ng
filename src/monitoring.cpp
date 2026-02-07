@@ -336,20 +336,24 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
         config->snmp.enabled = false;
-        strcpy(config->snmp.community, "public");
-        strcpy(config->snmp.location, "");
-        strcpy(config->snmp.contact, "");
+        strncpy(config->snmp.community, "public", sizeof(config->snmp.community) - 1);
+        config->snmp.community[sizeof(config->snmp.community) - 1] = '\0';
+        config->snmp.location[0] = '\0';
+        config->snmp.contact[0] = '\0';
         config->snmp.port = 161;
 
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
-        strcpy(config->checkmk.allowed_hosts, "*");
+        strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
+        config->checkmk.allowed_hosts[sizeof(config->checkmk.allowed_hosts) - 1] = '\0';
 
         config->mqtt.enabled = false;
         config->mqtt.port = 1883;
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
         config->mqtt.ha_discovery_enabled = false;
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
 
         return ESP_OK;
     }
@@ -416,7 +420,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.topic_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
     }
 
     if (nvs_get_u8(nvs_handle, NVS_MQTT_HA_ENABLED, &u8_val) == ESP_OK) {
@@ -427,7 +432,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.ha_discovery_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
     }
 
     nvs_close(nvs_handle);
