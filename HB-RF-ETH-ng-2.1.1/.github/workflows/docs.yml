@@ -1,0 +1,127 @@
+name: Documentation Checks
+
+on:
+  pull_request:
+    paths:
+      - '**.md'
+      - 'docs/**'
+  push:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v18
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+            !.pio
+          config: |
+            {
+              "default": true,
+              "MD013": false,
+              "MD033": false,
+              "MD041": false
+            }
+        continue-on-error: true
+
+  check-links:
+    name: Check Broken Links
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check links in Markdown files
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+          config-file: '.github/markdown-link-check-config.json'
+        continue-on-error: true
+
+  check-spelling:
+    name: Spell Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check spelling
+        uses: crate-ci/typos@v1.40.0
+        with:
+          files: |
+            *.md
+            docs/
+        continue-on-error: true
+
+  validate-docs:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check required documentation files
+        run: |
+          REQUIRED_FILES=(
+            "README.md"
+            "CHANGELOG.md"
+            "LICENSE.md"
+            "SECURITY.md"
+          )
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing required file: $file"
+              exit 1
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+
+      - name: Check if README is updated
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          if git diff origin/${{ github.base_ref }} --name-only | grep -q "^src/\|^webui/"; then
+            if ! git diff origin/${{ github.base_ref }} --name-only | grep -q "README.md"; then
+              echo "⚠️ Warning: Code changed but README.md not updated"
+            fi
+          fi
+        continue-on-error: true
+
+      - name: Validate version consistency
+        run: |
+          VERSION=$(cat version.txt)
+          echo "Current version: $VERSION"
+
+          # Check if version is mentioned in CHANGELOG
+          if ! grep -q "$VERSION" CHANGELOG.md; then
+            echo "⚠️ Warning: Version $VERSION not found in CHANGELOG.md"
+            exit 1
+          fi
+
+          # Check if version is in package.json
+          PACKAGE_VERSION=$(grep '"version"' webui/package.json | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+          echo "WebUI version: $PACKAGE_VERSION"
+
+          if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "⚠️ Warning: Version mismatch between version.txt ($VERSION) and package.json ($PACKAGE_VERSION)"
+          fi
+        continue-on-error: true
