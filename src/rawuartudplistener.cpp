@@ -86,9 +86,13 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         return;
     }
 
-    if (*((uint16_t *)(data + length - 2)) != htons(HMFrame::crc(data, length - 2)))
+    // SAFETY: Use byte-by-byte comparison to avoid unaligned access
+    // CRC is stored as big-endian at the end of the packet
+    uint16_t received_crc = ((uint16_t)data[length - 2] << 8) | data[length - 1];
+    if (received_crc != HMFrame::crc(data, length - 2))
     {
-        ESP_LOGE(TAG, "Received raw-uart packet with invalid crc.");
+        ESP_LOGE(TAG, "Received raw-uart packet with invalid crc (expected %04x, got %04x).",
+                 HMFrame::crc(data, length - 2), received_crc);
         return;
     }
 

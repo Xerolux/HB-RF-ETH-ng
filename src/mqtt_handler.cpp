@@ -143,8 +143,6 @@ void mqtt_handler_publish_status(void)
 
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
     PUBLISH_DOUBLE("status/memory_usage", sysInfo->getMemoryUsage(), 1);
-    PUBLISH_DOUBLE("status/supply_voltage", sysInfo->getSupplyVoltage(), 2);
-    PUBLISH_DOUBLE("status/temperature", sysInfo->getTemperature(), 1);
     PUBLISH_INT("status/uptime", (int)sysInfo->getUptimeSeconds());
     PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString());
 
@@ -239,12 +237,6 @@ void mqtt_handler_publish_ha_discovery(void)
 
     // Memory Usage
     publish_config("sensor", "memory_usage", "Memory Usage", NULL, "measurement", "%", NULL, "diagnostic", "mdi:memory");
-
-    // Supply Voltage
-    publish_config("sensor", "supply_voltage", "Supply Voltage", "voltage", "measurement", "V", NULL, "diagnostic", NULL);
-
-    // Temperature
-    publish_config("sensor", "temperature", "Temperature", "temperature", "measurement", "°C", NULL, "diagnostic", NULL);
 
     // Uptime (seconds)
     publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");

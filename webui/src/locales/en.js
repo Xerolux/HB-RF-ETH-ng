@@ -190,8 +190,6 @@ export default {
     latestVersion: 'Latest Version',
     memory: 'Memory Usage',
     cpu: 'CPU Usage',
-    temperature: 'Temperature',
-    voltage: 'Supply Voltage',
     ethernet: 'Ethernet',
     connected: 'Connected',
     disconnected: 'Disconnected',

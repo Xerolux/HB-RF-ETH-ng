@@ -109,6 +109,33 @@ static void heap_monitor_task(void *pvParameters)
             ESP_LOGI(TAG, "heap_monitor stack - Min watermark: %u words (%.1f%% used)",
                      stack_watermark_min,
                      100.0 * (2560 / sizeof(StackType_t) - stack_watermark_min) / (2560.0 / sizeof(StackType_t)));
+
+            // Stack watermark monitoring for critical tasks
+            // This helps identify tasks that need more stack space
+            ESP_LOGI(TAG, "--- Task Stack Watermarks ---");
+
+            // List all tasks and their stack watermarks
+            uint32_t task_count = uxTaskGetNumberOfTasks();
+            TaskStatus_t *task_status = (TaskStatus_t *)malloc(task_count * sizeof(TaskStatus_t));
+            if (task_status) {
+                task_count = uxTaskGetSystemState(task_status, task_count);
+                for (uint32_t i = 0; i < task_count; i++) {
+                    UBaseType_t wm = task_status[i].usStackHighWaterMark;
+                    // Warn if less than 20% stack free
+                    float usage_pct = 100.0 * (1.0 - (float)wm / task_status[i].usStackSize);
+                    if (usage_pct > 80.0) {
+                        ESP_LOGW(TAG, "  Task %s: %u/%u bytes free (%.0f%% used) - WARNING!",
+                                 task_status[i].pcTaskName, wm * sizeof(StackType_t),
+                                 task_status[i].usStackSize * sizeof(StackType_t), usage_pct);
+                    } else {
+                        ESP_LOGI(TAG, "  Task %s: %u/%u bytes free (%.0f%% used)",
+                                 task_status[i].pcTaskName, wm * sizeof(StackType_t),
+                                 task_status[i].usStackSize * sizeof(StackType_t), usage_pct);
+                    }
+                }
+                free(task_status);
+            }
+            ESP_LOGI(TAG, "-------------------------------");
         }
 
         vTaskDelay(5000 / portTICK_PERIOD_MS);  // Check every 5 seconds

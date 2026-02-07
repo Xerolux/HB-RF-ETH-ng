@@ -175,8 +175,6 @@ export default {
     latestVersion: 'Nejnovější verze',
     memory: 'Využití paměti',
     cpu: 'Využití CPU',
-    temperature: 'Teplota',
-    voltage: 'Napájecí napětí',
     ethernet: 'Ethernet',
     connected: 'Připojeno',
     disconnected: 'Odpojeno',

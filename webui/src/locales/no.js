@@ -175,8 +175,6 @@ export default {
     latestVersion: 'Nyeste versjon',
     memory: 'Minnebruk',
     cpu: 'CPU-bruk',
-    temperature: 'Temperatur',
-    voltage: 'Forsyningsspenning',
     ethernet: 'Ethernet',
     connected: 'Tilkoblet',
     disconnected: 'Frakoblet',

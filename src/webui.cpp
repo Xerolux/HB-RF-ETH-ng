@@ -50,6 +50,80 @@
 
 static const char *TAG = "WebUI";
 
+// Global flag for pending restart - set when restart is requested
+static volatile bool _restart_requested = false;
+static TaskHandle_t _restart_task_handle = NULL;
+
+/**
+ * Safe restart task - runs at highest priority to ensure clean shutdown
+ *
+ * This task:
+ * 1. Gives time for HTTP response to be sent
+ * 2. Waits for all pending operations to complete
+ * 3. Calls esp_restart() with proper cleanup
+ */
+static void restart_task(void* pvParameters) {
+    ESP_LOGI(TAG, "Restart task initiated - preparing for system restart");
+
+    // Give the HTTP response time to be sent to client
+    vTaskDelay(pdMS_TO_TICKS(500));
+
+    // Log the restart reason
+    ESP_LOGW(TAG, "System restart requested - esp_restart() will be called");
+
+    // Disable watchdogs that might interfere with restart
+    esp_task_wdt_reset();
+
+    // Additional delay to ensure all buffers are flushed
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    // Now perform the restart
+    ESP_LOGI(TAG, "Calling esp_restart()...");
+
+    // Disable interrupts and restart
+    esp_restart();
+
+    // Should never reach here, but just in case:
+    vTaskDelete(NULL);
+}
+
+/**
+ * Trigger a system restart via a dedicated high-priority task
+ *
+ * This is the preferred method for restart as it:
+ * - Ensures HTTP response is sent before restart
+ * - Runs at high priority to prevent interference
+ * - Allows ESP-IDF to properly cleanup resources
+ */
+static void trigger_restart() {
+    // Prevent multiple restart tasks
+    if (_restart_requested) {
+        ESP_LOGW(TAG, "Restart already requested, ignoring duplicate request");
+        return;
+    }
+    _restart_requested = true;
+
+    ESP_LOGI(TAG, "Scheduling system restart...");
+
+    // Create restart task at very high priority (24, above almost everything)
+    // This ensures the restart completes even if system is under load
+    BaseType_t ret = xTaskCreate(
+        restart_task,
+        "restart_task",
+        4096,           // Stack size
+        NULL,           // Parameters
+        24,             // Priority - very high, below ESP-IDF tasks (25-31)
+        &_restart_task_handle
+    );
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create restart task! Trying immediate restart...");
+        // Fallback: immediate restart after short delay
+        vTaskDelay(pdMS_TO_TICKS(100));
+        esp_restart();
+    }
+}
+
 // Buffer size constants - prevent magic numbers
 #define TOKEN_BASE_SIZE 21
 #define ETAG_BUFFER_SIZE 32
@@ -318,8 +392,6 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(sysInfo, "latestVersion", _updateCheck->getLatestVersion());
     cJSON_AddNumberToObject(sysInfo, "memoryUsage", _sysInfo->getMemoryUsage());
     cJSON_AddNumberToObject(sysInfo, "cpuUsage", _sysInfo->getCpuUsage());
-    cJSON_AddNumberToObject(sysInfo, "supplyVoltage", _sysInfo->getSupplyVoltage());
-    cJSON_AddNumberToObject(sysInfo, "temperature", _sysInfo->getTemperature());
     cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
     cJSON_AddStringToObject(sysInfo, "boardRevision", _sysInfo->getBoardRevisionString());
     cJSON_AddStringToObject(sysInfo, "resetReason", _sysInfo->getResetReason());
@@ -1103,11 +1175,10 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
     cJSON_Delete(root);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true}");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings restored. System is restarting...\"}");
 
-    // Restart
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Use trigger_restart() for more reliable reboot
+    trigger_restart();
 
     return ESP_OK;
 }
@@ -1208,14 +1279,15 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     OTA_CHECK(esp_ota_end(ota_handle) == ESP_OK, "Error writing OTA");
     OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error writing OTA");
 
-    ESP_LOGI(TAG, "OTA finished, restarting in 3 seconds to activate new firmware.");
-    httpd_resp_sendstr(req, "Firmware update completed, restarting in 3 seconds...");
+    ESP_LOGI(TAG, "OTA finished successfully! Partition: %s, Size: %d bytes",
+             update_partition->label, content_received);
+    httpd_resp_sendstr(req, "Firmware update completed! System is restarting...");
 
     _statusLED->setState(LED_STATE_OFF);
 
-    // Automatic restart after successful OTA update
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Use trigger_restart() for more reliable reboot
+    // This ensures all connections are properly closed before restart
+    trigger_restart();
 
     return ESP_OK;
 
@@ -1243,11 +1315,10 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_sendstr(req, "{\"success\":true}");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"System is restarting...\"}");
 
-    // Restart after a short delay to allow response to be sent
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Trigger restart via dedicated task (more reliable than direct esp_restart from HTTP handler)
+    trigger_restart();
 
     return ESP_OK;
 }
@@ -1389,11 +1460,10 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     _settings->clear();
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true}");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Factory reset complete. System is restarting...\"}");
 
-    // Restart after a short delay
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    // Use trigger_restart() for more reliable reboot
+    trigger_restart();
 
     return ESP_OK;
 }
