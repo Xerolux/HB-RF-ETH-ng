@@ -30,8 +30,9 @@ static const char *TAG = "MONITORING";
 
 static monitoring_config_t current_config = {};
 static bool snmp_running = false;
-static bool checkmk_running = false;
+static volatile bool checkmk_running = false;
 static TaskHandle_t checkmk_task_handle = NULL;
+static int checkmk_listen_sock = -1;
 
 // NVS keys
 #define NVS_NAMESPACE "monitoring"
@@ -88,35 +89,39 @@ UpdateCheck* monitoring_get_updatecheck(void) {
 static void checkmk_agent_task(void *pvParameters)
 {
     const checkmk_config_t *config = (const checkmk_config_t *)pvParameters;
-    int listen_sock = -1;
     struct sockaddr_in server_addr;
 
     ESP_LOGI(TAG, "CheckMK Agent starting on port %d", config->port);
 
-    listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (listen_sock < 0) {
+    checkmk_listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (checkmk_listen_sock < 0) {
         ESP_LOGE(TAG, "Unable to create socket");
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
     int opt = 1;
-    setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(checkmk_listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     server_addr.sin_port = htons(config->port);
 
-    if (bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(checkmk_listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         ESP_LOGE(TAG, "Socket bind failed");
-        close(listen_sock);
+        close(checkmk_listen_sock);
+        checkmk_listen_sock = -1;
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
 
-    if (listen(listen_sock, 5) < 0) {
+    if (listen(checkmk_listen_sock, 5) < 0) {
         ESP_LOGE(TAG, "Socket listen failed");
-        close(listen_sock);
+        close(checkmk_listen_sock);
+        checkmk_listen_sock = -1;
+        checkmk_task_handle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -127,7 +132,7 @@ static void checkmk_agent_task(void *pvParameters)
         struct sockaddr_in client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
 
-        int client_sock = accept(listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
+        int client_sock = accept(checkmk_listen_sock, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_sock < 0) {
             if (checkmk_running) {
                 ESP_LOGE(TAG, "Accept failed");
@@ -202,8 +207,12 @@ static void checkmk_agent_task(void *pvParameters)
         ESP_LOGI(TAG, "CheckMK client disconnected");
     }
 
-    close(listen_sock);
+    if (checkmk_listen_sock >= 0) {
+        close(checkmk_listen_sock);
+        checkmk_listen_sock = -1;
+    }
     ESP_LOGI(TAG, "CheckMK Agent stopped");
+    checkmk_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -281,7 +290,20 @@ esp_err_t checkmk_stop(void)
     ESP_LOGI(TAG, "Stopping CheckMK agent");
     checkmk_running = false;
 
+    // Close listening socket to unblock accept() so the task can exit cleanly
+    if (checkmk_listen_sock >= 0) {
+        close(checkmk_listen_sock);
+        checkmk_listen_sock = -1;
+    }
+
+    // Wait for task to self-delete (max 2 seconds)
+    for (int i = 0; i < 20 && checkmk_task_handle != NULL; i++) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    // Force-delete if task didn't exit in time
     if (checkmk_task_handle != NULL) {
+        ESP_LOGW(TAG, "CheckMK task did not exit cleanly, force deleting");
         vTaskDelete(checkmk_task_handle);
         checkmk_task_handle = NULL;
     }
@@ -336,20 +358,24 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
         config->snmp.enabled = false;
-        strcpy(config->snmp.community, "public");
-        strcpy(config->snmp.location, "");
-        strcpy(config->snmp.contact, "");
+        strncpy(config->snmp.community, "public", sizeof(config->snmp.community) - 1);
+        config->snmp.community[sizeof(config->snmp.community) - 1] = '\0';
+        config->snmp.location[0] = '\0';
+        config->snmp.contact[0] = '\0';
         config->snmp.port = 161;
 
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
-        strcpy(config->checkmk.allowed_hosts, "*");
+        strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
+        config->checkmk.allowed_hosts[sizeof(config->checkmk.allowed_hosts) - 1] = '\0';
 
         config->mqtt.enabled = false;
         config->mqtt.port = 1883;
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
         config->mqtt.ha_discovery_enabled = false;
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
 
         return ESP_OK;
     }
@@ -416,7 +442,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.topic_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.topic_prefix, "hb-rf-eth");
+        strncpy(config->mqtt.topic_prefix, "hb-rf-eth", sizeof(config->mqtt.topic_prefix) - 1);
+        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
     }
 
     if (nvs_get_u8(nvs_handle, NVS_MQTT_HA_ENABLED, &u8_val) == ESP_OK) {
@@ -427,7 +454,8 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 
     str_len = sizeof(config->mqtt.ha_discovery_prefix);
     if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
-        strcpy(config->mqtt.ha_discovery_prefix, "homeassistant");
+        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
+        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
     }
 
     nvs_close(nvs_handle);

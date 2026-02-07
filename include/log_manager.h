@@ -29,7 +29,7 @@ private:
     char *log_buffer = nullptr;
     size_t log_buffer_size = 0;
     uint64_t total_written = 0;
-    SemaphoreHandle_t _mutex = nullptr;
+    mutable SemaphoreHandle_t _mutex = nullptr;
 
     // Allow the C-style callback to access private members
     friend int log_vprintf(const char *fmt, va_list args);

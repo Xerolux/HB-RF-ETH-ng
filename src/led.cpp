@@ -26,7 +26,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 
-static uint8_t _blinkState = 0;
+static volatile uint8_t _blinkState = 0;
 static LED *_leds[MAX_LED_COUNT] = {0};
 static TaskHandle_t _switchTaskHandle = NULL;
 static int _highDuty;
@@ -47,8 +47,6 @@ void ledSwitcherTask(void *parameter)
         }
         vTaskDelay(125 / portTICK_PERIOD_MS);
     }
-
-    vTaskDelete(NULL);
 }
 
 void LED::start(Settings *settings)

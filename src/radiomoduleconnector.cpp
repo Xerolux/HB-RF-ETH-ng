@@ -112,6 +112,11 @@ void RadioModuleConnector::_serialQueueHandler()
 {
     uart_event_t event;
     uint8_t *buffer = (uint8_t *)malloc(UART_HW_FIFO_LEN(UART_NUM_1));
+    if (!buffer) {
+        ESP_LOGE("RadioModuleConnector", "Failed to allocate UART buffer");
+        vTaskDelete(NULL);
+        return;
+    }
 
     uart_flush_input(UART_NUM_1);
 
@@ -141,10 +146,6 @@ void RadioModuleConnector::_serialQueueHandler()
             }
         }
     }
-
-    free(buffer);
-    buffer = NULL;
-    vTaskDelete(NULL);
 }
 
 void RadioModuleConnector::_handleFrame(unsigned char *buffer, uint16_t len)

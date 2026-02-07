@@ -47,8 +47,6 @@ void updateRtcTask(void *parameter)
 
         ESP_LOGI(TAG, "Updated RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now.tm_year + 1900, now.tm_mon + 1, now.tm_mday, now.tm_hour, now.tm_min, now.tm_sec, get_tzname(now.tm_isdst));
     }
-
-    vTaskDelete(NULL);
 }
 
 SystemClock::SystemClock(Rtc *rtc) : _rtc(rtc)
@@ -61,7 +59,9 @@ void SystemClock::start(void)
     {
         struct timeval tv = _rtc->GetTime();
         settimeofday(&tv, NULL);
+        portENTER_CRITICAL(&_syncTimeMux);
         _lastSyncTime = tv;
+        portEXIT_CRITICAL(&_syncTimeMux);
 
         time_t nowtime = tv.tv_sec;
         struct tm *now = localtime(&nowtime);
@@ -84,7 +84,9 @@ void SystemClock::stop(void)
 void SystemClock::setTime(struct timeval *tv)
 {
     settimeofday(tv, NULL);
+    portENTER_CRITICAL(&_syncTimeMux);
     _lastSyncTime = *tv;
+    portEXIT_CRITICAL(&_syncTimeMux);
 
     if (_tHandle != NULL)
     {
@@ -101,7 +103,10 @@ struct timeval SystemClock::getTime()
 
 struct timeval SystemClock::getLastSyncTime()
 {
-    return _lastSyncTime;
+    portENTER_CRITICAL(&_syncTimeMux);
+    struct timeval tv = _lastSyncTime;
+    portEXIT_CRITICAL(&_syncTimeMux);
+    return tv;
 }
 
 struct tm SystemClock::getLocalTime(void)

@@ -69,6 +69,11 @@ void GPS::_gpsSerialQueueHandler()
 {
     uart_event_t event;
     uint8_t *buffer = (uint8_t *)malloc(UART_HW_FIFO_LEN(UART_NUM_2));
+    if (!buffer) {
+        ESP_LOGE("GPS", "Failed to allocate UART buffer");
+        vTaskDelete(NULL);
+        return;
+    }
 
     uart_flush_input(UART_NUM_2);
 
@@ -98,10 +103,6 @@ void GPS::_gpsSerialQueueHandler()
             }
         }
     }
-
-    free(buffer);
-    buffer = NULL;
-    vTaskDelete(NULL);
 }
 
 bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)

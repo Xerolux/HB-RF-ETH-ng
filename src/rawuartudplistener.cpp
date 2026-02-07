@@ -81,7 +81,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         return;
     }
 
-    _lastReceivedKeepAlive = esp_timer_get_time();
+    atomic_store(&_lastReceivedKeepAlive, (int64_t)esp_timer_get_time());
 
     switch (data[0])
     {
@@ -297,7 +297,7 @@ void RawUartUdpListener::_udpQueueHandler()
         {
             int64_t now = esp_timer_get_time();
 
-            if (now > _lastReceivedKeepAlive + 5000000)
+            if (now > atomic_load(&_lastReceivedKeepAlive) + 5000000)
             { // 5 sec
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
@@ -312,8 +312,6 @@ void RawUartUdpListener::_udpQueueHandler()
             }
         }
     }
-
-    vTaskDelete(NULL);
 }
 
 bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)

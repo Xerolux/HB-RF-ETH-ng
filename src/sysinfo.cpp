@@ -48,9 +48,15 @@ static board_type_t _board;
 static uint64_t _bootTime;
 static temperature_sensor_handle_t _temp_sensor = NULL;
 
+static const UBaseType_t MAX_TASKS = 32;
+
 void updateCPUUsageTask(void *arg)
 {
-    TaskStatus_t *taskStatus = (TaskStatus_t *)malloc(25 * sizeof(TaskStatus_t));
+    TaskStatus_t *taskStatus = (TaskStatus_t *)malloc(MAX_TASKS * sizeof(TaskStatus_t));
+    if (!taskStatus) {
+        vTaskDelete(NULL);
+        return;
+    }
 
     TaskHandle_t idle0Task = xTaskGetIdleTaskHandleForCore(0);
     TaskHandle_t idle1Task = xTaskGetIdleTaskHandleForCore(1);
@@ -61,7 +67,7 @@ void updateCPUUsageTask(void *arg)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-        UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
+        UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, MAX_TASKS, &totalRunTime);
 
         idleRunTime = 0;
 
@@ -89,9 +95,6 @@ void updateCPUUsageTask(void *arg)
         lastIdleRunTime = idleRunTime;
         lastTotalRunTime = totalRunTime;
     }
-
-    free(taskStatus);
-    vTaskDelete(NULL);
 }
 
 uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)

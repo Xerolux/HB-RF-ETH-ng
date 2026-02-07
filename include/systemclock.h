@@ -32,6 +32,7 @@ class SystemClock
 private:
     Rtc *_rtc;
     struct timeval _lastSyncTime = { .tv_sec = 0, .tv_usec = 0 };
+    portMUX_TYPE _syncTimeMux = portMUX_INITIALIZER_UNLOCKED;
     TaskHandle_t _tHandle = NULL;
 
 public:

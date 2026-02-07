@@ -80,7 +80,8 @@ void generateToken()
     char tokenBase[21];
     *((uint32_t *)tokenBase) = esp_random();
     *((uint32_t *)(tokenBase + sizeof(uint32_t))) = esp_random();
-    strcpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber());
+    strncpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber(), sizeof(tokenBase) - 2 * sizeof(uint32_t) - 1);
+    tokenBase[sizeof(tokenBase) - 1] = '\0';
 
     unsigned char shaResult[32];
 
@@ -625,29 +626,6 @@ httpd_uri_t get_backup_handler = {
 
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
-    // Re-use the logic from post_settings_json_handler but ensure it saves everything and restarts
-    // post_settings_json_handler already does most of the work.
-    // We can just call it, then trigger a restart if successful.
-
-    esp_err_t res = post_settings_json_handler_func(req);
-
-    if (res == ESP_OK) {
-        // We can't easily check if it was successful because post_settings_json_handler sends the response.
-        // But since we are here, we can assume if it returned ESP_OK, it processed the JSON.
-        // Ideally we should duplicate the logic or refactor, but to keep it simple:
-        // The user will see the response from post_settings.
-        // However, the user expects a restart after restore usually.
-        // post_settings_json_handler does NOT restart.
-
-        // Let's copy the logic instead to add the restart.
-        return res;
-    }
-    return res;
-}
-
-// Actually, let's implement a dedicated restore handler that restarts.
-esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
-{
     add_security_headers(req);
 
     if (validate_auth(req) != ESP_OK)
@@ -664,97 +642,98 @@ esp_err_t post_restore_handler_func_actual(httpd_req_t *req)
 
     int len = httpd_req_recv(req, buffer, 4095);
 
-    if (len > 0)
+    if (len <= 0)
     {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
         free(buffer);
-
-        if (!root) {
-             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        }
-
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
-
-        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-        timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
-
-        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-        int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
-
-        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-        int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
-
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
-        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-        int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
-
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-        int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        if (hostname) {
-            _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
-        }
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        if (ntpServer) {
-            _settings->setNtpServer(ntpServer);
-        }
-        _settings->setLEDBrightness(ledBrightness);
-
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
-            );
-        }
-
-        _settings->save();
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":true}");
-
-        // Restart
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        esp_restart();
-
-        return ESP_OK;
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
     }
 
-    return ESP_FAIL;
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    free(buffer);
+
+    if (!root) {
+         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
+
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
+
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
+
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
+
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+    cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    if (hostname) {
+        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    }
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    if (ntpServer) {
+        _settings->setNtpServer(ntpServer);
+    }
+    _settings->setLEDBrightness(ledBrightness);
+
+    if (ipv6Mode) {
+         _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : (char*)"",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : (char*)"",
+            ipv6Dns1 ? ipv6Dns1 : (char*)"",
+            ipv6Dns2 ? ipv6Dns2 : (char*)""
+        );
+    }
+
+    _settings->save();
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true}");
+
+    // Restart
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_restore_handler = {
     .uri = "/api/restore",
     .method = HTTP_POST,
-    .handler = post_restore_handler_func_actual,
+    .handler = post_restore_handler_func,
     .user_ctx = NULL};
 
 #define OTA_CHECK(a, str, ...)                                                    \
@@ -1016,7 +995,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     args->url = strdup(url_buf);
     args->statusLED = _statusLED;
 
-    xTaskCreate([](void* p) {
+    BaseType_t ret = xTaskCreate([](void* p) {
         TaskArgs* a = (TaskArgs*)p;
 
         esp_http_client_config_t config = {};
@@ -1049,6 +1028,12 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         }
         vTaskDelete(NULL);
     }, "ota_url_update", 8192, args, 5, NULL);
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create OTA update task");
+        free(args->url);
+        delete args;
+    }
 
     return ESP_OK;
 }

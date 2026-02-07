@@ -40,7 +40,7 @@ private:
     std::atomic<bool> _connectionStarted;
     std::atomic<int> _counter;
     std::atomic<int> _endpointConnectionIdentifier;
-    uint64_t _lastReceivedKeepAlive;
+    std::atomic<int64_t> _lastReceivedKeepAlive;
     udp_pcb *_pcb;
     QueueHandle_t _udp_queue;
     TaskHandle_t _tHandle = NULL;
