@@ -71,45 +71,6 @@ bool validateHostname(const char *hostname)
     return true;
 }
 
-bool validatePassword(const char *password)
-{
-    if (password == NULL)
-    {
-        return false;
-    }
-
-    size_t len = strlen(password);
-    if (len < 6 || len > MAX_PASSWORD_LENGTH)
-    {
-        ESP_LOGW(TAG, "Invalid password length: %zu", len);
-        return false;
-    }
-
-    bool has_letter = false;
-    bool has_digit = false;
-
-    for (size_t i = 0; i < len; i++)
-    {
-        unsigned char c = (unsigned char)password[i];
-        if (isalpha(c))
-        {
-            has_letter = true;
-        }
-        else if (isdigit(c))
-        {
-            has_digit = true;
-        }
-    }
-
-    if (!has_letter || !has_digit)
-    {
-        ESP_LOGW(TAG, "Password must contain letters and numbers");
-        return false;
-    }
-
-    return true;
-}
-
 bool validateIPAddress(ip4_addr_t addr)
 {
     // IP address 0.0.0.0 is valid (IPADDR_ANY) for DHCP mode

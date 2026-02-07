@@ -27,22 +27,15 @@
 #include "nvs_flash.h"
 #include "esp_mac.h"
 #include "esp_log.h"
-#include "esp_random.h"
-#include "mbedtls/md.h"
 #include <string.h>
 
 Settings::Settings()
 {
-  _passwordChanged = false;
-  _passwordHashValid = false;
   load();
 }
 
 static const char *TAG = "Settings";
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
-static const char *NVS_ADMIN_PWD_SALT = "admPwdSalt";
-static const char *NVS_ADMIN_PWD_HASH = "admPwdHash";
-static const char *NVS_ADMIN_PWD_LEGACY = "adminPassword";
 
 #define GET_IP_ADDR(handle, name, var, defaultValue)  \
   if (nvs_get_u32(handle, name, &var.addr) != ESP_OK) \
@@ -67,126 +60,35 @@ static const char *NVS_ADMIN_PWD_LEGACY = "adminPassword";
     var = (__##var##_temp != 0);                           \
   }
 
-#define GET_UINT16(handle, name, var, defaultValue) \
-  if (nvs_get_u16(handle, name, &var) != ESP_OK) \
-  {                                              \
-    var = defaultValue;                          \
-  }
-
 #define SET_IP_ADDR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, name, var.addr));
 #define SET_INT(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i32(handle, name, var));
 #define SET_STR(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_str(handle, name, var));
 #define SET_BOOL(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_i8(handle, name, var ? 1 : 0));
-#define SET_UINT16(handle, name, var) ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u16(handle, name, var));
-
-static bool compute_password_hash(const char *password, const uint8_t *salt, size_t salt_len, uint8_t *out_hash, size_t hash_len)
-{
-  if (!password || !salt || !out_hash || salt_len == 0 || hash_len < Settings::PASSWORD_HASH_SIZE)
-  {
-    return false;
-  }
-
-  const mbedtls_md_info_t *info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-  if (!info)
-  {
-    return false;
-  }
-
-  mbedtls_md_context_t ctx;
-  mbedtls_md_init(&ctx);
-
-  if (mbedtls_md_setup(&ctx, info, 0) != 0)
-  {
-    mbedtls_md_free(&ctx);
-    return false;
-  }
-
-  mbedtls_md_starts(&ctx);
-  mbedtls_md_update(&ctx, salt, salt_len);
-  mbedtls_md_update(&ctx, (const unsigned char *)password, strlen(password));
-  mbedtls_md_finish(&ctx, out_hash);
-  mbedtls_md_free(&ctx);
-
-  return true;
-}
-
-static uint8_t constant_time_compare(const uint8_t *a, const uint8_t *b, size_t len)
-{
-  uint8_t diff = 0;
-  for (size_t i = 0; i < len; i++)
-  {
-    diff |= a[i] ^ b[i];
-  }
-  return diff;
-}
 
 void Settings::load()
 {
-  nvs_handle_t handle = 0;
+  uint32_t handle;
 
   esp_err_t err = nvs_flash_init();
   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND)
   {
-    ESP_LOGW(TAG, "NVS partition needs to be erased (err: %s)", esp_err_to_name(err));
-    esp_err_t erase_err = nvs_flash_erase();
-    if (erase_err != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to erase NVS flash: %s - using defaults", esp_err_to_name(erase_err));
-      // Continue with defaults - don't crash
-      return;
-    }
+    ESP_ERROR_CHECK(nvs_flash_erase());
     err = nvs_flash_init();
   }
+  ESP_ERROR_CHECK(err);
 
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to initialize NVS flash: %s - using defaults", esp_err_to_name(err));
-    // Continue with defaults instead of crashing
-    return;
-  }
+  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
 
-  err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-  if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
-      return;
-  }
-
-  // Load hashed admin password if available
-  size_t salt_len = sizeof(_adminPasswordSalt);
-  size_t hash_len = sizeof(_adminPasswordHash);
-  esp_err_t salt_err = nvs_get_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, &salt_len);
-  esp_err_t hash_err = nvs_get_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, &hash_len);
-
-  if (salt_err == ESP_OK && hash_err == ESP_OK && salt_len == sizeof(_adminPasswordSalt) && hash_len == sizeof(_adminPasswordHash))
+  size_t adminPasswordLength = sizeof(_adminPassword);
+  if (nvs_get_str(handle, "adminPassword", _adminPassword, &adminPasswordLength) != ESP_OK)
   {
-    _passwordHashValid = true;
+    strncpy(_adminPassword, "admin", sizeof(_adminPassword) - 1);
+    _passwordChanged = false;
   }
   else
   {
-    // Legacy plaintext handling and migration
-    size_t adminPasswordLength = sizeof(_adminPassword);
-    if (nvs_get_str(handle, NVS_ADMIN_PWD_LEGACY, _adminPassword, &adminPasswordLength) != ESP_OK)
-    {
-      // Default password "admin" - User is forced to change on first login
-      // via _passwordChanged flag enforced in WebUI
-      strncpy(_adminPassword, "admin", sizeof(_adminPassword) - 1);
-      _passwordChanged = false;
-    }
-    else
-    {
-      _passwordChanged = (strcmp(_adminPassword, "admin") != 0);
-    }
-
-    esp_fill_random(_adminPasswordSalt, sizeof(_adminPasswordSalt));
-    if (compute_password_hash(_adminPassword, _adminPasswordSalt, sizeof(_adminPasswordSalt), _adminPasswordHash, sizeof(_adminPasswordHash)))
-    {
-      _passwordHashValid = true;
-      ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, sizeof(_adminPasswordSalt)));
-      ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, sizeof(_adminPasswordHash)));
-      nvs_erase_key(handle, NVS_ADMIN_PWD_LEGACY); // Best effort cleanup
-      nvs_commit(handle);
-    }
-
-    // Clear plaintext from memory
-    memset(_adminPassword, 0, sizeof(_adminPassword));
+    // Check if password was changed (if it's not default "admin")
+    _passwordChanged = (strcmp(_adminPassword, "admin") != 0);
   }
 
   // Also try to load explicit passwordChanged flag (overrides auto-detection)
@@ -240,12 +142,6 @@ void Settings::load()
 
   GET_INT(handle, "ipv6Prefix", _ipv6PrefixLength, 64);
 
-  // Load DTLS encryption settings
-  GET_INT(handle, "dtlsMode", _dtlsMode, 0);  // Default: Disabled
-  GET_INT(handle, "dtlsCipherSuite", _dtlsCipherSuite, 1);  // Default: AES-256-GCM
-  GET_BOOL(handle, "dtlsRequireClientCert", _dtlsRequireClientCert, false);
-  GET_BOOL(handle, "dtlsSessionResumption", _dtlsSessionResumption, true);
-
   len = sizeof(_ipv6Gateway);
   if (nvs_get_str(handle, "ipv6Gateway", _ipv6Gateway, &len) != ESP_OK) _ipv6Gateway[0] = 0;
 
@@ -255,34 +151,16 @@ void Settings::load()
   len = sizeof(_ipv6Dns2);
   if (nvs_get_str(handle, "ipv6Dns2", _ipv6Dns2, &len) != ESP_OK) _ipv6Dns2[0] = 0;
 
-  GET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled, false);
-  GET_UINT16(handle, "hmlgwPort", _hmlgwPort, 2000);
-  GET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort, 2001);
-
-  GET_BOOL(handle, "analyzerEnabled", _analyzerEnabled, false);
-
   nvs_close(handle);
 }
 
 void Settings::save()
 {
-  nvs_handle_t handle = 0;
+  uint32_t handle;
 
-  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-  if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
-      return;
-  }
+  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
 
-  if (_passwordHashValid)
-  {
-    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_SALT, _adminPasswordSalt, sizeof(_adminPasswordSalt)));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_blob(handle, NVS_ADMIN_PWD_HASH, _adminPasswordHash, sizeof(_adminPasswordHash)));
-  }
-  else
-  {
-    ESP_LOGE(TAG, "Password hash not initialized, refusing to save admin password");
-  }
+  SET_STR(handle, "adminPassword", _adminPassword);
   SET_BOOL(handle, "passwordChanged", _passwordChanged);
 
   SET_STR(handle, "hostname", _hostname);
@@ -315,31 +193,14 @@ void Settings::save()
   SET_STR(handle, "ipv6Dns1", _ipv6Dns1);
   SET_STR(handle, "ipv6Dns2", _ipv6Dns2);
 
-  // Save DTLS encryption settings
-  SET_INT(handle, "dtlsMode", _dtlsMode);
-  SET_INT(handle, "dtlsCipherSuite", _dtlsCipherSuite);
-  SET_BOOL(handle, "dtlsRequireClientCert", _dtlsRequireClientCert);
-  SET_BOOL(handle, "dtlsSessionResumption", _dtlsSessionResumption);
-
-  SET_BOOL(handle, "hmlgwEnabled", _hmlgwEnabled);
-  SET_UINT16(handle, "hmlgwPort", _hmlgwPort);
-  SET_UINT16(handle, "hmlgwKeepAlivePort", _hmlgwKeepAlivePort);
-
-  SET_BOOL(handle, "analyzerEnabled", _analyzerEnabled);
-
   nvs_close(handle);
 }
 
 void Settings::clear()
 {
-  nvs_handle_t handle = 0;
+  uint32_t handle;
 
-  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-  if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Error opening NVS handle: %s", esp_err_to_name(err));
-      return;
-  }
-
+  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle));
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_erase_all(handle));
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
@@ -347,40 +208,14 @@ void Settings::clear()
   load();
 }
 
-bool Settings::verifyAdminPassword(const char *password)
+char *Settings::getAdminPassword()
 {
-  if (!_passwordHashValid || !password)
-  {
-    ESP_LOGW(TAG, "Password verification attempted before initialization");
-    return false;
-  }
-
-  uint8_t candidate_hash[PASSWORD_HASH_SIZE] = {0};
-  if (!compute_password_hash(password, _adminPasswordSalt, sizeof(_adminPasswordSalt), candidate_hash, sizeof(candidate_hash)))
-  {
-    return false;
-  }
-
-  return constant_time_compare(_adminPasswordHash, candidate_hash, PASSWORD_HASH_SIZE) == 0;
+  return _adminPassword;
 }
 
-void Settings::setAdminPassword(const char *adminPassword)
+void Settings::setAdminPassword(char *adminPassword)
 {
-  if (!adminPassword)
-  {
-    ESP_LOGE(TAG, "setAdminPassword called with null password");
-    return;
-  }
-
-  esp_fill_random(_adminPasswordSalt, sizeof(_adminPasswordSalt));
-
-  if (!compute_password_hash(adminPassword, _adminPasswordSalt, sizeof(_adminPasswordSalt), _adminPasswordHash, sizeof(_adminPasswordHash)))
-  {
-    ESP_LOGE(TAG, "Failed to compute password hash");
-    return;
-  }
-
-  _passwordHashValid = true;
+  strncpy(_adminPassword, adminPassword, sizeof(_adminPassword) - 1);
   // Mark password as changed when it's explicitly set
   _passwordChanged = true;
 }
@@ -595,47 +430,3 @@ void Settings::setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Addres
     strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
     strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
 }
-
-// DTLS Getters
-int Settings::getDTLSMode() { return _dtlsMode; }
-int Settings::getDTLSCipherSuite() { return _dtlsCipherSuite; }
-bool Settings::getDTLSRequireClientCert() { return _dtlsRequireClientCert; }
-bool Settings::getDTLSSessionResumption() { return _dtlsSessionResumption; }
-
-// DTLS Setter
-void Settings::setDTLSSettings(int dtlsMode, int dtlsCipherSuite, bool requireClientCert, bool sessionResumption)
-{
-    // Validate DTLS mode (0=Disabled, 1=PSK, 2=Certificate)
-    if (dtlsMode < 0 || dtlsMode > 2)
-    {
-        ESP_LOGE(TAG, "Invalid DTLS mode %d, keeping current value", dtlsMode);
-        return;
-    }
-
-    // Validate cipher suite (0=AES-128-GCM, 1=AES-256-GCM, 2=ChaCha20-Poly1305)
-    if (dtlsCipherSuite < 0 || dtlsCipherSuite > 2)
-    {
-        ESP_LOGE(TAG, "Invalid DTLS cipher suite %d, keeping current value", dtlsCipherSuite);
-        return;
-    }
-
-    _dtlsMode = dtlsMode;
-    _dtlsCipherSuite = dtlsCipherSuite;
-    _dtlsRequireClientCert = requireClientCert;
-    _dtlsSessionResumption = sessionResumption;
-
-    ESP_LOGI(TAG, "DTLS settings updated: mode=%d, cipher=%d, requireClientCert=%d, sessionResumption=%d",
-             dtlsMode, dtlsCipherSuite, requireClientCert, sessionResumption);
-}
-
-bool Settings::getHmlgwEnabled() { return _hmlgwEnabled; }
-void Settings::setHmlgwEnabled(bool enabled) { _hmlgwEnabled = enabled; }
-
-uint16_t Settings::getHmlgwPort() { return _hmlgwPort; }
-void Settings::setHmlgwPort(uint16_t port) { _hmlgwPort = port; }
-
-uint16_t Settings::getHmlgwKeepAlivePort() { return _hmlgwKeepAlivePort; }
-void Settings::setHmlgwKeepAlivePort(uint16_t port) { _hmlgwKeepAlivePort = port; }
-
-bool Settings::getAnalyzerEnabled() { return _analyzerEnabled; }
-void Settings::setAnalyzerEnabled(bool enabled) { _analyzerEnabled = enabled; }

@@ -6,12 +6,12 @@
     header-text-variant="white"
     class="mb-3"
   >
-    <BForm @submit.stop.prevent="loginClick">
+    <BForm @submit.stop.prevent>
       <BFormGroup :label="t('login.password')" label-cols-sm="4">
-        <PasswordInput
+        <BFormInput
+          type="password"
           v-model="password"
           :state="v$.password.$error ? false : null"
-          :autofocus="true"
         />
       </BFormGroup>
       <BAlert
@@ -23,14 +23,11 @@
       >{{ t('login.loginError') }}</BAlert>
       <BFormGroup label-cols-sm="9">
         <BButton
-          type="submit"
           variant="primary"
           block
-          :disabled="!password || password === '' || loading"
-        >
-          <BSpinner small v-if="loading" class="me-2" />
-          {{ t('login.login') }}
-        </BButton>
+          @click="loginClick"
+          :disabled="!password || password === ''"
+        >{{ t('login.login') }}</BButton>
       </BFormGroup>
     </BForm>
   </BCard>
@@ -43,7 +40,6 @@ import { useI18n } from 'vue-i18n'
 import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import { useLoginStore } from './stores.js'
-import PasswordInput from './components/PasswordInput.vue'
 
 const { t } = useI18n()
 
@@ -53,7 +49,6 @@ const loginStore = useLoginStore()
 
 const password = ref('')
 const showError = ref(null)
-const loading = ref(false)
 
 const rules = {
   password: { required }
@@ -62,21 +57,12 @@ const rules = {
 const v$ = useVuelidate(rules, { password })
 
 const loginClick = async () => {
-  loading.value = true
   showError.value = null
-  try {
-    const success = await loginStore.tryLogin(password.value)
-    if (success) {
-      router.push(route.query.redirect || '/')
-    } else {
-      // Login failed - incorrect password
-      showError.value = true
-      loading.value = false
-    }
-  } catch (error) {
-    // Network or server error
-    showError.value = true
-    loading.value = false
+  const success = await loginStore.tryLogin(password.value)
+  if (success) {
+    router.push(route.query.redirect || '/')
+  } else {
+    showError.value = 10
   }
 }
 </script>

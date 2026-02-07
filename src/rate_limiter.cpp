@@ -12,7 +12,6 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include <string.h>
-#include <lwip/inet.h>
 #include <lwip/sockets.h>
 #include <lwip/netdb.h>
 
@@ -20,8 +19,7 @@ static const char *TAG = "RateLimiter";
 
 typedef struct
 {
-    uint8_t ip_address[16];
-    uint8_t ip_length;
+    uint32_t ip_address;
     int64_t last_attempt_time;
     uint8_t attempt_count;
     bool is_active;
@@ -31,12 +29,12 @@ static rate_limit_entry_t rate_limit_table[MAX_TRACKED_IPS];
 static bool initialized = false;
 
 // Get client IP address from request
-static bool get_client_ip(httpd_req_t *req, uint8_t *out_addr, uint8_t *out_len)
+static uint32_t get_client_ip(httpd_req_t *req)
 {
     int sockfd = httpd_req_to_sockfd(req);
     if (sockfd < 0)
     {
-        return false;
+        return 0;
     }
 
     struct sockaddr_storage addr;
@@ -44,29 +42,20 @@ static bool get_client_ip(httpd_req_t *req, uint8_t *out_addr, uint8_t *out_len)
 
     if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_len) != 0)
     {
-        return false;
+        return 0;
     }
 
     if (addr.ss_family == AF_INET)
     {
         struct sockaddr_in *s = (struct sockaddr_in *)&addr;
-        memcpy(out_addr, &s->sin_addr.s_addr, sizeof(s->sin_addr.s_addr));
-        *out_len = sizeof(s->sin_addr.s_addr);
-        return true;
-    }
-    else if (addr.ss_family == AF_INET6)
-    {
-        struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)&addr;
-        memcpy(out_addr, &s6->sin6_addr.s6_addr, sizeof(s6->sin6_addr.s6_addr));
-        *out_len = sizeof(s6->sin6_addr.s6_addr);
-        return true;
+        return s->sin_addr.s_addr;
     }
 
-    return false;
+    return 0;
 }
 
 // Find or create entry for IP address
-static rate_limit_entry_t* find_or_create_entry(const uint8_t *ip_address, uint8_t ip_length)
+static rate_limit_entry_t* find_or_create_entry(uint32_t ip_address)
 {
     int64_t current_time = esp_timer_get_time() / 1000000; // Convert to seconds
     rate_limit_entry_t *oldest_entry = NULL;
@@ -75,9 +64,7 @@ static rate_limit_entry_t* find_or_create_entry(const uint8_t *ip_address, uint8
     // First, try to find existing entry
     for (int i = 0; i < MAX_TRACKED_IPS; i++)
     {
-        if (rate_limit_table[i].is_active &&
-            rate_limit_table[i].ip_length == ip_length &&
-            memcmp(rate_limit_table[i].ip_address, ip_address, ip_length) == 0)
+        if (rate_limit_table[i].is_active && rate_limit_table[i].ip_address == ip_address)
         {
             return &rate_limit_table[i];
         }
@@ -88,8 +75,7 @@ static rate_limit_entry_t* find_or_create_entry(const uint8_t *ip_address, uint8
     {
         if (!rate_limit_table[i].is_active)
         {
-            memcpy(rate_limit_table[i].ip_address, ip_address, ip_length);
-            rate_limit_table[i].ip_length = ip_length;
+            rate_limit_table[i].ip_address = ip_address;
             rate_limit_table[i].last_attempt_time = current_time;
             rate_limit_table[i].attempt_count = 0;
             rate_limit_table[i].is_active = true;
@@ -108,8 +94,7 @@ static rate_limit_entry_t* find_or_create_entry(const uint8_t *ip_address, uint8
     if (oldest_entry != NULL)
     {
         ESP_LOGW(TAG, "Rate limit table full, evicting oldest entry");
-        memcpy(oldest_entry->ip_address, ip_address, ip_length);
-        oldest_entry->ip_length = ip_length;
+        oldest_entry->ip_address = ip_address;
         oldest_entry->last_attempt_time = current_time;
         oldest_entry->attempt_count = 0;
         oldest_entry->is_active = true;
@@ -145,15 +130,14 @@ bool rate_limiter_check_login(httpd_req_t *req)
         rate_limiter_init();
     }
 
-    uint8_t client_ip[16] = {0};
-    uint8_t client_ip_len = 0;
-    if (!get_client_ip(req, client_ip, &client_ip_len))
+    uint32_t client_ip = get_client_ip(req);
+    if (client_ip == 0)
     {
         ESP_LOGW(TAG, "Could not determine client IP address");
         return true; // Allow request if we can't determine IP
     }
 
-    rate_limit_entry_t *entry = find_or_create_entry(client_ip, client_ip_len);
+    rate_limit_entry_t *entry = find_or_create_entry(client_ip);
     if (entry == NULL)
     {
         ESP_LOGE(TAG, "Could not create rate limit entry");
@@ -175,16 +159,10 @@ bool rate_limiter_check_login(httpd_req_t *req)
     {
         int64_t remaining_time = RATE_LIMIT_WINDOW_SECONDS - time_since_last;
 
-        char ip_str[INET6_ADDRSTRLEN] = {0};
-        if (entry->ip_length == 4)
-        {
-            inet_ntop(AF_INET, entry->ip_address, ip_str, sizeof(ip_str));
-        }
-        else if (entry->ip_length == 16)
-        {
-            inet_ntop(AF_INET6, entry->ip_address, ip_str, sizeof(ip_str));
-        }
-        ESP_LOGW(TAG, "Rate limit exceeded for IP %s (wait %lld seconds)", ip_str[0] ? ip_str : "unknown", remaining_time);
+        // Log IP address in dotted notation
+        uint8_t *ip_bytes = (uint8_t *)&client_ip;
+        ESP_LOGW(TAG, "Rate limit exceeded for IP %d.%d.%d.%d (wait %lld seconds)",
+                 ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3], remaining_time);
 
         return false; // Block request
     }
@@ -203,9 +181,8 @@ void rate_limiter_reset_ip(httpd_req_t *req)
         return;
     }
 
-    uint8_t client_ip[16] = {0};
-    uint8_t client_ip_len = 0;
-    if (!get_client_ip(req, client_ip, &client_ip_len))
+    uint32_t client_ip = get_client_ip(req);
+    if (client_ip == 0)
     {
         return;
     }
@@ -213,23 +190,14 @@ void rate_limiter_reset_ip(httpd_req_t *req)
     // Find and reset entry for this IP
     for (int i = 0; i < MAX_TRACKED_IPS; i++)
     {
-        if (rate_limit_table[i].is_active &&
-            rate_limit_table[i].ip_length == client_ip_len &&
-            memcmp(rate_limit_table[i].ip_address, client_ip, client_ip_len) == 0)
+        if (rate_limit_table[i].is_active && rate_limit_table[i].ip_address == client_ip)
         {
             rate_limit_table[i].attempt_count = 0;
             rate_limit_table[i].last_attempt_time = esp_timer_get_time() / 1000000;
 
-            char ip_str[INET6_ADDRSTRLEN] = {0};
-            if (client_ip_len == 4)
-            {
-                inet_ntop(AF_INET, client_ip, ip_str, sizeof(ip_str));
-            }
-            else if (client_ip_len == 16)
-            {
-                inet_ntop(AF_INET6, client_ip, ip_str, sizeof(ip_str));
-            }
-            ESP_LOGD(TAG, "Reset rate limit for IP %s", ip_str[0] ? ip_str : "unknown");
+            uint8_t *ip_bytes = (uint8_t *)&client_ip;
+            ESP_LOGD(TAG, "Reset rate limit for IP %d.%d.%d.%d",
+                     ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3]);
             break;
         }
     }

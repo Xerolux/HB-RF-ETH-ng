@@ -90,8 +90,6 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;
     esp32_emac_config.smi_gpio.mdc_num = ETH_MDC_PIN;
-    esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_OUT;
-    esp32_emac_config.clock_config.rmii.clock_gpio = EMAC_CLK_OUT_180_GPIO;
     _mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
 
     _eth_config = ETH_DEFAULT_CONFIG(_mac, _phy);
@@ -103,48 +101,11 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
 void Ethernet::start()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle));
-    // PHY LED configuration moved to ETHERNET_EVENT_START handler
-    // to ensure the interface is fully initialized
 }
 
 void Ethernet::stop()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_stop(_eth_handle));
-}
-
-void Ethernet::_configurePHYLEDs()
-{
-    // LAN8720 PHY LED Configuration
-    // Register 31 (0x1F): Special Control/Status Register
-    // Bits [14:12] control LED mode:
-    //   001b: LED1=Link, LED2=Activity
-
-    uint32_t reg_value = 0;
-    esp_eth_phy_reg_rw_data_t phy_reg = {
-        .reg_addr = 0x1F,
-        .reg_value_p = &reg_value,
-    };
-
-    esp_err_t err = esp_eth_ioctl(_eth_handle, ETH_CMD_READ_PHY_REG, &phy_reg);
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "Failed to read PHY register 31: %s", esp_err_to_name(err));
-        return;
-    }
-
-    ESP_LOGI(TAG, "PHY register 31 current value: 0x%04X", reg_value);
-
-    // Clear LED_CFG bits [14:12] and set to mode 001b (Link on LED1, Activity on LED2)
-    reg_value = (reg_value & ~(0x7 << 12)) | (0x1 << 12);
-
-    err = esp_eth_ioctl(_eth_handle, ETH_CMD_WRITE_PHY_REG, &phy_reg);
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "Failed to write PHY register 31: %s", esp_err_to_name(err));
-        return;
-    }
-
-    ESP_LOGI(TAG, "PHY LED mode configured: LED1=Link, LED2=Activity (reg 31 = 0x%04X)", reg_value);
 }
 
 void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2)
@@ -195,11 +156,6 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
     case ETHERNET_EVENT_START:
         ESP_LOGI(TAG, "Started");
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_hostname(_eth_netif, _settings->getHostname()));
-
-        // Configure PHY LEDs after interface is started and initialized
-        // Small delay to ensure PHY is ready for register access
-        vTaskDelay(pdMS_TO_TICKS(100));
-        _configurePHYLEDs();
         break;
     case ETHERNET_EVENT_STOP:
         _isConnected = false;

@@ -10,25 +10,15 @@ export default {
     error: 'Error',
     success: 'Success',
     yes: 'Yes',
-    no: 'No',
-    saving: 'Saving...',
-    showPassword: 'Show password',
-    hidePassword: 'Hide password',
-    rebootingWait: 'System is rebooting. Please wait approx. 10 seconds...',
-    factoryResettingWait: 'System is resetting to factory defaults and rebooting. Please wait...',
-    confirmReboot: 'Are you sure you want to reboot the system?',
-    confirmFactoryReset: 'Are you sure? All settings will be lost!'
+    no: 'No'
   },
 
   // Header Navigation
   nav: {
     home: 'Home',
     settings: 'Settings',
-    networkSystem: 'Network & System',
-    firmware: 'Firmware Update',
+    firmware: 'Firmware',
     monitoring: 'Monitoring',
-    analyzer: 'Analyzer',
-    log: 'System Log',
     about: 'About',
     login: 'Login',
     logout: 'Logout',
@@ -87,55 +77,9 @@ export default {
     // System Settings
     systemSettings: 'System Settings',
     ledBrightness: 'LED Brightness',
+    checkUpdates: 'Check for updates',
+    allowPrerelease: 'Allow Early Updates (Beta/Alpha)',
     language: 'Language',
-    analyzerSettings: 'Analyzer Light Settings',
-    enableAnalyzer: 'Enable Analyzer Light',
-    systemMaintenance: 'System Maintenance',
-    reboot: 'Reboot',
-    factoryReset: 'Factory Reset',
-
-    // HMLGW
-    hmlgwSettings: 'HomeMatic LAN Gateway (HMLGW) Settings',
-    enableHmlgw: 'Enable HMLGW Mode',
-    hmlgwPort: 'Data Port (Default: 2000)',
-    hmlgwKeepAlivePort: 'KeepAlive Port (Default: 2001)',
-
-    // DTLS Security Settings
-    dtls: {
-      title: 'DTLS Encryption',
-      description: 'Secure transport encryption for communication between board and CCU on port 3008.',
-      mode: 'Encryption Mode',
-      modeDisabled: 'Disabled (Default)',
-      modePsk: 'Pre-Shared Key (PSK)',
-      modeCert: 'X.509 Certificate',
-      cipherSuite: 'Cipher Suite',
-      cipherAes128: 'AES-128-GCM-SHA256',
-      cipherAes256: 'AES-256-GCM-SHA384 (Recommended)',
-      cipherChacha: 'ChaCha20-Poly1305-SHA256',
-      requireClientCert: 'Require client certificate',
-      sessionResumption: 'Enable session resumption',
-      pskManagement: 'PSK Management',
-      pskIdentity: 'PSK Identity',
-      pskKey: 'PSK Key (Hex)',
-      pskGenerate: 'Generate new PSK',
-      pskGenerating: 'Generating PSK...',
-      pskGenerated: 'New PSK generated',
-      pskCopyWarning: 'IMPORTANT: Copy this key now! It will only be shown once.',
-      pskKeyLength: 'Key Length',
-      psk128bit: '128 Bit',
-      psk256bit: '256 Bit (Recommended)',
-      psk384bit: '384 Bit',
-      psk512bit: '512 Bit',
-      pskStatus: 'PSK Status',
-      pskConfigured: 'Configured',
-      pskNotConfigured: 'Not configured',
-      warningDisabled: 'Communication is UNENCRYPTED. Anyone on the network can intercept traffic.',
-      warningPsk: 'Ensure the PSK is stored securely on the CCU.',
-      info: 'DTLS 1.2 encrypts Raw-UART UDP communication end-to-end. The CCU must also support DTLS.',
-      documentation: 'Documentation for CCU Developers',
-      viewDocs: 'View Implementation Guide',
-      restartNote: 'Changes to DTLS settings require a system restart.'
-    },
 
     // Messages
     saveSuccess: 'Settings were successfully saved. Please restart to take them effect.',
@@ -162,19 +106,6 @@ export default {
     boardRevision: 'Board revision',
     uptime: 'Uptime',
     resetReason: 'Last reboot',
-    reset: {
-      unknown: 'Unknown',
-      poweron: 'Power-On Reset',
-      ext: 'External Reset',
-      sw: 'Software Reset',
-      panic: 'Exception/Panic',
-      int_wdt: 'Interrupt Watchdog',
-      task_wdt: 'Task Watchdog',
-      wdt: 'Other Watchdog',
-      deepsleep: 'Deep Sleep Reset',
-      brownout: 'Brownout Reset',
-      sdio: 'SDIO Reset'
-    },
     cpuUsage: 'CPU usage',
     memoryUsage: 'Memory usage',
     ethernetStatus: 'Ethernet connection',
@@ -185,12 +116,12 @@ export default {
     radioModuleBidCosRadioMAC: 'Radio address (BidCoS)',
     radioModuleHmIPRadioMAC: 'Radio address (HmIP)',
     radioModuleSGTIN: 'SGTIN',
-    availableVersion: 'Available Version',
-    upToDate: 'Up to date',
-    updateAvailable: 'Update available!',
     version: 'Version',
+    latestVersion: 'Latest Version',
     memory: 'Memory Usage',
     cpu: 'CPU Usage',
+    temperature: 'Temperature',
+    voltage: 'Supply Voltage',
     ethernet: 'Ethernet',
     connected: 'Connected',
     disconnected: 'Disconnected',
@@ -209,13 +140,19 @@ export default {
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
     versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    updateAvailable: 'An update to version {latestVersion} is available.',
+    onlineUpdate: 'Update Online',
+    onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
+    onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
+    showReleaseNotes: 'Show Release Notes',
+    releaseNotesTitle: 'Release Notes for v{version}',
+    releaseNotesError: 'Failed to load release notes from GitHub.',
     updateFile: 'Firmware file',
     noFileChosen: 'No file chosen',
     browse: 'Browse',
     selectFile: 'Select File',
     upload: 'Upload',
     restart: 'Restart system',
-    updating: 'Updating...',
     uploading: 'Uploading...',
     uploadSuccess: 'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
     uploadError: 'An error occured.',
@@ -274,32 +211,10 @@ export default {
     allowedHosts: 'Allowed Hosts'
   },
 
-  // Analyzer
-  analyzer: {
-    title: 'Analyzer Light',
-    disabled: 'Analyzer Light feature is disabled. Please enable it in Settings.',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
-    clear: 'Clear',
-    autoScroll: 'Auto Scroll',
-    time: 'Time',
-    len: 'Len',
-    cnt: 'Cnt',
-    type: 'Type',
-    src: 'Source',
-    dst: 'Destination',
-    payload: 'Payload',
-    rssi: 'RSSI',
-    deviceNames: 'Device Names',
-    address: 'Address',
-    name: 'Name',
-    storedNames: 'Stored Names'
-  },
-
   // About Page
   about: {
     title: 'About',
-    version: 'Version 2.1.4',
+    version: 'Version 2.1.0',
     fork: 'Modernized Fork',
     forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
     original: 'Original Author',
@@ -335,13 +250,5 @@ export default {
     passwordsDoNotMatch: 'Passwords do not match',
     warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
     success: 'Password changed successfully'
-  },
-
-  // Log
-  log: {
-    title: 'System Log',
-    refresh: 'Refresh',
-    autoRefresh: 'Auto Refresh',
-    noLog: 'No log available.'
   }
 }

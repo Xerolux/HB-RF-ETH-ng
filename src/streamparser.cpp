@@ -23,7 +23,6 @@
 
 #include "streamparser.h"
 #include <stdint.h>
-#include <string.h>
 
 StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _bufferPos(0), _framePos(0), _frameLength(0), _state(NO_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
 {
@@ -62,16 +61,6 @@ void StreamParser::append(unsigned char chr)
 
         case RECEIVE_LENGTH_LOW_BYTE:
             _frameLength |= (_isEscaped ? chr | 0x80 : chr);
-            // FIX: Validate frame length to prevent uint16_t wraparound
-            // and to reject impossibly large frames early.
-            // Max valid HM frame payload is ~512 bytes, but we allow up to
-            // buffer size minus header overhead as a safety margin.
-            if (_frameLength > sizeof(_buffer) - 10) {
-                _state = NO_DATA;
-                _bufferPos = 0;
-                _isEscaped = false;
-                return;
-            }
             _frameLength += 2; // handle crc as frame data
             _framePos = 0;
             _state = RECEIVE_FRAME_DATA;
@@ -99,60 +88,10 @@ void StreamParser::append(unsigned char chr)
 
 void StreamParser::append(unsigned char *buffer, uint16_t len)
 {
-    uint16_t processed = 0;
-
-    // OPTIMIZATION: Pre-calculate buffer limit once
-    const uint16_t bufferLimit = sizeof(_buffer);
-
-    while (processed < len)
+    int i;
+    for (i = 0; i < len; i++)
     {
-        // Optimization: Block copy for RECEIVE_FRAME_DATA when not decoding escapes
-        // This is the hot path for most frame data - avoid per-byte processing
-        if (_state == RECEIVE_FRAME_DATA && !_decodeEscaped)
-        {
-            uint16_t remainingFrame = _frameLength - _framePos;
-            uint16_t remainingBuffer = bufferLimit - _bufferPos;
-            uint16_t remainingInput = len - processed;
-
-            // OPTIMIZATION: Calculate minimum of three values efficiently
-            uint16_t chunkSize = remainingInput;
-            if (chunkSize > remainingFrame)
-                chunkSize = remainingFrame;
-            if (chunkSize > remainingBuffer)
-                chunkSize = remainingBuffer;
-
-            // Scan for 0xfd (Sync byte) - fast memchr is typically SIMD-optimized
-            unsigned char *syncPos = (unsigned char *)memchr(buffer + processed, 0xfd, chunkSize);
-            if (syncPos)
-            {
-                chunkSize = syncPos - (buffer + processed);
-            }
-
-            if (chunkSize > 0)
-            {
-                // OPTIMIZATION: Use optimized memcpy for bulk data transfer
-                // Restrict hint for better optimization
-                uint8_t* dest = &_buffer[_bufferPos];
-                const uint8_t* src = &buffer[processed];
-                memcpy(dest, src, chunkSize);
-                _bufferPos += chunkSize;
-                _framePos += chunkSize;
-
-                processed += chunkSize;
-
-                // Check for frame completion
-                if (_framePos == _frameLength || _bufferPos == bufferLimit)
-                {
-                    _state = FRAME_COMPLETE;
-                    _processor(_buffer, _bufferPos);
-                    _state = NO_DATA;
-                }
-
-                continue;
-            }
-        }
-
-        append(buffer[processed++]);
+        append(buffer[i]);
     }
 }
 
