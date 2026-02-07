@@ -11,14 +11,33 @@ import os
 
 def get_upload_params():
     """Extract upload parameters from environment"""
-    # Get IP address from upload_port or UPLOAD_PORT env variable
-    upload_port = env.get("UPLOAD_PORT", "")
+    # Priority 1: UPLOAD_PORT environment variable
+    upload_port = os.environ.get("UPLOAD_PORT", "")
+
+    # Priority 2: Check platformio_local.ini if it exists
+    if not upload_port:
+        local_ini = os.path.join(env.get("PROJECT_DIR"), "platformio_local.ini")
+        if os.path.exists(local_ini):
+            try:
+                import configparser
+                config = configparser.ConfigParser()
+                config.read(local_ini)
+                current_env = env.get("PIOENV")
+                if config.has_option(f"env:{current_env}", "upload_port"):
+                    upload_port = config.get(f"env:{current_env}", "upload_port")
+                    print(f"Using IP from platformio_local.ini: {upload_port}")
+            except Exception as e:
+                print(f"Warning: Could not read platformio_local.ini: {e}")
+
+    # Priority 3: upload_port from platformio.ini
+    if not upload_port:
+        upload_port = env.get("UPLOAD_PORT", "")
     if not upload_port:
         upload_port = env.get("upload_port", "")
 
     if not upload_port:
         print("Error: No upload_port specified!")
-        print("Set upload_port in platformio.ini or use UPLOAD_PORT environment variable")
+        print("Set upload_port in platformio.ini, platformio_local.ini, or use UPLOAD_PORT environment variable")
         sys.exit(1)
 
     # Get password from environment variable or prompt
@@ -126,10 +145,24 @@ def ota_upload(source, target, env):
 
     # Get parameters
     ip_address, password = get_upload_params()
-    firmware_path = str(target[0])
+
+    # Get firmware path - find the .bin file in build directory
+    import glob
+    build_dir = env.subst("$BUILD_DIR")
+
+    # Look for firmware*.bin files in build directory
+    firmware_candidates = glob.glob(os.path.join(build_dir, "firmware*.bin"))
+
+    if firmware_candidates:
+        # Use the first (or newest) firmware file found
+        firmware_path = firmware_candidates[0]
+    else:
+        # Fallback to standard firmware.bin name
+        firmware_path = os.path.join(build_dir, "firmware.bin")
 
     print(f"Target device: {ip_address}")
     print(f"Firmware: {firmware_path}")
+    print(f"Build dir: {build_dir}")
     print("-"*60)
 
     # Login and get token
