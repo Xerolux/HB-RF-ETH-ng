@@ -79,12 +79,6 @@
               <span>{{ t('settings.checkUpdates') || 'Automatic update check' }}</span>
             </label>
           </div>
-          <div class="form-group" v-if="checkUpdates">
-            <label class="checkbox-label">
-              <input type="checkbox" v-model="allowPrerelease" class="custom-checkbox" />
-              <span>{{ t('settings.allowPrerelease') || 'Include pre-release versions' }}</span>
-            </label>
-          </div>
         </div>
       </div>
 
@@ -433,7 +427,6 @@ const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
 const checkUpdates = ref(true)
-const allowPrerelease = ref(false)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -537,7 +530,6 @@ const loadSettings = () => {
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
   checkUpdates.value = settingsStore.checkUpdates !== undefined ? settingsStore.checkUpdates : true
-  allowPrerelease.value = settingsStore.allowPrerelease || false
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -617,7 +609,6 @@ const saveSettingsClick = async () => {
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
       checkUpdates: checkUpdates.value,
-      allowPrerelease: allowPrerelease.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,

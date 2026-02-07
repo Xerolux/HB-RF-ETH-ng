@@ -117,7 +117,6 @@ export const useSettingsStore = defineStore('settings', {
     ntpServer: "",
     ledBrightness: 100,
     checkUpdates: true,
-    allowPrerelease: false,
   }),
   actions: {
     async load() {
