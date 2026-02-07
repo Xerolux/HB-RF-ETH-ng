@@ -11,7 +11,7 @@ public:
     static LogManager& instance();
 
     // Static wrappers for initialization (called from main.cpp)
-    static void begin(size_t size = 16384);
+    static void begin(size_t size = 8192);
     static void clear();
 
     // Instance methods

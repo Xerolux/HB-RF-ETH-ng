@@ -5,10 +5,12 @@
     <BCollapse id="nav-collapse" is-nav>
       <BNavbarNav>
         <BNavItem to="/">{{ t('nav.home') }}</BNavItem>
-        <BNavItem to="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
-        <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">{{ t('nav.firmware') }}</BNavItem>
-        <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-        <BNavItem to="/analyzer" v-if="loginStore.isLoggedIn && sysInfoStore.enableAnalyzer && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BNavItem>
+        <BNavItemDropdown :text="t('nav.settings')" v-if="loginStore.isLoggedIn">
+          <BDropdownItem to="/settings">{{ t('nav.networkSystem') }}</BDropdownItem>
+          <BDropdownItem to="/firmware">{{ t('nav.firmware') }}</BDropdownItem>
+          <BDropdownItem to="/monitoring">{{ t('nav.monitoring') }}</BDropdownItem>
+          <BDropdownItem to="/analyzer" v-if="sysInfoStore.enableAnalyzer && settingsStore.analyzerEnabled">{{ t('nav.analyzer') }}</BDropdownItem>
+        </BNavItemDropdown>
         <BNavItem to="/log" v-if="loginStore.isLoggedIn">{{ t('nav.log') }}</BNavItem>
         <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
       </BNavbarNav>

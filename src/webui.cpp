@@ -58,6 +58,91 @@ static const char *TAG = "WebUI";
 static std::atomic<bool> _restart_requested{false};
 static TaskHandle_t _restart_task_handle = NULL;
 
+// Lightweight version check: cache + 24h interval
+static char _available_version[16] = "";
+static uint32_t _last_version_check_ms = 0;
+static bool _version_check_running = false;
+#define VERSION_CHECK_INTERVAL_MS (24UL * 60 * 60 * 1000)  // 24 hours
+#define VERSION_CHECK_URL "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version"
+
+// Buffer for version check HTTP event handler
+static char _ver_check_buf[16];
+static int _ver_check_buf_len = 0;
+
+static esp_err_t _version_check_event_handler(esp_http_client_event_t *evt)
+{
+    if (evt->event_id == HTTP_EVENT_ON_DATA) {
+        int copy_len = evt->data_len;
+        if (_ver_check_buf_len + copy_len >= (int)sizeof(_ver_check_buf))
+            copy_len = sizeof(_ver_check_buf) - _ver_check_buf_len - 1;
+        if (copy_len > 0) {
+            memcpy(_ver_check_buf + _ver_check_buf_len, evt->data, copy_len);
+            _ver_check_buf_len += copy_len;
+            _ver_check_buf[_ver_check_buf_len] = '\0';
+        }
+    }
+    return ESP_OK;
+}
+
+static void _version_check_task(void *param)
+{
+    ESP_LOGI(TAG, "VersionCheck: Fetching %s", VERSION_CHECK_URL);
+
+    _ver_check_buf[0] = '\0';
+    _ver_check_buf_len = 0;
+
+    esp_http_client_config_t config = {};
+    config.url = VERSION_CHECK_URL;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.buffer_size = 512;
+    config.buffer_size_tx = 256;
+    config.timeout_ms = 15000;
+    config.event_handler = _version_check_event_handler;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (client) {
+        esp_err_t err = esp_http_client_perform(client);
+        if (err == ESP_OK) {
+            int status = esp_http_client_get_status_code(client);
+            if (status == 200 && _ver_check_buf_len > 0) {
+                // Trim trailing whitespace/newlines
+                int len = _ver_check_buf_len;
+                while (len > 0 && (_ver_check_buf[len-1] == '\n' || _ver_check_buf[len-1] == '\r' || _ver_check_buf[len-1] == ' '))
+                    _ver_check_buf[--len] = '\0';
+                strncpy(_available_version, _ver_check_buf, sizeof(_available_version) - 1);
+                ESP_LOGI(TAG, "VersionCheck: Available version: %s", _available_version);
+            } else {
+                ESP_LOGW(TAG, "VersionCheck: HTTP %d, data_len=%d", status, _ver_check_buf_len);
+            }
+        } else {
+            ESP_LOGE(TAG, "VersionCheck: Failed: %s", esp_err_to_name(err));
+        }
+        esp_http_client_cleanup(client);
+    }
+
+    _last_version_check_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+    _version_check_running = false;
+    vTaskDelete(NULL);
+}
+
+static void _trigger_version_check()
+{
+    if (_version_check_running) return;
+
+    uint32_t now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+    // Check if interval has elapsed (or first time)
+    if (_last_version_check_ms == 0 || (now_ms - _last_version_check_ms) >= VERSION_CHECK_INTERVAL_MS) {
+        // Only run if enough free heap (TLS needs ~40KB)
+        if (esp_get_free_heap_size() < 45000) {
+            ESP_LOGW(TAG, "VersionCheck: Skipped, low heap (%lu)", (unsigned long)esp_get_free_heap_size());
+            return;
+        }
+        _version_check_running = true;
+        xTaskCreate(_version_check_task, "ver_chk", 4096, NULL, 2, NULL);
+    }
+}
+
 /**
  * Safe restart task - runs at highest priority to ensure clean shutdown
  *
@@ -135,19 +220,24 @@ static void trigger_restart() {
 #define SYSINFO_BUFFER_SIZE 1536
 #define IF_NONE_MATCH_SIZE 64
 
+#define BUILD_ETAG __DATE__ __TIME__
+
 #define EMBED_HANDLER(_uri, _resource, _contentType)                   \
     extern const char _resource[] asm("_binary_" #_resource "_start"); \
     extern const size_t _resource##_length asm(#_resource "_length");  \
     esp_err_t _resource##_handler_func(httpd_req_t *req)               \
     {                                                                  \
         add_security_headers(req);                                     \
-        if (_sysInfo) {                                                \
-            char etag[32];                                             \
-            snprintf(etag, sizeof(etag), "\"%s\"", _sysInfo->getCurrentVersion()); \
+        {                                                              \
+            char etag[48];                                             \
+            snprintf(etag, sizeof(etag), "\"%s-%s\"",                  \
+                _sysInfo ? _sysInfo->getCurrentVersion() : "0",        \
+                BUILD_ETAG);                                           \
             httpd_resp_set_hdr(req, "ETag", etag);                     \
-            httpd_resp_set_hdr(req, "Cache-Control", "public, max-age=0, must-revalidate"); \
+            httpd_resp_set_hdr(req, "Cache-Control", "no-cache");      \
             char if_none_match[64];                                    \
-            if (httpd_req_get_hdr_value_str(req, "If-None-Match", if_none_match, sizeof(if_none_match)) == ESP_OK) { \
+            if (httpd_req_get_hdr_value_str(req, "If-None-Match",      \
+                if_none_match, sizeof(if_none_match)) == ESP_OK) {     \
                 if (strstr(if_none_match, etag)) {                     \
                     httpd_resp_set_status(req, "304 Not Modified");    \
                     httpd_resp_send(req, NULL, 0);                     \
@@ -419,6 +509,14 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 #else
     cJSON_AddBoolToObject(sysInfo, "enableAnalyzer", false);
 #endif
+
+    // Available version from lightweight GitHub check
+    if (_available_version[0] != '\0') {
+        cJSON_AddStringToObject(sysInfo, "availableVersion", _available_version);
+    }
+
+    // Trigger version check if needed (24h interval)
+    _trigger_version_check();
 
     const char *json = cJSON_PrintUnformatted(root);
     if (json) {
@@ -955,154 +1053,6 @@ httpd_uri_t get_log_download_handler = {
     .uri = "/api/log/download",
     .method = HTTP_GET,
     .handler = get_log_download_handler_func,
-    .user_ctx = NULL,
-    .is_websocket = false,
-    .handle_ws_control_frames = false,
-    .supported_subprotocol = NULL
-};
-
-// Paste proxy - uploads log content to paste.blueml.eu (MicroBin) from the backend
-// to avoid CORS issues with direct browser-to-paste requests
-esp_err_t post_log_paste_handler_func(httpd_req_t *req)
-{
-    add_security_headers(req);
-    if (validate_auth(req) != ESP_OK)
-    {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-
-    // Get the log content
-    std::string log_content = LogManager::instance().getLogContent();
-    if (log_content.empty()) {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"No log content available\"}");
-        return ESP_OK;
-    }
-
-    // Build multipart form data for MicroBin upload
-    const char *boundary = "----HbRfEthBoundary";
-
-    // Build the multipart body
-    std::string body;
-    body.reserve(log_content.size() + 512);
-
-    // content field
-    body += "--"; body += boundary; body += "\r\n";
-    body += "Content-Disposition: form-data; name=\"content\"\r\n\r\n";
-    body += log_content;
-    body += "\r\n";
-
-    // expiration field
-    body += "--"; body += boundary; body += "\r\n";
-    body += "Content-Disposition: form-data; name=\"expiration\"\r\n\r\n";
-    body += "1week\r\n";
-
-    // privacy field
-    body += "--"; body += boundary; body += "\r\n";
-    body += "Content-Disposition: form-data; name=\"privacy\"\r\n\r\n";
-    body += "unlisted\r\n";
-
-    // syntax_highlight field
-    body += "--"; body += boundary; body += "\r\n";
-    body += "Content-Disposition: form-data; name=\"syntax_highlight\"\r\n\r\n";
-    body += "\r\n";
-
-    // Final boundary
-    body += "--"; body += boundary; body += "--\r\n";
-
-    // Configure HTTP client
-    esp_http_client_config_t config = {};
-    config.url = "https://paste.blueml.eu/upload";
-    config.crt_bundle_attach = esp_crt_bundle_attach;
-    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-    config.buffer_size = 1536;
-    config.buffer_size_tx = 512;
-    config.timeout_ms = 15000;
-    config.disable_auto_redirect = true;  // We handle redirects manually
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        ESP_LOGE(TAG, "Paste: Failed to initialize HTTP client");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to connect to paste service\"}");
-        return ESP_OK;
-    }
-
-    // Set headers
-    char content_type[80];
-    snprintf(content_type, sizeof(content_type), "multipart/form-data; boundary=%s", boundary);
-    esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_header(client, "Content-Type", content_type);
-    esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
-    esp_http_client_set_post_field(client, body.c_str(), body.size());
-
-    ESP_LOGI(TAG, "Paste: Uploading %d bytes to paste.blueml.eu", (int)body.size());
-
-    esp_err_t err = esp_http_client_perform(client);
-
-    if (err == ESP_OK) {
-        int status_code = esp_http_client_get_status_code(client);
-        ESP_LOGI(TAG, "Paste: HTTP status %d", status_code);
-
-        if (status_code == 302 || status_code == 301 || status_code == 303) {
-            // MicroBin redirects to the paste URL on success
-            char location[256] = {0};
-            // Read the Location header from the redirect response
-            char *location_ptr = NULL;
-            esp_http_client_get_header(client, "Location", &location_ptr);
-
-            if (location_ptr && strlen(location_ptr) > 0) {
-                // Location may be relative (e.g., "/paste/abc123") or absolute
-                if (location_ptr[0] == '/') {
-                    snprintf(location, sizeof(location), "https://paste.blueml.eu%s", location_ptr);
-                } else {
-                    strncpy(location, location_ptr, sizeof(location) - 1);
-                }
-                ESP_LOGI(TAG, "Paste: Success, URL: %s", location);
-
-                char response[384];
-                snprintf(response, sizeof(response), "{\"success\":true,\"url\":\"%s\"}", location);
-                httpd_resp_set_type(req, "application/json");
-                httpd_resp_sendstr(req, response);
-            } else {
-                ESP_LOGW(TAG, "Paste: Redirect but no Location header");
-                httpd_resp_set_type(req, "application/json");
-                httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Paste service returned redirect without location\"}");
-            }
-        } else if (status_code == 200) {
-            // Some MicroBin configs return 200 with the URL in the response body
-            char resp_body[256] = {0};
-            int read_len = esp_http_client_read(client, resp_body, sizeof(resp_body) - 1);
-            if (read_len > 0) {
-                resp_body[read_len] = '\0';
-                ESP_LOGI(TAG, "Paste: 200 response: %s", resp_body);
-            }
-            // Return the final URL from the client
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, "{\"success\":true,\"url\":\"https://paste.blueml.eu\"}");
-        } else {
-            ESP_LOGE(TAG, "Paste: Unexpected status code %d", status_code);
-            char error_resp[128];
-            snprintf(error_resp, sizeof(error_resp), "{\"success\":false,\"error\":\"Paste service returned status %d\"}", status_code);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, error_resp);
-        }
-    } else {
-        ESP_LOGE(TAG, "Paste: HTTP request failed: %s", esp_err_to_name(err));
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to connect to paste service\"}");
-    }
-
-    esp_http_client_cleanup(client);
-    return ESP_OK;
-}
-
-httpd_uri_t post_log_paste_handler = {
-    .uri = "/api/log/paste",
-    .method = HTTP_POST,
-    .handler = post_log_paste_handler_func,
     .user_ctx = NULL,
     .is_websocket = false,
     .handle_ws_control_frames = false,
@@ -1662,7 +1612,6 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
-        httpd_register_uri_handler(_httpd_handle, &post_log_paste_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_analyzer_ws_handler);
 

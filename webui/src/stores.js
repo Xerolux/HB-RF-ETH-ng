@@ -79,7 +79,8 @@ export const useSysInfoStore = defineStore('sysInfo', {
     radioModuleHmIPRadioMAC: "",
     radioModuleSGTIN: "",
     enableHmlgw: false,
-    enableAnalyzer: false
+    enableAnalyzer: false,
+    availableVersion: ""
   }),
   actions: {
     async update() {

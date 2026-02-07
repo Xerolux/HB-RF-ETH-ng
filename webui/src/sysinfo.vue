@@ -11,6 +11,16 @@
       <BFormGroup :label="t('sysinfo.serial')" label-cols-sm="4">
         <BFormInput type="text" :model-value="sysInfoStore.serial" disabled />
       </BFormGroup>
+      <BFormGroup :label="t('firmware.installedVersion')" label-cols-sm="4">
+        <BFormInput type="text" :model-value="sysInfoStore.currentVersion" disabled />
+      </BFormGroup>
+      <BFormGroup :label="t('sysinfo.availableVersion')" label-cols-sm="4" v-if="sysInfoStore.availableVersion">
+        <div class="d-flex align-items-center gap-2">
+          <BFormInput type="text" :model-value="sysInfoStore.availableVersion" disabled class="flex-grow-1" />
+          <span v-if="isUpdateAvailable" class="badge bg-warning text-dark">{{ t('sysinfo.updateAvailable') }}</span>
+          <span v-else class="badge bg-success">{{ t('sysinfo.upToDate') }}</span>
+        </div>
+      </BFormGroup>
       <BFormGroup :label="t('sysinfo.uptime')" label-cols-sm="4">
         <BFormInput type="text" :model-value="uptimeFormatted" disabled />
       </BFormGroup>
@@ -72,6 +82,14 @@ import { useSysInfoStore } from './stores.js'
 const { t } = useI18n()
 
 const sysInfoStore = useSysInfoStore()
+
+// Version comparison
+const isUpdateAvailable = computed(() => {
+  const current = sysInfoStore.currentVersion
+  const available = sysInfoStore.availableVersion
+  if (!current || !available) return false
+  return available !== current
+})
 
 // Ethernet status
 const ethernetStatus = computed(() => {

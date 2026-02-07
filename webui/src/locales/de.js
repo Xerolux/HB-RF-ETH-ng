@@ -24,7 +24,8 @@ export default {
   nav: {
     home: 'Status',
     settings: 'Einstellungen',
-    firmware: 'Firmware',
+    networkSystem: 'Netzwerk & System',
+    firmware: 'Firmware-Update',
     monitoring: 'Monitoring',
     analyzer: 'Analyzer',
     log: 'Systemprotokoll',
@@ -184,6 +185,9 @@ export default {
     radioModuleBidCosRadioMAC: 'Funkadresse (BidCoS)',
     radioModuleHmIPRadioMAC: 'Funkadresse (HmIP)',
     radioModuleSGTIN: 'SGTIN',
+    availableVersion: 'Verfügbare Version',
+    upToDate: 'Aktuell',
+    updateAvailable: 'Update verfügbar!',
     version: 'Version',
     memory: 'Speichernutzung',
     cpu: 'CPU Auslastung',
@@ -337,10 +341,6 @@ export default {
   log: {
     title: 'Systemprotokoll',
     refresh: 'Aktualisieren',
-    paste: 'Paste',
-    copyLink: 'Link kopieren',
-    pasteSuccess: 'Log hochgeladen:',
-    pasteFailed: 'Upload fehlgeschlagen. Bitte erneut versuchen.',
     autoRefresh: 'Auto-Refresh',
     noLog: 'Kein Protokoll vorhanden.'
   }

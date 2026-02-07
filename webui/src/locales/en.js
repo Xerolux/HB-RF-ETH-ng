@@ -24,7 +24,8 @@ export default {
   nav: {
     home: 'Home',
     settings: 'Settings',
-    firmware: 'Firmware',
+    networkSystem: 'Network & System',
+    firmware: 'Firmware Update',
     monitoring: 'Monitoring',
     analyzer: 'Analyzer',
     log: 'System Log',
@@ -184,6 +185,9 @@ export default {
     radioModuleBidCosRadioMAC: 'Radio address (BidCoS)',
     radioModuleHmIPRadioMAC: 'Radio address (HmIP)',
     radioModuleSGTIN: 'SGTIN',
+    availableVersion: 'Available Version',
+    upToDate: 'Up to date',
+    updateAvailable: 'Update available!',
     version: 'Version',
     memory: 'Memory Usage',
     cpu: 'CPU Usage',
@@ -337,10 +341,6 @@ export default {
   log: {
     title: 'System Log',
     refresh: 'Refresh',
-    paste: 'Paste',
-    copyLink: 'Copy Link',
-    pasteSuccess: 'Log uploaded:',
-    pasteFailed: 'Upload failed. Please try again.',
     autoRefresh: 'Auto Refresh',
     noLog: 'No log available.'
   }

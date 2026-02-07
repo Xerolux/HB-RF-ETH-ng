@@ -33,6 +33,9 @@ jobs:
           cd webui
           npm run build
 
+      - name: Rename WebUI files
+        run: python rename_webui_files.py
+
       - name: Upload WebUI artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -41,9 +44,21 @@ jobs:
           retention-days: 7
 
   build-firmware:
-    name: Build Firmware
+    name: Build ${{ matrix.variant }} variant
     needs: build-webui
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          - variant: standard
+            env_name: hb-rf-eth-ng-standard
+          - variant: hmlgw
+            env_name: hb-rf-eth-ng-hmlgw
+          - variant: analyzer
+            env_name: hb-rf-eth-ng-analyzer
+          - variant: full
+            env_name: hb-rf-eth-ng-full
 
     steps:
       - name: Checkout repository
@@ -61,8 +76,9 @@ jobs:
           path: |
             ~/.platformio
             .pio
-          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+          key: ${{ runner.os }}-pio-${{ matrix.env_name }}-${{ hashFiles('**/platformio.ini') }}
           restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.env_name }}-
             ${{ runner.os }}-pio-
 
       - name: Setup Python
@@ -77,19 +93,20 @@ jobs:
 
       - name: Build firmware
         run: |
-          pio run -e hb-rf-eth-ng
+          pio run -e ${{ matrix.env_name }}
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: firmware
+          name: firmware-${{ matrix.variant }}
           path: |
-            .pio/build/hb-rf-eth-ng/firmware*.bin
-            .pio/build/hb-rf-eth-ng/bootloader.bin
-            .pio/build/hb-rf-eth-ng/partitions.bin
+            .pio/build/${{ matrix.env_name }}/firmware*.bin
+            .pio/build/${{ matrix.env_name }}/bootloader.bin
+            .pio/build/${{ matrix.env_name }}/partitions.bin
           retention-days: 30
 
       - name: Upload build info
+        if: matrix.variant == 'standard'
         uses: actions/upload-artifact@v6
         with:
           name: build-info
