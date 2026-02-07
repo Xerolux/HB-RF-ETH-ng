@@ -87,9 +87,14 @@ void mqtt_publish_task(void *pvParameters)
             }
         }
 
-        // Publish every 60 seconds
-        vTaskDelay(60000 / portTICK_PERIOD_MS);
+        // FIX: Use short delays in a loop instead of one long 60s delay
+        // This allows the task to exit quickly when mqtt_running becomes false
+        for (int i = 0; i < 60 && mqtt_running; i++) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
     }
+
+    mqtt_publish_task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -359,9 +364,20 @@ esp_err_t mqtt_handler_stop(void)
     ESP_LOGI(TAG, "Stopping MQTT client");
     mqtt_running = false;
 
+    // FIX: Wait for the publish task to exit its loop gracefully.
+    // The task now uses 1-second delays and checks mqtt_running each iteration.
+    // Give it up to 3 seconds to notice the flag and clean up.
     if (mqtt_publish_task_handle) {
-        vTaskDelete(mqtt_publish_task_handle);
-        mqtt_publish_task_handle = NULL;
+        for (int i = 0; i < 30 && mqtt_publish_task_handle != NULL; i++) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        if (mqtt_publish_task_handle) {
+            ESP_LOGW(TAG, "MQTT publish task did not exit in time, force deleting");
+            vTaskDelete(mqtt_publish_task_handle);
+            mqtt_publish_task_handle = NULL;
+        } else {
+            ESP_LOGI(TAG, "MQTT publish task exited cleanly");
+        }
     }
 
     if (client) {

@@ -211,17 +211,23 @@ void Hmlgw::start() {
 void Hmlgw::stop() {
     if (!_running) return;
 
+    // Signal tasks to stop first
     _running = false;
     _connector->removeFrameHandler(this);
 
+    // Close sockets to unblock any blocking accept()/recv() calls
     cleanupSockets();
 
-    auto gracefully_delete_task = [&](TaskHandle_t& task_handle, const char* task_name) {
+    // Wait for tasks to notice _running==false and exit their loops.
+    // The accept() calls have a 1-second timeout, so 2 seconds is sufficient.
+    auto gracefully_delete_task = [](TaskHandle_t& task_handle, const char* task_name) {
         if (task_handle) {
-            // Wait for the task to exit its loop for up to 500ms
-            for (int i = 0; i < 5; ++i) {
+            // Wait up to 2 seconds for the task to exit its loop
+            for (int i = 0; i < 20; ++i) {
                 vTaskDelay(pdMS_TO_TICKS(100));
             }
+            // Force delete - the task should have exited by now
+            // (accept timeout is 1s, so 2s wait is sufficient)
             vTaskDelete(task_handle);
             task_handle = NULL;
             ESP_LOGI(TAG, "%s task deleted", task_name);
@@ -524,22 +530,32 @@ void Hmlgw::handleFrame(unsigned char* buffer, uint16_t len) {
     int sock = _clientSocket.load();
     if (sock < 0) return;
 
-    // Encapsulate in 'S' frame
-    // 'S' + HighLen + LowLen + Data
-    uint8_t header[3];
-    header[0] = CMD_SERIAL;
-    header[1] = (len >> 8) & 0xFF;
-    header[2] = len & 0xFF;
-
-    // Send header first
-    ssize_t sent = send(sock, header, 3, MSG_DONTWAIT);
-    if (sent < 0) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            ESP_LOGW(TAG, "Send header failed: errno %d", errno);
-        }
+    // FIX: Send header and data in a single send() call to prevent interleaving
+    // with concurrent calls. HM radio frames are typically < 256 bytes.
+    // Use a fixed stack buffer that covers all realistic frame sizes.
+    // Max HM radio frame is ~512 bytes, so 1024+3 covers all valid frames.
+    if (len > 1024) {
+        ESP_LOGW(TAG, "Frame too large: %d bytes", len);
         return;
     }
 
-    // Send data
-    sendDataToClient(buffer, len);
+    uint8_t frame[1024 + 3];
+    frame[0] = CMD_SERIAL;
+    frame[1] = (len >> 8) & 0xFF;
+    frame[2] = len & 0xFF;
+    memcpy(frame + 3, buffer, len);
+
+    ssize_t sent = send(sock, frame, 3 + len, MSG_DONTWAIT);
+    if (sent < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EPIPE) {
+            ESP_LOGW(TAG, "Send frame failed (errno %d), closing client", errno);
+        } else {
+            ESP_LOGW(TAG, "Send frame failed: errno %d", errno);
+        }
+        // Only close if still the same socket (avoid closing a new connection)
+        int expected = sock;
+        if (_clientSocket.compare_exchange_strong(expected, -1)) {
+            close(sock);
+        }
+    }
 }

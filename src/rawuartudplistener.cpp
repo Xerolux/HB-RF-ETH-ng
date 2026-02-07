@@ -104,8 +104,9 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length == 5 && data[2] == 1)
         { // protocol version 1
             atomic_fetch_add(&_endpointConnectionIdentifier, 2);
-            atomic_store(&_remotePort, (ushort)0);
             atomic_store(&_connectionStarted, false);
+            // FIX: Update address before port to prevent sendMessage from sending
+            // to old address with new port. Port acts as the "connection valid" flag.
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -127,7 +128,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
                 ESP_LOGW(TAG, "Received raw-uart reconnect packet with invalid endpoint identifier %d, should be %d. Sending response to force sync.", data[3], endpointConnectionIdentifier);
             }
 
-            atomic_store(&_remotePort, (ushort)0);
+            // FIX: Update address before port to prevent sendMessage from using
+            // stale address with new port.
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
@@ -143,6 +145,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         break;
 
     case 1: // disconnect
+        // FIX: Clear port first (checked by sendMessage), then state, then address.
+        // This ensures sendMessage won't send to a partially-cleared connection.
         atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_connectionStarted, false);
         atomic_store(&_remoteAddress, 0u);
@@ -212,8 +216,8 @@ ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 {
     // SAFETY: Load both atomics before checking to get consistent snapshot
     // Note: There's still a small race window, but it's acceptable for this use case
-    uint32_t address = atomic_load_explicit(&_remoteAddress, memory_order_relaxed);
-    uint16_t port = atomic_load_explicit(&_remotePort, memory_order_relaxed);
+    uint32_t address = _remoteAddress.load(std::memory_order_relaxed);
+    uint16_t port = _remotePort.load(std::memory_order_relaxed);
 
     if (port)
     {
@@ -229,8 +233,8 @@ ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffer, size_t len)
 {
     // SAFETY: Load atomics in a consistent order
-    uint32_t address = atomic_load_explicit(&_remoteAddress, memory_order_relaxed);
-    uint16_t port = atomic_load_explicit(&_remotePort, memory_order_relaxed);
+    uint32_t address = _remoteAddress.load(std::memory_order_relaxed);
+    uint16_t port = _remotePort.load(std::memory_order_relaxed);
 
     if (!port)
         return;
@@ -248,7 +252,7 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     addr.u_addr.ip4.addr = address;
 
     sendBuffer[0] = command;
-    sendBuffer[1] = (unsigned char)atomic_fetch_add_explicit(&_counter, 1, memory_order_relaxed);
+    sendBuffer[1] = (unsigned char)_counter.fetch_add(1, std::memory_order_relaxed);
 
     if (len)
         memcpy(sendBuffer + 2, buffer, len);
@@ -354,7 +358,9 @@ void RawUartUdpListener::_udpQueueHandler()
             // OPTIMIZED: 2.5s timeout for faster disconnect detection
             if (now > _lastReceivedKeepAlive + 2500000)
             {
+                // FIX: Clear port first (checked by sendMessage as connection flag)
                 atomic_store(&_remotePort, (ushort)0);
+                atomic_store(&_connectionStarted, false);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
                 ESP_LOGE(TAG, "Connection timed out");

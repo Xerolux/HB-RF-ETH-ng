@@ -26,12 +26,15 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/param.h>
+#include <atomic>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include "validation.h"
+#include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "esp_ota_ops.h"
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
@@ -50,8 +53,8 @@
 
 static const char *TAG = "WebUI";
 
-// Global flag for pending restart - set when restart is requested
-static volatile bool _restart_requested = false;
+// FIX: Use std::atomic instead of volatile for proper thread safety
+static std::atomic<bool> _restart_requested{false};
 static TaskHandle_t _restart_task_handle = NULL;
 
 /**
@@ -96,12 +99,12 @@ static void restart_task(void* pvParameters) {
  * - Allows ESP-IDF to properly cleanup resources
  */
 static void trigger_restart() {
-    // Prevent multiple restart tasks
-    if (_restart_requested) {
+    // FIX: Use atomic exchange to prevent TOCTOU race between check and set
+    bool expected = false;
+    if (!_restart_requested.compare_exchange_strong(expected, true)) {
         ESP_LOGW(TAG, "Restart already requested, ignoring duplicate request");
         return;
     }
-    _restart_requested = true;
 
     ESP_LOGI(TAG, "Scheduling system restart...");
 
@@ -531,7 +534,25 @@ esp_err_t analyzer_ws_handler_func(httpd_req_t *req)
 
     // Lazily create analyzer only when feature is enabled to reduce background load
     if (_analyzer == nullptr) {
+        // FIX: Check heap before creating Analyzer (uses ~40KB for buffer pool)
+        uint32_t free_heap = esp_get_free_heap_size();
+        if (free_heap < 60000) {
+            ESP_LOGW(TAG, "Insufficient heap for Analyzer: %" PRIu32 " bytes free", free_heap);
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_sendstr(req, "Insufficient memory for Analyzer");
+            return ESP_OK;
+        }
         _analyzer = new Analyzer(_radioModuleConnector);
+        if (!_analyzer || !_analyzer->isReady()) {
+            ESP_LOGE(TAG, "Failed to initialize Analyzer");
+            if (_analyzer) {
+                delete _analyzer;
+                _analyzer = nullptr;
+            }
+            httpd_resp_set_status(req, "503 Service Unavailable");
+            httpd_resp_sendstr(req, "Failed to initialize Analyzer");
+            return ESP_OK;
+        }
     }
 
     return Analyzer::ws_handler(req);

@@ -63,7 +63,7 @@ static const char *TAG = "HB-RF-ETH";
 // Heap monitoring task
 static void heap_monitor_task(void *pvParameters)
 {
-    LED *statusLED = (LED *)pvParameters;
+    (void)pvParameters;
     uint32_t low_water_mark = UINT32_MAX;
     const uint32_t critical_threshold = 30720;  // 30KB critical threshold (raised from 20KB)
     const uint32_t warning_threshold = 51200;   // 50KB warning threshold
@@ -84,6 +84,14 @@ static void heap_monitor_task(void *pvParameters)
         if (free_heap < critical_threshold) {
             ESP_LOGW(TAG, "CRITICAL: Low heap memory: %" PRIu32 " bytes free (min: %" PRIu32 ")",
                      free_heap, min_free_heap);
+
+            // FIX: If heap drops dangerously low (below 10KB), restart to recover
+            // from potential memory fragmentation or leaks
+            if (free_heap < 10240) {
+                ESP_LOGE(TAG, "FATAL: Heap critically low (%" PRIu32 " bytes). Restarting to recover.", free_heap);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_restart();
+            }
         }
         // Warning threshold - early warning
         else if (free_heap < warning_threshold) {
@@ -115,25 +123,30 @@ static void heap_monitor_task(void *pvParameters)
             ESP_LOGI(TAG, "--- Task Stack Watermarks ---");
 
             // List all tasks and their stack watermarks
-            uint32_t task_count = uxTaskGetNumberOfTasks();
-            TaskStatus_t *task_status = (TaskStatus_t *)malloc(task_count * sizeof(TaskStatus_t));
-            if (task_status) {
-                task_count = uxTaskGetSystemState(task_status, task_count);
-                for (uint32_t i = 0; i < task_count; i++) {
-                    UBaseType_t wm = task_status[i].usStackHighWaterMark;
-                    // Warn if less than 20% stack free
-                    float usage_pct = 100.0 * (1.0 - (float)wm / task_status[i].usStackSize);
-                    if (usage_pct > 80.0) {
-                        ESP_LOGW(TAG, "  Task %s: %u/%u bytes free (%.0f%% used) - WARNING!",
-                                 task_status[i].pcTaskName, wm * sizeof(StackType_t),
-                                 task_status[i].usStackSize * sizeof(StackType_t), usage_pct);
-                    } else {
-                        ESP_LOGI(TAG, "  Task %s: %u/%u bytes free (%.0f%% used)",
-                                 task_status[i].pcTaskName, wm * sizeof(StackType_t),
-                                 task_status[i].usStackSize * sizeof(StackType_t), usage_pct);
+            // FIX: Check available heap before allocating to prevent OOM
+            // during the monitoring that's supposed to detect low memory
+            UBaseType_t task_count = uxTaskGetNumberOfTasks();
+            size_t alloc_size = task_count * sizeof(TaskStatus_t);
+            if (free_heap > alloc_size + 4096) {
+                TaskStatus_t *task_status = (TaskStatus_t *)malloc(alloc_size);
+                if (task_status) {
+                    configRUN_TIME_COUNTER_TYPE total_runtime;
+                    UBaseType_t filled = uxTaskGetSystemState(task_status, task_count, &total_runtime);
+                    for (UBaseType_t i = 0; i < filled; i++) {
+                        UBaseType_t wm = task_status[i].usStackHighWaterMark;
+                        // Warn if watermark is below 128 words (512 bytes)
+                        if (wm < 128) {
+                            ESP_LOGW(TAG, "  Task %s: %u words free - WARNING LOW STACK!",
+                                     task_status[i].pcTaskName, (unsigned)wm);
+                        } else {
+                            ESP_LOGI(TAG, "  Task %s: %u words free",
+                                     task_status[i].pcTaskName, (unsigned)wm);
+                        }
                     }
+                    free(task_status);
                 }
-                free(task_status);
+            } else {
+                ESP_LOGW(TAG, "  Skipping task watermarks - low heap (%" PRIu32 " free)", free_heap);
             }
             ESP_LOGI(TAG, "-------------------------------");
         }

@@ -399,27 +399,13 @@ void UpdateCheck::performOnlineUpdate()
     config.timeout_ms = 30000;  // 30 second timeout for OTA operations
     config.buffer_size = 4096;
     config.buffer_size_tx = 2048;
-
-    // Set GitHub headers
-    esp_http_client_handle_t http_client = esp_http_client_init(&config);
-    if (!http_client) {
-        ESP_LOGE(TAG, "Failed to initialize HTTP client for OTA");
-        _statusLED->setState(LED_STATE_ON);
-        // Re-enable watchdog
-        esp_task_wdt_add(current_task);
-        return;
-    }
-
-    esp_http_client_set_header(http_client, "User-Agent", "HB-RF-ETH-ng");
-    esp_http_client_set_header(http_client, "Accept", "application/octet-stream");
+    config.user_agent = "HB-RF-ETH-ng";
 
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &config;
 
     ESP_LOGI(TAG, "Beginning HTTPS OTA update...");
     esp_err_t ret = esp_https_ota(&ota_config);
-
-    esp_http_client_cleanup(http_client);
 
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update successful! Restarting in 2 seconds...");
