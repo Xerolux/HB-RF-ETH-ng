@@ -30,26 +30,27 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_system.h"
-#include "driver/temperature_sensor.h"
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-#include "esp_adc/adc_cali_scheme.h"
 #include "pins.h"
-
-#define DEFAULT_VREF 1100
 
 static const char *TAG = "SysInfo";
 
-static double _cpuUsage;
+static volatile float _cpuUsage = 0.0f;
+static volatile float _memoryUsage = 0.0f;
+static volatile uint32_t _lastSysInfoRequestTime = 0;
 static char _serial[13];
 static const char *_currentVersion;
+static const char *_firmwareVariant;
 static board_type_t _board;
 static uint64_t _bootTime;
-static temperature_sensor_handle_t _temp_sensor = NULL;
 
 void updateCPUUsageTask(void *arg)
 {
     TaskStatus_t *taskStatus = (TaskStatus_t *)malloc(25 * sizeof(TaskStatus_t));
+    if (!taskStatus) {
+        ESP_LOGE(TAG, "Failed to allocate memory for task status");
+        vTaskDelete(NULL);
+        return;
+    }
 
     TaskHandle_t idle0Task = xTaskGetIdleTaskHandleForCore(0);
     TaskHandle_t idle1Task = xTaskGetIdleTaskHandleForCore(1);
@@ -58,134 +59,53 @@ void updateCPUUsageTask(void *arg)
 
     for (;;)
     {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        // Optimize performance: Only calculate CPU usage if SysInfo was recently requested
+        // If no one is looking at the dashboard, we don't need to burn cycles calculating CPU usage
+        bool active = (xTaskGetTickCount() * portTICK_PERIOD_MS) - _lastSysInfoRequestTime < 5000;
 
-        UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
+        vTaskDelay((active ? 1000 : 2000) / portTICK_PERIOD_MS);
 
-        idleRunTime = 0;
+        if (active) {
+            UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, 25, &totalRunTime);
 
-        if (totalRunTime > 0)
-        {
-            for (int i = 0; i < taskCount; i++)
+            idleRunTime = 0;
+
+            if (totalRunTime > 0)
             {
-                TaskStatus_t ts = taskStatus[i];
-
-                if (ts.xHandle == idle0Task || ts.xHandle == idle1Task)
+                for (int i = 0; i < taskCount; i++)
                 {
-                    idleRunTime += ts.ulRunTimeCounter;
+                    TaskStatus_t ts = taskStatus[i];
+
+                    if (ts.xHandle == idle0Task || ts.xHandle == idle1Task)
+                    {
+                        idleRunTime += ts.ulRunTimeCounter;
+                    }
                 }
             }
+
+            // CPU Usage
+            _cpuUsage = 100.0f - ((idleRunTime - lastIdleRunTime) * 100.0f / ((totalRunTime - lastTotalRunTime) * 2));
+
+            lastIdleRunTime = idleRunTime;
+            lastTotalRunTime = totalRunTime;
         }
 
-        _cpuUsage = 100.0 - ((idleRunTime - lastIdleRunTime) * 100.0 / ((totalRunTime - lastTotalRunTime) * 2));
-
-        lastIdleRunTime = idleRunTime;
-        lastTotalRunTime = totalRunTime;
+        // Memory Usage
+        multi_heap_info_t info;
+        heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
+        _memoryUsage = 100.0f - (info.total_free_bytes * 100.0f / (info.total_free_bytes + info.total_allocated_bytes));
     }
 
     free(taskStatus);
     vTaskDelete(NULL);
 }
 
-uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)
-{
-    // ESP-IDF 5.1 ADC oneshot API
-    adc_oneshot_unit_handle_t adc_handle;
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = adc_unit,
-        .clk_src = (adc_oneshot_clk_src_t)0,
-        .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
-    esp_err_t ret = adc_oneshot_new_unit(&init_config, &adc_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(ret));
-        return 0;
-    }
-
-    adc_oneshot_chan_cfg_t config = {
-        .atten = adc_atten,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-    };
-    ret = adc_oneshot_config_channel(adc_handle, adc_channel, &config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(ret));
-        adc_oneshot_del_unit(adc_handle);
-        return 0;
-    }
-
-    // Calibration
-    adc_cali_handle_t cali_handle = NULL;
-    adc_cali_line_fitting_config_t cali_config = {
-        .unit_id = adc_unit,
-        .atten = adc_atten,
-        .bitwidth = ADC_BITWIDTH_DEFAULT,
-        .default_vref = DEFAULT_VREF,
-    };
-    ret = adc_cali_create_scheme_line_fitting(&cali_config, &cali_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "ADC calibration failed, using raw values: %s", esp_err_to_name(ret));
-    }
-
-    // Read ADC with multiple samples for stability
-    int adc_raw = 0;
-    const int num_samples = 10;
-    for (int i = 0; i < num_samples; i++) {
-        int sample;
-        ret = adc_oneshot_read(adc_handle, adc_channel, &sample);
-        if (ret == ESP_OK) {
-            adc_raw += sample;
-        } else {
-            ESP_LOGW(TAG, "ADC read failed: %s", esp_err_to_name(ret));
-        }
-        vTaskDelay(pdMS_TO_TICKS(10)); // Small delay between samples
-    }
-    adc_raw /= num_samples;
-
-    // Convert to voltage
-    int voltage_mv = 0;
-    if (cali_handle != NULL) {
-        ret = adc_cali_raw_to_voltage(cali_handle, adc_raw, &voltage_mv);
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to convert ADC to voltage: %s", esp_err_to_name(ret));
-            // Fallback: use raw value with approximation
-            voltage_mv = (adc_raw * 3300) / 4095; // 12-bit ADC, 3.3V ref
-        }
-    } else {
-        // No calibration, use raw value approximation
-        voltage_mv = (adc_raw * 3300) / 4095;
-    }
-
-    // Cleanup
-    if (cali_handle != NULL) {
-        adc_cali_delete_scheme_line_fitting(cali_handle);
-    }
-    adc_oneshot_del_unit(adc_handle);
-
-    return voltage_mv;
-}
-
+// Board detection removed - ADC voltage measurement not functional
+// All boards will report as UNKNOWN type
 board_type_t detectBoard()
 {
-    uint32_t voltage = get_voltage(BOARD_REV_SENSE_UNIT, BOARD_REV_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
-    switch (voltage) // R31/R32
-    {
-    case 400 ... 700: // 10K/2K
-        return BOARD_TYPE_REV_1_10_PUB;
-
-    case 1500 ... 1800: // 10K/10K
-        return BOARD_TYPE_REV_1_8_SK;
-
-    case 2600 ... 2900: // 2K/10K
-        return BOARD_TYPE_REV_1_8_PUB;
-
-    case 2901 ... 3200: // 1K/12K
-        return BOARD_TYPE_REV_1_10_SK;
-
-    default:
-        ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32, voltage);
-        return BOARD_TYPE_UNKNOWN;
-    }
+    ESP_LOGI(TAG, "Board detection disabled (ADC not functional)");
+    return BOARD_TYPE_UNKNOWN;
 }
 
 SysInfo::SysInfo()
@@ -199,72 +119,50 @@ SysInfo::SysInfo()
     const esp_app_desc_t* app_desc = esp_app_get_description();
     _currentVersion = app_desc->version;
 
+    // Set firmware variant from compile-time define
+#ifndef FIRMWARE_VARIANT
+    _firmwareVariant = "unknown";
+#else
+    _firmwareVariant = FIRMWARE_VARIANT;
+#endif
+
     _board = detectBoard();
 
     // Store boot time for uptime calculation
     _bootTime = esp_timer_get_time() / 1000000; // Convert to seconds
-
-    // Initialize temperature sensor
-    // Note: ESP32 (classic) does not have an internal temperature sensor
-    // Only ESP32-S2, ESP32-S3, ESP32-C3, etc. have internal temperature sensors
-#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
-    temperature_sensor_config_t temp_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(temperature_sensor_install(&temp_config, &_temp_sensor));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(temperature_sensor_enable(_temp_sensor));
-    ESP_LOGI(TAG, "Internal temperature sensor initialized");
-#else
-    ESP_LOGI(TAG, "ESP32 classic has no internal temperature sensor - external sensor required");
-    _temp_sensor = NULL;
-#endif
 }
 
-double SysInfo::getCpuUsage()
+double SysInfo::getCpuUsage() const
 {
-    return _cpuUsage;
+    return (double)_cpuUsage;
 }
 
-double SysInfo::getMemoryUsage()
+double SysInfo::getMemoryUsage() const
 {
-    multi_heap_info_t info;
-    heap_caps_get_info(&info, MALLOC_CAP_INTERNAL);
-
-    return 100.0 - (info.total_free_bytes * 100.0 / (info.total_free_bytes + info.total_allocated_bytes));
+    return (double)_memoryUsage;
 }
 
-const char *SysInfo::getSerialNumber()
+const char *SysInfo::getSerialNumber() const
 {
     return _serial;
 }
 
-board_type_t SysInfo::getBoardType()
+board_type_t SysInfo::getBoardType() const
 {
     return _board;
 }
 
-const char *SysInfo::getCurrentVersion()
+const char *SysInfo::getCurrentVersion() const
 {
     return _currentVersion;
 }
 
-double SysInfo::getSupplyVoltage()
+const char *SysInfo::getFirmwareVariant() const
 {
-    // Measure supply voltage with 2:1 voltage divider
-    // GPIO37 (ADC1_CH1) measures half of the actual supply voltage
-    uint32_t voltage_mv = get_voltage(SUPPLY_VOLTAGE_SENSE_UNIT, SUPPLY_VOLTAGE_SENSE_CHANNEL, ADC_ATTEN_DB_12);
-
-    if (voltage_mv == 0) {
-        ESP_LOGW(TAG, "Failed to read supply voltage, returning 0.0V");
-        return 0.0;
-    }
-
-    // Apply 2:1 voltage divider correction
-    double actual_voltage = (voltage_mv * 2.0) / 1000.0; // Convert to volts
-
-    ESP_LOGD(TAG, "Supply voltage: %.2fV (ADC: %u mV)", actual_voltage, voltage_mv);
-    return actual_voltage;
+    return _firmwareVariant;
 }
 
-const char* SysInfo::getBoardRevisionString()
+const char* SysInfo::getBoardRevisionString() const
 {
     switch (_board)
     {
@@ -281,66 +179,45 @@ const char* SysInfo::getBoardRevisionString()
     }
 }
 
-double SysInfo::getTemperature()
-{
-#if defined(SOC_TEMP_SENSOR_SUPPORTED) && SOC_TEMP_SENSOR_SUPPORTED
-    if (_temp_sensor == NULL) {
-        ESP_LOGD(TAG, "Temperature sensor not initialized");
-        return -127.0; // Return special value to indicate "not available"
-    }
-
-    float temp_celsius = 0.0;
-    esp_err_t err = temperature_sensor_get_celsius(_temp_sensor, &temp_celsius);
-
-    if (err != ESP_OK)
-    {
-        ESP_LOGW(TAG, "Failed to read temperature: %s", esp_err_to_name(err));
-        return -127.0;
-    }
-
-    return (double)temp_celsius;
-#else
-    // ESP32 classic has no internal temperature sensor
-    // Return special value -127.0 to indicate "not available"
-    // This value is commonly used in temperature sensors to indicate invalid/unavailable reading
-    return -127.0;
-#endif
-}
-
-uint64_t SysInfo::getUptimeSeconds()
+uint64_t SysInfo::getUptimeSeconds() const
 {
     // Get current time in seconds since boot
     uint64_t uptime = (esp_timer_get_time() / 1000000);
     return uptime;
 }
 
-const char* SysInfo::getResetReason()
+const char* SysInfo::getResetReason() const
 {
     esp_reset_reason_t reason = esp_reset_reason();
 
     switch (reason)
     {
     case ESP_RST_POWERON:
-        return "Power-On Reset";
+        return "sysinfo.reset.poweron";
     case ESP_RST_SW:
-        return "Software Reset";
+        return "sysinfo.reset.sw";
     case ESP_RST_PANIC:
-        return "Exception/Panic";
+        return "sysinfo.reset.panic";
     case ESP_RST_INT_WDT:
-        return "Interrupt Watchdog";
+        return "sysinfo.reset.int_wdt";
     case ESP_RST_TASK_WDT:
-        return "Task Watchdog";
+        return "sysinfo.reset.task_wdt";
     case ESP_RST_WDT:
-        return "Other Watchdog";
+        return "sysinfo.reset.wdt";
     case ESP_RST_DEEPSLEEP:
-        return "Deep Sleep Reset";
+        return "sysinfo.reset.deepsleep";
     case ESP_RST_BROWNOUT:
-        return "Brownout Reset";
+        return "sysinfo.reset.brownout";
     case ESP_RST_SDIO:
-        return "SDIO Reset";
+        return "sysinfo.reset.sdio";
     case ESP_RST_EXT:
-        return "External Reset";
+        return "sysinfo.reset.ext";
     default:
-        return "Unknown";
+        return "sysinfo.reset.unknown";
     }
+}
+
+void SysInfo::markSysInfoRequested()
+{
+    _lastSysInfoRequestTime = xTaskGetTickCount() * portTICK_PERIOD_MS;
 }

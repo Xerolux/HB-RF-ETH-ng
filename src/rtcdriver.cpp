@@ -70,28 +70,39 @@ static void i2c_master_init()
     _isDriverInstalled = true;
 }
 
+/**
+ * RTC Detection Function
+ *
+ * MEMORY ALLOCATION PATTERN:
+ * - This function allocates RTC objects with 'new' and returns them on success
+ * - Returned objects are intentionally NOT deleted - they persist for application lifetime
+ * - Failed objects ARE deleted immediately to prevent memory leaks
+ * - This is by design: the RTC driver is a singleton that lives until device reset
+ *
+ * IMPORTANT: Caller should NOT delete the returned RTC object
+ */
 Rtc *Rtc::detect()
 {
     RtcDS3231 *ds3231 = new RtcDS3231();
     if (ds3231->begin())
     {
         ESP_LOGI(TAG, "DS3231 RTC found and initialized.");
-        return ds3231;
+        return ds3231;  // Intentionally persistent - not a leak
     }
     else
     {
-        delete ds3231;
+        delete ds3231;  // Clean up failed attempt
     }
 
     RtcRX8130 *rx9130 = new RtcRX8130();
     if (rx9130->begin())
     {
         ESP_LOGI(TAG, "RX9130 RTC found and initialized.");
-        return rx9130;
+        return rx9130;  // Intentionally persistent - not a leak
     }
     else
     {
-        delete rx9130;
+        delete rx9130;  // Clean up failed attempt
     }
 
     ESP_LOGE(TAG, "No RTC found.");

@@ -24,6 +24,7 @@
 #include "gps.h"
 #include "pins.h"
 #include "esp_log.h"
+#include <esp_timer.h>
 #include "string.h"
 
 void gpsSerialQueueHandlerTask(void *parameter)
@@ -41,10 +42,7 @@ GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 122,
         .source_clk = UART_SCLK_DEFAULT,
-        .flags = {
-            .allow_pd = 0,
-            .backup_before_sleep = 0,
-        },
+        .flags = {},
     };
     uart_param_config(UART_NUM_2, &uart_config);
     uart_set_pin(UART_NUM_2, GPIO_NUM_0, DCF_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
@@ -53,10 +51,20 @@ GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
     _lineReader = new LineReader(std::bind(&GPS::_handleLine, this, _1, _2));
 }
 
+GPS::~GPS()
+{
+    if (_lineReader) {
+        delete _lineReader;
+        _lineReader = nullptr;
+    }
+}
+
 void GPS::start()
 {
     uart_driver_install(UART_NUM_2, UART_HW_FIFO_LEN(UART_NUM_2) * 2, 0, 20, &_uart_queue, 0);
-    xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler", 4096, this, 15, &_tHandle);
+
+    // OPTIMIZED: Reduced stack from 4096 to 3072 bytes (saves 1KB RAM)
+    xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler", 3072, this, 15, &_tHandle);
 }
 
 void GPS::stop()

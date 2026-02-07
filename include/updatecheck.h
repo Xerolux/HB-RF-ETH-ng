@@ -38,14 +38,22 @@ private:
     TaskHandle_t _tHandle = NULL;   
     void _updateLatestVersion();
     char _latestVersion[33] = "n/a";
+    static constexpr size_t RELEASE_NOTES_SIZE = 2048;
+    static constexpr size_t DOWNLOAD_URL_SIZE = 512;
+    char _releaseNotes[RELEASE_NOTES_SIZE] = "";
+    char _downloadUrl[DOWNLOAD_URL_SIZE] = "";
 
 public:
     UpdateCheck(Settings* settings, SysInfo* sysInfo, LED *statusLED);
     void start();
     void stop();
     void performOnlineUpdate();
+    void checkNow();
 
     const char* getLatestVersion();
+    const char* getReleaseNotes();
+    const char* getDownloadUrl();
+    bool hasDownloadUrl();
 
     void _taskFunc();
 };
