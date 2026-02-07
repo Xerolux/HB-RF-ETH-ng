@@ -1,6 +1,7 @@
 # PlatformIO
 .pio/
 .vscode/
+platformio_local.ini
 
 # ESP-IDF Build artifacts
 build/
