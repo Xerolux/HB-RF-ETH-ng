@@ -27,6 +27,13 @@
           <span class="link-icon">🔗</span>
           GitHub Repository
         </a>
+        <div class="license-info">
+          <p>Copyright (c) 2025, Xerolux</p>
+          <p>
+            {{ t('about.firmwareLicense') }} HB-RF-ETH-ng {{ t('about.under') }}
+            <a href="https://github.com/Xerolux/HB-RF-ETH-ng/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>
+          </p>
+        </div>
       </div>
     </div>
 

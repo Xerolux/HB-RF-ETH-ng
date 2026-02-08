@@ -183,12 +183,12 @@ onMounted(async () => {
     }
   }
 
-  // Re-check every hour
+  // Re-check every 24 hours
   setInterval(() => {
     if (sysInfoStore.currentVersion) {
       updateStore.checkForUpdate(sysInfoStore.currentVersion)
     }
-  }, 60 * 60 * 1000)
+  }, 24 * 60 * 60 * 1000)
 })
 </script>
 
@@ -201,12 +201,13 @@ onMounted(async () => {
 /* Glass Navbar */
 .navbar-glass {
   /* Styles are mostly inherited from global .navbar in main.css */
-  padding: 0; /* Let inner container handle padding */
+  padding: 0 !important; /* Let inner container handle padding */
 }
 
 .navbar-container {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
 }
