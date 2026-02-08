@@ -1,92 +1,124 @@
 <template>
   <header class="app-header">
-    <!-- Update Notification Banner -->
-    <Transition name="banner">
-      <div v-if="updateStore.shouldShowUpdateBadge" class="update-banner">
-        <div class="update-banner-content">
-          <span class="update-icon">🔄</span>
-          <span class="update-text">
-            {{ t('update.available') || 'New version available:' }}
-            <strong>{{ updateStore.latestVersion }}</strong>
-          </span>
-          <BButton size="sm" variant="light" to="/firmware" class="update-btn">
-            {{ t('update.updateNow') || 'Update' }}
-          </BButton>
-          <BButton size="sm" variant="light" @click="dismissUpdate" class="update-close">
-            ✕
-          </BButton>
+    <!-- Update Notification Banner (Floating Style) -->
+    <Transition name="slide-down">
+      <div v-if="updateStore.shouldShowUpdateBadge && showBanner" class="update-notification">
+        <div class="notification-content">
+          <div class="icon-circle">
+            <span class="update-icon">🚀</span>
+          </div>
+          <div class="text-content">
+            <span class="notification-title">{{ t('update.available') || 'Update Available' }}</span>
+            <span class="notification-subtitle">v{{ updateStore.latestVersion }}</span>
+          </div>
+          <div class="actions">
+            <BButton size="sm" variant="primary" to="/firmware" class="action-btn">
+              {{ t('update.updateNow') || 'Update' }}
+            </BButton>
+            <button @click="dismissUpdate" class="close-btn" aria-label="Close">
+              ✕
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
 
-    <BNavbar toggleable="lg" class="navbar-custom">
-      <div class="navbar-content">
+    <BNavbar toggleable="lg" class="navbar-glass">
+      <div class="navbar-container">
         <!-- Brand -->
         <BNavbarBrand to="/" class="brand">
-          <span class="brand-icon">📡</span>
+          <div class="brand-logo">
+            <span class="brand-icon">📡</span>
+          </div>
           <span class="brand-text">HB-RF-ETH-ng</span>
-          <span v-if="updateStore.shouldShowUpdateBadge" class="update-badge" :title="t('update.available') || 'Update available'">
-            <span class="pulse"></span>
-          </span>
+          <span v-if="updateStore.shouldShowUpdateBadge" class="update-dot"></span>
         </BNavbarBrand>
 
         <!-- Toggle Button (Mobile) -->
-        <BNavbarToggle target="nav-collapse" class="navbar-toggle">
-          <span class="hamburger"></span>
+        <BNavbarToggle target="nav-collapse" class="navbar-toggle-custom">
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
         </BNavbarToggle>
 
         <!-- Collapsible Content -->
-        <BCollapse id="nav-collapse" is-nav class="navbar-collapse">
-          <!-- Navigation Links -->
-          <BNavbarNav class="nav-links">
-            <BNavItem to="/">{{ t('nav.home') }}</BNavItem>
-            <BNavItem to="/settings" v-if="loginStore.isLoggedIn">{{ t('nav.settings') }}</BNavItem>
-            <BNavItem to="/firmware" v-if="loginStore.isLoggedIn">
-              {{ t('nav.firmware') }}
-              <span v-if="updateStore.shouldShowUpdateBadge" class="nav-update-dot"></span>
-            </BNavItem>
-            <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn">{{ t('nav.monitoring') }}</BNavItem>
-            <BNavItem to="/about">{{ t('nav.about') }}</BNavItem>
-          </BNavbarNav>
+        <BCollapse id="nav-collapse" is-nav>
+          <div class="nav-content-wrapper">
+            <!-- Navigation Links -->
+            <BNavbarNav class="nav-links">
+              <BNavItem to="/" active-class="active">{{ t('nav.home') }}</BNavItem>
 
-          <!-- Right Side Actions -->
-          <BNavbarNav class="nav-actions ms-auto">
-            <!-- Update Indicator (small) -->
-            <div v-if="updateStore.shouldShowUpdateBadge && !showBanner" class="update-indicator" @click="showBanner = true">
-              <span class="update-indicator-icon">🔄</span>
-            </div>
+              <!-- Settings Dropdown -->
+              <BNavItemDropdown v-if="loginStore.isLoggedIn" class="settings-dropdown" no-caret>
+                <template #button-content>
+                  <span class="nav-link" :class="{ active: router.currentRoute.value.path === '/settings' }">
+                    {{ t('nav.settings') }}
+                  </span>
+                </template>
+                <BDropdownItem to="/settings?tab=general">{{ t('settings.tabGeneral') || 'General' }}</BDropdownItem>
+                <BDropdownItem to="/settings?tab=network">{{ t('settings.tabNetwork') || 'Network' }}</BDropdownItem>
+                <BDropdownItem to="/settings?tab=time">{{ t('settings.tabTime') || 'Time' }}</BDropdownItem>
+                <BDropdownItem to="/settings?tab=backup">{{ t('settings.tabBackup') || 'Backup' }}</BDropdownItem>
+              </BNavItemDropdown>
 
-            <!-- Language Selector -->
-            <BNavItemDropdown :text="currentLocaleName" variant="light" class="dropdown-locale">
-              <BDropdownItem
-                v-for="locale in availableLocales"
-                :key="locale.code"
-                @click="changeLocale(locale.code)"
-                :active="locale.code === currentLocale"
+              <BNavItem to="/firmware" v-if="loginStore.isLoggedIn" active-class="active">
+                {{ t('nav.firmware') }}
+                <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
+              </BNavItem>
+              <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn" active-class="active">{{ t('nav.monitoring') }}</BNavItem>
+              <BNavItem to="/about" active-class="active">{{ t('nav.about') }}</BNavItem>
+            </BNavbarNav>
+
+            <!-- Right Side Actions -->
+            <BNavbarNav class="nav-actions">
+              <!-- Update Indicator (small) -->
+              <div v-if="updateStore.shouldShowUpdateBadge && !showBanner" class="action-icon-btn" @click="showBanner = true" title="Show update">
+                <span>🚀</span>
+              </div>
+
+              <!-- Language Selector -->
+              <BNavItemDropdown class="locale-dropdown" no-caret>
+                <template #button-content>
+                  <div class="locale-btn">
+                    {{ currentLocaleFlag }}
+                  </div>
+                </template>
+                <BDropdownItem
+                  v-for="locale in availableLocales"
+                  :key="locale.code"
+                  @click="changeLocale(locale.code)"
+                  :active="locale.code === currentLocale"
+                >
+                  <span class="locale-flag">{{ locale.flag || '' }}</span>
+                  {{ locale.name }}
+                </BDropdownItem>
+              </BNavItemDropdown>
+
+              <!-- Theme Toggle -->
+              <div class="action-icon-btn" @click="themeStore.toggleTheme" :title="t('nav.toggleTheme')">
+                <span>{{ themeStore.theme === 'light' ? '🌙' : '☀️' }}</span>
+              </div>
+
+              <!-- Login / Logout -->
+              <BButton
+                v-if="!loginStore.isLoggedIn"
+                to="/login"
+                variant="primary"
+                size="sm"
+                class="auth-btn"
               >
-                <span class="locale-flag">{{ locale.flag || '' }}</span>
-                {{ locale.name }}
-              </BDropdownItem>
-            </BNavItemDropdown>
-
-            <!-- Theme Toggle -->
-            <BNavItem
-              @click.prevent="themeStore.toggleTheme"
-              class="nav-icon-btn"
-              :title="t('nav.toggleTheme')"
-              :aria-label="t('nav.toggleTheme')"
-            >
-              <span class="theme-icon">{{ themeStore.theme === 'light' ? '🌙' : '☀️' }}</span>
-            </BNavItem>
-
-            <!-- Login / Logout -->
-            <BNavItem to="/login" v-if="!loginStore.isLoggedIn" class="nav-login">
-              {{ t('nav.login') }}
-            </BNavItem>
-            <BNavItem v-if="loginStore.isLoggedIn" @click.prevent="logout" class="nav-logout">
-              {{ t('nav.logout') }}
-            </BNavItem>
-          </BNavbarNav>
+                {{ t('nav.login') }}
+              </BButton>
+              <div
+                v-if="loginStore.isLoggedIn"
+                @click="logout"
+                class="action-icon-btn logout-btn"
+                :title="t('nav.logout')"
+              >
+                <span>🚪</span>
+              </div>
+            </BNavbarNav>
+          </div>
         </BCollapse>
       </div>
     </BNavbar>
@@ -111,9 +143,9 @@ const showBanner = ref(true)
 const dismissedVersion = ref(localStorage.getItem('dismissedUpdate'))
 
 const currentLocale = computed(() => locale.value)
-const currentLocaleName = computed(() => {
+const currentLocaleFlag = computed(() => {
   const current = availableLocales.find(l => l.code === locale.value)
-  return current ? current.name : 'English'
+  return current ? (current.flag || current.code.toUpperCase()) : 'EN'
 })
 
 const changeLocale = (newLocale) => {
@@ -162,176 +194,21 @@ onMounted(async () => {
 
 <style scoped>
 .app-header {
-  margin-bottom: var(--spacing-lg);
+  position: relative;
+  z-index: 1000;
 }
 
-/* Update Banner */
-.update-banner {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
-  box-shadow: var(--shadow-md);
+/* Glass Navbar */
+.navbar-glass {
+  /* Styles are mostly inherited from global .navbar in main.css */
+  padding: 0; /* Let inner container handle padding */
 }
 
-.update-banner-content {
+.navbar-container {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  color: white;
-  flex-wrap: wrap;
-}
-
-.update-icon {
-  font-size: 1.5rem;
-  animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.update-text {
-  flex: 1;
-  font-size: 0.9375rem;
-}
-
-.update-btn {
-  padding: 0.375rem 1rem;
-  font-weight: 600;
-  border: none;
-}
-
-.update-close {
-  padding: 0.375rem 0.625rem;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  opacity: 0.8;
-}
-
-.update-close:hover {
-  opacity: 1;
-}
-
-/* Banner transition */
-.banner-enter-active,
-.banner-leave-active {
-  transition: all var(--transition-normal);
-}
-
-.banner-enter-from,
-.banner-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Update Badge on Brand */
-.update-badge {
-  position: relative;
-  width: 12px;
-  height: 12px;
-  margin-left: var(--spacing-xs);
-}
-
-.update-badge .pulse {
-  position: absolute;
   width: 100%;
-  height: 100%;
-  background-color: #ffd700;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-.update-badge .pulse::before,
-.update-badge .pulse::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: #ffd700;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-.update-badge .pulse::after {
-  animation-delay: 0.5s;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.5);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* Nav Update Dot */
-.nav-update-dot {
-  position: relative;
-}
-
-.nav-update-dot::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  right: -4px;
-  width: 8px;
-  height: 8px;
-  background-color: #ffd700;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.3);
-  animation: blink 1.5s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* Update Indicator (small icon in nav) */
-.update-indicator {
-  padding: 0.5rem;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.update-indicator:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.update-indicator-icon {
-  font-size: 1.125rem;
-  animation: rotate 3s linear infinite;
-}
-
-/* Navbar */
-.navbar-custom {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
   padding: var(--spacing-sm) var(--spacing-md);
-  backdrop-filter: blur(10px);
-}
-
-.navbar-content {
-  display: flex;
-  align-items: center;
-  width: 100%;
 }
 
 /* Brand */
@@ -339,222 +216,274 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  color: white !important;
   text-decoration: none;
-  position: relative;
+  margin-right: var(--spacing-xl);
+}
+
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .brand-icon {
-  font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  font-size: 1.25rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .brand-text {
   font-weight: 700;
   font-size: 1.25rem;
-  letter-spacing: -0.025em;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
 }
 
-/* Toggle Button (Hamburger) */
-.navbar-toggle {
+.update-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-warning);
+  border-radius: 50%;
+  margin-left: 4px;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+/* Custom Hamburger */
+.navbar-toggle-custom {
   border: none;
-  padding: var(--spacing-sm);
-  margin-left: auto;
-}
-
-.navbar-toggle .navbar-toggler-icon {
-  background-image: none;
-}
-
-.hamburger {
-  display: block;
-  width: 24px;
-  height: 2px;
-  background: white;
-  position: relative;
-  transition: all var(--transition-fast);
-}
-
-.hamburger::before,
-.hamburger::after {
-  content: '';
-  position: absolute;
-  width: 24px;
-  height: 2px;
-  background: white;
-  left: 0;
-  transition: all var(--transition-fast);
-}
-
-.hamburger::before { top: -8px; }
-.hamburger::after { top: 8px; }
-
-.navbar-toggle[aria-expanded="true"] .hamburger {
+  padding: 8px;
   background: transparent;
-}
-
-.navbar-toggle[aria-expanded="true"] .hamburger::before {
-  transform: rotate(45deg);
-  top: 0;
-}
-
-.navbar-toggle[aria-expanded="true"] .hamburger::after {
-  transform: rotate(-45deg);
-  top: 0;
-}
-
-/* Collapse */
-.navbar-collapse {
-  margin-top: var(--spacing-md);
-}
-
-@media (min-width: 992px) {
-  .navbar-collapse {
-    margin-top: 0;
-  }
-
-  .navbar-toggle {
-    display: none;
-  }
-}
-
-/* Nav Links */
-.nav-links {
-  gap: var(--spacing-xs);
-}
-
-.nav-links .nav-link {
-  color: rgba(255, 255, 255, 0.9) !important;
-  padding: 0.625rem 1rem;
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  font-weight: 500;
-  min-height: var(--touch-target);
   display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  justify-content: center;
   align-items: center;
 }
 
-.nav-links .nav-link:hover,
-.nav-links .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: white !important;
-  transform: translateY(-1px);
+.hamburger-line {
+  width: 24px;
+  height: 2px;
+  background-color: var(--color-text);
+  border-radius: 2px;
+  transition: all 0.2s;
 }
 
-/* Nav Actions */
+/* Nav Content */
+.nav-content-wrapper {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nav-links {
+  display: flex;
+  gap: 4px;
+}
+
+:deep(.nav-link) {
+  font-size: 0.9375rem;
+  padding: 0.5rem 1rem !important;
+  border-radius: var(--radius-full) !important;
+}
+
+.menu-badge {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: var(--color-warning);
+  border-radius: 50%;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Right Actions */
 .nav-actions {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-md);
 }
 
-@media (min-width: 992px) {
-  .nav-actions {
-    margin-top: 0;
-  }
-}
-
-/* Icon Buttons */
-.nav-icon-btn {
-  padding: 0.625rem;
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  min-width: var(--touch-target);
+.action-icon-btn {
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.nav-icon-btn:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.theme-icon {
-  font-size: 1.25rem;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
-}
-
-/* Login/Logout Links */
-.nav-login,
-.nav-logout {
-  padding: 0.625rem 1.25rem;
-  background-color: rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-md);
-  font-weight: 600;
-  transition: all var(--transition-fast);
-  min-height: var(--touch-target);
-  display: flex;
-  align-items: center;
-}
-
-.nav-login:hover,
-.nav-logout:hover {
-  background-color: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
-}
-
-/* Dropdown */
-.dropdown-locale ::v-deep(.btn) {
-  background-color: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: white;
-  padding: 0.5rem 1rem;
-  font-weight: 500;
-  border-radius: var(--radius-md);
-}
-
-.dropdown-locale ::v-deep(.btn:hover) {
-  background-color: rgba(255, 255, 255, 0.25);
-}
-
-.dropdown-locale ::v-deep(.dropdown-menu) {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  padding: var(--spacing-xs);
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.dropdown-locale ::v-deep(.dropdown-item) {
-  padding: 0.625rem 1rem;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.dropdown-locale ::v-deep(.dropdown-item:hover),
-.dropdown-locale ::v-deep(.dropdown-item.active) {
-  background-color: var(--color-primary-light);
-}
-
-.locale-flag {
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
   font-size: 1.125rem;
+  color: var(--color-text);
 }
 
-/* Mobile Adjustments */
+.action-icon-btn:hover {
+  background-color: var(--color-bg);
+}
+
+.logout-btn:hover {
+  background-color: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.locale-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  background: transparent;
+  font-size: 1.25rem;
+  transition: all 0.2s;
+}
+
+.locale-btn:hover {
+  background-color: var(--color-bg);
+}
+
+:deep(.dropdown-toggle) {
+  padding: 0;
+  border: none;
+  background: transparent !important;
+}
+
+:deep(.dropdown-toggle::after) {
+  display: none;
+}
+
+:deep(.dropdown-menu) {
+  border: none;
+  box-shadow: var(--shadow-xl);
+  border-radius: var(--radius-lg);
+  margin-top: 10px;
+  padding: 8px;
+}
+
+:deep(.dropdown-item) {
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-weight: 500;
+}
+
+:deep(.dropdown-item:active) {
+  background-color: var(--color-primary);
+}
+
+.auth-btn {
+  border-radius: var(--radius-full);
+  padding: 0.5rem 1.25rem;
+  font-weight: 600;
+}
+
+/* Update Notification */
+.update-notification {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  left: 0;
+  margin: 0 auto;
+  width: 90%;
+  max-width: 400px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  padding: 16px;
+  z-index: 2000;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.icon-circle {
+  width: 40px;
+  height: 40px;
+  background-color: var(--color-primary-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.text-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.notification-title {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.notification-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--color-text);
+}
+
+/* Transitions */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
 @media (max-width: 991px) {
-  .navbar-collapse {
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
+  .nav-content-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: var(--spacing-md);
   }
 
-  .nav-links,
-  .nav-actions {
+  .nav-links {
     flex-direction: column;
     width: 100%;
+    gap: var(--spacing-xs);
   }
 
-  .nav-links .nav-link,
-  .nav-icon-btn,
-  .nav-login,
-  .nav-logout,
-  .update-indicator {
+  .nav-actions {
+    margin-top: var(--spacing-md);
     width: 100%;
-    justify-content: center;
+    justify-content: flex-end;
   }
 }
 </style>

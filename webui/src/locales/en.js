@@ -7,6 +7,7 @@ export default {
     cancel: 'Cancel',
     close: 'Close',
     loading: 'Loading...',
+    changing: 'Changing...',
     error: 'Error',
     success: 'Success',
     yes: 'Yes',
@@ -39,9 +40,26 @@ export default {
   // Settings Page
   settings: {
     title: 'Settings',
+    tabGeneral: 'General',
+    tabNetwork: 'Network',
+    tabTime: 'Time',
+    tabBackup: 'Backup',
     changePassword: 'Change Password',
     repeatPassword: 'Repeat Password',
     hostname: 'Hostname',
+
+    // Security Settings
+    security: 'Security',
+    changePasswordHint: 'Change your administrator password for secure access',
+    otaPassword: 'OTA Password',
+    otaPasswordHint: 'Separate password required for firmware updates',
+    changePasswordBtn: 'Change Password',
+    changeOtaPassword: 'Change',
+    setOtaPassword: 'Set Password',
+    clearOtaPassword: 'Clear',
+    clearOtaPasswordConfirm: 'Are you sure you want to remove the OTA password? Firmware updates will not be possible until a new password is set.',
+    clearOtaPasswordSuccess: 'OTA password has been removed.',
+    clearOtaPasswordError: 'Failed to remove OTA password',
 
     // Network Settings
     networkSettings: 'Network Settings',
@@ -91,6 +109,8 @@ export default {
     restoreInfo: 'Upload a backup file to restore settings. The system will restart afterwards.',
     downloadBackup: 'Download Backup',
     restore: 'Restore',
+    restoreBtn: 'Restore',
+    download: 'Download',
     noFileChosen: 'No file chosen',
     browse: 'Browse',
     restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
@@ -131,7 +151,11 @@ export default {
     moduleType: 'Module Type',
     firmwareVersion: 'Firmware Version',
     bidcosMAC: 'BidCoS Radio MAC',
-    hmipMAC: 'HmIP Radio MAC'
+    hmipMAC: 'HmIP Radio MAC',
+    system: 'System',
+    network: 'Network',
+    down: 'Down',
+    mbits: 'Mbit/s'
   },
 
   // Firmware Update
@@ -214,7 +238,7 @@ export default {
   // About Page
   about: {
     title: 'About',
-    version: 'Version 2.1.0',
+    version: 'Version 2.1.2',
     fork: 'Modernized Fork',
     forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains (GCC 13.2.0) and current WebUI technologies (Vue 3, Parcel 2, Pinia).',
     original: 'Original Author',
@@ -249,6 +273,36 @@ export default {
     passwordTooShort: 'Password must be at least 6 characters long and contain letters and numbers.',
     passwordsDoNotMatch: 'Passwords do not match',
     warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
-    success: 'Password changed successfully'
+    success: 'Password changed successfully',
+    newPasswordPlaceholder: 'Enter new password',
+    confirmPasswordPlaceholder: 'Confirm new password'
+  },
+
+  // OTA Password Modal
+  otaPassword: {
+    title: 'Set OTA Password',
+    warningMessage: 'Set a separate password for firmware updates. This is required for OTA updates.',
+    otaPassword: 'OTA Password',
+    otaPasswordPlaceholder: 'Enter OTA password',
+    confirmPassword: 'Confirm Password',
+    confirmPasswordPlaceholder: 'Confirm OTA password',
+    passwordTooShort: 'Password must be at least 8 characters long',
+    passwordRequirements: 'Must contain uppercase, lowercase, and numbers',
+    passwordsDoNotMatch: 'Passwords do not match',
+    requirementsTitle: 'Password requirements:',
+    reqMinLength: 'At least 8 characters',
+    reqMixedCase: 'Uppercase and lowercase letters',
+    reqNumbers: 'At least one number',
+    strengthWeak: 'Weak',
+    strengthMedium: 'Medium',
+    strengthGood: 'Good',
+    strengthStrong: 'Strong'
+  },
+
+  // Sponsor
+  sponsor: {
+    title: 'Support this Project',
+    description: 'If you like this project and want to support its development, you can buy me a coffee or sponsor me on GitHub.',
+    thanks: 'Thank you for your support!'
   }
 }

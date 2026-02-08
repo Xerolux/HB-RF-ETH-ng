@@ -1,64 +1,66 @@
 <template>
   <div class="login-page">
-    <BCard class="login-card">
-      <template #header>
-        <div class="login-header">
-          <span class="login-icon">🔐</span>
-          <h2 class="login-title">{{ t('login.title') }}</h2>
-          <p class="login-subtitle">{{ t('login.subtitle') || 'Please enter your password to continue' }}</p>
+    <div class="login-container">
+      <div class="login-card glass-panel">
+        <div class="brand-section">
+          <div class="brand-logo">📡</div>
+          <h1 class="brand-name">HB-RF-ETH-ng</h1>
         </div>
-      </template>
 
-      <BForm @submit.stop.prevent class="login-form">
-        <BFormGroup class="form-group-custom">
-          <template #label>
-            <span class="form-label-custom">
-              <span class="label-icon">🔑</span>
-              {{ t('login.password') }}
-            </span>
-          </template>
-          <BFormInput
-            type="password"
-            v-model="password"
-            :placeholder="t('login.passwordPlaceholder') || 'Enter your password'"
-            :state="v$.password.$error ? false : null"
-            class="form-input-custom"
-            size="lg"
-            @keyup.enter="loginClick"
-          />
-          <BFormInvalidFeedback v-if="v$.password.$error">
-            {{ t('login.passwordRequired') || 'Password is required' }}
-          </BFormInvalidFeedback>
-        </BFormGroup>
+        <div class="form-section">
+          <h2 class="welcome-text">{{ t('login.title') || 'Welcome Back' }}</h2>
+          <p class="subtitle-text">{{ t('login.subtitle') || 'Please enter your password to continue' }}</p>
 
-        <BAlert
-          variant="danger"
-          :model-value="showError"
-          dismissible
-          fade
-          @update:model-value="showError = null"
-          class="login-alert"
-        >
-          <span class="alert-icon">⚠️</span>
-          {{ t('login.loginError') }}
-        </BAlert>
+          <BForm @submit.stop.prevent class="login-form">
+            <div class="input-group-modern">
+              <div class="input-icon">🔒</div>
+              <input
+                type="password"
+                v-model="password"
+                :placeholder="t('login.passwordPlaceholder') || 'Password'"
+                class="modern-input"
+                :class="{ 'has-error': v$.password.$error }"
+                @keyup.enter="loginClick"
+                autofocus
+              />
+            </div>
+            <div v-if="v$.password.$error" class="error-text">
+              {{ t('login.passwordRequired') || 'Password is required' }}
+            </div>
 
-        <BButton
-          variant="primary"
-          block
-          size="lg"
-          @click="loginClick"
-          :disabled="!password || password === '' || loading"
-          class="login-btn"
-        >
-          <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-          <span>{{ loading ? (t('login.loggingIn') || 'Logging in...') : t('login.login') }}</span>
-        </BButton>
-      </BForm>
-    </BCard>
+            <BAlert
+              v-if="showError"
+              variant="danger"
+              class="login-alert"
+              dismissible
+              @dismissed="showError = false"
+            >
+              {{ t('login.loginError') }}
+            </BAlert>
 
-    <div class="login-footer">
-      <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }}</small>
+            <BButton
+              variant="primary"
+              block
+              size="lg"
+              @click="loginClick"
+              :disabled="!password || loading"
+              class="login-btn"
+            >
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              <span>{{ loading ? (t('login.loggingIn') || 'Logging in...') : t('login.login') }}</span>
+            </BButton>
+          </BForm>
+        </div>
+      </div>
+
+      <div class="login-footer">
+        <small class="version-text">v{{ sysInfoStore.currentVersion || '...' }}</small>
+        <div class="links">
+          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank">GitHub</a>
+          <span class="separator">•</span>
+          <a href="https://github.com/alexreinert/HB-RF-ETH" target="_blank">Original Project</a>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -79,7 +81,7 @@ const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
 
 const password = ref('')
-const showError = ref(null)
+const showError = ref(false)
 const loading = ref(false)
 
 const rules = {
@@ -93,8 +95,14 @@ onMounted(() => {
 })
 
 const loginClick = async () => {
-  showError.value = null
+  v$.value.$touch()
+  if (v$.value.$error) return
+
+  showError.value = false
   loading.value = true
+
+  // Simulate network delay for smoother UX
+  await new Promise(resolve => setTimeout(resolve, 500))
 
   const success = await loginStore.tryLogin(password.value)
   loading.value = false
@@ -102,141 +110,196 @@ const loginClick = async () => {
   if (success) {
     router.push(route.query.redirect || '/')
   } else {
-    showError.value = 10
+    showError.value = true
     password.value = ''
+    v$.value.$reset()
   }
 }
 </script>
 
 <style scoped>
 .login-page {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: var(--spacing-md);
 }
 
-.login-card {
+.login-container {
   width: 100%;
-  max-width: 420px;
-  border: none;
-  box-shadow: var(--shadow-xl);
-  overflow: visible;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
 }
 
-.login-card :deep(.card-header) {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-  border-bottom: none;
-  padding: var(--spacing-xl) var(--spacing-lg);
+.glass-panel {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.brand-section {
   text-align: center;
+  margin-bottom: 30px;
 }
 
-.login-header {
-  color: white;
-}
-
-.login-icon {
+.brand-logo {
   font-size: 3rem;
-  display: block;
-  margin-bottom: var(--spacing-md);
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
+  margin-bottom: 10px;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
 }
 
-.login-title {
+.brand-name {
   font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 var(--spacing-sm) 0;
-}
-
-.login-subtitle {
-  font-size: 0.9375rem;
-  opacity: 0.9;
+  font-weight: 800;
+  color: var(--color-text);
   margin: 0;
+  letter-spacing: -0.03em;
 }
 
-.login-card :deep(.card-body) {
-  padding: var(--spacing-xl) var(--spacing-lg);
+.welcome-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--color-text);
+}
+
+.subtitle-text {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 24px;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 16px;
 }
 
-.form-group-custom {
-  margin-bottom: var(--spacing-lg);
-}
-
-.form-label-custom {
+.input-group-modern {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-sm);
 }
 
-.label-icon {
-  font-size: 1.125rem;
+.input-icon {
+  position: absolute;
+  left: 16px;
+  font-size: 1.25rem;
+  z-index: 2;
+  pointer-events: none;
 }
 
-.form-input-custom {
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0.875rem 1rem;
+.modern-input {
+  width: 100%;
+  padding: 14px 16px 14px 48px;
+  border: 2px solid transparent;
+  background: var(--color-bg);
+  border-radius: 16px;
   font-size: 1rem;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
+  color: var(--color-text);
 }
 
-.form-input-custom:focus {
+.modern-input:focus {
+  background: white;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+  outline: none;
+}
+
+.modern-input.has-error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-light);
+}
+
+.error-text {
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+  margin-top: -8px;
+  margin-left: 12px;
 }
 
 .login-alert {
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.alert-icon {
-  font-size: 1.25rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
 }
 
 .login-btn {
-  height: var(--touch-target-lg);
+  padding: 14px;
+  border-radius: 16px;
   font-weight: 600;
-  letter-spacing: 0.025em;
-  margin-top: var(--spacing-sm);
+  font-size: 1.0625rem;
+  margin-top: 8px;
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+  transition: all 0.2s;
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+}
+
+.login-btn:active {
+  transform: translateY(0);
 }
 
 .login-footer {
-  margin-top: var(--spacing-xl);
   text-align: center;
+  color: var(--color-text-secondary);
 }
 
-/* Mobile adjustments */
-@media (max-width: 480px) {
+.version-text {
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.7;
+}
+
+.links {
+  font-size: 0.875rem;
+}
+
+.links a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.links a:hover {
+  color: var(--color-primary);
+}
+
+.separator {
+  margin: 0 8px;
+  opacity: 0.5;
+}
+
+/* Dark Mode Overrides */
+@media (prefers-color-scheme: dark) {
   .login-page {
-    padding: var(--spacing-sm);
+    background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
   }
 
-  .login-card :deep(.card-header),
-  .login-card :deep(.card-body) {
-    padding: var(--spacing-lg) var(--spacing-md);
+  .glass-panel {
+    background: rgba(30, 30, 30, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
-  .login-icon {
-    font-size: 2.5rem;
+  .modern-input {
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
   }
 
-  .login-title {
-    font-size: 1.25rem;
+  .modern-input:focus {
+    background: rgba(0, 0, 0, 0.5);
   }
 }
 </style>
