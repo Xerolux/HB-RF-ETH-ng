@@ -758,14 +758,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // Validate OTA password
-    if (validate_ota_password(req, NULL) != ESP_OK)
-    {
-        httpd_resp_set_status(req, "403 Forbidden");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA password required or invalid\"}");
-        return ESP_OK;
-    }
+    // OTA password validation removed - authentication is sufficient
 
     esp_ota_handle_t ota_handle;
 
@@ -953,7 +946,6 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     }
 
     char *url_json = cJSON_GetStringValue(cJSON_GetObjectItem(root, "url"));
-    char *otaPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "otaPassword"));
 
     // Copy URL before freeing JSON to avoid use-after-free
     char url_buf[256] = {0};
@@ -961,14 +953,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         strncpy(url_buf, url_json, sizeof(url_buf) - 1);
     }
 
-    // Validate OTA password BEFORE deleting the JSON
-    if (validate_ota_password(req, otaPassword) != ESP_OK)
-    {
-        cJSON_Delete(root);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA password required or invalid\"}");
-        return ESP_OK;
-    }
+    // OTA password validation removed - authentication is sufficient
 
     cJSON_Delete(root);
 

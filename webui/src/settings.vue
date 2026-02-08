@@ -33,21 +33,6 @@
                   {{ t('settings.changePasswordBtn') || 'Change Password' }}
                 </BButton>
               </div>
-              <hr />
-              <div class="security-item">
-                <div class="security-info">
-                  <h4>{{ t('settings.otaPassword') || 'OTA Password' }}</h4>
-                  <p>{{ t('settings.otaPasswordHint') || 'Separate password required for firmware updates' }}</p>
-                </div>
-                <div class="security-actions">
-                  <BButton variant="secondary" @click="showOtaPasswordModal = true">
-                    {{ otaPasswordSet ? (t('settings.changeOtaPassword') || 'Change') : (t('settings.setOtaPassword') || 'Set Password') }}
-                  </BButton>
-                  <BButton v-if="otaPasswordSet" variant="danger" size="sm" @click="clearOtaPassword" class="ms-2">
-                    {{ t('settings.clearOtaPassword') || 'Clear' }}
-                  </BButton>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -364,9 +349,6 @@
 
     <!-- Password Change Modal -->
     <PasswordChangeModal v-model="showPasswordModal" :force-redirect="false" />
-
-    <!-- OTA Password Modal -->
-    <OtaPasswordModal v-model="showOtaPasswordModal" @success="onOtaPasswordSet" />
   </div>
 </template>
 
@@ -387,7 +369,6 @@ import {
 } from '@vuelidate/validators'
 import { useSettingsStore, useLoginStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
-import OtaPasswordModal from './components/OtaPasswordModal.vue'
 
 import { useRoute, useRouter } from 'vue-router'
 
@@ -399,8 +380,6 @@ const router = useRouter()
 
 // Password modal
 const showPasswordModal = ref(false)
-const showOtaPasswordModal = ref(false)
-const otaPasswordSet = ref(false)
 
 // Tab management
 const activeTab = ref(route.query.tab || 'general')
@@ -578,37 +557,7 @@ watch(() => settingsStore.$state, () => {
 onMounted(async () => {
   await settingsStore.load()
   loadSettings()
-  // Check if OTA password is set
-  checkOtaPasswordSet()
 })
-
-const checkOtaPasswordSet = async () => {
-  try {
-    const response = await axios.get('/api/ota-password-status')
-    otaPasswordSet.value = response.data.isSet
-  } catch (e) {
-    // Assume not set on error
-    otaPasswordSet.value = false
-  }
-}
-
-const onOtaPasswordSet = () => {
-  otaPasswordSet.value = true
-}
-
-const clearOtaPassword = async () => {
-  if (!confirm(t('settings.clearOtaPasswordConfirm') || 'Are you sure you want to remove the OTA password? Firmware updates will not be possible until a new password is set.')) {
-    return
-  }
-
-  try {
-    await axios.post('/api/clear-ota-password')
-    otaPasswordSet.value = false
-    alert(t('settings.clearOtaPasswordSuccess') || 'OTA password has been removed.')
-  } catch (error) {
-    alert(t('settings.clearOtaPasswordError') || 'Failed to remove OTA password: ' + (error.response?.data?.error || error.message))
-  }
-}
 
 const handleFileSelect = (event) => {
   restoreFile.value = event.target.files[0]

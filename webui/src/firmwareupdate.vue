@@ -30,20 +30,6 @@
       </div>
     </div>
 
-    <!-- OTA Password Warning Banner -->
-    <Transition name="slide-down">
-      <div v-if="!otaPasswordSet && otaPasswordChecked" class="alert-banner warning">
-        <div class="banner-icon">⚠️</div>
-        <div class="banner-content">
-          <strong>{{ t('firmware.otaPasswordNotSet') || 'OTA Password Not Set' }}</strong>
-          <p>{{ t('firmware.otaPasswordNotSetText') || 'You must set an OTA password before firmware updates can be performed.' }}</p>
-        </div>
-        <BButton variant="light" size="sm" @click="goToSettings" class="banner-action">
-          {{ t('firmware.goToSettings') || 'Go to Settings' }}
-        </BButton>
-      </div>
-    </Transition>
-
     <!-- Update Available Banner -->
     <Transition name="slide-down">
       <div v-if="showUpdateBanner" class="alert-banner info">
@@ -204,29 +190,6 @@
       </div>
     </BModal>
 
-    <!-- OTA Password Prompt -->
-    <BModal v-model="showOtaPasswordPrompt" centered hide-header hide-footer content-class="password-modal-content">
-      <div class="password-modal-body">
-        <div class="lock-icon">🔒</div>
-        <h3>{{ t('firmware.otaPasswordRequired') || 'Password Required' }}</h3>
-        <p>{{ t('firmware.otaPasswordPromptText') || 'Please enter OTA password to continue.' }}</p>
-
-        <form @submit.prevent="confirmOtaPassword">
-          <input
-            type="password"
-            v-model="otaPassword"
-            class="password-input"
-            :placeholder="t('firmware.enterOtaPassword')"
-            autofocus
-          >
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="cancelOtaPassword">{{ t('common.cancel') }}</button>
-            <button type="submit" class="btn-confirm" :disabled="!otaPassword">{{ t('common.confirm') }}</button>
-          </div>
-        </form>
-      </div>
-    </BModal>
-
   </div>
 </template>
 
@@ -250,11 +213,6 @@ const otaUrl = ref('')
 const otaUpdating = ref(false)
 const otaProgress = ref(0)
 const otaSection = ref(null)
-const otaPassword = ref('')
-const showOtaPasswordPrompt = ref(false)
-const pendingAction = ref(null)
-const otaPasswordSet = ref(false)
-const otaPasswordChecked = ref(false)
 const showCountdown = ref(false)
 const countdown = ref(30)
 const showStatusModal = ref(false)
@@ -300,11 +258,6 @@ const clearFile = () => {
 
 const uploadFirmware = async () => {
   if (!file.value) return
-  if (!otaPassword.value) {
-    pendingAction.value = 'upload'
-    showOtaPasswordPrompt.value = true
-    return
-  }
   executeUpload()
 }
 
@@ -318,7 +271,7 @@ const executeUpload = async () => {
         if (p.lengthComputable) uploadProgress.value = Math.round((p.loaded / p.total) * 100)
       }
     }
-    await firmwareUpdateStore.update(file.value, { ...config, otaPassword: otaPassword.value })
+    await firmwareUpdateStore.update(file.value, config)
     startCountdown()
   } catch (error) {
     showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')
@@ -330,11 +283,6 @@ const executeUpload = async () => {
 
 const startOtaUpdate = async () => {
   if (!otaUrl.value) return
-  if (!otaPassword.value) {
-    pendingAction.value = 'url'
-    showOtaPasswordPrompt.value = true
-    return
-  }
   executeOtaUpdate()
 }
 
@@ -350,7 +298,7 @@ const executeOtaUpdate = async () => {
       if (otaProgress.value < 90) otaProgress.value += 5
     }, 200)
 
-    const response = await axios.post('/api/ota_url', { url: otaUrl.value, otaPassword: otaPassword.value })
+    const response = await axios.post('/api/ota_url', { url: otaUrl.value })
 
     clearInterval(progressInterval)
     otaProgress.value = 100
@@ -388,18 +336,6 @@ const startCountdown = () => {
   }, 1000)
 }
 
-const confirmOtaPassword = () => {
-  showOtaPasswordPrompt.value = false
-  if (pendingAction.value === 'upload') executeUpload()
-  else if (pendingAction.value === 'url') executeOtaUpdate()
-  pendingAction.value = null
-}
-
-const cancelOtaPassword = () => {
-  showOtaPasswordPrompt.value = false
-  pendingAction.value = null
-}
-
 const restartClick = async () => {
   try {
     await axios.post('/api/restart')
@@ -427,17 +363,10 @@ const setGithubUrl = () => {
   }
 }
 
-const goToSettings = () => window.location.href = '#/settings'
 const scrollToOta = () => otaSection.value?.scrollIntoView({ behavior: 'smooth' })
 
 onMounted(() => {
   sysInfoStore.update()
-  axios.get('/api/ota-password-status').then(res => {
-    otaPasswordSet.value = res.data.isSet
-    otaPasswordChecked.value = true
-  }).catch(() => {
-    otaPasswordChecked.value = true
-  })
 })
 </script>
 
@@ -807,50 +736,6 @@ onMounted(() => {
 .status-modal-body.info { border-top: 6px solid var(--color-info); }
 
 .status-icon-large { font-size: 4rem; margin-bottom: var(--spacing-md); }
-
-:deep(.password-modal-content) {
-  border-radius: var(--radius-xl);
-  border: none;
-}
-
-.password-modal-body {
-  padding: var(--spacing-xl);
-  text-align: center;
-}
-
-.lock-icon { font-size: 3rem; margin-bottom: var(--spacing-md); }
-
-.password-input {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--spacing-lg);
-  font-size: 1.125rem;
-  text-align: center;
-}
-
-.password-input:focus {
-  border-color: var(--color-primary);
-  outline: none;
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--spacing-md);
-}
-
-.modal-actions button {
-  flex: 1;
-  padding: 12px;
-  border-radius: var(--radius-lg);
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-cancel { background: var(--color-bg); color: var(--color-text); }
-.btn-confirm { background: var(--color-primary); color: white; }
 
 @media (max-width: 640px) {
   .page-header { flex-direction: column; text-align: center; }
