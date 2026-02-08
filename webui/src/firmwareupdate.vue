@@ -1,249 +1,232 @@
 <template>
   <div class="firmware-page">
     <!-- Countdown Overlay -->
-    <Transition name="countdown">
+    <Transition name="fade">
       <div v-if="showCountdown" class="countdown-overlay">
-        <div class="countdown-content">
-          <div class="countdown-icon">🔄</div>
+        <div class="countdown-card">
+          <div class="spinner-container">
+            <div class="spinner-ring"></div>
+            <div class="spinner-icon">🔄</div>
+          </div>
           <h2 class="countdown-title">{{ t('firmware.restarting') || 'Restarting...' }}</h2>
-          <div class="countdown-timer">{{ countdown }}s</div>
+          <div class="countdown-value">{{ countdown }}</div>
           <p class="countdown-text">{{ t('firmware.restartingText') || 'Device is restarting. Page will reload automatically.' }}</p>
-          <div class="countdown-progress">
-            <div class="countdown-bar" :style="{ width: ((30 - countdown) / 30 * 100) + '%' }"></div>
+          <div class="progress-track">
+            <div class="progress-fill" :style="{ width: ((30 - countdown) / 30 * 100) + '%' }"></div>
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- Header Section -->
-    <div class="firmware-header">
-      <span class="header-icon">📦</span>
-      <div class="header-content">
-        <h1 class="header-title">{{ t('firmware.title') || 'Firmware Update' }}</h1>
-        <p class="header-subtitle">{{ t('firmware.subtitle') || 'Update your device firmware' }}</p>
+    <div class="page-header">
+      <div class="icon-wrapper">📦</div>
+      <div class="text-wrapper">
+        <h1>{{ t('firmware.title') || 'Firmware Update' }}</h1>
+        <p>{{ t('firmware.subtitle') || 'Update your device firmware' }}</p>
       </div>
       <div class="version-badge">
-        <span class="version-label">{{ t('firmware.version') || 'Version' }}</span>
-        <span class="version-number">{{ sysInfoStore.currentVersion }}</span>
+        <span class="label">{{ t('firmware.version') || 'Current' }}</span>
+        <span class="value">{{ sysInfoStore.currentVersion }}</span>
       </div>
     </div>
 
     <!-- OTA Password Warning Banner -->
-    <Transition name="banner">
-      <div v-if="!otaPasswordSet && otaPasswordChecked" class="warning-banner">
-        <span class="warning-banner-icon">⚠️</span>
-        <div class="warning-banner-content">
+    <Transition name="slide-down">
+      <div v-if="!otaPasswordSet && otaPasswordChecked" class="alert-banner warning">
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-content">
           <strong>{{ t('firmware.otaPasswordNotSet') || 'OTA Password Not Set' }}</strong>
-          {{ t('firmware.otaPasswordNotSetText') || 'You must set an OTA password before firmware updates can be performed.' }}
+          <p>{{ t('firmware.otaPasswordNotSetText') || 'You must set an OTA password before firmware updates can be performed.' }}</p>
         </div>
-        <BButton variant="light" size="sm" @click="goToSettings">
+        <BButton variant="light" size="sm" @click="goToSettings" class="banner-action">
           {{ t('firmware.goToSettings') || 'Go to Settings' }}
         </BButton>
       </div>
     </Transition>
 
     <!-- Update Available Banner -->
-    <Transition name="banner">
-      <div v-if="showUpdateBanner" class="update-banner">
-        <span class="update-banner-icon">🎉</span>
-        <div class="update-banner-content">
+    <Transition name="slide-down">
+      <div v-if="showUpdateBanner" class="alert-banner info">
+        <div class="banner-icon">🎉</div>
+        <div class="banner-content">
           <strong>{{ t('firmware.updateAvailable') || 'Update Available' }}</strong>
-          {{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) || `New version ${sysInfoStore.latestVersion} is available!` }}
+          <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) || `New version ${sysInfoStore.latestVersion} is available!` }}</p>
         </div>
-        <BButton variant="light" size="sm" @click="scrollToOta">
+        <BButton variant="light" size="sm" @click="scrollToOta" class="banner-action">
           {{ t('firmware.viewUpdate') || 'View' }}
         </BButton>
       </div>
     </Transition>
 
-    <!-- Update Methods Grid -->
-    <div class="methods-grid">
+    <div class="content-grid">
       <!-- File Upload Card -->
-      <div class="method-card upload-card">
+      <div class="update-card">
         <div class="card-header">
-          <span class="card-icon">📤</span>
-          <div>
-            <h3 class="card-title">{{ t('firmware.fileUpload') || 'File Upload' }}</h3>
-            <p class="card-description">{{ t('firmware.fileUploadHint') || 'Upload a .bin firmware file from your computer' }}</p>
+          <div class="header-icon bg-primary-light text-primary">📤</div>
+          <div class="header-text">
+            <h3>{{ t('firmware.fileUpload') || 'File Upload' }}</h3>
+            <p>{{ t('firmware.fileUploadHint') || 'Upload a .bin firmware file' }}</p>
           </div>
         </div>
 
-        <div class="upload-area" :class="{ 'has-file': file }">
-          <input
-            type="file"
-            ref="fileInput"
-            accept=".bin"
-            @change="handleFileSelect"
-            class="file-input"
-          />
-          <div v-if="!file" class="upload-placeholder" @click="$refs.fileInput.click()">
-            <span class="upload-icon">📁</span>
-            <span>{{ t('firmware.selectFile') || 'Select .bin file' }}</span>
-          </div>
-          <div v-else class="file-info">
-            <span class="file-name">{{ file.name }}</span>
-            <BButton size="sm" variant="outline-danger" @click="clearFile">
-              ✕
-            </BButton>
-          </div>
-        </div>
+        <div class="card-body">
+          <div
+            class="upload-zone"
+            :class="{ 'has-file': file, 'dragging': isDragging }"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="handleDrop"
+            @click="$refs.fileInput.click()"
+          >
+            <input
+              type="file"
+              ref="fileInput"
+              accept=".bin"
+              @change="handleFileSelect"
+              class="hidden-input"
+            />
 
-        <BButton
-          variant="primary"
-          size="lg"
-          block
-          :disabled="!file || uploading"
-          @click="uploadFirmware"
-          class="upload-btn"
-        >
-          <span v-if="uploading" class="spinner-border spinner-border-sm me-2"></span>
-          <span>{{ uploading ? (t('firmware.uploading') || 'Uploading...' ) : (t('firmware.upload') || 'Upload Firmware') }}</span>
-        </BButton>
+            <template v-if="!file">
+              <div class="upload-icon">☁️</div>
+              <span class="upload-text">{{ t('firmware.selectFile') || 'Select or drop .bin file' }}</span>
+            </template>
 
-        <!-- Upload Progress -->
-        <div v-if="uploadProgress > 0" class="upload-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: uploadProgress + '%' }"></div>
+            <template v-else>
+              <div class="file-preview">
+                <div class="file-icon">📄</div>
+                <div class="file-details">
+                  <span class="file-name">{{ file.name }}</span>
+                  <span class="file-size">{{ formatSize(file.size) }}</span>
+                </div>
+                <button @click.stop="clearFile" class="remove-file-btn">✕</button>
+              </div>
+            </template>
           </div>
-          <span class="progress-text">{{ uploadProgress }}%</span>
-        </div>
-      </div>
 
-      <!-- Network URL Card -->
-      <div class="method-card url-card" ref="otaSection">
-        <div class="card-header">
-          <span class="card-icon">🌐</span>
-          <div>
-            <h3 class="card-title">{{ t('firmware.networkUpdate') || 'Network Update' }}</h3>
-            <p class="card-description">{{ t('firmware.networkUpdateHint') || 'Download firmware from a URL' }}</p>
+          <div v-if="uploadProgress > 0" class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-value" :style="{ width: uploadProgress + '%' }"></div>
+            </div>
+            <span class="progress-label">{{ uploadProgress }}%</span>
           </div>
-        </div>
 
-        <BFormGroup>
-          <BFormInput
-            v-model="otaUrl"
-            :placeholder="t('firmware.urlPlaceholder') || 'https://example.com/firmware.bin'"
-            :disabled="otaUpdating"
+          <BButton
+            variant="primary"
             size="lg"
-            class="url-input"
-          />
-          <BFormText>
-            {{ t('firmware.urlHint') || 'Enter the URL to the firmware .bin file' }}
-          </BFormText>
-        </BFormGroup>
-
-        <div class="quick-urls" v-if="sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a'">
-          <small class="quick-url-label">{{ t('firmware.quickUrl') || 'Quick URL:' }}</small>
-          <BButton size="sm" variant="outline-primary" @click="setGithubUrl">
-            GitHub v{{ sysInfoStore.latestVersion }}
+            block
+            :disabled="!file || uploading"
+            @click="uploadFirmware"
+            class="action-btn"
+          >
+            <span v-if="uploading" class="spinner-border spinner-border-sm me-2"></span>
+            {{ uploading ? (t('firmware.uploading') || 'Uploading...') : (t('firmware.upload') || 'Install Firmware') }}
           </BButton>
         </div>
+      </div>
 
-        <BButton
-          variant="success"
-          size="lg"
-          block
-          :disabled="!otaUrl || otaUpdating"
-          @click="startOtaUpdate"
-          class="ota-btn"
-        >
-          <span v-if="otaUpdating" class="spinner-border spinner-border-sm me-2"></span>
-          <span>{{ otaUpdating ? (t('firmware.downloading') || 'Downloading...' ) : (t('firmware.downloadInstall') || 'Download & Install') }}</span>
-        </BButton>
-
-        <!-- Download Progress -->
-        <div v-if="otaProgress > 0" class="upload-progress">
-          <div class="progress-bar">
-            <div class="progress-fill ota-progress" :style="{ width: otaProgress + '%' }"></div>
+      <!-- Network Update Card -->
+      <div class="update-card" ref="otaSection">
+        <div class="card-header">
+          <div class="header-icon bg-success-light text-success">🌐</div>
+          <div class="header-text">
+            <h3>{{ t('firmware.networkUpdate') || 'Network Update' }}</h3>
+            <p>{{ t('firmware.networkUpdateHint') || 'Download from URL' }}</p>
           </div>
-          <span class="progress-text">{{ otaProgress }}%</span>
+        </div>
+
+        <div class="card-body">
+          <div class="url-input-group">
+            <BFormInput
+              v-model="otaUrl"
+              :placeholder="t('firmware.urlPlaceholder') || 'https://example.com/firmware.bin'"
+              :disabled="otaUpdating"
+              class="modern-input"
+            />
+          </div>
+
+          <div class="quick-actions" v-if="sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a'">
+            <button class="chip-btn" @click="setGithubUrl">
+              <span class="chip-icon">🐙</span>
+              GitHub v{{ sysInfoStore.latestVersion }}
+            </button>
+          </div>
+
+          <div v-if="otaProgress > 0" class="progress-container">
+            <div class="progress-bar">
+              <div class="progress-value success" :style="{ width: otaProgress + '%' }"></div>
+            </div>
+            <span class="progress-label">{{ otaProgress }}%</span>
+          </div>
+
+          <BButton
+            variant="success"
+            size="lg"
+            block
+            :disabled="!otaUrl || otaUpdating"
+            @click="startOtaUpdate"
+            class="action-btn"
+          >
+            <span v-if="otaUpdating" class="spinner-border spinner-border-sm me-2"></span>
+            {{ otaUpdating ? (t('firmware.downloading') || 'Downloading...') : (t('firmware.downloadInstall') || 'Download & Install') }}
+          </BButton>
         </div>
       </div>
     </div>
 
-    <!-- Actions Grid -->
-    <div class="actions-grid">
-      <!-- Restart Action -->
-      <div class="action-card">
-        <div class="action-icon restart-icon">🔄</div>
-        <div class="action-content">
-          <h4>{{ t('firmware.restart') || 'Restart Device' }}</h4>
-          <p>{{ t('firmware.restartHint') || 'Restart the device without changing settings' }}</p>
+    <!-- System Actions -->
+    <div class="system-actions">
+      <div class="action-tile warning" @click="restartClick">
+        <div class="tile-icon">🔄</div>
+        <div class="tile-text">
+          <h4>{{ t('firmware.restart') || 'Restart' }}</h4>
+          <p>{{ t('firmware.restartHint') || 'Reboot device' }}</p>
         </div>
-        <BButton variant="warning" size="lg" @click="restartClick">
-          {{ t('firmware.restart') || 'Restart' }}
-        </BButton>
       </div>
 
-      <!-- Factory Reset Action -->
-      <div class="action-card">
-        <div class="action-icon reset-icon">🔧</div>
-        <div class="action-content">
-          <h4>{{ t('firmware.factoryReset') || 'Factory Reset' }}</h4>
-          <p>{{ t('firmware.factoryResetHint') || 'Reset all settings to factory defaults' }}</p>
-        </div>
-        <BButton variant="danger" size="lg" @click="factoryResetClick">
-          {{ t('firmware.factoryReset') || 'Factory Reset' }}
-        </BButton>
-      </div>
-    </div>
-
-    <!-- Info Section -->
-    <div class="info-section">
-      <div class="info-card">
-        <div class="info-icon">📖</div>
-        <div class="info-content">
-          <h4>{{ t('firmware.infoTitle') || 'About Firmware Updates' }}</h4>
-          <p>{{ t('firmware.infoText') || 'Firmware can be updated via file upload or downloaded directly from a URL. The device will restart automatically after the update.' }}</p>
-          <p class="info-link">
-            <a href="https://github.com/Xerolux/HB-RF-ETH-ng/releases" target="_blank">
-              <span>🔗</span>
-              {{ t('firmware.viewReleases') || 'View Releases on GitHub' }}
-            </a>
-          </p>
+      <div class="action-tile danger" @click="factoryResetClick">
+        <div class="tile-icon">🔧</div>
+        <div class="tile-text">
+          <h4>{{ t('firmware.factoryReset') || 'Reset' }}</h4>
+          <p>{{ t('firmware.factoryResetHint') || 'Factory defaults' }}</p>
         </div>
       </div>
     </div>
 
     <!-- Status Modal -->
-    <BModal v-model="showStatusModal" :title="statusTitle" :header-class="statusHeaderClass" centered hide-footer hide-header-close>
-      <div class="status-modal">
-        <div class="status-icon">{{ statusIcon }}</div>
+    <BModal v-model="showStatusModal" centered hide-footer hide-header no-close-on-backdrop no-close-on-esc content-class="status-modal-content">
+      <div class="status-modal-body" :class="statusType">
+        <div class="status-icon-large">{{ statusIcon }}</div>
         <h3>{{ statusTitle }}</h3>
         <p>{{ statusMessage }}</p>
-        <BButton v-if="statusCountdown > 0" variant="primary" disabled class="status-countdown">
-          {{ statusCountdown }}s
+        <BButton v-if="!statusPersistent" @click="showStatusModal = false" variant="secondary" class="mt-3">
+          {{ t('common.close') || 'Close' }}
         </BButton>
       </div>
     </BModal>
 
-    <!-- OTA Password Prompt Modal -->
-    <BModal v-model="showOtaPasswordPrompt" :title="t('firmware.otaPasswordRequired') || 'OTA Password Required'" centered hide-header-close>
-      <div class="ota-prompt-modal">
-        <div class="ota-prompt-icon">🔒</div>
-        <p>{{ t('firmware.otaPasswordPromptText') || 'Please enter your OTA password to continue with the firmware update.' }}</p>
-        <BForm @submit.stop.prevent="confirmOtaPassword">
-          <BFormGroup :label="t('firmware.otaPassword') || 'OTA Password'">
-            <BFormInput
-              type="password"
-              v-model="otaPassword"
-              :placeholder="t('firmware.enterOtaPassword') || 'Enter OTA password'"
-              size="lg"
-              autofocus
-              @keyup.enter="confirmOtaPassword"
-            />
-          </BFormGroup>
-          <div class="ota-prompt-actions">
-            <BButton variant="secondary" @click="cancelOtaPassword">
-              {{ t('common.cancel') || 'Cancel' }}
-            </BButton>
-            <BButton variant="primary" @click="confirmOtaPassword" :disabled="!otaPassword">
-              {{ t('common.confirm') || 'Confirm' }}
-            </BButton>
+    <!-- OTA Password Prompt -->
+    <BModal v-model="showOtaPasswordPrompt" centered hide-header hide-footer content-class="password-modal-content">
+      <div class="password-modal-body">
+        <div class="lock-icon">🔒</div>
+        <h3>{{ t('firmware.otaPasswordRequired') || 'Password Required' }}</h3>
+        <p>{{ t('firmware.otaPasswordPromptText') || 'Please enter OTA password to continue.' }}</p>
+
+        <form @submit.prevent="confirmOtaPassword">
+          <input
+            type="password"
+            v-model="otaPassword"
+            class="password-input"
+            :placeholder="t('firmware.enterOtaPassword')"
+            autofocus
+          >
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" @click="cancelOtaPassword">{{ t('common.cancel') }}</button>
+            <button type="submit" class="btn-confirm" :disabled="!otaPassword">{{ t('common.confirm') }}</button>
           </div>
-        </BForm>
+        </form>
       </div>
     </BModal>
+
   </div>
 </template>
 
@@ -254,45 +237,32 @@ import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
 import axios from 'axios'
 
 const { t } = useI18n()
-
 const sysInfoStore = useSysInfoStore()
 const firmwareUpdateStore = useFirmwareUpdateStore()
 
-// File upload
+// State
 const file = ref(null)
 const fileInput = ref(null)
+const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
-
-// OTA URL update
 const otaUrl = ref('')
 const otaUpdating = ref(false)
 const otaProgress = ref(0)
 const otaSection = ref(null)
-
-// OTA Password prompt
 const otaPassword = ref('')
 const showOtaPasswordPrompt = ref(false)
-const pendingAction = ref(null) // 'upload' or 'url'
+const pendingAction = ref(null)
 const otaPasswordSet = ref(false)
 const otaPasswordChecked = ref(false)
-
-// NOTE: Password is NOT persisted to localStorage for security reasons.
-// Users must re-enter the OTA password for each firmware update session.
-// This is a security best practice to prevent password theft via XSS.
-
-// Countdown
 const showCountdown = ref(false)
 const countdown = ref(30)
-const countdownTimer = ref(null)
-
-// Status modal
 const showStatusModal = ref(false)
 const statusTitle = ref('')
 const statusMessage = ref('')
 const statusIcon = ref('')
-const statusHeaderClass = ref('')
-const statusCountdown = ref(0)
+const statusType = ref('info') // info, success, error, warning
+const statusPersistent = ref(false)
 
 const showUpdateBanner = computed(() => {
   const current = sysInfoStore.currentVersion
@@ -300,7 +270,14 @@ const showUpdateBanner = computed(() => {
   return current && latest && latest !== 'n/a' && latest !== current
 })
 
-// File handling
+const formatSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 const handleFileSelect = (event) => {
   const selectedFile = event.target.files[0]
   if (selectedFile && selectedFile.name.endsWith('.bin')) {
@@ -308,60 +285,113 @@ const handleFileSelect = (event) => {
   }
 }
 
-const clearFile = () => {
-  file.value = null
-  if (fileInput.value) {
-    fileInput.value.value = ''
+const handleDrop = (event) => {
+  isDragging.value = false
+  const selectedFile = event.dataTransfer.files[0]
+  if (selectedFile && selectedFile.name.endsWith('.bin')) {
+    file.value = selectedFile
   }
 }
 
-// Upload firmware
+const clearFile = () => {
+  file.value = null
+  if (fileInput.value) fileInput.value.value = ''
+}
+
 const uploadFirmware = async () => {
   if (!file.value) return
-
-  // Check if OTA password is needed
   if (!otaPassword.value) {
     pendingAction.value = 'upload'
     showOtaPasswordPrompt.value = true
     return
   }
+  executeUpload()
+}
 
+const executeUpload = async () => {
   uploading.value = true
   uploadProgress.value = 0
 
   try {
     const config = {
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.lengthComputable) {
-          uploadProgress.value = Math.round((progressEvent.loaded / progressEvent.total) * 100)
-        }
+      onUploadProgress: (p) => {
+        if (p.lengthComputable) uploadProgress.value = Math.round((p.loaded / p.total) * 100)
       }
     }
-
     await firmwareUpdateStore.update(file.value, { ...config, otaPassword: otaPassword.value })
-
-    showStatusModal.value = false
     startCountdown()
   } catch (error) {
-    showStatusModal.value = true
-    statusTitle.value = t('firmware.uploadError') || 'Upload Failed'
-    statusMessage.value = error.response?.data?.error || error.message || t('firmware.uploadErrorText') || 'Failed to upload firmware. Please try again.'
-    statusIcon.value = '❌'
-    statusHeaderClass.value = 'modal-header-danger'
+    showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')
   } finally {
     uploading.value = false
     uploadProgress.value = 0
   }
 }
 
-// Confirm OTA password and proceed with action
+const startOtaUpdate = async () => {
+  if (!otaUrl.value) return
+  if (!otaPassword.value) {
+    pendingAction.value = 'url'
+    showOtaPasswordPrompt.value = true
+    return
+  }
+  executeOtaUpdate()
+}
+
+const executeOtaUpdate = async () => {
+  otaUpdating.value = true
+  otaProgress.value = 0
+
+  // Show non-closable status modal
+  showStatus('Downloading', t('firmware.otaProgress'), '📥', 'info', true)
+
+  try {
+    const progressInterval = setInterval(() => {
+      if (otaProgress.value < 90) otaProgress.value += 5
+    }, 200)
+
+    const response = await axios.post('/api/ota_url', { url: otaUrl.value, otaPassword: otaPassword.value })
+
+    clearInterval(progressInterval)
+    otaProgress.value = 100
+
+    if (response.data.success) {
+      showStatus('Success', t('firmware.otaSuccess'), '✓', 'success', true)
+      setTimeout(startCountdown, 1000)
+    }
+  } catch (error) {
+    showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')
+  } finally {
+    otaUpdating.value = false
+  }
+}
+
+const showStatus = (title, message, icon, type = 'info', persistent = false) => {
+  statusTitle.value = title
+  statusMessage.value = message
+  statusIcon.value = icon
+  statusType.value = type
+  statusPersistent.value = persistent
+  showStatusModal.value = true
+}
+
+const startCountdown = () => {
+  showStatusModal.value = false
+  showCountdown.value = true
+  countdown.value = 30
+  const timer = setInterval(() => {
+    countdown.value--
+    if (countdown.value <= 0) {
+      clearInterval(timer)
+      window.location.reload()
+    }
+  }, 1000)
+}
+
 const confirmOtaPassword = () => {
   showOtaPasswordPrompt.value = false
-  if (pendingAction.value === 'upload') {
-    executeUpload()
-  } else if (pendingAction.value === 'url') {
-    executeOtaUpdate()
-  }
+  if (pendingAction.value === 'upload') executeUpload()
+  else if (pendingAction.value === 'url') executeOtaUpdate()
   pendingAction.value = null
 }
 
@@ -370,38 +400,26 @@ const cancelOtaPassword = () => {
   pendingAction.value = null
 }
 
-const executeUpload = async () => {
-  if (!file.value) return
-
-  uploading.value = true
-  uploadProgress.value = 0
-
+const restartClick = async () => {
   try {
-    const config = {
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.lengthComputable) {
-          uploadProgress.value = Math.round((progressEvent.loaded / progressEvent.total) * 100)
-        }
-      }
-    }
-
-    await firmwareUpdateStore.update(file.value, { ...config, otaPassword: otaPassword.value })
-
-    showStatusModal.value = false
+    await axios.post('/api/restart')
     startCountdown()
-  } catch (error) {
-    showStatusModal.value = true
-    statusTitle.value = t('firmware.uploadError') || 'Upload Failed'
-    statusMessage.value = error.response?.data?.error || error.message || t('firmware.uploadErrorText') || 'Failed to upload firmware. Please try again.'
-    statusIcon.value = '❌'
-    statusHeaderClass.value = 'modal-header-danger'
-  } finally {
-    uploading.value = false
-    uploadProgress.value = 0
+  } catch (e) {
+    startCountdown() // Assume success if network drops
   }
 }
 
-// Set GitHub URL for quick update
+const factoryResetClick = async () => {
+  if (confirm(t('firmware.factoryResetConfirm'))) {
+    try {
+      await axios.post('/api/factory-reset')
+      startCountdown()
+    } catch (e) {
+      startCountdown()
+    }
+  }
+}
+
 const setGithubUrl = () => {
   const version = sysInfoStore.latestVersion
   if (version && version !== 'n/a') {
@@ -409,681 +427,441 @@ const setGithubUrl = () => {
   }
 }
 
-// Scroll to OTA section
-const scrollToOta = () => {
-  if (otaSection.value) {
-    otaSection.value.scrollIntoView({ behavior: 'smooth' })
-  }
-}
-
-// Check OTA password status
-const checkOtaPasswordStatus = async () => {
-  try {
-    const response = await axios.get('/api/ota-password-status')
-    otaPasswordSet.value = response.data.isSet || false
-  } catch (e) {
-    otaPasswordSet.value = false
-  } finally {
-    otaPasswordChecked.value = true
-  }
-}
-
-// Navigate to settings
-const goToSettings = () => {
-  window.location.href = '#/settings'
-}
-
-// OTA URL Update
-const startOtaUpdate = async () => {
-  if (!otaUrl.value) return
-
-  // Check if OTA password is needed
-  if (!otaPassword.value) {
-    pendingAction.value = 'url'
-    showOtaPasswordPrompt.value = true
-    return
-  }
-
-  await executeOtaUpdate()
-}
-
-const executeOtaUpdate = async () => {
-  if (!otaUrl.value) return
-
-  otaUpdating.value = true
-  otaProgress.value = 0
-
-  showStatusModal.value = true
-  statusTitle.value = t('firmware.downloading') || 'Downloading...'
-  statusMessage.value = t('firmware.otaProgress') || 'Downloading and installing firmware...'
-  statusIcon.value = '📥'
-  statusHeaderClass.value = 'modal-header-info'
-
-  try {
-    // Simulate progress (we don't get real progress from URL OTA)
-    const progressInterval = setInterval(() => {
-      if (otaProgress.value < 90) {
-        otaProgress.value += 10
-      }
-    }, 500)
-
-    const response = await axios.post('/api/ota_url', { url: otaUrl.value, otaPassword: otaPassword.value })
-
-    clearInterval(progressInterval)
-
-    if (response.data.success) {
-      otaProgress.value = 100
-      statusMessage.value = t('firmware.otaSuccess') || 'Update successful! Restarting device...'
-      setTimeout(() => startCountdown(), 1000)
-    }
-  } catch (error) {
-    showStatusModal.value = true
-    statusTitle.value = t('firmware.otaError') || 'Update Failed'
-    statusMessage.value = error.response?.data?.error || error.message || t('firmware.otaErrorText') || 'Failed to download firmware. Check the URL and try again.'
-    statusIcon.value = '❌'
-    statusHeaderClass.value = 'modal-header-danger'
-    otaUpdating.value = false
-    otaProgress.value = 0
-  }
-}
-
-// Start countdown after successful update
-const startCountdown = () => {
-  showCountdown.value = true
-  showStatusModal.value = false
-  countdown.value = 30
-
-  countdownTimer.value = setInterval(() => {
-    countdown.value--
-
-    if (countdown.value <= 0) {
-      clearInterval(countdownTimer.value)
-      window.location.reload()
-    }
-  }, 1000)
-}
-
-// Restart
-const restartClick = async () => {
-  showStatusModal.value = true
-  statusTitle.value = t('firmware.restarting') || 'Restarting...'
-  statusMessage.value = t('firmware.restartProgress') || 'Device is restarting...'
-  statusIcon.value = '🔄'
-  statusHeaderClass.value = 'modal-header-warning'
-
-  try {
-    await axios.post('/api/restart')
-    startCountdown()
-  } catch (error) {
-    startCountdown()
-  }
-}
-
-// Factory Reset
-const factoryResetClick = async () => {
-  if (!confirm(t('firmware.factoryResetConfirm') || 'This will erase all settings and restart the device. Continue?')) {
-    return
-  }
-
-  showStatusModal.value = true
-  statusTitle.value = t('firmware.resetting') || 'Resetting...'
-  statusMessage.value = t('firmware.resetProgress') || 'Device is resetting to factory settings...'
-  statusIcon.value = '🔧'
-  statusHeaderClass.value = 'modal-header-danger'
-
-  try {
-    await axios.post('/api/factory-reset')
-    startCountdown()
-  } catch (error) {
-    startCountdown()
-  }
-}
+const goToSettings = () => window.location.href = '#/settings'
+const scrollToOta = () => otaSection.value?.scrollIntoView({ behavior: 'smooth' })
 
 onMounted(() => {
   sysInfoStore.update()
-  checkOtaPasswordStatus()
+  axios.get('/api/ota-password-status').then(res => {
+    otaPasswordSet.value = res.data.isSet
+    otaPasswordChecked.value = true
+  }).catch(() => {
+    otaPasswordChecked.value = true
+  })
 })
 </script>
 
 <style scoped>
 .firmware-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
+  padding-bottom: 60px;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
-/* Countdown Overlay */
-.countdown-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
+/* Page Header */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.icon-wrapper {
+  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  backdrop-filter: blur(10px);
-}
-
-.countdown-content {
-  text-align: center;
-  color: white;
-  max-width: 400px;
-  padding: var(--spacing-xl);
-}
-
-.countdown-icon {
-  font-size: 4rem;
-  margin-bottom: var(--spacing-lg);
-  animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.countdown-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 var(--spacing-md) 0;
-}
-
-.countdown-timer {
-  font-size: 3rem;
-  font-weight: 700;
-  margin: 0 0 var(--spacing-md) 0;
-}
-
-.countdown-text {
-  opacity: 0.9;
-  margin: 0 0 var(--spacing-lg) 0;
-}
-
-.countdown-progress {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.countdown-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  transition: width 1s linear;
-}
-
-.countdown-enter-active,
-.countdown-leave-active {
-  transition: opacity 0.3s;
-}
-
-.countdown-enter-from,
-.countdown-leave-to {
-  opacity: 0;
-}
-
-/* Header */
-.firmware-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-xl) var(--spacing-lg);
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  flex-wrap: wrap;
-}
-
-.header-icon {
-  font-size: 3rem;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
-}
-
-.header-content {
-  flex: 1;
-  min-width: 200px;
-}
-
-.header-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 var(--spacing-xs) 0;
-}
-
-.header-subtitle {
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.version-badge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-md);
   background: var(--color-bg);
   border-radius: var(--radius-lg);
 }
 
-.version-label {
+.text-wrapper h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.text-wrapper p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.version-badge {
+  margin-left: auto;
+  text-align: right;
+  background: var(--color-bg);
+  padding: 8px 16px;
+  border-radius: var(--radius-lg);
+}
+
+.version-badge .label {
+  display: block;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
-.version-number {
-  font-size: 1.5rem;
+.version-badge .value {
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-primary);
 }
 
-/* Update Banner */
-.warning-banner {
+/* Banners */
+.alert-banner {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  color: white;
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.alert-banner.warning {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  border-radius: var(--radius-lg);
-  color: white;
-  box-shadow: var(--shadow-lg);
-  flex-wrap: wrap;
 }
 
-.warning-banner-icon {
-  font-size: 2rem;
+.alert-banner.info {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.warning-banner-content {
-  flex: 1;
-  min-width: 200px;
-}
+.banner-icon { font-size: 1.5rem; }
+.banner-content { flex: 1; }
+.banner-content p { margin: 0; opacity: 0.9; font-size: 0.9375rem; }
 
-.update-banner {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: var(--radius-lg);
-  color: white;
-  box-shadow: var(--shadow-lg);
-  flex-wrap: wrap;
-}
-
-.update-banner-icon {
-  font-size: 2rem;
-}
-
-.update-banner-content {
-  flex: 1;
-  min-width: 200px;
-}
-
-.banner-enter-active,
-.banner-leave-active {
-  transition: all 0.3s;
-}
-
-.banner-enter-from,
-.banner-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-/* Methods Grid */
-.methods-grid {
+/* Content Grid */
+.content-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
 }
 
-.method-card {
+.update-card {
   background: var(--color-surface);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-xl);
   box-shadow: var(--shadow-md);
-  border: 1px solid var(--color-border);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
 }
 
 .card-header {
+  padding: var(--spacing-lg);
   display: flex;
-  align-items: flex-start;
   gap: var(--spacing-md);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
-.card-icon {
-  font-size: 2.5rem;
+.header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
 }
 
-.card-title {
+.header-text h3 {
   font-size: 1.125rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-xs) 0;
-}
-
-.card-description {
-  color: var(--color-text-secondary);
   margin: 0;
 }
 
-/* Upload Area */
-.upload-area {
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-xl);
-  text-align: center;
-  transition: all var(--transition-fast);
-  cursor: pointer;
-  background: var(--color-bg);
+.header-text p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
 }
 
-.upload-area:hover {
+.card-body {
+  padding: var(--spacing-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Upload Zone */
+.upload-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--color-bg);
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.upload-zone:hover, .upload-zone.dragging {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
 }
 
-.upload-area.has-file {
+.upload-zone.has-file {
   border-style: solid;
   border-color: var(--color-success);
   background: var(--color-success-light);
 }
 
-.file-input {
-  display: none;
-}
+.upload-icon { font-size: 2.5rem; margin-bottom: var(--spacing-sm); opacity: 0.5; }
+.upload-text { color: var(--color-text-secondary); font-weight: 500; }
 
-.upload-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-text-secondary);
-}
-
-.upload-icon {
-  font-size: 2rem;
-  opacity: 0.7;
-}
-
-.file-info {
+.file-preview {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--spacing-md);
   width: 100%;
 }
 
-.file-name {
-  font-weight: 500;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.file-icon { font-size: 2rem; }
+.file-details { flex: 1; text-align: left; overflow: hidden; }
+.file-name { display: block; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.file-size { color: var(--color-text-secondary); font-size: 0.8125rem; }
+.remove-file-btn {
+  background: transparent; border: none; font-size: 1.25rem; color: var(--color-text-secondary); cursor: pointer;
 }
 
-/* URL Input */
-.url-input {
+/* Modern Input */
+.modern-input {
   border: 2px solid var(--color-border);
   border-radius: var(--radius-lg);
+  padding: 12px;
+  font-size: 1rem;
 }
-
-.url-input:focus {
+.modern-input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
 }
 
-.quick-urls {
-  display: flex;
+/* Quick Actions */
+.quick-actions {
+  margin-top: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.chip-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  margin: var(--spacing-sm) 0;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.quick-url-label {
-  color: var(--color-text-secondary);
+.chip-btn:hover {
+  background: var(--color-border-light);
+  transform: translateY(-1px);
 }
 
-.ota-progress {
-  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
-}
-
-/* Progress Bar */
-.upload-progress {
-  margin-top: var(--spacing-md);
+/* Progress */
+.progress-container {
+  margin-bottom: var(--spacing-md);
 }
 
 .progress-bar {
-  height: 8px;
-  background: var(--color-bg);
+  height: 6px;
+  background: var(--color-border-light);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 
-.progress-fill {
+.progress-value {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: var(--color-primary);
   transition: width 0.3s ease;
 }
 
-.progress-text {
+.progress-value.success { background: var(--color-success); }
+
+.progress-label {
   display: block;
-  text-align: center;
-  font-size: 0.875rem;
+  text-align: right;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-primary);
-  margin-top: var(--spacing-xs);
+  margin-top: 4px;
 }
 
-/* Buttons */
-.upload-btn,
-.ota-btn {
-  margin-top: var(--spacing-md);
+.action-btn {
+  margin-top: auto;
+  border-radius: var(--radius-lg);
+  padding: 12px;
 }
 
-/* Actions Grid */
-.actions-grid {
+/* System Actions */
+.system-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-lg);
 }
 
-.action-card {
+.action-tile {
+  background: var(--color-surface);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.action-icon {
-  font-size: 2.5rem;
-  flex-shrink: 0;
+.action-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
-.restart-icon {
-  filter: drop-shadow(0 2px 4px rgba(255, 152, 0, 0.3));
-}
+.action-tile.warning:hover { background: var(--color-warning-light); }
+.action-tile.danger:hover { background: var(--color-danger-light); }
 
-.reset-icon {
-  filter: drop-shadow(0 2px 4px rgba(220, 53, 69, 0.3));
-}
+.tile-icon { font-size: 2rem; }
+.tile-text h4 { margin: 0; font-size: 1rem; }
+.tile-text p { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); }
 
-.action-content {
-  flex: 1;
-}
-
-.action-content h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-xs) 0;
-}
-
-.action-content p {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-/* Info Section */
-.info-section {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-
-.info-card {
+/* Countdown Overlay */
+.countdown-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-md);
+  align-items: center;
+  justify-content: center;
 }
 
-.info-icon {
+.countdown-card {
+  text-align: center;
+  color: white;
+}
+
+.spinner-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-lg);
+}
+
+.spinner-ring {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  border: 4px solid rgba(255,255,255,0.1);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.spinner-icon {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 2rem;
 }
 
-.info-content h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-xs) 0;
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.countdown-value {
+  font-size: 4rem;
+  font-weight: 700;
+  margin: var(--spacing-md) 0;
 }
 
-.info-content p {
-  color: var(--color-text-secondary);
-  margin: 0 0 var(--spacing-sm) 0;
+.progress-track {
+  width: 300px;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  margin: 0 auto;
 }
 
-.info-link {
-  margin: 0;
+.progress-fill {
+  height: 100%;
+  background: white;
+  transition: width 1s linear;
 }
 
-.info-link a {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
+/* Modals */
+:deep(.status-modal-content) {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: none;
 }
 
-.info-link a:hover {
-  text-decoration: underline;
+.status-modal-body {
+  padding: var(--spacing-xl);
+  text-align: center;
 }
 
-/* Status Modal */
-:deep(.modal-content) {
+.status-modal-body.error { border-top: 6px solid var(--color-danger); }
+.status-modal-body.success { border-top: 6px solid var(--color-success); }
+.status-modal-body.info { border-top: 6px solid var(--color-info); }
+
+.status-icon-large { font-size: 4rem; margin-bottom: var(--spacing-md); }
+
+:deep(.password-modal-content) {
   border-radius: var(--radius-xl);
   border: none;
 }
 
-:deep(.modal-header-warning) {
-  background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
-  color: white;
-}
-
-:deep(.modal-header-danger) {
-  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-  color: white;
-}
-
-:deep(.modal-header-info) {
-  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-  color: white;
-}
-
-.status-modal {
+.password-modal-body {
+  padding: var(--spacing-xl);
   text-align: center;
-  padding: var(--spacing-lg);
 }
 
-.status-icon {
-  font-size: 4rem;
-  margin-bottom: var(--spacing-md);
-}
+.lock-icon { font-size: 3rem; margin-bottom: var(--spacing-md); }
 
-.status-modal h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin: 0 0 var(--spacing-sm) 0;
-}
-
-.status-modal p {
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.status-countdown {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: var(--spacing-lg) auto 0;
-  background: var(--color-bg);
-  border: 4px solid var(--color-primary);
-}
-
-/* OTA Password Prompt Modal */
-.ota-prompt-modal {
-  text-align: center;
-  padding: var(--spacing-lg);
-}
-
-.ota-prompt-icon {
-  font-size: 3rem;
-  margin-bottom: var(--spacing-md);
-}
-
-.ota-prompt-modal p {
-  color: var(--color-text-secondary);
+.password-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   margin-bottom: var(--spacing-lg);
+  font-size: 1.125rem;
+  text-align: center;
 }
 
-.ota-prompt-actions {
+.password-input:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+.modal-actions {
   display: flex;
   gap: var(--spacing-md);
-  justify-content: center;
-  margin-top: var(--spacing-lg);
 }
 
-.ota-prompt-actions .btn {
-  min-width: 100px;
+.modal-actions button {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-/* Mobile adjustments */
+.btn-cancel { background: var(--color-bg); color: var(--color-text); }
+.btn-confirm { background: var(--color-primary); color: white; }
+
 @media (max-width: 640px) {
-  .firmware-header {
-    padding: var(--spacing-lg) var(--spacing-md);
-    flex-direction: column;
-    text-align: center;
-  }
-
-  .version-badge {
-    width: 100%;
-  }
-
-  .methods-grid,
-  .actions-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .countdown-timer {
-    font-size: 2.5rem;
-  }
+  .page-header { flex-direction: column; text-align: center; }
+  .version-badge { width: 100%; margin: 0; }
+  .content-grid { grid-template-columns: 1fr; }
+  .system-actions { grid-template-columns: 1fr; }
 }
+
+/* Utility Colors */
+.bg-primary-light { background-color: var(--color-primary-light); }
+.bg-success-light { background-color: var(--color-success-light); }
+.text-primary { color: var(--color-primary); }
+.text-success { color: var(--color-success); }
 </style>
