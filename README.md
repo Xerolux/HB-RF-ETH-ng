@@ -1,4 +1,4 @@
-# HB-RF-ETH-ng Firmware v2.1.2
+# HB-RF-ETH-ng Firmware v2.1.3
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
@@ -15,6 +15,23 @@
 ## Modernisierte Fork von Xerolux (2025)
 
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
+
+**Version 2.1.3 Änderungen:**
+* **Sicherheitsfix**
+  * Migration von Parcel zu Vite Build-System behoben Origin Validation Error Schwachstelle
+  * Entfernung aller anfälligen Parcel-Dependencies
+* **Verbesserter Release-Workflow**
+  * Firmware-Benennung korrigiert (Unterstriche statt Punkte)
+  * Umfassende, automatisch generierte Release Notes mit allen wichtigen Informationen
+  * Alle erforderlichen Dateien im Release enthalten (firmware, bootloader, partitions, checksums)
+* **Build-System**
+  * Wechsel zu Vite 6.3.5 (schneller, sicherer, moderner)
+  - Build-Zeit reduziert von ~10s auf ~2s
+  - Kleinere Bundle-Größen durch bessere Optimierung
+* **Fehlerbehebungen**
+  * Korrektur des Import-Syntax für vite-plugin-compression
+  * Automatische npm-Dependency-Installation vor Build
+  - Verbesserte Fehlerbehandlung bei OTA-Updates (verhindert Panic bei fehlerhaften Updates)
 
 **Version 2.1.2 Änderungen:**
 * **Erhöhte Sicherheit**
