@@ -58,100 +58,83 @@ const char *UpdateCheck::getLatestVersion()
   return _latestVersion;
 }
 
+// Helper function to compare semantic versions
+// Returns: negative if v1 < v2, 0 if v1 == v2, positive if v1 > v2
+static int compareVersions(const char* v1, const char* v2)
+{
+    int major1 = 0, minor1 = 0, patch1 = 0;
+    int major2 = 0, minor2 = 0, patch2 = 0;
+
+    sscanf(v1, "%d.%d.%d", &major1, &minor1, &patch1);
+    sscanf(v2, "%d.%d.%d", &major2, &minor2, &patch2);
+
+    if (major1 != major2) return major1 - major2;
+    if (minor1 != minor2) return minor1 - minor2;
+    return patch1 - patch2;
+}
+
 void UpdateCheck::_updateLatestVersion()
 {
-  char url[256];
-  if (_settings->getAllowPrerelease()) {
-      // Get the latest release (which can be a prerelease) by listing 1 per page
-      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=1");
-  } else {
-      // Get the latest stable release
-      snprintf(url, sizeof(url), "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases/latest");
-  }
+    // Fetch version from version.txt on GitHub
+    const char* url = "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version.txt";
 
-  esp_http_client_config_t config = {};
-  config.url = url;
-  config.crt_bundle_attach = esp_crt_bundle_attach; // Important for GitHub API
-  config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-  // Increase buffer size for API response
-  config.buffer_size = 4096;
-  config.buffer_size_tx = 1024;
+    esp_http_client_config_t config = {};
+    config.url = url;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.buffer_size = 1024;
+    config.buffer_size_tx = 1024;
+    config.timeout_ms = 10000;
+    config.user_agent = "HB-RF-ETH-ng";
 
-  esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
 
-  // Set headers
-  esp_http_client_set_header(client, "Accept", "application/vnd.github.v3+json");
-  esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
-
-  if (esp_http_client_perform(client) == ESP_OK)
-  {
-    // We read into a buffer. Note: Release API response can be large.
-    // We only need the tag_name.
-    // If it's a list (allowPrerelease=true), it starts with '['.
-    // If it's a single object (allowPrerelease=false), it starts with '{'.
-
-    // Using cJSON to parse might be memory intensive if the JSON is huge.
-    // Let's try to read enough to find "tag_name".
-
-    char buffer[4096]; // 4KB should cover the first part of the JSON where tag_name usually resides
-    int len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
-
-    if (len > 0)
+    if (esp_http_client_perform(client) == ESP_OK)
     {
-      buffer[len] = 0;
+        int content_length = esp_http_client_content_length(client);
+        int read_len = 0;
+        char buffer[64] = {0};
 
-      // Simple string search to avoid full JSON parsing overhead if possible,
-      // but cJSON is safer. Let's try cJSON. If it fails, we might need a stream parser.
-      cJSON *json = cJSON_Parse(buffer);
+        if (content_length > 0 && content_length < (int)sizeof(buffer))
+        {
+            read_len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
+        }
+        else
+        {
+            read_len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
+        }
 
-      if (json)
-      {
-          cJSON *targetObj = json;
+        if (read_len > 0)
+        {
+            buffer[read_len] = 0;
 
-          if (cJSON_IsArray(json)) {
-              targetObj = cJSON_GetArrayItem(json, 0);
-          }
+            // Trim whitespace and newlines
+            char* start = buffer;
+            while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n') start++;
 
-          if (targetObj) {
-              char *tagName = cJSON_GetStringValue(cJSON_GetObjectItem(targetObj, "tag_name"));
-              if (tagName != NULL)
-              {
-                  // Tag name usually starts with 'v', e.g. "v2.1.0".
-                  // Our system expects "2.1.0".
-                  if (tagName[0] == 'v') {
-                      strncpy(_latestVersion, tagName + 1, sizeof(_latestVersion) - 1);
-                  } else {
-                      strncpy(_latestVersion, tagName, sizeof(_latestVersion) - 1);
-                  }
-                  _latestVersion[sizeof(_latestVersion) - 1] = 0;
-              }
-          }
-          cJSON_Delete(json);
-      } else {
-          ESP_LOGW(TAG, "Failed to parse JSON from GitHub API (might be incomplete)");
-          // Fallback manual parsing if cJSON failed due to incomplete JSON in buffer
-          const char* tagKey = "\"tag_name\":\"";
-          char* pos = strstr(buffer, tagKey);
-          if (pos) {
-              pos += strlen(tagKey);
-              char* end = strchr(pos, '"');
-              if (end) {
-                  *end = 0;
-                   if (pos[0] == 'v') {
-                      strncpy(_latestVersion, pos + 1, sizeof(_latestVersion) - 1);
-                  } else {
-                      strncpy(_latestVersion, pos, sizeof(_latestVersion) - 1);
-                  }
-                   _latestVersion[sizeof(_latestVersion) - 1] = 0;
-              }
-          }
-      }
+            char* end = start + strlen(start) - 1;
+            while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) {
+                *end = 0;
+                end--;
+            }
+
+            strncpy(_latestVersion, start, sizeof(_latestVersion) - 1);
+            _latestVersion[sizeof(_latestVersion) - 1] = 0;
+
+            ESP_LOGI(TAG, "Latest version from server: %s", _latestVersion);
+        }
+        else
+        {
+            ESP_LOGE(TAG, "Failed to read version from response");
+        }
     }
-  } else {
-      ESP_LOGE(TAG, "Failed to check for updates");
-  }
+    else
+    {
+        int status = esp_http_client_get_status_code(client);
+        ESP_LOGE(TAG, "Failed to check for updates: HTTP status %d", status);
+    }
 
-  esp_http_client_cleanup(client);
+    esp_http_client_cleanup(client);
 }
 
 void UpdateCheck::_taskFunc()
@@ -162,17 +145,34 @@ void UpdateCheck::_taskFunc()
   for (;;)
   {
     if (_settings->getCheckUpdates()) {
-      ESP_LOGI(TAG, "Start checking for the latest available firmware.");
+      ESP_LOGI(TAG, "Checking for firmware updates...");
+      ESP_LOGI(TAG, "Current version: %s", _sysInfo->getCurrentVersion());
+
       _updateLatestVersion();
 
-      if (strcmp(_latestVersion, "n/a") != 0 && strcmp(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+      if (strcmp(_latestVersion, "n/a") != 0)
       {
-        ESP_LOGW(TAG, "An updated firmware with version %s is available.", _latestVersion);
-        _statusLED->setState(LED_STATE_BLINK_SLOW);
+        ESP_LOGI(TAG, "Latest available version: %s", _latestVersion);
+
+        // Use semantic version comparison instead of string comparison
+        if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
+        {
+          ESP_LOGW(TAG, "An updated firmware with version %s is available!", _latestVersion);
+          _statusLED->setState(LED_STATE_BLINK_SLOW);
+        }
+        else if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) > 0)
+        {
+          ESP_LOGI(TAG, "Running version (%s) is newer than available version (%s)",
+                   _sysInfo->getCurrentVersion(), _latestVersion);
+        }
+        else
+        {
+          ESP_LOGI(TAG, "Firmware is up to date (version %s)", _latestVersion);
+        }
       }
       else
       {
-        ESP_LOGI(TAG, "There is no newer firmware available.");
+        ESP_LOGE(TAG, "Failed to determine latest version");
       }
     } else {
         ESP_LOGI(TAG, "Update check is disabled.");
@@ -192,10 +192,11 @@ void UpdateCheck::performOnlineUpdate()
     }
 
     char url[256];
-    // Construct URL: https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v<version>/firmware.bin
+    // Construct URL: https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v<version>/firmware_<version>.bin
     // Note: We assume the tag has 'v' prefix, but version string might not.
-    // If _latestVersion is "2.1.1", tag is "v2.1.1".
-    snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware.bin", _latestVersion);
+    // If _latestVersion is "2.1.1", tag is "v2.1.1" and file is "firmware_2.1.1.bin"
+    snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware_%s.bin",
+            _latestVersion, _latestVersion);
 
     ESP_LOGI(TAG, "Starting OTA update from %s", url);
     _statusLED->setState(LED_STATE_BLINK_FAST);
