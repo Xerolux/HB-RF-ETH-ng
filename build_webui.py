@@ -37,13 +37,13 @@ def build_web():
         # Run npm install first if node_modules doesn't exist
         if not Path("node_modules").exists():
             print("Installing npm dependencies...")
-            result = run([npm_cmd, "install"], capture_output=True, text=True)
+            result = run([npm_cmd, "install"], capture_output=True, text=True, encoding="utf-8")
             if result.returncode != 0:
                 print(f"ERROR: npm install failed:\n{result.stderr}")
                 return
 
         # Build the web UI
-        result = run([npm_cmd, "run", "build"], capture_output=True, text=True)
+        result = run([npm_cmd, "run", "build"], capture_output=True, text=True, encoding="utf-8")
         if result.returncode == 0:
             print("Web UI built successfully!")
             if result.stdout:
