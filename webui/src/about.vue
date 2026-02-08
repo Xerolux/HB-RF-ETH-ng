@@ -289,11 +289,32 @@ const libs = ref([
   font-size: 0.875rem;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .about-section {
     padding: var(--spacing-md);
+    border-radius: var(--radius-md);
   }
 
+  .section-header {
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+  }
+
+  .libs-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-xs);
+  }
+
+  .lib-card {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .license-info {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
   .libs-grid {
     grid-template-columns: 1fr;
   }

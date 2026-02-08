@@ -434,7 +434,7 @@ ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 {
     ip4_addr_t res{.addr = IPADDR_ANY};
 
-    if (cJSON_IsString(item))
+    if (item && cJSON_IsString(item))
     {
         ip4addr_aton(item->valuestring, &res);
     }
@@ -444,7 +444,7 @@ ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 
 bool cJSON_GetBoolValue(const cJSON *item)
 {
-    if (cJSON_IsBool(item))
+    if (item && cJSON_IsBool(item))
     {
         return item->type == cJSON_True;
     }

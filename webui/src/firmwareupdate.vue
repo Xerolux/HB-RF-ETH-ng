@@ -760,11 +760,95 @@ onMounted(() => {
 
 .status-icon-large { font-size: 4rem; margin-bottom: var(--spacing-md); }
 
-@media (max-width: 640px) {
-  .page-header { flex-direction: column; text-align: center; }
-  .version-badge { width: 100%; margin: 0; }
-  .content-grid { grid-template-columns: 1fr; }
-  .system-actions { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+  .firmware-page {
+    padding-bottom: 40px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    text-align: center;
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+
+  .icon-wrapper {
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+  }
+
+  .text-wrapper h1 {
+    font-size: 1.25rem;
+  }
+
+  .version-badge {
+    width: 100%;
+    margin: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .card-header {
+    padding: var(--spacing-md);
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .header-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .header-text h3 {
+    font-size: 1rem;
+  }
+
+  .card-body {
+    padding: var(--spacing-md);
+  }
+
+  .upload-zone {
+    min-height: 100px;
+    padding: var(--spacing-md);
+  }
+
+  .upload-icon {
+    font-size: 2rem;
+  }
+
+  .system-actions {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .action-tile {
+    padding: var(--spacing-md);
+  }
+
+  .alert-banner {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+  }
+
+  /* Countdown */
+  .progress-track {
+    width: 80%;
+    max-width: 300px;
+  }
+
+  .countdown-value {
+    font-size: 3rem;
+  }
 }
 
 /* Utility Colors */

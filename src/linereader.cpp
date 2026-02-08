@@ -36,13 +36,25 @@ void LineReader::Append(unsigned char chr)
         return;
 
     case '\n':
-        _buffer[_buffer_pos++] = 0;
+        if (_buffer_pos < sizeof(_buffer) - 1)
+        {
+            _buffer[_buffer_pos++] = 0;
+        }
+        else
+        {
+            _buffer[sizeof(_buffer) - 1] = 0;
+            _buffer_pos = sizeof(_buffer);
+        }
         _processor(_buffer, _buffer_pos);
         _buffer_pos = 0;
         break;
 
     default:
-        _buffer[_buffer_pos++] = chr;
+        if (_buffer_pos < sizeof(_buffer) - 1)
+        {
+            _buffer[_buffer_pos++] = chr;
+        }
+        // else: silently drop character, buffer full
         break;
     }
 }

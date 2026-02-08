@@ -427,4 +427,60 @@ const saveConfig = async () => {
   color: var(--color-text-secondary);
   margin-top: 4px;
 }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  .monitoring-page {
+    padding-bottom: 100px;
+  }
+
+  .page-header {
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .page-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .settings-card {
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .card-header {
+    padding: var(--spacing-md);
+  }
+
+  .header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 1rem;
+  }
+
+  .card-header h3 {
+    font-size: 1rem;
+  }
+
+  .card-body {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    padding-top: var(--spacing-md);
+  }
+
+  .floating-footer {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .save-btn {
+    font-size: 1rem;
+    padding: 0.875rem;
+  }
+
+  .toast-card {
+    min-width: 0;
+    width: 90%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
 </style>

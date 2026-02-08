@@ -73,10 +73,35 @@ static int compareVersions(const char* v1, const char* v2)
     return patch1 - patch2;
 }
 
+// Buffer for HTTP event handler to collect response body
+struct http_response_data {
+    char buffer[64];
+    int len;
+};
+
+static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+{
+    struct http_response_data *resp = (struct http_response_data *)evt->user_data;
+    if (evt->event_id == HTTP_EVENT_ON_DATA && resp) {
+        int copy_len = evt->data_len;
+        if (resp->len + copy_len >= (int)sizeof(resp->buffer)) {
+            copy_len = sizeof(resp->buffer) - 1 - resp->len;
+        }
+        if (copy_len > 0) {
+            memcpy(resp->buffer + resp->len, evt->data, copy_len);
+            resp->len += copy_len;
+            resp->buffer[resp->len] = 0;
+        }
+    }
+    return ESP_OK;
+}
+
 void UpdateCheck::_updateLatestVersion()
 {
     // Fetch version from version.txt on GitHub
     const char* url = "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version.txt";
+
+    struct http_response_data resp = {};
 
     esp_http_client_config_t config = {};
     config.url = url;
@@ -86,30 +111,20 @@ void UpdateCheck::_updateLatestVersion()
     config.buffer_size_tx = 1024;
     config.timeout_ms = 10000;
     config.user_agent = "HB-RF-ETH-ng";
+    config.event_handler = _http_event_handler;
+    config.user_data = &resp;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
-    if (esp_http_client_perform(client) == ESP_OK)
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK)
     {
-        int content_length = esp_http_client_get_content_length(client);
-        int read_len = 0;
-        char buffer[64] = {0};
+        int status = esp_http_client_get_status_code(client);
 
-        if (content_length > 0 && content_length < (int)sizeof(buffer))
+        if (status == 200 && resp.len > 0)
         {
-            read_len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
-        }
-        else
-        {
-            read_len = esp_http_client_read(client, buffer, sizeof(buffer) - 1);
-        }
-
-        if (read_len > 0)
-        {
-            buffer[read_len] = 0;
-
             // Trim whitespace and newlines
-            char* start = buffer;
+            char* start = resp.buffer;
             while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n') start++;
 
             char* end = start + strlen(start) - 1;
@@ -125,13 +140,12 @@ void UpdateCheck::_updateLatestVersion()
         }
         else
         {
-            ESP_LOGE(TAG, "Failed to read version from response");
+            ESP_LOGE(TAG, "Failed to read version: HTTP %d, body_len=%d", status, resp.len);
         }
     }
     else
     {
-        int status = esp_http_client_get_status_code(client);
-        ESP_LOGE(TAG, "Failed to check for updates: HTTP status %d", status);
+        ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(err));
     }
 
     esp_http_client_cleanup(client);

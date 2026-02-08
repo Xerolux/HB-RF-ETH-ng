@@ -439,6 +439,32 @@ h1, h2, h3, h4, h5, h6 {
   .card-body {
     padding: var(--spacing-md);
   }
+
+  .card-header {
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-xs);
+    font-size: 1.125rem;
+  }
+
+  .card {
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-md);
+  }
+
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.125rem; }
+}
+
+/* Tablet adjustments */
+@media (max-width: 768px) {
+  #app {
+    padding: var(--spacing-sm);
+  }
+
+  .form-control,
+  .form-select {
+    font-size: 16px; /* Prevents iOS zoom on input focus */
+  }
 }
 
 /* Touch Optimization */
@@ -446,8 +472,33 @@ a, button, input, select, .btn, .nav-link, .form-check-input {
   touch-action: manipulation;
 }
 
-@media (max-width: 991px) {
-  .navbar-glass {
-    height: auto !important;
+/* Safe areas for notch devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .floating-footer {
+    padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+  }
+}
+
+/* Prevent text selection on interactive elements for mobile */
+.btn, .nav-link, .action-icon-btn, .segment-btn, .source-card, .action-tile {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Smooth scrolling for the entire page */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Better tap behavior on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .btn:hover {
+    transform: none;
+  }
+
+  .card:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
   }
 }

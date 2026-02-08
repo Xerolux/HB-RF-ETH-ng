@@ -107,15 +107,43 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 480px) {
+  .app-container {
+    padding: var(--spacing-sm);
+  }
+}
+
+/* Safe area padding for notch devices */
+@supports (padding: env(safe-area-inset-left)) {
+  .app-container {
+    padding-left: max(var(--spacing-sm), env(safe-area-inset-left));
+    padding-right: max(var(--spacing-sm), env(safe-area-inset-right));
+  }
+}
+
 .main-content {
   flex: 1;
   margin-bottom: var(--spacing-lg);
+  /* Prevent content from overflowing horizontally on mobile */
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-bottom: var(--spacing-md);
+  }
 }
 
 .app-footer {
   padding: var(--spacing-lg) 0;
   border-top: 1px solid var(--color-border);
   margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    padding: var(--spacing-md) 0;
+  }
 }
 
 .footer-content {

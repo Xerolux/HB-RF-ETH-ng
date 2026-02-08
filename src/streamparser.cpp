@@ -74,15 +74,21 @@ void StreamParser::append(unsigned char chr)
         _isEscaped = false;
     }
 
-    _buffer[_bufferPos++] = chr;
-
-    if (_bufferPos == sizeof(_buffer))
+    if (_bufferPos < sizeof(_buffer))
+    {
+        _buffer[_bufferPos++] = chr;
+    }
+    else
+    {
+        // Buffer full - force frame complete to avoid overflow
         _state = FRAME_COMPLETE;
+    }
 
     if (_state == FRAME_COMPLETE)
     {
         _processor(_buffer, _bufferPos);
         _state = NO_DATA;
+        _bufferPos = 0;
     }
 }
 
