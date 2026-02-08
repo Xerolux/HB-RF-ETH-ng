@@ -64,7 +64,7 @@ def rename_webui_files():
                 shutil.copyfileobj(f_in, f_out)
         print("Created index.html.gz")
 
-    if index_html_gz.exists() and replacements:
+    if index_html_gz.exists():
         import gzip
 
         # Decompress
@@ -76,9 +76,11 @@ def rename_webui_files():
             html_content = html_content.replace(old_name, new_name)
             print(f"Replaced {old_name} -> {new_name} in index.html")
 
-        # Also update favicon references
-        for f in dist_dir.glob("favicon.*.ico"):
-            old_favicon = f.name
+        # Also update favicon references (Vite generates index-[hash].ico or favicon.[hash].ico)
+        import re
+        favicon_pattern = re.compile(r'(?:index|favicon)-[A-Za-z0-9_-]+\.ico')
+        favicon_matches = favicon_pattern.findall(html_content)
+        for old_favicon in favicon_matches:
             html_content = html_content.replace(old_favicon, "favicon.ico")
             print(f"Replaced {old_favicon} -> favicon.ico in index.html")
 
@@ -97,10 +99,11 @@ def rename_webui_files():
     dist_favicon = dist_dir / "favicon.ico"
     favicon_gz = dist_dir / "favicon.ico.gz"
 
-    # Delete any hashed favicon files
-    for f in dist_dir.glob("favicon.*.ico"):
-        f.unlink()
-        print(f"Removed {f.name}")
+    # Delete any hashed favicon files (both favicon.[hash].ico and index-[hash].ico)
+    for pattern in ["favicon.*.ico", "index-*.ico"]:
+        for f in dist_dir.glob(pattern):
+            f.unlink()
+            print(f"Removed {f.name}")
 
     # Copy favicon from webui root to dist
     if webui_favicon.exists():

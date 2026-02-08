@@ -24,14 +24,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         entryFileNames: 'index-[hash].js',
-        chunkFileNames: 'index-[hash].js',
         assetFileNames: 'index-[hash].[ext]',
-        manualChunks: {
-          'vendor': ['vue', 'vue-router', 'pinia'],
-          'bootstrap': ['bootstrap', 'bootstrap-vue-next']
-        }
+        // IMPORTANT: Bundle everything into a single JS file. The ESP32 HTTP server
+        // only serves specific embedded files (main.js, main.css, index.html, favicon.ico).
+        // Any additional chunk files would not be served and break the UI.
+        inlineDynamicImports: true
       }
     },
+    cssCodeSplit: false,
     minify: 'esbuild',
     target: 'es2015'
   },

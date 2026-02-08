@@ -783,7 +783,6 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     int recv_len;
     bool is_req_body_started = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    const esp_partition_t *configured = NULL;
     const esp_partition_t *running = NULL;
 
     // Validate update partition exists
@@ -885,7 +884,6 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
     // Verify the firmware image before setting boot partition
     ESP_LOGI(TAG, "Validating firmware image...");
-    configured = esp_ota_get_boot_partition();
     running = esp_ota_get_running_partition();
 
     if (update_partition == running) {
