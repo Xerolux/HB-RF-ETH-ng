@@ -238,7 +238,7 @@ export default {
   // About Page
   about: {
     title: 'Über',
-    version: 'Version 2.1.0',
+    version: 'Version 2.1.2',
     fork: 'Modernisierte Fork',
     forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains (GCC 13.2.0) und aktuelle WebUI-Technologien (Vue 3, Parcel 2, Pinia).',
     original: 'Original-Autor',
@@ -297,5 +297,12 @@ export default {
     strengthMedium: 'Mittel',
     strengthGood: 'Gut',
     strengthStrong: 'Stark'
+  },
+
+  // Sponsor
+  sponsor: {
+    title: 'Unterstützen Sie dieses Projekt',
+    description: 'Wenn Ihnen dieses Projekt gefällt und Sie die Weiterentwicklung unterstützen möchten, können Sie mir einen Kaffee spendieren oder mich auf GitHub sponsern.',
+    thanks: 'Vielen Dank für Ihre Unterstützung!'
   }
 }

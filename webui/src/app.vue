@@ -6,21 +6,30 @@
         <RouterView />
       </main>
       <footer class="app-footer">
-        <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025</small>
+        <div class="footer-content">
+          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025</small>
+          <button class="sponsor-btn" @click="showSponsorModal = true">
+            <span>❤️</span> Sponsor
+          </button>
+        </div>
       </footer>
     </div>
+
+    <SponsorModal v-model="showSponsorModal" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
+import SponsorModal from './components/SponsorModal.vue'
 
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
 const router = useRouter()
+const showSponsorModal = ref(false)
 let idleTimer = null
 const IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
 
@@ -104,9 +113,38 @@ onUnmounted(() => {
 }
 
 .app-footer {
-  text-align: center;
   padding: var(--spacing-lg) 0;
   border-top: 1px solid var(--color-border);
   margin-top: auto;
+}
+
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.sponsor-btn {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sponsor-btn:hover {
+  background: #ffecec;
+  color: #ff3b30;
+  border-color: #ff3b30;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 </style>
