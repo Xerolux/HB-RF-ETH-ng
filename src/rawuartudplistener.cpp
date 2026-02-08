@@ -26,12 +26,18 @@
 #include "esp_log.h"
 #include <string.h>
 #include "udphelper.h"
+#include "mdns.h"
 
 static const char *TAG = "RawUartUdpListener";
 
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
     ((RawUartUdpListener *)parameter)->_udpQueueHandler();
+}
+
+void _mDNS_announce_task(void *parameter)
+{
+    ((RawUartUdpListener *)parameter)->_mDNSAnnounceTask();
 }
 
 void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
@@ -94,6 +100,9 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
+
+            ESP_LOGI(TAG, "CCU 3 connected from %s:%u", ip4addr_ntoa(&addr), port);
+
             response_buffer[0] = 1;
             response_buffer[1] = data[1];
             sendMessage(0, response_buffer, 2);
@@ -117,6 +126,9 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             atomic_store(&_remoteAddress, addr.addr);
             atomic_store(&_remotePort, port);
             _radioModuleConnector->setLED(true, true, false);
+
+            ESP_LOGI(TAG, "CCU 3 reconnected from %s:%u", ip4addr_ntoa(&addr), port);
+
             response_buffer[0] = 2;
             response_buffer[1] = data[1];
             response_buffer[2] = endpointConnectionIdentifier;
@@ -129,6 +141,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         break;
 
     case 1: // disconnect
+        ESP_LOGI(TAG, "CCU 3 disconnected");
         atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_connectionStarted, false);
         atomic_store(&_remoteAddress, 0u);
@@ -266,6 +279,10 @@ void RawUartUdpListener::start()
     _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
 
     _radioModuleConnector->setFrameHandler(this, false);
+
+    // Start mDNS announcement task to help CCU 3 discover and reconnect
+    xTaskCreate(_mDNS_announce_task, "mDNS_Announce", 2048, this, 5, &_mDNS_announce_handle);
+    ESP_LOGI(TAG, "UDP listener started with periodic mDNS announcements for CCU 3 stability");
 }
 
 void RawUartUdpListener::stop()
@@ -277,6 +294,12 @@ void RawUartUdpListener::stop()
 
     _radioModuleConnector->setFrameHandler(NULL, false);
     vTaskDelete(_tHandle);
+
+    if (_mDNS_announce_handle != NULL)
+    {
+        vTaskDelete(_mDNS_announce_handle);
+        _mDNS_announce_handle = NULL;
+    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()
@@ -299,10 +322,17 @@ void RawUartUdpListener::_udpQueueHandler()
 
             if (now > atomic_load(&_lastReceivedKeepAlive) + 5000000)
             { // 5 sec
+                ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 5 seconds)");
+                ESP_LOGW(TAG, "Sending mDNS announcements to help CCU 3 reconnect...");
+
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
-                ESP_LOGE(TAG, "Connection timed out");
+
+                // Send mDNS announcements to help CCU 3 discover us and reconnect
+                mdns_service_register_all();
+
+                ESP_LOGW(TAG, "Connection reset. CCU 3 should reconnect automatically via mDNS.");
             }
 
             if (now > nextKeepAliveSentOut)
@@ -310,6 +340,27 @@ void RawUartUdpListener::_udpQueueHandler()
                 nextKeepAliveSentOut = now + 1000000; // 1sec
                 sendMessage(2, NULL, 0);
             }
+        }
+    }
+}
+
+void RawUartUdpListener::_mDNSAnnounceTask()
+{
+    ESP_LOGI(TAG, "mDNS announcement task started - announcing every 30 seconds for CCU 3 stability");
+
+    while (true)
+    {
+        // Wait 30 seconds
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
+
+        // Send mDNS announcements to help CCU 3 discover us
+        // This is especially useful after connection drops or network issues
+        mdns_service_register_all();
+
+        // Log only if not connected (to reduce log noise)
+        if (atomic_load(&_remotePort) == 0)
+        {
+            ESP_LOGI(TAG, "mDNS announcements sent (waiting for CCU 3 to connect...)");
         }
     }
 }

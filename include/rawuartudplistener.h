@@ -44,6 +44,7 @@ private:
     udp_pcb *_pcb;
     QueueHandle_t _udp_queue;
     TaskHandle_t _tHandle = NULL;
+    TaskHandle_t _mDNS_announce_handle = NULL;
 
     void handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
     void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
@@ -60,5 +61,6 @@ public:
     void stop();
 
     void _udpQueueHandler();
+    void _mDNSAnnounceTask();  // Periodic mDNS announcements
     bool _udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port);
 };
