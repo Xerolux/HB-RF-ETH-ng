@@ -36,6 +36,7 @@
 #include "rate_limiter.h"
 #include "security_headers.h"
 #include "reset_info.h"
+#include "system_reset.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
@@ -685,7 +686,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 
     // Restart
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    full_system_restart();
 
     return ESP_OK;
 }
@@ -711,7 +712,7 @@ httpd_uri_t post_restore_handler = {
 
 void delayed_restart_task(void *pvParameter) {
     vTaskDelay(3000 / portTICK_PERIOD_MS);
-    esp_restart();
+    full_system_restart();
     vTaskDelete(NULL);
 }
 
@@ -906,7 +907,7 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
 
     // Restart after a short delay to allow response to be sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    full_system_restart();
 
     return ESP_OK;
 }
@@ -938,7 +939,7 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 
     // Restart after a short delay to allow response to be sent
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    esp_restart();
+    full_system_restart();
 
     return ESP_OK;
 }
@@ -1070,7 +1071,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             free(a->url);
             delete a;
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
+            full_system_restart();
         } else {
             ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
             ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
