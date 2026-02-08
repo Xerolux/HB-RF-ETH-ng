@@ -49,13 +49,11 @@ void MDns::start(Settings* settings)
 
 void MDns::announce()
 {
-    // Send mDNS announcements to help network devices discover us faster
-    ESP_LOGI(TAG, "Sending mDNS service announcements...");
-
-    // ESP-IDF's mdns implementation automatically sends announcements,
-    // but we can trigger additional announcements if needed
-    // This is especially helpful after restart when devices need to rediscover us
-    mdns_service_register_all();
+    // ESP-IDF's mdns implementation automatically sends announcements
+    // when services are added or when network changes occur
+    // This function exists for logging purposes to track when announcements should occur
+    ESP_LOGI(TAG, "mDNS services are being advertised (automatic announcements by ESP-IDF)");
+    ESP_LOGI(TAG, "CCU 3 should be able to discover HB-RF-ETH via _raw-uart._udp service");
 }
 
 void MDns::stop()

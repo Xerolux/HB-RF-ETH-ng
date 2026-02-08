@@ -323,16 +323,15 @@ void RawUartUdpListener::_udpQueueHandler()
             if (now > atomic_load(&_lastReceivedKeepAlive) + 5000000)
             { // 5 sec
                 ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 5 seconds)");
-                ESP_LOGW(TAG, "Sending mDNS announcements to help CCU 3 reconnect...");
+                ESP_LOGW(TAG, "Connection reset - waiting for CCU 3 to reconnect via mDNS...");
 
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
 
-                // Send mDNS announcements to help CCU 3 discover us and reconnect
-                mdns_service_register_all();
-
-                ESP_LOGW(TAG, "Connection reset. CCU 3 should reconnect automatically via mDNS.");
+                // ESP-IDF automatically sends mDNS announcements
+                // CCU 3 will discover us via _raw-uart._udp service on port 3008
+                ESP_LOGI(TAG, "mDNS service _raw-uart._udp:3008 is continuously advertised");
             }
 
             if (now > nextKeepAliveSentOut)
@@ -346,21 +345,18 @@ void RawUartUdpListener::_udpQueueHandler()
 
 void RawUartUdpListener::_mDNSAnnounceTask()
 {
-    ESP_LOGI(TAG, "mDNS announcement task started - announcing every 30 seconds for CCU 3 stability");
+    ESP_LOGI(TAG, "mDNS monitoring task started - mDNS is continuously advertised by ESP-IDF");
 
     while (true)
     {
         // Wait 30 seconds
         vTaskDelay(30000 / portTICK_PERIOD_MS);
 
-        // Send mDNS announcements to help CCU 3 discover us
-        // This is especially useful after connection drops or network issues
-        mdns_service_register_all();
-
-        // Log only if not connected (to reduce log noise)
+        // ESP-IDF automatically handles mDNS announcements
+        // This task monitors connection status and provides helpful logging
         if (atomic_load(&_remotePort) == 0)
         {
-            ESP_LOGI(TAG, "mDNS announcements sent (waiting for CCU 3 to connect...)");
+            ESP_LOGI(TAG, "Waiting for CCU 3 to connect via mDNS (_raw-uart._udp:3008)...");
         }
     }
 }
