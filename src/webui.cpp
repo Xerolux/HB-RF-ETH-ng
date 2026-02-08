@@ -760,7 +760,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
     // OTA password validation removed - authentication is sufficient
 
-    esp_ota_handle_t ota_handle;
+    esp_ota_handle_t ota_handle = 0;
+    bool ota_begun = false;
 
     char ota_buff[1024];
     int content_length = req->content_len;
@@ -769,15 +770,37 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     bool is_req_body_started = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
 
+    // Validate update partition exists
+    if (update_partition == NULL) {
+        ESP_LOGE(TAG, "No OTA update partition found");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition available");
+        goto err;
+    }
+
+    ESP_LOGI(TAG, "Starting OTA update, partition: %s, size: %d bytes", update_partition->label, content_length);
+
     do
     {
-        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length, sizeof(ota_buff)))) < 0)
+        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length - content_received, sizeof(ota_buff)))) < 0)
         {
-            if (recv_len != HTTPD_SOCK_ERR_TIMEOUT)
+            if (recv_len == HTTPD_SOCK_ERR_TIMEOUT)
             {
-                ESP_LOGE(TAG, "OTA socket Error %d", recv_len);
-                return ESP_FAIL;
+                // Timeout - continue waiting
+                continue;
             }
+            else
+            {
+                ESP_LOGE(TAG, "OTA socket error %d, received %d of %d bytes", recv_len, content_received, content_length);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Network error during upload");
+                goto err;
+            }
+        }
+        else if (recv_len == 0)
+        {
+            // Connection closed by client
+            ESP_LOGE(TAG, "OTA connection closed prematurely, received %d of %d bytes", content_received, content_length);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete upload");
+            goto err;
         }
 
         if (!is_req_body_started)
@@ -806,28 +829,53 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
                 } else {
                     // Header not found in first chunk - this is likely invalid for multipart
                      ESP_LOGE(TAG, "Multipart header not found in first chunk");
+                     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid multipart format");
                      goto err;
                 }
             }
 
             OTA_CHECK(esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle) == ESP_OK, "Could not start OTA");
+            ota_begun = true;
             ESP_LOGW(TAG, "Begin OTA Update to partition %s, File Size: %d", update_partition->label, content_length);
             _statusLED->setState(LED_STATE_BLINK_FAST);
 
             OTA_CHECK(esp_ota_write(ota_handle, body_start_p, body_part_len) == ESP_OK, "Error writing OTA");
             content_received += body_part_len;
+            ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
         }
         else
         {
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += recv_len;
+            ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
         }
-    } while ((recv_len > 0) && (content_received < content_length));
+    } while (content_received < content_length);
 
-    OTA_CHECK(esp_ota_end(ota_handle) == ESP_OK, "Error writing OTA");
-    OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error writing OTA");
+    // Verify complete firmware was received
+    if (content_received != content_length) {
+        ESP_LOGE(TAG, "Incomplete firmware: received %d of %d bytes", content_received, content_length);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete firmware upload");
+        goto err;
+    }
 
-    ESP_LOGI(TAG, "OTA finished, restarting in 3 seconds to activate new firmware.");
+    // Validate and finalize OTA
+    OTA_CHECK(esp_ota_end(ota_handle) == ESP_OK, "Error finalizing OTA");
+    ota_begun = false;  // Successfully ended, don't abort
+
+    // Verify the firmware image before setting boot partition
+    ESP_LOGI(TAG, "Validating firmware image...");
+    const esp_partition_t *configured = esp_ota_get_boot_partition();
+    const esp_partition_t *running = esp_ota_get_running_partition();
+
+    if (update_partition == running) {
+        ESP_LOGE(TAG, "Cannot update running partition!");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid OTA partition");
+        goto err;
+    }
+
+    OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error setting boot partition");
+
+    ESP_LOGI(TAG, "OTA finished successfully, restarting in 3 seconds to activate new firmware.");
     httpd_resp_sendstr(req, "Firmware update completed, restarting in 3 seconds...");
 
     _statusLED->setState(LED_STATE_OFF);
@@ -843,6 +891,13 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
 err:
     _statusLED->setState(LED_STATE_OFF);
+
+    // Abort OTA if it was started but not completed
+    if (ota_begun) {
+        ESP_LOGW(TAG, "Aborting OTA operation due to error");
+        esp_ota_abort(ota_handle);
+    }
+
     // Store reset reason for failed firmware update
     ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
     return ESP_FAIL;
@@ -950,6 +1005,13 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     // Copy URL before freeing JSON to avoid use-after-free
     char url_buf[256] = {0};
     if (url_json != NULL && strlen(url_json) > 0) {
+        // Basic URL validation - must start with http:// or https://
+        if (strncmp(url_json, "http://", 7) != 0 && strncmp(url_json, "https://", 8) != 0) {
+            cJSON_Delete(root);
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Invalid URL format\"}");
+            return ESP_OK;
+        }
         strncpy(url_buf, url_json, sizeof(url_buf) - 1);
     }
 
@@ -978,17 +1040,26 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 
     TaskArgs* args = new TaskArgs();
     args->url = strdup(url_buf);
+    if (args->url == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for URL");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Memory allocation failed\"}");
+        return ESP_OK;
+    }
     args->statusLED = _statusLED;
 
     BaseType_t ret = xTaskCreate([](void* p) {
         TaskArgs* a = (TaskArgs*)p;
 
+        ESP_LOGI(TAG, "OTA task started, downloading from: %s", a->url);
+
         esp_http_client_config_t config = {};
         config.url = a->url;
         config.crt_bundle_attach = esp_crt_bundle_attach;
         config.keep_alive_enable = true;
-        config.timeout_ms = 10000;  // 10 second timeout
-        config.buffer_size = 1024;
+        config.timeout_ms = 30000;  // 30 second timeout for downloads
+        config.buffer_size = 4096;   // Larger buffer for better performance
+        config.max_redirection_count = 5;  // Allow redirects
 
         esp_https_ota_config_t ota_config = {};
         ota_config.http_config = &config;
@@ -996,8 +1067,27 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         a->statusLED->setState(LED_STATE_BLINK_FAST);
 
         esp_err_t ret = esp_https_ota(&ota_config);
+
         if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "OTA Update successful, restarting...");
+            ESP_LOGI(TAG, "OTA Update successful, validating firmware...");
+
+            // Validate the new partition
+            const esp_partition_t *running = esp_ota_get_running_partition();
+            const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+
+            if (update_partition != NULL && update_partition != running) {
+                // Verify the partition can be booted
+                esp_app_desc_t running_app_desc;
+                esp_app_desc_t new_app_desc;
+
+                if (esp_ota_get_partition_description(running, &running_app_desc) == ESP_OK &&
+                    esp_ota_get_partition_description(update_partition, &new_app_desc) == ESP_OK) {
+                    ESP_LOGI(TAG, "Running firmware: %s %s", running_app_desc.project_name, running_app_desc.version);
+                    ESP_LOGI(TAG, "New firmware: %s %s", new_app_desc.project_name, new_app_desc.version);
+                }
+            }
+
+            ESP_LOGI(TAG, "Firmware validation complete, restarting...");
             ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
             a->statusLED->setState(LED_STATE_OFF);
             free(a->url);
@@ -1018,6 +1108,9 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to create OTA update task");
         free(args->url);
         delete args;
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to start update task\"}");
+        return ESP_OK;
     }
 
     return ESP_OK;
