@@ -176,29 +176,46 @@ static void checkmk_agent_task(void *pvParameters)
 
         // Send CheckMK agent output
         char output[2048];
-        int len = 0;
+        size_t len = 0;
+        int ret;
+
+        #define APPEND_CHECKMK(...) \
+            do { \
+                if (len < sizeof(output) - 1) { \
+                    ret = snprintf(output + len, sizeof(output) - len, __VA_ARGS__); \
+                    if (ret > 0) { \
+                        if ((size_t)ret >= sizeof(output) - len) { \
+                            len = sizeof(output) - 1; \
+                        } else { \
+                            len += ret; \
+                        } \
+                    } \
+                } \
+            } while(0)
 
         // Version section
-        len += snprintf(output + len, sizeof(output) - len, "<<<check_mk>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "Version: HB-RF-ETH-%s\n", get_firmware_version());
-        len += snprintf(output + len, sizeof(output) - len, "AgentOS: ESP-IDF\n");
+        APPEND_CHECKMK("<<<check_mk>>>\n");
+        APPEND_CHECKMK("Version: HB-RF-ETH-%s\n", get_firmware_version());
+        APPEND_CHECKMK("AgentOS: ESP-IDF\n");
 
         // Uptime section
         uint32_t days, hours, minutes;
         get_system_uptime(&days, &hours, &minutes);
-        len += snprintf(output + len, sizeof(output) - len, "<<<uptime>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
+        APPEND_CHECKMK("<<<uptime>>>\n");
+        APPEND_CHECKMK("%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
         // Memory section
-        len += snprintf(output + len, sizeof(output) - len, "<<<mem>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "MemTotal: %lu kB\n",
+        APPEND_CHECKMK("<<<mem>>>\n");
+        APPEND_CHECKMK("MemTotal: %lu kB\n",
                        (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
-        len += snprintf(output + len, sizeof(output) - len, "MemFree: %lu kB\n",
+        APPEND_CHECKMK("MemFree: %lu kB\n",
                        (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
         // CPU section
-        len += snprintf(output + len, sizeof(output) - len, "<<<cpu>>>\n");
-        len += snprintf(output + len, sizeof(output) - len, "esp32 0 0 0\n");
+        APPEND_CHECKMK("<<<cpu>>>\n");
+        APPEND_CHECKMK("esp32 0 0 0\n");
+
+        #undef APPEND_CHECKMK
 
         // Send data
         send(client_sock, output, len, 0);
