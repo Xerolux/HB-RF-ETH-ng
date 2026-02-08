@@ -56,9 +56,9 @@
       <div class="login-footer">
         <small class="version-text">v{{ sysInfoStore.currentVersion || '...' }}</small>
         <div class="links">
-          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank">GitHub</a>
+          <span>&copy; Xerolux 2026</span>
           <span class="separator">•</span>
-          <a href="https://github.com/alexreinert/HB-RF-ETH" target="_blank">Original Project</a>
+          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank">GitHub</a>
         </div>
       </div>
     </div>

@@ -159,21 +159,36 @@ export default {
     system: 'System',
     network: 'Network',
     down: 'Down',
-    mbits: 'Mbit/s'
+    mbits: 'Mbit/s',
+    online: 'Online',
+    offline: 'Offline',
+    dashboardTitle: 'System Status'
   },
 
   // Firmware Update
   firmware: {
     title: 'Firmware',
     subtitle: 'Update your device firmware',
+    restarting: 'Restarting...',
     restartingText: 'Device is restarting. Page will reload automatically.',
+    fileUpload: 'File Upload',
     fileUploadHint: 'Upload a .bin firmware file',
+    networkUpdate: 'Network Update',
     networkUpdateHint: 'Download from URL',
+    urlPlaceholder: 'https://example.com/firmware.bin',
+    downloading: 'Downloading...',
+    downloadInstall: 'Download & Install',
+    factoryReset: 'Reset',
     factoryResetHint: 'Reset to factory defaults',
+    factoryResetConfirm: 'Do you really want to reset to factory defaults? All settings will be lost.',
+    otaProgress: 'Downloading firmware update...',
+    otaSuccess: 'Download successful. Installing...',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
     versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailable: 'An update to version {latestVersion} is available.',
+    newVersionAvailable: 'New version {version} is available!',
+    viewUpdate: 'View',
     onlineUpdate: 'Update Online',
     onlineUpdateConfirm: 'Do you really want to download and install the update? The system will restart automatically.',
     onlineUpdateStarted: 'Update started. The device will restart automatically once finished.',
@@ -183,9 +198,10 @@ export default {
     updateFile: 'Firmware file',
     noFileChosen: 'No file chosen',
     browse: 'Browse',
-    selectFile: 'Select File',
-    upload: 'Upload',
-    restart: 'Restart system',
+    selectFile: 'Select or drop .bin file',
+    upload: 'Install Firmware',
+    restart: 'Restart',
+    restartHint: 'Reboot device',
     uploading: 'Uploading...',
     uploadSuccess: 'Firmware update successfully uploaded. System will restart automatically in 3 seconds...',
     uploadError: 'An error occured.',
@@ -311,7 +327,7 @@ export default {
   // Sponsor
   sponsor: {
     title: 'Support this Project',
-    description: 'If you like this project and want to support its development, you can buy me a coffee or sponsor me on GitHub.',
+    description: 'If you like this project and want to support its development, you can use one of the options below.',
     thanks: 'Thank you for your support!'
   }
 }
