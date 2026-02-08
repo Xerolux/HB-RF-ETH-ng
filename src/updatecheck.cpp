@@ -91,7 +91,7 @@ void UpdateCheck::_updateLatestVersion()
 
     if (esp_http_client_perform(client) == ESP_OK)
     {
-        int content_length = esp_http_client_content_length(client);
+        int content_length = esp_http_client_get_content_length(client);
         int read_len = 0;
         char buffer[64] = {0};
 
