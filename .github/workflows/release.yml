@@ -89,12 +89,19 @@ jobs:
       - name: Copy firmware files
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
+          VERSION_US="${VERSION//./_}"  # Replace dots with underscores
 
-          # Copy firmware
-          if [ -f ".pio/build/hb-rf-eth-ng/firmware_${VERSION}.bin" ]; then
-            cp ".pio/build/hb-rf-eth-ng/firmware_${VERSION}.bin" "release/firmware_${VERSION}.bin"
+          # Copy firmware (version in filename uses underscores)
+          if [ -f ".pio/build/hb-rf-eth-ng/firmware_${VERSION_US}.bin" ]; then
+            cp ".pio/build/hb-rf-eth-ng/firmware_${VERSION_US}.bin" "release/firmware_${VERSION}.bin"
+            echo "Found firmware_${VERSION_US}.bin"
           elif [ -f ".pio/build/hb-rf-eth-ng/firmware.bin" ]; then
             cp ".pio/build/hb-rf-eth-ng/firmware.bin" "release/firmware_${VERSION}.bin"
+            echo "Found firmware.bin"
+          else
+            echo "ERROR: No firmware file found!"
+            ls -la .pio/build/hb-rf-eth-ng/
+            exit 1
           fi
 
           # Copy bootloader and partitions

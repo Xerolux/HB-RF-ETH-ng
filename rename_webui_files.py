@@ -1,5 +1,5 @@
 """
-Script to rename Parcel 2 output files with content hashes to fixed names
+Script to rename Vite/Parcel output files with content hashes to fixed names
 """
 from pathlib import Path
 import shutil
@@ -17,8 +17,11 @@ def rename_webui_files():
         print("WARNING: webui/dist directory not found")
         return
 
-    # Mapping of patterns to target filenames
+    # Mapping of patterns to target filenames (Vite uses index-[hash].js/css)
     renames = [
+        ("index-*.js.gz", "main.js.gz"),
+        ("index-*.css.gz", "main.css.gz"),
+        # Fallback for Parcel naming
         ("webui.*.js.gz", "main.js.gz"),
         ("webui.*.css.gz", "main.css.gz"),
     ]
@@ -49,8 +52,18 @@ def rename_webui_files():
         shutil.move(str(source), str(dest))
         print(f"Renamed {source.name} -> {target}")
 
-    # Update index.html.gz with new filenames
+    # Update index.html and index.html.gz with new filenames
+    index_html = dist_dir / "index.html"
     index_html_gz = dist_dir / "index.html.gz"
+
+    # First, ensure index.html.gz exists
+    if index_html.exists() and not index_html_gz.exists():
+        import gzip
+        with open(index_html, 'rb') as f_in:
+            with gzip.open(index_html_gz, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        print("Created index.html.gz")
+
     if index_html_gz.exists() and replacements:
         import gzip
 
@@ -73,6 +86,11 @@ def rename_webui_files():
         with gzip.open(index_html_gz, 'wt', encoding='utf-8') as f:
             f.write(html_content)
         print("Updated index.html.gz with new filenames")
+
+        # Also update uncompressed index.html
+        with open(index_html, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        print("Updated index.html with new filenames")
 
     # Handle favicon - copy from webui root and compress
     webui_favicon = Path("webui/favicon.ico")

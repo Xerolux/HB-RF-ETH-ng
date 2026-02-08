@@ -3,8 +3,9 @@
   "version": "2.1.2",
   "description": "WebUI of HB-RF-ETH firmware",
   "scripts": {
-    "dev": "parcel index.htm",
-    "build": "parcel build index.htm --no-source-maps --no-content-hash --dist-dir dist"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "Alexander Reinert",
@@ -21,12 +22,8 @@
     "vue-router": "^5.0.2"
   },
   "devDependencies": {
-    "@parcel/compressor-brotli": "^2.16.4",
-    "@parcel/compressor-gzip": "^2.16.4",
-    "@parcel/transformer-vue": "^2.16.4",
     "@vitejs/plugin-vue": "^6.0.4",
-    "buffer": "^6.0.3",
-    "parcel": "^2.16.4",
-    "process": "^0.11.10"
+    "vite": "^6.3.5",
+    "vite-plugin-compression": "^0.5.1"
   }
 }

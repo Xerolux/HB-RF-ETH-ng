@@ -38,9 +38,7 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
   * MQTT-Support mit Home Assistant Auto-Discovery
   * Check_MK Agent für erweitertes Monitoring
   * Detailliertes SNMP-Monitoring mit MIB-2 Unterstützung
-* **Backup & Restore**
-  * Konfigurations-Backup/Restore über WebUI
-  * Nextcloud-Integration für Cloud-Backups
+* **Backup & Restore** der Einstellungen über die WebUI
 * **Technische Updates**
   * Espressif32 Platform 6.12.0 (neuestes ESP-IDF)
   * Vue.js 3.5.27, Vue Router 5, Pinia 3, Vue i18n 11
@@ -102,9 +100,7 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * Erkennung des Funkmoduls und Ausgabe von Typ, Seriennummer, Funkadresse und SGTIN in der WebUI
 * Regelmäßige Prüfung auf Firmwareupdates
 * Werksreset per Taster oder über die WebUI
-* **Backup & Restore**
-  * Manuelles Backup/Restore der Einstellungen über die WebUI
-  * **Nextcloud-Integration** für automatische Cloud-Backups
+* **Backup & Restore** der Einstellungen über die WebUI
 * **Sicherheits-Features**
   * Timing-attacken-geschützte Passwortvergleiche
   * Rate Limiting bei Login-Versuchen
