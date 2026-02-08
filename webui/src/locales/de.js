@@ -161,21 +161,34 @@ export default {
     down: 'Down',
     mbits: 'Mbit/s',
     online: 'Online',
-    offline: 'Offline'
+    offline: 'Offline',
+    dashboardTitle: 'Systemstatus'
   },
 
   // Firmware Update
   firmware: {
     title: 'Firmware',
     subtitle: 'Firmware aktualisieren',
+    restarting: 'Startet neu...',
     restartingText: 'Gerät startet neu. Seite wird automatisch neu geladen.',
+    fileUpload: 'Datei-Upload',
     fileUploadHint: 'Laden Sie eine .bin Firmware-Datei hoch',
+    networkUpdate: 'Netzwerk-Update',
     networkUpdateHint: 'Download von URL',
+    urlPlaceholder: 'https://beispiel.de/firmware.bin',
+    downloading: 'Lädt herunter...',
+    downloadInstall: 'Herunterladen & Installieren',
+    factoryReset: 'Zurücksetzen',
     factoryResetHint: 'Auf Werkseinstellungen zurücksetzen',
+    factoryResetConfirm: 'Möchten Sie wirklich auf Werkseinstellungen zurücksetzen? Alle Einstellungen gehen verloren.',
+    otaProgress: 'Firmware-Update wird heruntergeladen...',
+    otaSuccess: 'Download erfolgreich. Installation...',
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
     versionInfo: 'Modernisierte Fork v2.1 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailable: 'Ein Update auf Version {latestVersion} ist verfügbar.',
+    newVersionAvailable: 'Neue Version {version} ist verfügbar!',
+    viewUpdate: 'Ansehen',
     onlineUpdate: 'Online Update durchführen',
     onlineUpdateConfirm: 'Möchten Sie das Update wirklich herunterladen und installieren? Das System wird automatisch neu gestartet.',
     onlineUpdateStarted: 'Update gestartet. Das Gerät wird nach Abschluss automatisch neu gestartet.',
@@ -185,9 +198,10 @@ export default {
     updateFile: 'Firmware Datei',
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',
-    selectFile: 'Datei auswählen',
-    upload: 'Hochladen',
-    restart: 'System neu starten',
+    selectFile: 'Datei auswählen oder hierher ziehen',
+    upload: 'Firmware installieren',
+    restart: 'Neustart',
+    restartHint: 'Gerät neu starten',
     uploading: 'Wird hochgeladen...',
     uploadSuccess: 'Die Firmware wurde erfolgreich hochgeladen. System startet in 3 Sekunden automatisch neu...',
     uploadError: 'Es ist ein Fehler aufgetreten.',
@@ -313,7 +327,7 @@ export default {
   // Sponsor
   sponsor: {
     title: 'Unterstützen Sie dieses Projekt',
-    description: 'Wenn Ihnen dieses Projekt gefällt und Sie die Weiterentwicklung unterstützen möchten, können Sie mir einen Kaffee spendieren oder mich auf GitHub sponsern.',
+    description: 'Wenn Ihnen dieses Projekt gefällt und Sie die Weiterentwicklung unterstützen möchten, können Sie eine der folgenden Optionen nutzen.',
     thanks: 'Vielen Dank für Ihre Unterstützung!'
   }
 }

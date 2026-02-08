@@ -8,9 +8,9 @@
             <div class="spinner-ring"></div>
             <div class="spinner-icon">🔄</div>
           </div>
-          <h2 class="countdown-title">{{ t('firmware.restarting') || 'Restarting...' }}</h2>
+          <h2 class="countdown-title">{{ t('firmware.restarting') }}</h2>
           <div class="countdown-value">{{ countdown }}</div>
-          <p class="countdown-text">{{ t('firmware.restartingText') || 'Device is restarting. Page will reload automatically.' }}</p>
+          <p class="countdown-text">{{ t('firmware.restartingText') }}</p>
           <div class="progress-track">
             <div class="progress-fill" :style="{ width: ((30 - countdown) / 30 * 100) + '%' }"></div>
           </div>
@@ -21,11 +21,11 @@
     <div class="page-header">
       <div class="icon-wrapper">📦</div>
       <div class="text-wrapper">
-        <h1>{{ t('firmware.title') || 'Firmware Update' }}</h1>
-        <p>{{ t('firmware.subtitle') || 'Update your device firmware' }}</p>
+        <h1>{{ t('firmware.title') }}</h1>
+        <p>{{ t('firmware.subtitle') }}</p>
       </div>
       <div class="version-badge">
-        <span class="label">{{ t('firmware.version') || 'Current' }}</span>
+        <span class="label">{{ t('firmware.version') }}</span>
         <span class="value">{{ sysInfoStore.currentVersion }}</span>
       </div>
     </div>
@@ -35,11 +35,11 @@
       <div v-if="showUpdateBanner" class="alert-banner info">
         <div class="banner-icon">🎉</div>
         <div class="banner-content">
-          <strong>{{ t('firmware.updateAvailable') || 'Update Available' }}</strong>
-          <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) || `New version ${sysInfoStore.latestVersion} is available!` }}</p>
+          <strong>{{ t('firmware.updateAvailable') }}</strong>
+          <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) }}</p>
         </div>
         <BButton variant="light" size="sm" @click="scrollToOta" class="banner-action">
-          {{ t('firmware.viewUpdate') || 'View' }}
+          {{ t('firmware.viewUpdate') }}
         </BButton>
       </div>
     </Transition>
@@ -50,8 +50,8 @@
         <div class="card-header">
           <div class="header-icon bg-primary-light text-primary">📤</div>
           <div class="header-text">
-            <h3>{{ t('firmware.fileUpload') || 'File Upload' }}</h3>
-            <p>{{ t('firmware.fileUploadHint') || 'Upload a .bin firmware file' }}</p>
+            <h3>{{ t('firmware.fileUpload') }}</h3>
+            <p>{{ t('firmware.fileUploadHint') }}</p>
           </div>
         </div>
 
@@ -74,7 +74,7 @@
 
             <template v-if="!file">
               <div class="upload-icon">☁️</div>
-              <span class="upload-text">{{ t('firmware.selectFile') || 'Select or drop .bin file' }}</span>
+              <span class="upload-text">{{ t('firmware.selectFile') }}</span>
             </template>
 
             <template v-else>
@@ -105,7 +105,7 @@
             class="action-btn"
           >
             <span v-if="uploading" class="spinner-border spinner-border-sm me-2"></span>
-            {{ uploading ? (t('firmware.uploading') || 'Uploading...') : (t('firmware.upload') || 'Install Firmware') }}
+            {{ uploading ? t('firmware.uploading') : t('firmware.upload') }}
           </BButton>
         </div>
       </div>
@@ -115,8 +115,8 @@
         <div class="card-header">
           <div class="header-icon bg-success-light text-success">🌐</div>
           <div class="header-text">
-            <h3>{{ t('firmware.networkUpdate') || 'Network Update' }}</h3>
-            <p>{{ t('firmware.networkUpdateHint') || 'Download from URL' }}</p>
+            <h3>{{ t('firmware.networkUpdate') }}</h3>
+            <p>{{ t('firmware.networkUpdateHint') }}</p>
           </div>
         </div>
 
@@ -124,7 +124,7 @@
           <div class="url-input-group">
             <BFormInput
               v-model="otaUrl"
-              :placeholder="t('firmware.urlPlaceholder') || 'https://example.com/firmware.bin'"
+              :placeholder="t('firmware.urlPlaceholder')"
               :disabled="otaUpdating"
               class="modern-input"
             />
@@ -153,7 +153,7 @@
             class="action-btn"
           >
             <span v-if="otaUpdating" class="spinner-border spinner-border-sm me-2"></span>
-            {{ otaUpdating ? (t('firmware.downloading') || 'Downloading...') : (t('firmware.downloadInstall') || 'Download & Install') }}
+            {{ otaUpdating ? t('firmware.downloading') : t('firmware.downloadInstall') }}
           </BButton>
         </div>
       </div>
@@ -164,16 +164,16 @@
       <div class="action-tile warning" @click="restartClick">
         <div class="tile-icon">🔄</div>
         <div class="tile-text">
-          <h4>{{ t('firmware.restart') || 'Restart' }}</h4>
-          <p>{{ t('firmware.restartHint') || 'Reboot device' }}</p>
+          <h4>{{ t('firmware.restart') }}</h4>
+          <p>{{ t('firmware.restartHint') }}</p>
         </div>
       </div>
 
       <div class="action-tile danger" @click="factoryResetClick">
         <div class="tile-icon">🔧</div>
         <div class="tile-text">
-          <h4>{{ t('firmware.factoryReset') || 'Reset' }}</h4>
-          <p>{{ t('firmware.factoryResetHint') || 'Factory defaults' }}</p>
+          <h4>{{ t('firmware.factoryReset') }}</h4>
+          <p>{{ t('firmware.factoryResetHint') }}</p>
         </div>
       </div>
     </div>
@@ -185,7 +185,7 @@
         <h3>{{ statusTitle }}</h3>
         <p>{{ statusMessage }}</p>
         <BButton v-if="!statusPersistent" @click="showStatusModal = false" variant="secondary" class="mt-3">
-          {{ t('common.close') || 'Close' }}
+          {{ t('common.close') }}
         </BButton>
       </div>
     </BModal>

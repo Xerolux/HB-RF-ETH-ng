@@ -12,9 +12,9 @@
 
       <div class="header-section">
         <div class="heart-icon">❤️</div>
-        <h2 class="title">{{ t('sponsor.title') || 'Support this Project' }}</h2>
+        <h2 class="title">{{ t('sponsor.title') }}</h2>
         <p class="description">
-          {{ t('sponsor.description') || 'If you like this project and want to support its development, you can buy me a coffee or sponsor me on GitHub.' }}
+          {{ t('sponsor.description') }}
         </p>
       </div>
 
@@ -36,7 +36,7 @@
       </div>
 
       <div class="footer-text">
-        {{ t('sponsor.thanks') || 'Thank you for your support!' }}
+        {{ t('sponsor.thanks') }}
       </div>
     </div>
   </BModal>

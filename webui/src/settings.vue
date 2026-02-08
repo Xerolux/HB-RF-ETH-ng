@@ -21,16 +21,16 @@
         <div v-show="activeTab === 'general'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.security') || 'Security' }}</h3>
+              <h3>{{ t('settings.security') }}</h3>
             </div>
             <div class="card-body">
               <div class="security-item">
                 <div class="security-info">
-                  <h4>{{ t('settings.changePassword') || 'Change Admin Password' }}</h4>
-                  <p>{{ t('settings.changePasswordHint') || 'Change your administrator password for secure access' }}</p>
+                  <h4>{{ t('settings.changePassword') }}</h4>
+                  <p>{{ t('settings.changePasswordHint') }}</p>
                 </div>
                 <BButton variant="primary" @click="showPasswordModal = true">
-                  {{ t('settings.changePasswordBtn') || 'Change Password' }}
+                  {{ t('settings.changePasswordBtn') }}
                 </BButton>
               </div>
             </div>
@@ -38,7 +38,7 @@
 
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.systemSettings') || 'System' }}</h3>
+              <h3>{{ t('settings.systemSettings') }}</h3>
             </div>
             <div class="card-body">
               <div class="form-group">
@@ -67,7 +67,7 @@
         <div v-show="activeTab === 'network'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.networkSettings') || 'Network' }}</h3>
+              <h3>{{ t('settings.networkSettings') }}</h3>
             </div>
             <div class="card-body">
               <div class="form-group mb-3">
@@ -118,7 +118,7 @@
 
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.ipv6Settings') || 'IPv6' }}</h3>
+              <h3>{{ t('settings.ipv6Settings') }}</h3>
             </div>
             <div class="card-body">
               <div class="form-group">
@@ -137,11 +137,11 @@
                     <button
                       :class="['mode-btn', { active: ipv6Mode === 'auto' }]"
                       @click="ipv6Mode = 'auto'"
-                    >{{ t('settings.ipv6Auto') || 'Auto' }}</button>
+                    >{{ t('settings.ipv6Auto') }}</button>
                     <button
                       :class="['mode-btn', { active: ipv6Mode === 'static' }]"
                       @click="ipv6Mode = 'static'"
-                    >{{ t('settings.ipv6Static') || 'Static' }}</button>
+                    >{{ t('settings.ipv6Static') }}</button>
                   </div>
                 </div>
 
@@ -211,10 +211,10 @@
         <div v-show="activeTab === 'time'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.timeSettings') || 'Time' }}</h3>
+              <h3>{{ t('settings.timeSettings') }}</h3>
             </div>
             <div class="card-body">
-              <label class="form-label mb-3">{{ t('settings.timesource') || 'Time Source' }}</label>
+              <label class="form-label mb-3">{{ t('settings.timesource') }}</label>
               <div class="source-selector">
                 <button
                   v-for="source in timeSources"
@@ -267,15 +267,15 @@
         <div v-show="activeTab === 'backup'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.backupRestore') || 'Backup & Restore' }}</h3>
+              <h3>{{ t('settings.backupRestore') }}</h3>
             </div>
             <div class="card-body">
               <div class="backup-grid">
                 <div class="action-tile" @click="downloadBackup">
                   <div class="tile-icon">⬇️</div>
                   <div class="tile-content">
-                    <h4>{{ t('settings.downloadBackup') || 'Download Backup' }}</h4>
-                    <p>{{ t('settings.backupInfo') || 'Download your settings as JSON file' }}</p>
+                    <h4>{{ t('settings.downloadBackup') }}</h4>
+                    <p>{{ t('settings.backupInfo') }}</p>
                   </div>
                   <span class="tile-arrow">➜</span>
                 </div>
@@ -283,8 +283,8 @@
                 <div class="action-tile" @click="$refs.fileInput.click()">
                   <div class="tile-icon">⬆️</div>
                   <div class="tile-content">
-                    <h4>{{ t('settings.restore') || 'Restore Backup' }}</h4>
-                    <p>{{ t('settings.restoreInfo') || 'Upload a backup file to restore settings' }}</p>
+                    <h4>{{ t('settings.restore') }}</h4>
+                    <p>{{ t('settings.restoreInfo') }}</p>
                   </div>
                   <span class="tile-arrow">➜</span>
                   <input
@@ -299,7 +299,7 @@
                 <div v-if="restoreFile" class="restore-confirm mt-3 p-3 bg-light rounded">
                   <p class="mb-2">Selected: <strong>{{ restoreFile.name }}</strong></p>
                   <BButton variant="warning" class="w-100" @click="restoreSettings">
-                    {{ t('settings.restoreBtn') || 'Confirm Restore' }}
+                    {{ t('settings.restoreBtn') }}
                   </BButton>
                 </div>
               </div>
@@ -397,16 +397,16 @@ watch(() => route.query.tab, (newTab) => {
 })
 
 const tabs = computed(() => [
-  { id: 'general', label: t('settings.tabGeneral') || 'General' },
-  { id: 'network', label: t('settings.tabNetwork') || 'Network' },
-  { id: 'time', label: t('settings.tabTime') || 'Time' },
-  { id: 'backup', label: t('settings.tabBackup') || 'Backup' }
+  { id: 'general', label: t('settings.tabGeneral') },
+  { id: 'network', label: t('settings.tabNetwork') },
+  { id: 'time', label: t('settings.tabTime') },
+  { id: 'backup', label: t('settings.tabBackup') }
 ])
 
 const timeSources = computed(() => [
-  { value: 0, icon: '🌍', label: t('settings.ntp') || 'NTP' },
-  { value: 1, icon: '📻', label: t('settings.dcf') || 'DCF' },
-  { value: 2, icon: '🛰️', label: t('settings.gps') || 'GPS' }
+  { value: 0, icon: '🌍', label: t('settings.ntp') },
+  { value: 1, icon: '📻', label: t('settings.dcf') },
+  { value: 2, icon: '🛰️', label: t('settings.gps') }
 ])
 
 // Local form state

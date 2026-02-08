@@ -3,7 +3,7 @@
     <!-- Header Section -->
     <div class="dashboard-header animate-entry">
       <div class="header-text">
-        <h1>{{ greeting }}</h1>
+        <h1>{{ t('sysinfo.dashboardTitle') }}</h1>
       </div>
       <div class="status-indicator" :class="{ 'online': sysInfoStore.ethernetConnected }">
         <span class="indicator-dot"></span>
@@ -54,7 +54,7 @@
           <span class="widget-trend small">{{ ethernetStatusShort }}</span>
         </div>
         <div class="widget-bottom">
-          <span class="widget-label">{{ t('sysinfo.ethernet') || 'Ethernet' }}</span>
+          <span class="widget-label">{{ t('sysinfo.ethernet') }}</span>
           <div class="widget-status-text" :class="sysInfoStore.ethernetConnected ? 'text-success' : 'text-danger'">
             {{ sysInfoStore.ethernetConnected ? t('sysinfo.connected') : t('sysinfo.disconnected') }}
           </div>
@@ -67,7 +67,7 @@
       <!-- System Information -->
       <div class="info-card animate-entry" style="animation-delay: 0.4s">
         <div class="card-header-clean">
-          <h3>{{ t('sysinfo.system') || 'System' }}</h3>
+          <h3>{{ t('sysinfo.system') }}</h3>
           <div class="header-line"></div>
         </div>
         <div class="card-content">
@@ -93,7 +93,7 @@
       <!-- Network Information -->
       <div class="info-card animate-entry" style="animation-delay: 0.5s">
         <div class="card-header-clean">
-          <h3>{{ t('sysinfo.network') || 'Network' }}</h3>
+          <h3>{{ t('sysinfo.network') }}</h3>
           <div class="header-line"></div>
         </div>
         <div class="card-content">
@@ -113,7 +113,7 @@
       <!-- Radio Module Information -->
       <div class="info-card wide animate-entry" style="animation-delay: 0.6s">
         <div class="card-header-clean">
-          <h3>{{ t('sysinfo.radioModule') || 'Radio Module' }}</h3>
+          <h3>{{ t('sysinfo.radioModule') }}</h3>
           <div class="header-line"></div>
         </div>
         <div class="card-content grid-3">
@@ -154,14 +154,6 @@ import { useSysInfoStore } from './stores.js'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
-
-// Greeting based on time
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return t('sysinfo.goodMorning') || 'Good Morning'
-  if (hour < 18) return t('sysinfo.goodAfternoon') || 'Good Afternoon'
-  return t('sysinfo.goodEvening') || 'Good Evening'
-})
 
 // Ethernet status
 const ethernetStatus = computed(() => {
