@@ -440,3 +440,14 @@ h1, h2, h3, h4, h5, h6 {
     padding: var(--spacing-md);
   }
 }
+
+/* Touch Optimization */
+a, button, input, select, .btn, .nav-link, .form-check-input {
+  touch-action: manipulation;
+}
+
+@media (max-width: 991px) {
+  .navbar-glass {
+    height: auto !important;
+  }
+}

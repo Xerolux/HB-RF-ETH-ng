@@ -159,7 +159,9 @@ export default {
     system: 'System',
     network: 'Network',
     down: 'Down',
-    mbits: 'Mbit/s'
+    mbits: 'Mbit/s',
+    online: 'Online',
+    offline: 'Offline'
   },
 
   // Firmware Update

@@ -51,21 +51,23 @@
               <!-- Settings Dropdown -->
               <BNavItemDropdown v-if="loginStore.isLoggedIn" class="settings-dropdown" no-caret>
                 <template #button-content>
-                  <span class="nav-link" :class="{ active: router.currentRoute.value.path === '/settings' }">
+                  <span :class="{ 'text-primary': router.currentRoute.value.path.startsWith('/settings') || router.currentRoute.value.path === '/firmware' || router.currentRoute.value.path === '/monitoring' }">
                     {{ t('nav.settings') }}
+                    <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
                   </span>
                 </template>
                 <BDropdownItem to="/settings?tab=general">{{ t('settings.tabGeneral') || 'General' }}</BDropdownItem>
                 <BDropdownItem to="/settings?tab=network">{{ t('settings.tabNetwork') || 'Network' }}</BDropdownItem>
                 <BDropdownItem to="/settings?tab=time">{{ t('settings.tabTime') || 'Time' }}</BDropdownItem>
                 <BDropdownItem to="/settings?tab=backup">{{ t('settings.tabBackup') || 'Backup' }}</BDropdownItem>
+                <BDropdownDivider />
+                <BDropdownItem to="/firmware">
+                  {{ t('nav.firmware') }}
+                  <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
+                </BDropdownItem>
+                <BDropdownItem to="/monitoring">{{ t('nav.monitoring') }}</BDropdownItem>
               </BNavItemDropdown>
 
-              <BNavItem to="/firmware" v-if="loginStore.isLoggedIn" active-class="active">
-                {{ t('nav.firmware') }}
-                <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
-              </BNavItem>
-              <BNavItem to="/monitoring" v-if="loginStore.isLoggedIn" active-class="active">{{ t('nav.monitoring') }}</BNavItem>
               <BNavItem to="/about" active-class="active">{{ t('nav.about') }}</BNavItem>
             </BNavbarNav>
 

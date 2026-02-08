@@ -7,7 +7,7 @@
       </main>
       <footer class="app-footer">
         <div class="footer-content">
-          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025</small>
+          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2026 Xerolux</small>
           <button class="sponsor-btn" @click="showSponsorModal = true">
             <span>❤️</span> Sponsor
           </button>

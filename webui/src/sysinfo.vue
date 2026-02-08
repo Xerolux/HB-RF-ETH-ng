@@ -7,7 +7,7 @@
       </div>
       <div class="status-indicator" :class="{ 'online': sysInfoStore.ethernetConnected }">
         <span class="indicator-dot"></span>
-        <span class="indicator-text">{{ sysInfoStore.ethernetConnected ? 'Online' : 'Offline' }}</span>
+        <span class="indicator-text">{{ sysInfoStore.ethernetConnected ? t('sysinfo.online') : t('sysinfo.offline') }}</span>
       </div>
     </div>
 
@@ -56,7 +56,7 @@
         <div class="widget-bottom">
           <span class="widget-label">{{ t('sysinfo.ethernet') || 'Ethernet' }}</span>
           <div class="widget-status-text" :class="sysInfoStore.ethernetConnected ? 'text-success' : 'text-danger'">
-            {{ sysInfoStore.ethernetConnected ? 'Connected' : 'Disconnected' }}
+            {{ sysInfoStore.ethernetConnected ? t('sysinfo.connected') : t('sysinfo.disconnected') }}
           </div>
         </div>
       </div>
