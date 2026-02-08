@@ -29,6 +29,7 @@
 #include "string.h"
 #include "cJSON.h"
 #include "reset_info.h"
+#include "system_reset.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -227,7 +228,7 @@ void UpdateCheck::performOnlineUpdate()
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update successful, restarting...");
         ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
-        esp_restart();
+        full_system_restart();
     } else {
         ESP_LOGE(TAG, "OTA Update failed");
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
