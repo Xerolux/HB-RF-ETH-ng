@@ -747,6 +747,14 @@ httpd_uri_t post_restore_handler = {
         }                                                                         \
     } while (0)
 
+#define OTA_BUFFER_SIZE 4096
+
+void delayed_restart_task(void *pvParameter) {
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    esp_restart();
+    vTaskDelete(NULL);
+}
+
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -763,7 +771,13 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     esp_ota_handle_t ota_handle = 0;
     bool ota_begun = false;
 
-    char ota_buff[1024];
+    char *ota_buff = (char *)malloc(OTA_BUFFER_SIZE);
+    if (!ota_buff) {
+        ESP_LOGE(TAG, "Failed to allocate OTA buffer");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_FAIL;
+    }
+
     int content_length = req->content_len;
     int content_received = 0;
     int recv_len;
@@ -783,7 +797,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
     do
     {
-        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length - content_received, sizeof(ota_buff)))) < 0)
+        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length - content_received, OTA_BUFFER_SIZE))) < 0)
         {
             if (recv_len == HTTPD_SOCK_ERR_TIMEOUT)
             {
@@ -836,7 +850,12 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
                 }
             }
 
-            OTA_CHECK(esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle) == ESP_OK, "Could not start OTA");
+            size_t image_size = OTA_SIZE_UNKNOWN;
+            if (!is_multipart) {
+                image_size = content_length;
+            }
+
+            OTA_CHECK(esp_ota_begin(update_partition, image_size, &ota_handle) == ESP_OK, "Could not start OTA");
             ota_begun = true;
             ESP_LOGW(TAG, "Begin OTA Update to partition %s, File Size: %d", update_partition->label, content_length);
             _statusLED->setState(LED_STATE_BLINK_FAST);
@@ -878,7 +897,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error setting boot partition");
 
     ESP_LOGI(TAG, "OTA finished successfully, restarting in 3 seconds to activate new firmware.");
-    httpd_resp_sendstr(req, "Firmware update completed, restarting in 3 seconds...");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware update completed, restarting in 3 seconds...\"}");
 
     _statusLED->setState(LED_STATE_OFF);
 
@@ -886,12 +906,13 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
 
     // Automatic restart after successful OTA update
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    esp_restart();
+    xTaskCreate(delayed_restart_task, "restart_task", 2048, NULL, 5, NULL);
 
+    free(ota_buff);
     return ESP_OK;
 
 err:
+    if (ota_buff) free(ota_buff);
     _statusLED->setState(LED_STATE_OFF);
 
     // Abort OTA if it was started but not completed
