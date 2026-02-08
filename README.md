@@ -19,20 +19,33 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
 **Version 2.1.2 Änderungen:**
 * **Erhöhte Sicherheit**
   * Stärkere Passwort-Anforderungen (8 Zeichen, Groß-/Kleinschreibung, Zahlen)
-  * OTA-Passwort wird nicht mehr im Browser gespeichert (Security Best Practice)
+  * Automatischer Logout nach 5 Minuten Inaktivität
+  * Timing-attacken-geschützte Passwortvergleiche
 * **Verbesserte Firmware-Update-UX**
   * Passwort-Stärke-Anzeige beim Setzen
-  * Warnhinweis wenn OTA-Passwort nicht gesetzt
   * Automatischer Neustart nach erfolgreichem Update
+  * Verbesserte Fehlerbehandlung verhindert Panic bei fehlerhaften Updates
+  * OTA-Passwort-Anforderung entfernt (Authentifizierung ist ausreichend)
 * **Detaillierte Neustart-Gründe** in der WebUI
   * Zeigt Ursache des letzten Neustarts (Update, Werksreset, Fehler, etc.)
 * **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
 * **Werksreset** auch über WebUI möglich
 * **Moderne, responsive WebUI** mit Mobile-Support
+  * Dark/Light Theme Toggle
+  * Multi-Language Support (10 Sprachen: DE, EN, ES, FR, IT, NL, NO, PL, CS, SV)
+  * LED-Helligkeitssteuerung (0-100%)
+* **Neue Monitoring-Features**
+  * MQTT-Support mit Home Assistant Auto-Discovery
+  * Check_MK Agent für erweitertes Monitoring
+  * Detailliertes SNMP-Monitoring mit MIB-2 Unterstützung
+* **Backup & Restore**
+  * Konfigurations-Backup/Restore über WebUI
+  * Nextcloud-Integration für Cloud-Backups
 * **Technische Updates**
   * Espressif32 Platform 6.12.0 (neuestes ESP-IDF)
   * Vue.js 3.5.27, Vue Router 5, Pinia 3, Vue i18n 11
   * Bootstrap Vue Next 0.43.0
+  * HTTP gzip Kompression für schnellere Ladezeiten
   * Alle npm-Pakete auf dem neuesten Stand
 
 **Version 2.1.1 Änderungen:**
@@ -68,38 +81,55 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
     * Pin 2: TX
     * Pin 3: Gnd
 * MDNS Server um Platine im Netzwerk bekannt zu machen
-* Netzwerkeinsellungen per DHCP oder statisch konfigurierbar
+* Netzwerkeinsettings per DHCP oder statisch konfigurierbar
 * **IPv6 Support** (Auto-Konfiguration oder statisch)
 * **Moderne WebUI zur Konfiguration**
   * Initiales Passwort: `admin` (muss nach dem ersten Login geändert werden)
-  * Separates **OTA-Passwort** für Firmware-Updates (optional, aber empfohlen)
+  * Separates **OTA-Passwort** für Firmware-Updates (optional)
   * Responsive Design für Desktop und Mobile
+  * **Dark/Light Theme Toggle** für helles und dunkles Design
+  * **Multi-Language Support** (10 Sprachen: Deutsch, Englisch, Spanisch, Französisch, Italienisch, Niederländisch, Norwegisch, Polnisch, Tschechisch, Schwedisch)
+  * **LED-Helligkeitssteuerung** (0-100%) für alle Status-LEDs
   * Detaillierte Systeminformationen und Neustart-Gründe
+  * Automatischer Logout nach 5 Minuten Inaktivität
 * **Firmware Updates**
   * Upload als .bin Datei
   * **Download per URL** (z.B. direkt von GitHub Releases)
-  * OTA-Passwort-Schutz für Updates
+  * Verbesserte Fehlerbehandlung verhindert Panic bei fehlerhaften Updates
   * Automatischer Neustart nach erfolgreichem Update
   * Anzeige verfügbarer Updates in der WebUI
+  * Upload-Fortschrittsanzeige in Prozent
 * Erkennung des Funkmoduls und Ausgabe von Typ, Seriennummer, Funkadresse und SGTIN in der WebUI
 * Regelmäßige Prüfung auf Firmwareupdates
 * Werksreset per Taster oder über die WebUI
-* **Backup & Restore** der Einstellungen über die WebUI
+* **Backup & Restore**
+  * Manuelles Backup/Restore der Einstellungen über die WebUI
+  * **Nextcloud-Integration** für automatische Cloud-Backups
 * **Sicherheits-Features**
   * Timing-attacken-geschützte Passwortvergleiche
   * Rate Limiting bei Login-Versuchen
-  * Moderne Security Headers
+  * Moderne Security Headers (CSP, X-Frame-Options, etc.)
+  * HTTP gzip Kompression für schnellere Übertragung
 * **Monitoring und Überwachung**
+  * **MQTT-Support**
+    * Vollständige MQTT-Client-Integration
+    * Home Assistant Auto-Discovery für automatische Einrichtung
+    * Konfigurierbarer Server, Port und Authentifizierung
+    * Status-Publishing für Systemmetriken
   * **SNMP Support** (Simple Network Management Protocol)
-    * Überwachung von Systemmetriken (CPU, Speicher, Uptime, Temperatur)
+    * Überwachung von Systemmetriken (CPU, Speicher, Uptime, Temperatur, Spannung)
     * Standard MIB-2 Unterstützung
     * Konfigurierbarer SNMP Community String
     * Konfigurierbare Location und Contact Informationen
   * **Check_MK Agent**
-    * Native Unterstützung für Check_MK Monitoring
+    * Native Unterstützung für Check_MK/CheckMK Monitoring
     * Erweiterte Systemmetriken und Statusinformationen
-    * Konfigurierbare Zugriffskontrolle
+    * IP-basierte Zugriffskontrolle
     * Einfache Integration in bestehende Monitoring-Infrastruktur
+* **Hardware-Überwachung**
+  * Echtzeit-Temperaturüberwachung
+  * Spannungsüberwachung
+  * CPU- und Speicheranzeige
 
 ### Bekannte Einschränkungen
 * Nach einem Neustart der Platine (z.B. bei Stromausfall) findet kein automatischer Reconnect statt, in diesem Fall muss die CCU Software daher neu gestartet werden.
@@ -141,21 +171,19 @@ Firmware Updates sind fertig kompiliert in den [Releases](https://github.com/Xer
 1. Herunterladen der `firmware.bin` Datei aus dem Release
 2. In der WebUI zur Seite "Firmware Update" navigieren
 3. Die .bin Datei hochladen
-4. OTA-Passwort eingeben (falls konfiguriert)
-5. Update wird automatisch eingespielt und die Platine neu gestartet
+4. Update wird automatisch eingespielt und die Platine neu gestartet
 
 **Per Webinterface (URL Download):**
 1. In der WebUI zur Seite "Firmware Update" navigieren
 2. Direkte URL zur .bin Datei eingeben (z.B. von GitHub)
 3. Quick-Button für die neueste GitHub-Version nutzen
-4. OTA-Passwort eingeben (falls konfiguriert)
-5. Firmware wird heruntergeladen, installiert und die Platine neu gestartet
+4. Firmware wird heruntergeladen, installiert und die Platine neu gestartet
 
-**OTA-Passwort:**
-- Ein separates OTA-Passwort kann in den Einstellungen festgelegt werden
-- Dieses Passwort ist für alle Firmware-Updates erforderlich
-- Es dient als zusätzlicher Schutz vor unbefugten Updates
-- Wird das Passwort vergessen, kann es nur über die Konsole gelöscht werden
+**Sicherheitshinweise:**
+- Die Standard-Authentifizierung schützt Firmware-Updates ausreichend
+- Ein separates OTA-Passwort ist optional verfügbar
+- Die Firmware validiert alle Updates vor der Installation
+- Bei fehlerhaften Updates wird die OTA-Operation korrekt abgebrochen
 
 ### Kompatible CCU-Systeme
 
