@@ -4,7 +4,6 @@
     <div class="dashboard-header animate-entry">
       <div class="header-text">
         <h1>{{ greeting }}</h1>
-        <p>{{ t('sysinfo.systemStatus') || 'System Status Overview' }}</p>
       </div>
       <div class="status-indicator" :class="{ 'online': sysInfoStore.ethernetConnected }">
         <span class="indicator-dot"></span>

@@ -19,14 +19,19 @@
       </div>
 
       <div class="options-grid">
-        <a href="https://github.com/sponsors/Xerolux" target="_blank" class="sponsor-option github">
-          <span class="icon">🐙</span>
-          <span class="label">GitHub Sponsors</span>
-        </a>
-
         <a href="https://paypal.me/Xerolux" target="_blank" class="sponsor-option paypal">
           <span class="icon">☕</span>
-          <span class="label">PayPal / Coffee</span>
+          <span class="label">PayPal</span>
+        </a>
+
+        <a href="https://www.buymeacoffee.com/xerolux" target="_blank" class="sponsor-option bmc">
+          <span class="icon">🥤</span>
+          <span class="label">Buy Me a Coffee</span>
+        </a>
+
+        <a href="https://ts.la/sebastian564489" target="_blank" class="sponsor-option tesla">
+          <span class="icon">🚗</span>
+          <span class="label">Tesla Referral</span>
         </a>
       </div>
 
@@ -155,6 +160,16 @@ const closeModal = () => {
 
 .sponsor-option.paypal {
   background-color: #0070ba;
+  color: white;
+}
+
+.sponsor-option.bmc {
+  background-color: #FFDD00;
+  color: #000000;
+}
+
+.sponsor-option.tesla {
+  background-color: #cc0000;
   color: white;
 }
 

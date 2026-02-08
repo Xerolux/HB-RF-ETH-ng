@@ -29,6 +29,7 @@ export default {
   // Login Page
   login: {
     title: 'Please log in',
+    subtitle: 'Please enter your password to continue',
     username: 'Username',
     password: 'Password',
     login: 'Login',
@@ -122,6 +123,9 @@ export default {
   // System Info
   sysinfo: {
     title: 'System information',
+    goodMorning: 'Good Morning',
+    goodAfternoon: 'Good Afternoon',
+    goodEvening: 'Good Evening',
     serial: 'Serial number',
     boardRevision: 'Board revision',
     uptime: 'Uptime',
@@ -161,6 +165,11 @@ export default {
   // Firmware Update
   firmware: {
     title: 'Firmware',
+    subtitle: 'Update your device firmware',
+    restartingText: 'Device is restarting. Page will reload automatically.',
+    fileUploadHint: 'Upload a .bin firmware file',
+    networkUpdateHint: 'Download from URL',
+    factoryResetHint: 'Reset to factory defaults',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
     versionInfo: 'Modernized fork v2.1 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
