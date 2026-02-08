@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { viteCompression } from 'vite-plugin-compression'
+import viteCompression from 'vite-plugin-compression'
 import { resolve } from 'path'
 
 export default defineConfig({
@@ -32,13 +32,8 @@ export default defineConfig({
         }
       }
     },
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
-    }
+    minify: 'esbuild',
+    target: 'es2015'
   },
   server: {
     port: 1234,

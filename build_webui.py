@@ -34,13 +34,17 @@ def build_web():
 
         npm_cmd = "npm.cmd" if platform.system() == "Windows" else "npm"
 
-        # Run npm install first if node_modules doesn't exist
-        if not Path("node_modules").exists():
-            print("Installing npm dependencies...")
+        # Always install/update dependencies to ensure we have the latest packages
+        # Use 'npm ci' if package-lock.json exists for faster, reproducible builds
+        print("Installing npm dependencies...")
+        if Path("package-lock.json").exists():
+            result = run([npm_cmd, "ci"], capture_output=True, text=True, encoding="utf-8")
+        else:
             result = run([npm_cmd, "install"], capture_output=True, text=True, encoding="utf-8")
-            if result.returncode != 0:
-                print(f"ERROR: npm install failed:\n{result.stderr}")
-                return
+
+        if result.returncode != 0:
+            print(f"ERROR: npm install failed:\n{result.stderr}")
+            return
 
         # Build the web UI
         result = run([npm_cmd, "run", "build"], capture_output=True, text=True, encoding="utf-8")
