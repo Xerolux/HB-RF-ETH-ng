@@ -30,4 +30,7 @@ class MDns
 public:
     void start(Settings* settings);
     void stop();
+    void announce(); // Send mDNS announcement
+private:
+    Settings* _settings = nullptr;
 };

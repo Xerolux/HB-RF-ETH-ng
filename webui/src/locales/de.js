@@ -329,5 +329,17 @@ export default {
     title: 'Unterstützen Sie dieses Projekt',
     description: 'Wenn Ihnen dieses Projekt gefällt und Sie die Weiterentwicklung unterstützen möchten, können Sie eine der folgenden Optionen nutzen.',
     thanks: 'Vielen Dank für Ihre Unterstützung!'
+  },
+
+  // Changelog
+  changelog: {
+    title: 'Änderungsprotokoll',
+    loading: 'Laden...',
+    fetching: 'Lade Änderungsprotokoll von GitHub...',
+    error: 'Fehler beim Laden des Änderungsprotokolls',
+    fetchError: 'Änderungsprotokoll konnte nicht geladen werden. Bitte überprüfen Sie Ihre Internetverbindung.',
+    retry: 'Wiederholen',
+    close: 'Schließen',
+    viewOnGithub: 'Auf GitHub anzeigen'
   }
 }

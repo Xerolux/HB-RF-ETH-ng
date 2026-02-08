@@ -27,6 +27,9 @@
       <div class="version-badge">
         <span class="label">{{ t('firmware.version') }}</span>
         <span class="value">{{ sysInfoStore.currentVersion }}</span>
+        <BButton variant="outline-light" size="sm" @click="showChangelogModal = true" class="changelog-btn">
+          📋 {{ t('changelog.title') || 'Changelog' }}
+        </BButton>
       </div>
     </div>
 
@@ -190,6 +193,9 @@
       </div>
     </BModal>
 
+    <!-- Changelog Modal -->
+    <ChangelogModal v-model="showChangelogModal" />
+
   </div>
 </template>
 
@@ -198,6 +204,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
 import axios from 'axios'
+import ChangelogModal from './components/ChangelogModal.vue'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
@@ -221,6 +228,7 @@ const statusMessage = ref('')
 const statusIcon = ref('')
 const statusType = ref('info') // info, success, error, warning
 const statusPersistent = ref(false)
+const showChangelogModal = ref(false)
 
 const showUpdateBanner = computed(() => {
   const current = sysInfoStore.currentVersion
@@ -416,6 +424,9 @@ onMounted(() => {
   background: var(--color-bg);
   padding: 8px 16px;
   border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .version-badge .label {
@@ -428,6 +439,18 @@ onMounted(() => {
 .version-badge .value {
   font-size: 1.25rem;
   font-weight: 700;
+  color: var(--color-primary);
+}
+
+.version-badge .changelog-btn {
+  font-size: 0.875rem;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  transition: all 0.2s;
+}
+
+.version-badge .changelog-btn:hover {
+  border-color: var(--color-primary);
   color: var(--color-primary);
 }
 

@@ -172,8 +172,16 @@ void app_main()
 
     radioModuleConnector.resetModule();
 
+    // Add a short delay before starting UDP listener to ensure network is fully stable
+    // This helps improve CCU 3 reconnection after firmware updates
+    ESP_LOGI(TAG, "Waiting 2 seconds for network stabilization before starting UDP listener...");
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
+
+    ESP_LOGI(TAG, "UDP listener started on port 3008");
+    ESP_LOGI(TAG, "CCU 3 should now be able to reconnect. If not, restart CCU software.");
 
     // Initialize log manager early to capture all logs (8KB ring buffer)
     LogManager::begin(8192);
@@ -194,6 +202,11 @@ void app_main()
     statusLED.setState(LED_STATE_OFF);
 
     esp_ota_mark_app_valid_cancel_rollback();
+
+    // Send mDNS announcement after all services are started
+    // This helps CCU 3 and other devices discover us after restart
+    ESP_LOGI(TAG, "All services started. Sending mDNS announcements...");
+    mdns.announce();
 
     vTaskSuspend(NULL);
 }

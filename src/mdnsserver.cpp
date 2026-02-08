@@ -24,15 +24,38 @@
 #include "mdnsserver.h"
 #include "esp_system.h"
 #include "mdns.h"
+#include "esp_log.h"
+
+static const char *TAG = "MDns";
 
 void MDns::start(Settings* settings)
 {
+    _settings = settings;
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_init());
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_hostname_set(settings->getHostname()));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0));
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_service_add(NULL, "_raw-uart", "_udp", 3008, NULL, 0));
     ESP_ERROR_CHECK_WITHOUT_ABORT(mdns_service_add(NULL, "_ntp", "_udp", 123, NULL, 0));
+
+    ESP_LOGI(TAG, "mDNS services started for hostname: %s", settings->getHostname());
+    ESP_LOGI(TAG, "  - _http._tcp :80 (WebUI)");
+    ESP_LOGI(TAG, "  - _raw-uart._udp :3008 (CCU connection)");
+    ESP_LOGI(TAG, "  - _ntp._udp :123 (NTP server)");
+
+    // Send initial announcement
+    announce();
+}
+
+void MDns::announce()
+{
+    // Send mDNS announcements to help network devices discover us faster
+    ESP_LOGI(TAG, "Sending mDNS service announcements...");
+
+    // ESP-IDF's mdns implementation automatically sends announcements,
+    // but we can trigger additional announcements if needed
+    // This is especially helpful after restart when devices need to rediscover us
+    mdns_service_register_all();
 }
 
 void MDns::stop()

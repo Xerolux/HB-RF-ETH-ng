@@ -329,5 +329,17 @@ export default {
     title: 'Support this Project',
     description: 'If you like this project and want to support its development, you can use one of the options below.',
     thanks: 'Thank you for your support!'
+  },
+
+  // Changelog
+  changelog: {
+    title: 'Changelog',
+    loading: 'Loading...',
+    fetching: 'Fetching changelog from GitHub...',
+    error: 'Failed to load changelog',
+    fetchError: 'Could not fetch changelog. Please check your internet connection.',
+    retry: 'Retry',
+    close: 'Close',
+    viewOnGithub: 'View on GitHub'
   }
 }
