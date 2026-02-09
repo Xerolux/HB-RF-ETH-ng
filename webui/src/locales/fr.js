@@ -137,7 +137,7 @@ export default {
     title: 'Micrologiciel',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
-    versionInfo: 'Fork modernisé v2.1 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
+    versionInfo: 'Fork modernisé v2.1.4 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
     onlineUpdate: 'Mise à jour en ligne',
     onlineUpdateConfirm: 'Voulez-vous vraiment télécharger et installer la mise à jour ? Le système redémarrera automatiquement.',
