@@ -338,6 +338,8 @@ export default {
     description: 'Live-Ansicht der Systemprotokollierung mit Download-Funktion.',
     liveLog: 'Live-Protokoll',
     autoScroll: 'Auto-Scroll',
+    enabled: 'Aktiv',
+    disabledMessage: 'Log-Anzeige ist deaktiviert. Schalten Sie den Schalter ein, um Live-Logs zu sehen.',
     clear: 'Leeren',
     download: 'Download',
     empty: 'Noch keine Log-Einträge vorhanden.'

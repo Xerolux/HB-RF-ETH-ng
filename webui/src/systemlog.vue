@@ -12,7 +12,11 @@
           <h3>{{ t('systemlog.liveLog') }}</h3>
         </div>
         <div class="log-actions">
-          <button class="btn btn-sm btn-outline-secondary me-2" @click="toggleAutoScroll" :title="t('systemlog.autoScroll')">
+          <div class="form-check form-switch me-3">
+            <input class="form-check-input" type="checkbox" id="logEnabled" v-model="logEnabled">
+            <label class="form-check-label" for="logEnabled">{{ t('systemlog.enabled') }}</label>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary me-2" @click="toggleAutoScroll" :disabled="!logEnabled" :title="t('systemlog.autoScroll')">
             {{ autoScroll ? '⏸' : '▶' }}
           </button>
           <button class="btn btn-sm btn-outline-secondary me-2" @click="clearLog" :title="t('systemlog.clear')">
@@ -25,8 +29,11 @@
       </div>
 
       <div class="card-body p-0">
-        <div ref="logContainer" class="log-container" @scroll="onScroll">
+        <div v-if="logEnabled" ref="logContainer" class="log-container" @scroll="onScroll">
           <pre class="log-content">{{ logContent || t('systemlog.empty') }}</pre>
+        </div>
+        <div v-else class="log-disabled">
+          <p>{{ t('systemlog.disabledMessage') }}</p>
         </div>
       </div>
     </div>
@@ -34,7 +41,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 
@@ -42,11 +49,33 @@ const { t } = useI18n()
 
 const logContent = ref('')
 const logContainer = ref(null)
+const logEnabled = ref(true)
 const autoScroll = ref(true)
 const offset = ref(0)
 let pollTimer = null
 
 const downloadUrl = computed(() => '/api/log/download')
+
+const startPolling = () => {
+  stopPolling()
+  fetchLog()
+  pollTimer = setInterval(fetchLog, 3000)
+}
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+watch(logEnabled, (enabled) => {
+  if (enabled) {
+    startPolling()
+  } else {
+    stopPolling()
+  }
+})
 
 const fetchLog = async () => {
   try {
@@ -89,12 +118,13 @@ const clearLog = () => {
 }
 
 onMounted(() => {
-  fetchLog()
-  pollTimer = setInterval(fetchLog, 3000)
+  if (logEnabled.value) {
+    startPolling()
+  }
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  stopPolling()
 })
 </script>
 
@@ -174,6 +204,17 @@ onUnmounted(() => {
   color: #a8b2d1;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.log-disabled {
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg, #1a1a2e);
+  border-top: 1px solid var(--color-border-light);
+  color: var(--color-text-secondary, #666);
+  font-size: 0.9rem;
 }
 
 /* Utility Colors */

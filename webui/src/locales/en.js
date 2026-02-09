@@ -338,6 +338,8 @@ export default {
     description: 'Live view of system log output with download capability.',
     liveLog: 'Live Log',
     autoScroll: 'Auto-scroll',
+    enabled: 'Enabled',
+    disabledMessage: 'Log viewer is disabled. Turn on the switch to see live logs.',
     clear: 'Clear',
     download: 'Download',
     empty: 'No log entries yet.'
