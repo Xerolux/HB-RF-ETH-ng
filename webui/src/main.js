@@ -63,6 +63,18 @@ axios.interceptors.response.use(
 // Router guard
 router.beforeEach((to, from, next) => {
   const loginStore = useLoginStore()
+
+  // Check activity on navigation
+  if (loginStore.isLoggedIn) {
+    if (loginStore.checkActivity()) {
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath }
+      })
+      return
+    }
+  }
+
   if (to.matched.some(r => r.meta.requiresAuth)) {
     if (!loginStore.isLoggedIn) {
       next({
@@ -121,5 +133,33 @@ for (const key in BootstrapVueNext) {
 // Initialize theme
 const themeStore = useThemeStore()
 themeStore.init()
+
+// Activity tracking for idle timeout
+let lastUpdate = 0
+const updateActivity = () => {
+  const now = Date.now()
+  if (now - lastUpdate > 1000) { // Throttle updates to once per second
+    const loginStore = useLoginStore()
+    if (loginStore.isLoggedIn) {
+      loginStore.updateActivity()
+    }
+    lastUpdate = now
+  }
+}
+
+window.addEventListener('mousemove', updateActivity)
+window.addEventListener('keydown', updateActivity)
+window.addEventListener('click', updateActivity)
+window.addEventListener('touchstart', updateActivity)
+
+// Check for inactivity every 30 seconds
+setInterval(() => {
+  const loginStore = useLoginStore()
+  if (loginStore.isLoggedIn) {
+    if (loginStore.checkActivity()) {
+      router.push('/login')
+    }
+  }
+}, 30000)
 
 app.mount('#app')

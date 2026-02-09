@@ -18,8 +18,11 @@
 #define RATE_LIMIT_WINDOW_SECONDS 60
 #define MAX_TRACKED_IPS 20
 
+#include "lwip/ip_addr.h"
+
 // Rate limiter functions
 void rate_limiter_init();
 bool rate_limiter_check_login(httpd_req_t *req);
+bool rate_limiter_is_whitelisted(httpd_req_t *req, const ip4_addr_t *whitelist_ip);
 void rate_limiter_reset_ip(httpd_req_t *req);
 void rate_limiter_cleanup();
