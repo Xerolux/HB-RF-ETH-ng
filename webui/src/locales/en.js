@@ -33,6 +33,7 @@ export default {
     subtitle: 'Please enter your password to continue',
     username: 'Username',
     password: 'Password',
+    passwordPlaceholder: 'Password',
     login: 'Login',
     loginFailed: 'Login failed',
     invalidCredentials: 'Invalid credentials',

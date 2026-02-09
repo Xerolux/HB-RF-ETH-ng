@@ -56,7 +56,7 @@ Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF
   * Zeigt Ursache des letzten Neustarts (Update, Werksreset, Fehler, etc.)
 * **OTA Update per URL** - Firmware direkt aus dem Netzwerk herunterladen
 * **Werksreset** auch über WebUI möglich
-* **Moderne, responsive WebUI** mit Mobile-Support
+* **Moderne, responsive WebUI** mit optimierter Mobile-Ansicht
   * Dark/Light Theme Toggle
   * Multi-Language Support (10 Sprachen: DE, EN, ES, FR, IT, NL, NO, PL, CS, SV)
   * LED-Helligkeitssteuerung (0-100%)
@@ -152,6 +152,11 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
   * Echtzeit-Temperaturüberwachung
   * Spannungsüberwachung
   * CPU- und Speicheranzeige
+
+### Mobile Ansicht
+Die Benutzeroberfläche wurde speziell für mobile Endgeräte optimiert und bietet eine intuitive Bedienung auf Smartphones und Tablets.
+
+![Mobile Tour](docs/mobile_tour.gif)
 
 ### Bekannte Einschränkungen
 * Nach einem Neustart der Platine (z.B. bei Stromausfall) findet kein automatischer Reconnect statt, in diesem Fall muss die CCU Software daher neu gestartet werden.
