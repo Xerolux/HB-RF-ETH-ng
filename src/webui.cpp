@@ -35,6 +35,8 @@
 #include "monitoring_api.h"
 #include "rate_limiter.h"
 #include "security_headers.h"
+#include "secure_utils.h"
+#include "log_manager.h"
 #include "reset_info.h"
 #include "system_reset.h"
 #include "esp_http_client.h"
@@ -131,29 +133,6 @@ void formatRadioMAC(uint32_t radioMAC, char *buf, size_t bufSize)
     {
         snprintf(buf, bufSize, "0x%06" PRIX32, radioMAC);
     }
-}
-
-/**
- * Constant-time string comparison to prevent timing attacks.
- * Returns 0 if strings match, non-zero otherwise.
- */
-int secure_strcmp(const char *s1, const char *s2) {
-    if (!s1 || !s2) return 1;
-
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2);
-    size_t min_len = (len1 < len2) ? len1 : len2;
-    int result = 0;
-
-    if (len1 != len2) {
-        result = 1;
-    }
-
-    for (size_t i = 0; i < min_len; i++) {
-        result |= (s1[i] ^ s2[i]);
-    }
-
-    return result;
 }
 
 esp_err_t validate_auth(httpd_req_t *req)
@@ -1185,6 +1164,66 @@ httpd_uri_t post_change_password_handler = {
     .user_ctx = NULL};
 
 
+esp_err_t get_log_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    size_t offset = 0;
+    char query[32];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char param[16];
+        if (httpd_query_key_value(query, "offset", param, sizeof(param)) == ESP_OK) {
+            offset = strtoul(param, NULL, 10);
+        }
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    std::string content = LogManager::instance().getLogContent(offset);
+    httpd_resp_send(req, content.c_str(), content.length());
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_log_handler = {
+    .uri = "/api/log",
+    .method = HTTP_GET,
+    .handler = get_log_handler_func,
+    .user_ctx = NULL};
+
+esp_err_t get_log_download_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"hb-rf-eth-log.txt\"");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    std::string content = LogManager::instance().getLogContent();
+    httpd_resp_send(req, content.c_str(), content.length());
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_log_download_handler = {
+    .uri = "/api/log/download",
+    .method = HTTP_GET,
+    .handler = get_log_download_handler_func,
+    .user_ctx = NULL};
+
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
 WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
@@ -1229,6 +1268,8 @@ void WebUI::start()
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_log_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
 
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);

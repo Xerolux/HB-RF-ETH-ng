@@ -20,6 +20,7 @@ export default {
     settings: 'Einstellungen',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    systemlog: 'System-Log',
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
@@ -329,6 +330,19 @@ export default {
     title: 'Unterstützen Sie dieses Projekt',
     description: 'Wenn Ihnen dieses Projekt gefällt und Sie die Weiterentwicklung unterstützen möchten, können Sie eine der folgenden Optionen nutzen.',
     thanks: 'Vielen Dank für Ihre Unterstützung!'
+  },
+
+  // System Log
+  systemlog: {
+    title: 'System-Log',
+    description: 'Live-Ansicht der Systemprotokollierung mit Download-Funktion.',
+    liveLog: 'Live-Protokoll',
+    autoScroll: 'Auto-Scroll',
+    enabled: 'Aktiv',
+    disabledMessage: 'Log-Anzeige ist deaktiviert. Schalten Sie den Schalter ein, um Live-Logs zu sehen.',
+    clear: 'Leeren',
+    download: 'Download',
+    empty: 'Noch keine Log-Einträge vorhanden.'
   },
 
   // Changelog

@@ -18,6 +18,7 @@ import Login from './login.vue'
 import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
+import SystemLog from './systemlog.vue'
 
 
 // Router
@@ -28,6 +29,7 @@ const router = createRouter({
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
+    { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
     { path: '/login', component: Login },

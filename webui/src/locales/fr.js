@@ -19,6 +19,7 @@ export default {
     settings: 'Paramètres',
     firmware: 'Micrologiciel',
     monitoring: 'Surveillance',
+    systemlog: 'System Log',
     about: 'À propos',
     login: 'Connexion',
     logout: 'Déconnexion'

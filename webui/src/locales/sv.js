@@ -19,6 +19,7 @@ export default {
     settings: 'Inställningar',
     firmware: 'Firmware',
     monitoring: 'Övervakning',
+    systemlog: 'System Log',
     about: 'Om',
     logout: 'Logga ut'
   },

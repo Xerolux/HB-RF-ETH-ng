@@ -19,6 +19,7 @@ export default {
     settings: 'Nastavení',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    systemlog: 'System Log',
     about: 'O aplikaci',
     logout: 'Odhlásit'
   },

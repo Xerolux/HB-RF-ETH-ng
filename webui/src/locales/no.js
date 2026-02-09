@@ -19,6 +19,7 @@ export default {
     settings: 'Innstillinger',
     firmware: 'Fastvare',
     monitoring: 'Overvåkning',
+    systemlog: 'System Log',
     about: 'Om',
     logout: 'Logg ut'
   },

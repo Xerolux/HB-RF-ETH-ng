@@ -19,6 +19,7 @@ export default {
     settings: 'Ustawienia',
     firmware: 'Oprogramowanie',
     monitoring: 'Monitorowanie',
+    systemlog: 'System Log',
     about: 'O programie',
     logout: 'Wyloguj'
   },
