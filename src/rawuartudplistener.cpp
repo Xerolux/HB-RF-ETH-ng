@@ -26,18 +26,12 @@
 #include "esp_log.h"
 #include <string.h>
 #include "udphelper.h"
-#include "mdns.h"
 
 static const char *TAG = "RawUartUdpListener";
 
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
     ((RawUartUdpListener *)parameter)->_udpQueueHandler();
-}
-
-void _mDNS_announce_task(void *parameter)
-{
-    ((RawUartUdpListener *)parameter)->_mDNSAnnounceTask();
 }
 
 void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
@@ -145,13 +139,14 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
     case 1: // disconnect
         ESP_LOGI(TAG, "CCU 3 disconnected");
-        atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_connectionStarted, false);
+        atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_remoteAddress, 0u);
         _radioModuleConnector->setLED(false, false, false);
         break;
 
     case 2: // keep alive
+        sendMessage(2, NULL, 0);
         break;
 
     case 3: // LED
@@ -273,7 +268,7 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
-    _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
+    _udp_queue = xQueueCreate(64, sizeof(udp_event_t *));
     xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 
     _pcb = udp_new();
@@ -283,9 +278,7 @@ void RawUartUdpListener::start()
 
     _radioModuleConnector->setFrameHandler(this, false);
 
-    // Start mDNS announcement task to help CCU 3 discover and reconnect
-    xTaskCreate(_mDNS_announce_task, "mDNS_Announce", 2048, this, 5, &_mDNS_announce_handle);
-    ESP_LOGI(TAG, "UDP listener started with periodic mDNS announcements for CCU 3 stability");
+    ESP_LOGI(TAG, "UDP listener started on port 3008");
 }
 
 void RawUartUdpListener::stop()
@@ -297,12 +290,6 @@ void RawUartUdpListener::stop()
 
     _radioModuleConnector->setFrameHandler(NULL, false);
     vTaskDelete(_tHandle);
-
-    if (_mDNS_announce_handle != NULL)
-    {
-        vTaskDelete(_mDNS_announce_handle);
-        _mDNS_announce_handle = NULL;
-    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()
@@ -312,7 +299,7 @@ void RawUartUdpListener::_udpQueueHandler()
 
     for (;;)
     {
-        if (xQueueReceive(_udp_queue, &event, (TickType_t)(100 / portTICK_PERIOD_MS)) == pdTRUE)
+        if (xQueueReceive(_udp_queue, &event, (TickType_t)(10 / portTICK_PERIOD_MS)) == pdTRUE)
         {
             handlePacket(event->pb, event->addr, event->port);
             pbuf_free(event->pb);
@@ -323,43 +310,19 @@ void RawUartUdpListener::_udpQueueHandler()
         {
             int64_t now = esp_timer_get_time();
 
-            if (now > atomic_load(&_lastReceivedKeepAlive) + 5000000)
-            { // 5 sec
-                ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 5 seconds)");
-                ESP_LOGW(TAG, "Connection reset - waiting for CCU 3 to reconnect via mDNS...");
-
+            if (now > atomic_load(&_lastReceivedKeepAlive) + 10000000)
+            { // 10 sec
+                ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 10 seconds)");
+                atomic_store(&_connectionStarted, false);
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
-
-                // ESP-IDF automatically sends mDNS announcements
-                // CCU 3 will discover us via _raw-uart._udp service on port 3008
-                ESP_LOGI(TAG, "mDNS service _raw-uart._udp:3008 is continuously advertised");
             }
-
-            if (now > nextKeepAliveSentOut)
+            else if (now > nextKeepAliveSentOut)
             {
                 nextKeepAliveSentOut = now + 1000000; // 1sec
                 sendMessage(2, NULL, 0);
             }
-        }
-    }
-}
-
-void RawUartUdpListener::_mDNSAnnounceTask()
-{
-    ESP_LOGI(TAG, "mDNS monitoring task started - mDNS is continuously advertised by ESP-IDF");
-
-    while (true)
-    {
-        // Wait 30 seconds
-        vTaskDelay(30000 / portTICK_PERIOD_MS);
-
-        // ESP-IDF automatically handles mDNS announcements
-        // This task monitors connection status and provides helpful logging
-        if (atomic_load(&_remotePort) == 0)
-        {
-            ESP_LOGI(TAG, "Waiting for CCU 3 to connect via mDNS (_raw-uart._udp:3008)...");
         }
     }
 }
@@ -385,8 +348,9 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
 
     #pragma GCC diagnostic pop
 
-    if (xQueueSend(_udp_queue, &e, portMAX_DELAY) != pdPASS)
+    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
     {
+        ESP_LOGW(TAG, "UDP queue full, dropping packet");
         free((void *)(e));
         return false;
     }
