@@ -215,7 +215,7 @@ char *Settings::getAdminPassword()
   return _adminPassword;
 }
 
-void Settings::setAdminPassword(char *adminPassword)
+void Settings::setAdminPassword(const char *adminPassword)
 {
   strncpy(_adminPassword, adminPassword, sizeof(_adminPassword) - 1);
   // Mark password as changed when it's explicitly set
@@ -262,7 +262,7 @@ ip4_addr_t Settings::getDns2()
   return _dns2;
 }
 
-void Settings::setNetworkSettings(char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2)
+void Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2)
 {
   // Validate hostname
   if (!validateHostname(hostname))
@@ -358,7 +358,7 @@ char *Settings::getNtpServer()
   return _ntpServer;
 }
 
-void Settings::setNtpServer(char *ntpServer)
+void Settings::setNtpServer(const char *ntpServer)
 {
   if (!validateNtpServer(ntpServer))
   {
@@ -413,7 +413,7 @@ char *Settings::getIPv6Dns1() { return _ipv6Dns1; }
 char *Settings::getIPv6Dns2() { return _ipv6Dns2; }
 
 // IPv6 Setter
-void Settings::setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway, char *ipv6Dns1, char *ipv6Dns2)
+void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char *ipv6Address, int ipv6PrefixLength, const char *ipv6Gateway, const char *ipv6Dns1, const char *ipv6Dns2)
 {
     _enableIPv6 = enableIPv6;
     strncpy(_ipv6Mode, ipv6Mode, sizeof(_ipv6Mode) - 1);

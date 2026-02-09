@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Enhanced monitoring capabilities
 
+## [2.1.4] - 2025-02-17
+
+### Fixed
+- 🐛 **Memory Leak** - Fixed memory leak in OTA URL handler (`args` not freed on error)
+- 🐛 **Code Quality** - Fixed variable shadowing in `UpdateCheck` class
+- 🔧 **Const Correctness** - Improved C++ standards compliance in Settings class
+- 🌍 **Localization** - Corrected version display in French translation
+
 ## [2.1.3] - 2025-02-08
 
 ### Added
@@ -152,7 +160,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...HEAD
+[2.1.4]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...v2.1.4
 [2.1.3]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.2...v2.1.3
 [2.1.2]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.0...v2.1.1

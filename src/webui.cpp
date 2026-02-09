@@ -491,11 +491,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
              _settings->setIPv6Settings(
                 enableIPv6,
                 ipv6Mode,
-                ipv6Address ? ipv6Address : (char*)"",
+                ipv6Address ? ipv6Address : "",
                 ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : (char*)"",
-                ipv6Dns1 ? ipv6Dns1 : (char*)"",
-                ipv6Dns2 ? ipv6Dns2 : (char*)""
+                ipv6Gateway ? ipv6Gateway : "",
+                ipv6Dns1 ? ipv6Dns1 : "",
+                ipv6Dns2 ? ipv6Dns2 : ""
             );
         }
 
@@ -669,11 +669,11 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
          _settings->setIPv6Settings(
             enableIPv6,
             ipv6Mode,
-            ipv6Address ? ipv6Address : (char*)"",
+            ipv6Address ? ipv6Address : "",
             ipv6PrefixLength,
-            ipv6Gateway ? ipv6Gateway : (char*)"",
-            ipv6Dns1 ? ipv6Dns1 : (char*)"",
-            ipv6Dns2 ? ipv6Dns2 : (char*)""
+            ipv6Gateway ? ipv6Gateway : "",
+            ipv6Dns1 ? ipv6Dns1 : "",
+            ipv6Dns2 ? ipv6Dns2 : ""
         );
     }
 
@@ -1022,6 +1022,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to allocate memory for URL");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Memory allocation failed\"}");
+        delete args;
         return ESP_OK;
     }
     args->statusLED = _statusLED;

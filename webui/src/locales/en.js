@@ -263,7 +263,7 @@ export default {
   // About Page
   about: {
     title: 'About',
-    version: 'Version 2.1.3',
+    version: 'Version 2.1.4',
     fork: 'Modernized Fork',
     forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 5.3, modern toolchains and current WebUI technologies (Vue 3, Vite, Pinia).',
     original: 'Original Author',

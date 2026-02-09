@@ -125,16 +125,16 @@ void UpdateCheck::_updateLatestVersion()
         if (status == 200 && resp.len > 0)
         {
             // Trim whitespace and newlines
-            char* start = resp.buffer;
-            while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n') start++;
+            char* pStart = resp.buffer;
+            while (*pStart == ' ' || *pStart == '\t' || *pStart == '\r' || *pStart == '\n') pStart++;
 
-            char* end = start + strlen(start) - 1;
-            while (end > start && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) {
+            char* end = pStart + strlen(pStart) - 1;
+            while (end > pStart && (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n')) {
                 *end = 0;
                 end--;
             }
 
-            strncpy(_latestVersion, start, sizeof(_latestVersion) - 1);
+            strncpy(_latestVersion, pStart, sizeof(_latestVersion) - 1);
             _latestVersion[sizeof(_latestVersion) - 1] = 0;
 
             ESP_LOGI(TAG, "Latest version from server: %s", _latestVersion);
