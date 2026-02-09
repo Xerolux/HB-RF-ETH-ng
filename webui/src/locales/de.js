@@ -33,6 +33,7 @@ export default {
     subtitle: 'Bitte geben Sie Ihr Passwort ein',
     username: 'Benutzername',
     password: 'Passwort',
+    passwordPlaceholder: 'Passwort',
     login: 'Anmelden',
     loginFailed: 'Anmeldung fehlgeschlagen',
     invalidCredentials: 'Ungültige Anmeldedaten',
