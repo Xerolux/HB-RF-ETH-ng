@@ -1,3 +1,0 @@
-dependencies:
-  espressif/mdns:
-    version: "^1.4.3"
