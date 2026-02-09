@@ -75,7 +75,7 @@ public:
   void clear();
 
   char *getAdminPassword();
-  void setAdminPassword(char* password);
+  void setAdminPassword(const char* password);
   bool getPasswordChanged();
 
   char *getHostname();
@@ -86,7 +86,7 @@ public:
   ip4_addr_t getDns1();
   ip4_addr_t getDns2();
 
-  void setNetworkSettings(char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2);
+  void setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2);
 
   timesource_t getTimesource();
   void setTimesource(timesource_t timesource);
@@ -98,7 +98,7 @@ public:
   void setGpsBaudrate(int baudrate);
 
   char *getNtpServer();
-  void setNtpServer(char *ntpServer);
+  void setNtpServer(const char *ntpServer);
 
   int getLEDBrightness();
   void setLEDBrightness(int brightness);
@@ -119,5 +119,5 @@ public:
   char *getIPv6Dns2();
 
   // IPv6 setter
-  void setIPv6Settings(bool enableIPv6, char *ipv6Mode, char *ipv6Address, int ipv6PrefixLength, char *ipv6Gateway, char *ipv6Dns1, char *ipv6Dns2);
+  void setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char *ipv6Address, int ipv6PrefixLength, const char *ipv6Gateway, const char *ipv6Dns1, const char *ipv6Dns2);
 };
