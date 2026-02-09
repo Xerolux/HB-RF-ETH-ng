@@ -396,6 +396,12 @@ bool cJSON_GetBoolValue(const cJSON *item)
     return false;
 }
 
+void delayed_restart_task(void *pvParameter) {
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    full_system_restart();
+    vTaskDelete(NULL);
+}
+
 esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -698,12 +704,6 @@ httpd_uri_t post_restore_handler = {
     } while (0)
 
 #define OTA_BUFFER_SIZE 4096
-
-void delayed_restart_task(void *pvParameter) {
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    full_system_restart();
-    vTaskDelete(NULL);
-}
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
