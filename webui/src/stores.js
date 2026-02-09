@@ -23,23 +23,43 @@ export const useThemeStore = defineStore('theme', {
 
 export const useLoginStore = defineStore('login', {
   state: () => ({
-    isLoggedIn: sessionStorage.getItem("hb-rf-eth-ng-pw") != null,
-    token: sessionStorage.getItem("hb-rf-eth-ng-pw") || "",
-    passwordChanged: true // Default to true to avoid blocking if unknown
+    isLoggedIn: localStorage.getItem("hb-rf-eth-ng-pw") != null,
+    token: localStorage.getItem("hb-rf-eth-ng-pw") || "",
+    passwordChanged: true, // Default to true to avoid blocking if unknown
+    lastActivity: parseInt(localStorage.getItem("hb-rf-eth-ng-last-activity")) || Date.now()
   }),
   actions: {
     login(token) {
-      sessionStorage.setItem("hb-rf-eth-ng-pw", token)
+      localStorage.setItem("hb-rf-eth-ng-pw", token)
       this.token = token
       this.isLoggedIn = true
+      this.updateActivity()
     },
     logout() {
       this.isLoggedIn = false
-      sessionStorage.removeItem("hb-rf-eth-ng-pw")
+      localStorage.removeItem("hb-rf-eth-ng-pw")
+      localStorage.removeItem("hb-rf-eth-ng-last-activity")
       this.token = ""
     },
     setPasswordChanged(status) {
       this.passwordChanged = status
+    },
+    updateActivity() {
+      if (this.isLoggedIn) {
+        this.lastActivity = Date.now()
+        localStorage.setItem("hb-rf-eth-ng-last-activity", this.lastActivity)
+      }
+    },
+    checkActivity() {
+      if (this.isLoggedIn) {
+        const now = Date.now()
+        // 10 minutes = 600,000 ms
+        if (now - this.lastActivity > 600000) {
+          this.logout()
+          return true
+        }
+      }
+      return false
     },
     async tryLogin(password) {
       try {
