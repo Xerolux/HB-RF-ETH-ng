@@ -180,9 +180,6 @@ void app_main()
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
 
-    ESP_LOGI(TAG, "UDP listener started on port 3008");
-    ESP_LOGI(TAG, "CCU 3 should now be able to reconnect. If not, restart CCU software.");
-
     // Initialize log manager early to capture all logs (8KB ring buffer)
     LogManager::begin(8192);
 
