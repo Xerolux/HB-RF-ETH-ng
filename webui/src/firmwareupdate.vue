@@ -28,7 +28,7 @@
         <span class="label">{{ t('firmware.version') }}</span>
         <span class="value">{{ sysInfoStore.currentVersion }}</span>
         <BButton variant="outline-light" size="sm" @click="showChangelogModal = true" class="changelog-btn">
-          📋 {{ t('changelog.title') || 'Changelog' }}
+          📋 {{ t('changelog.title') }}
         </BButton>
       </div>
     </div>

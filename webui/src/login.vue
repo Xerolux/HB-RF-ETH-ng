@@ -8,8 +8,8 @@
         </div>
 
         <div class="form-section">
-          <h2 class="welcome-text">{{ t('login.title') || 'Welcome Back' }}</h2>
-          <p class="subtitle-text">{{ t('login.subtitle') || 'Please enter your password to continue' }}</p>
+          <h2 class="welcome-text">{{ t('login.title') }}</h2>
+          <p class="subtitle-text">{{ t('login.subtitle') }}</p>
 
           <BForm @submit.stop.prevent class="login-form">
             <div class="input-group-modern">
@@ -17,7 +17,7 @@
               <input
                 type="password"
                 v-model="password"
-                :placeholder="t('login.passwordPlaceholder') || 'Password'"
+                :placeholder="t('login.passwordPlaceholder')"
                 class="modern-input"
                 :class="{ 'has-error': v$.password.$error }"
                 @keyup.enter="loginClick"
@@ -25,7 +25,7 @@
               />
             </div>
             <div v-if="v$.password.$error" class="error-text">
-              {{ t('login.passwordRequired') || 'Password is required' }}
+              {{ t('login.passwordRequired') }}
             </div>
 
             <BAlert
@@ -47,14 +47,14 @@
               class="login-btn"
             >
               <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-              <span>{{ loading ? (t('login.loggingIn') || 'Logging in...') : t('login.login') }}</span>
+              <span>{{ loading ? t('login.loggingIn') : t('login.login') }}</span>
             </BButton>
           </BForm>
         </div>
       </div>
 
       <div class="login-footer">
-        <small class="version-text">v{{ sysInfoStore.currentVersion || '...' }}</small>
+        <small class="version-text">v{{ sysInfoStore.currentVersion || t('common.loading') }}</small>
         <div class="links">
           <span>&copy; Xerolux 2026</span>
           <span class="separator">•</span>

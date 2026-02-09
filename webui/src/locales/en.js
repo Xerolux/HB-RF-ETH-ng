@@ -24,7 +24,8 @@ export default {
     about: 'About',
     login: 'Login',
     logout: 'Logout',
-    toggleTheme: 'Toggle theme'
+    toggleTheme: 'Toggle theme',
+    language: 'Language'
   },
 
   // Login Page
@@ -37,12 +38,17 @@ export default {
     login: 'Login',
     loginFailed: 'Login failed',
     invalidCredentials: 'Invalid credentials',
-    loginError: 'Login was not successful.'
+    loginError: 'Login was not successful.',
+    passwordRequired: 'Password is required',
+    loggingIn: 'Logging in...'
   },
 
   // Settings Page
   settings: {
     title: 'Settings',
+    ccuSettings: 'CCU Connection',
+    ccuIpAddress: 'CCU IP Address',
+    ccuIpHint: 'Please enter the IP address of your CCU to prevent connection blocking. System will restart after saving.',
     tabGeneral: 'General',
     tabNetwork: 'Network',
     tabTime: 'Time',
@@ -165,6 +171,12 @@ export default {
     online: 'Online',
     offline: 'Offline',
     dashboardTitle: 'System Status'
+  },
+
+  // Update
+  update: {
+    available: 'Update Available',
+    updateNow: 'Update Now'
   },
 
   // Firmware Update
@@ -290,6 +302,11 @@ export default {
   // Change Password
   changePassword: {
     title: 'Password change required',
+    subtitle: 'Secure your account',
+    warningTitle: 'Required',
+    requirementsTitle: 'Password requirements:',
+    reqMinLength: 'At least 6 characters',
+    reqLettersNumbers: 'Must contain letters and numbers',
     currentPassword: 'Current Password',
     newPassword: 'New Password',
     confirmPassword: 'Confirm Password',
@@ -298,6 +315,7 @@ export default {
     changeError: 'Error changing password',
     passwordMismatch: 'Passwords do not match',
     passwordTooShort: 'Password must be at least 6 characters long and contain letters and numbers.',
+    passwordRequirements: 'Must contain letters and numbers',
     passwordsDoNotMatch: 'Passwords do not match',
     warningMessage: 'This is your first login or the password is still set to "admin". For security reasons, you must change the password.',
     success: 'Password changed successfully',

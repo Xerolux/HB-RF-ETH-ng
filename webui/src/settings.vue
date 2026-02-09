@@ -38,11 +38,11 @@
 
           <div class="settings-card">
             <div class="card-header">
-              <h3>{{ t('settings.ccuSettings') || 'CCU Connection' }}</h3>
+              <h3>{{ t('settings.ccuSettings') }}</h3>
             </div>
             <div class="card-body">
               <div class="form-group">
-                <label class="form-label">CCU IP Address</label>
+                <label class="form-label">{{ t('settings.ccuIpAddress') }}</label>
                 <BFormInput
                   type="text"
                   v-model="ccuIP"
@@ -51,7 +51,7 @@
                   :state="v$.ccuIP.$error ? false : null"
                 />
                 <div class="form-text text-warning mt-2">
-                  <small>Please enter the IP address of your CCU to prevent connection blocking. System will restart after saving.</small>
+                  <small>{{ t('settings.ccuIpHint') }}</small>
                 </div>
               </div>
             </div>

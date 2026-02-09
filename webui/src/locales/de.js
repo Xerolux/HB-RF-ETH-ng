@@ -24,7 +24,8 @@ export default {
     about: 'Über',
     login: 'Anmelden',
     logout: 'Abmelden',
-    toggleTheme: 'Design wechseln'
+    toggleTheme: 'Design wechseln',
+    language: 'Sprache'
   },
 
   // Login Page
@@ -37,12 +38,17 @@ export default {
     login: 'Anmelden',
     loginFailed: 'Anmeldung fehlgeschlagen',
     invalidCredentials: 'Ungültige Anmeldedaten',
-    loginError: 'Anmelden war nicht erfolgreich.'
+    loginError: 'Anmelden war nicht erfolgreich.',
+    passwordRequired: 'Passwort ist erforderlich',
+    loggingIn: 'Anmeldung läuft...'
   },
 
   // Settings Page
   settings: {
     title: 'Einstellungen',
+    ccuSettings: 'CCU Verbindung',
+    ccuIpAddress: 'CCU IP-Adresse',
+    ccuIpHint: 'Bitte geben Sie die IP-Adresse Ihrer CCU ein, um Verbindungsblockaden zu vermeiden. Das System startet nach dem Speichern neu.',
     tabGeneral: 'Allgemein',
     tabNetwork: 'Netzwerk',
     tabTime: 'Zeit',
@@ -120,6 +126,12 @@ export default {
     restoreSuccess: 'Einstellungen erfolgreich wiederhergestellt. System startet neu...',
     restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
     backupError: 'Fehler beim Herunterladen der Sicherung'
+  },
+
+  // Update
+  update: {
+    available: 'Update verfügbar',
+    updateNow: 'Jetzt aktualisieren'
   },
 
   // System Info
@@ -290,6 +302,11 @@ export default {
   // Change Password
   changePassword: {
     title: 'Passwort ändern erforderlich',
+    subtitle: 'Sichern Sie Ihr Konto',
+    warningTitle: 'Erforderlich',
+    requirementsTitle: 'Passwort-Anforderungen:',
+    reqMinLength: 'Mindestens 6 Zeichen',
+    reqLettersNumbers: 'Muss Buchstaben und Zahlen enthalten',
     currentPassword: 'Aktuelles Passwort',
     newPassword: 'Neues Passwort',
     confirmPassword: 'Passwort bestätigen',
@@ -298,6 +315,7 @@ export default {
     changeError: 'Fehler beim Ändern des Passworts',
     passwordMismatch: 'Passwörter stimmen nicht überein',
     passwordTooShort: 'Das Passwort muss mindestens 6 Zeichen lang sein und Buchstaben und Zahlen enthalten.',
+    passwordRequirements: 'Muss Buchstaben und Zahlen enthalten',
     passwordsDoNotMatch: 'Passwörter stimmen nicht überein',
     warningMessage: 'Dies ist Ihre erste Anmeldung oder das Passwort ist noch auf "admin". Aus Sicherheitsgründen müssen Sie das Passwort ändern.',
     success: 'Passwort erfolgreich geändert',
