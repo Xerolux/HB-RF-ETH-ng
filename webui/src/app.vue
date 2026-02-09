@@ -3,7 +3,11 @@
     <div class="app-container">
       <Header />
       <main class="main-content">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </RouterView>
       </main>
       <footer class="app-footer">
         <div class="footer-content">
@@ -135,14 +139,14 @@ onUnmounted(() => {
 }
 
 .app-footer {
-  padding: var(--spacing-lg) 0;
-  border-top: 1px solid var(--color-border);
+  padding: var(--spacing-lg) 0 var(--spacing-xl);
+  /* border-top: 1px solid var(--color-border); */ /* Cleaner look without border */
   margin-top: auto;
 }
 
 @media (max-width: 768px) {
   .app-footer {
-    padding: var(--spacing-md) 0;
+    padding: var(--spacing-md) 0 var(--spacing-lg);
   }
 }
 
@@ -150,13 +154,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
 .sponsor-btn {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  padding: 6px 16px;
+  border: 1px solid var(--color-border-light);
+  padding: 8px 20px;
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 600;
@@ -165,14 +169,15 @@ onUnmounted(() => {
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
 }
 
 .sponsor-btn:hover {
-  background: #ffecec;
+  background: #fff0f0;
   color: #ff3b30;
-  border-color: #ff3b30;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  border-color: #ff3b30; /* Keep border color change for feedback */
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 </style>

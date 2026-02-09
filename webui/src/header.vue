@@ -488,6 +488,7 @@ onMounted(async () => {
 .nav-link-item.active {
   background-color: var(--color-primary-light);
   color: var(--color-primary);
+  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.15);
 }
 
 [data-bs-theme="dark"] .nav-link-item.active {
@@ -891,10 +892,12 @@ onMounted(async () => {
 
 .mobile-menu-enter-active .mobile-menu-panel {
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 .mobile-menu-leave-active .mobile-menu-panel {
   animation: slideOutRight 0.2s ease forwards;
+  will-change: transform;
 }
 
 @keyframes slideInRight {
@@ -926,12 +929,10 @@ onMounted(async () => {
 /* Update Notification */
 .update-notification {
   position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  left: 0;
-  margin: 0 auto;
-  width: 90%;
-  max-width: 400px;
+  top: 1rem;
+  right: 1rem;
+  width: auto;
+  max-width: 340px;
   background: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
