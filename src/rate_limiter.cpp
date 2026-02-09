@@ -163,6 +163,29 @@ void rate_limiter_init()
              MAX_LOGIN_ATTEMPTS, RATE_LIMIT_WINDOW_SECONDS);
 }
 
+bool rate_limiter_is_whitelisted(httpd_req_t *req, const ip4_addr_t *whitelist_ip)
+{
+    if (whitelist_ip == NULL || whitelist_ip->addr == IPADDR_ANY || whitelist_ip->addr == IPADDR_NONE) {
+        return false;
+    }
+
+    client_ip_t client_ip;
+    if (!get_client_ip(req, &client_ip))
+    {
+        return false;
+    }
+
+    // Only support IPv4 whitelist for now as CCU connection is usually IPv4
+    if (client_ip.family == AF_INET) {
+        if (client_ip.addr.ip4.s_addr == whitelist_ip->addr) {
+            ESP_LOGD(TAG, "IP whitelisted: %s", ip4addr_ntoa(whitelist_ip));
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool rate_limiter_check_login(httpd_req_t *req)
 {
     if (!initialized)

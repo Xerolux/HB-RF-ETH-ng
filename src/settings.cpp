@@ -151,6 +151,9 @@ void Settings::load()
   len = sizeof(_ipv6Dns2);
   if (nvs_get_str(handle, "ipv6Dns2", _ipv6Dns2, &len) != ESP_OK) _ipv6Dns2[0] = 0;
 
+  len = sizeof(_ccuIP);
+  if (nvs_get_str(handle, "ccuIP", _ccuIP, &len) != ESP_OK) _ccuIP[0] = 0;
+
   nvs_close(handle);
 }
 
@@ -192,6 +195,8 @@ void Settings::save()
   SET_STR(handle, "ipv6Gateway", _ipv6Gateway);
   SET_STR(handle, "ipv6Dns1", _ipv6Dns1);
   SET_STR(handle, "ipv6Dns2", _ipv6Dns2);
+
+  SET_STR(handle, "ccuIP", _ccuIP);
 
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
@@ -430,4 +435,18 @@ void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char
     strncpy(_ipv6Gateway, ipv6Gateway, sizeof(_ipv6Gateway) - 1);
     strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
     strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
+}
+
+char *Settings::getCCUIP()
+{
+  return _ccuIP;
+}
+
+void Settings::setCCUIP(const char *ip)
+{
+  if (ip) {
+    strncpy(_ccuIP, ip, sizeof(_ccuIP) - 1);
+  } else {
+    _ccuIP[0] = 0;
+  }
 }

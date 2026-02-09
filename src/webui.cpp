@@ -154,8 +154,18 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
-    // Check rate limit
-    if (!rate_limiter_check_login(req))
+    // Check rate limit, but allow whitelisted IP
+    // Prioritize manual setting, fallback to dynamic raw uart listener
+    ip4_addr_t ccu_ip = {0};
+    const char* storedCCUIP = _settings->getCCUIP();
+
+    if (storedCCUIP && strlen(storedCCUIP) > 0) {
+        ip4addr_aton(storedCCUIP, &ccu_ip);
+    } else {
+        ccu_ip = _rawUartUdpListener->getConnectedRemoteAddress();
+    }
+
+    if (!rate_limiter_is_whitelisted(req, &ccu_ip) && !rate_limiter_check_login(req))
     {
         httpd_resp_set_status(req, "429 Too Many Requests");
         httpd_resp_set_type(req, "application/json");
@@ -326,6 +336,8 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ipv6Gateway", _settings->getIPv6Gateway());
     cJSON_AddStringToObject(settings, "ipv6Dns1", _settings->getIPv6Dns1());
     cJSON_AddStringToObject(settings, "ipv6Dns2", _settings->getIPv6Dns2());
+
+    cJSON_AddStringToObject(settings, "ccuIP", _settings->getCCUIP());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -441,6 +453,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
         char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
+        char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
+
         if (adminPassword && strlen(adminPassword) > 0)
             _settings->setAdminPassword(adminPassword);
 
@@ -478,23 +492,19 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
             );
         }
 
+        if (ccuIP) {
+            _settings->setCCUIP(ccuIP);
+        }
+
         _settings->save();
 
         cJSON_Delete(root);
 
         httpd_resp_set_type(req, "application/json");
-        root = cJSON_CreateObject();
+        httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings saved. Restarting...\"}");
 
-        add_settings(root);
-
-        const char *json = cJSON_PrintUnformatted(root);
-        if (json) {
-            httpd_resp_sendstr(req, json);
-            free((void *)json);
-        } else {
-            httpd_resp_send_500(req);
-        }
-        cJSON_Delete(root);
+        // Restart to apply new whitelist settings immediately
+        xTaskCreate(delayed_restart_task, "restart_task", 2048, NULL, 5, NULL);
 
         return ESP_OK;
     }

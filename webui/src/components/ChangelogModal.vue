@@ -24,7 +24,7 @@
     <div v-else-if="error" class="text-center py-5">
       <div class="error-icon">⚠️</div>
       <h5 class="mt-3">{{ t('changelog.error') || 'Failed to load changelog' }}</h5>
-      <p class="text-muted">{{ error }}</p>
+      <p class="text-danger">{{ error }}</p>
       <BButton variant="outline-primary" @click="fetchChangelog">
         {{ t('changelog.retry') || 'Retry' }}
       </BButton>
@@ -37,7 +37,7 @@
         <a
           href="https://github.com/Xerolux/HB-RF-ETH-ng/blob/main/CHANGELOG.md"
           target="_blank"
-          class="text-decoration-none text-muted small"
+          class="text-decoration-none text-primary small fw-bold"
         >
           {{ t('changelog.viewOnGithub') || 'View on GitHub' }}
           <span class="ms-1">↗</span>
@@ -90,7 +90,7 @@ const fetchChangelog = async () => {
 
   try {
     const response = await axios.get(
-      'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/CHANGELOG.md',
+      'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md',
       {
         timeout: 10000,
         headers: {

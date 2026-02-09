@@ -38,6 +38,27 @@
 
           <div class="settings-card">
             <div class="card-header">
+              <h3>{{ t('settings.ccuSettings') || 'CCU Connection' }}</h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">CCU IP Address</label>
+                <BFormInput
+                  type="text"
+                  v-model="ccuIP"
+                  trim
+                  placeholder="192.168.x.x"
+                  :state="v$.ccuIP.$error ? false : null"
+                />
+                <div class="form-text text-warning mt-2">
+                  <small>Please enter the IP address of your CCU to prevent connection blocking. System will restart after saving.</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="card-header">
               <h3>{{ t('settings.systemSettings') }}</h3>
             </div>
             <div class="card-body">
@@ -419,6 +440,7 @@ const netmask = ref('')
 const gateway = ref('')
 const dns1 = ref('')
 const dns2 = ref('')
+const ccuIP = ref('')
 
 // IPv6 settings
 const enableIPv6 = ref(false)
@@ -472,6 +494,9 @@ const rules = {
     ipAddress
   },
   dns2: {
+    ipAddress
+  },
+  ccuIP: {
     ipAddress
   },
   ipv6Address: {
@@ -531,6 +556,7 @@ const loadSettings = () => {
   gateway.value = settingsStore.gateway
   dns1.value = settingsStore.dns1
   dns2.value = settingsStore.dns2
+  ccuIP.value = settingsStore.ccuIP || ''
   timesource.value = settingsStore.timesource
   dcfOffset.value = settingsStore.dcfOffset
   gpsBaudrate.value = settingsStore.gpsBaudrate
@@ -579,6 +605,7 @@ const saveSettingsClick = async () => {
       gateway: gateway.value,
       dns1: dns1.value,
       dns2: dns2.value,
+      ccuIP: ccuIP.value,
       timesource: timesource.value,
       dcfOffset: dcfOffset.value,
       gpsBaudrate: gpsBaudrate.value,
@@ -596,6 +623,12 @@ const saveSettingsClick = async () => {
 
     await settingsStore.save(settings)
     showSuccess.value = true
+
+    // Wait briefly then show restarting message
+    setTimeout(() => {
+      alert("Settings saved. The device is restarting...")
+      // Optional: Redirect or reload after delay
+    }, 500)
   } catch (error) {
     showError.value = true
   }

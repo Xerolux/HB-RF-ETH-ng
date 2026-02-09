@@ -68,6 +68,8 @@ private:
   char _ipv6Dns1[40] = {0};
   char _ipv6Dns2[40] = {0};
 
+  char _ccuIP[16] = {0};
+
 public:
   Settings();
   void load();
@@ -120,4 +122,7 @@ public:
 
   // IPv6 setter
   void setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char *ipv6Address, int ipv6PrefixLength, const char *ipv6Gateway, const char *ipv6Dns1, const char *ipv6Dns2);
+
+  char *getCCUIP();
+  void setCCUIP(const char *ip);
 };
