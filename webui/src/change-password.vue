@@ -6,7 +6,7 @@
           <span class="lock-icon">🔐</span>
           <div>
             <h2 class="card-title">{{ t('changePassword.title') }}</h2>
-            <p class="card-subtitle">{{ t('changePassword.subtitle') || 'Secure your account' }}</p>
+            <p class="card-subtitle">{{ t('changePassword.subtitle') }}</p>
           </div>
         </div>
       </template>
@@ -15,7 +15,7 @@
         <BAlert show variant="warning" class="warning-alert">
           <span class="alert-icon">⚠️</span>
           <div class="alert-content">
-            <strong>{{ t('changePassword.warningTitle') || 'Required' }}</strong>
+            <strong>{{ t('changePassword.warningTitle') }}</strong>
             {{ t('changePassword.warningMessage') }}
           </div>
         </BAlert>
@@ -23,42 +23,42 @@
         <div class="password-requirements">
           <span class="req-icon">📋</span>
           <div class="req-content">
-            <strong>{{ t('changePassword.requirementsTitle') || 'Password requirements:' }}</strong>
+            <strong>{{ t('changePassword.requirementsTitle') }}</strong>
             <ul>
-              <li>{{ t('changePassword.reqMinLength') || 'At least 6 characters' }}</li>
-              <li>{{ t('changePassword.reqLettersNumbers') || 'Must contain letters and numbers' }}</li>
+              <li>{{ t('changePassword.reqMinLength') }}</li>
+              <li>{{ t('changePassword.reqLettersNumbers') }}</li>
             </ul>
           </div>
         </div>
 
         <BForm @submit.stop.prevent="handleSubmit">
-          <BFormGroup :label="t('changePassword.newPassword') || 'New Password'">
+          <BFormGroup :label="t('changePassword.newPassword')">
             <BFormInput
               type="password"
               v-model="newPassword"
-              :placeholder="t('changePassword.newPasswordPlaceholder') || 'Enter new password'"
+              :placeholder="t('changePassword.newPasswordPlaceholder')"
               :state="v$.newPassword.$error ? false : null"
               size="lg"
             />
             <BFormInvalidFeedback v-if="v$.newPassword.minLength.$invalid">
-              {{ t('changePassword.passwordTooShort') || 'Password must be at least 6 characters' }}
+              {{ t('changePassword.passwordTooShort') }}
             </BFormInvalidFeedback>
             <BFormInvalidFeedback v-else-if="v$.newPassword.password_validator.$invalid">
-              {{ t('changePassword.passwordRequirements') || 'Must contain letters and numbers' }}
+              {{ t('changePassword.passwordRequirements') }}
             </BFormInvalidFeedback>
           </BFormGroup>
 
-          <BFormGroup :label="t('changePassword.confirmPassword') || 'Confirm Password'">
+          <BFormGroup :label="t('changePassword.confirmPassword')">
             <BFormInput
               type="password"
               v-model="confirmPassword"
-              :placeholder="t('changePassword.confirmPasswordPlaceholder') || 'Confirm new password'"
+              :placeholder="t('changePassword.confirmPasswordPlaceholder')"
               :state="v$.confirmPassword.$error ? false : null"
               size="lg"
               @keyup.enter="handleSubmit"
             />
             <BFormInvalidFeedback v-if="v$.confirmPassword.sameAs.$invalid">
-              {{ t('changePassword.passwordsDoNotMatch') || 'Passwords do not match' }}
+              {{ t('changePassword.passwordsDoNotMatch') }}
             </BFormInvalidFeedback>
           </BFormGroup>
 
@@ -83,7 +83,7 @@
             class="submit-btn"
           >
             <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-            <span>{{ loading ? (t('common.changing') || 'Changing...') : (t('changePassword.changePassword') || 'Change Password') }}</span>
+            <span>{{ loading ? t('common.changing') : t('changePassword.changePassword') }}</span>
           </BButton>
         </BForm>
       </div>

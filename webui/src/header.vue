@@ -8,12 +8,12 @@
             <span class="update-icon">🚀</span>
           </div>
           <div class="text-content">
-            <span class="notification-title">{{ t('update.available') || 'Update Available' }}</span>
+            <span class="notification-title">{{ t('update.available') }}</span>
             <span class="notification-subtitle">v{{ updateStore.latestVersion }}</span>
           </div>
           <div class="actions">
             <BButton size="sm" variant="primary" to="/firmware" class="action-btn" @click="mobileMenuOpen = false">
-              {{ t('update.updateNow') || 'Update' }}
+              {{ t('update.updateNow') }}
             </BButton>
             <button @click="dismissUpdate" class="close-btn" aria-label="Close">
               ✕
@@ -69,10 +69,10 @@
               </button>
               <Transition name="dropdown-fade">
                 <div v-show="settingsOpen" class="dropdown-panel">
-                  <router-link to="/settings?tab=general" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabGeneral') || 'General' }}</router-link>
-                  <router-link to="/settings?tab=network" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabNetwork') || 'Network' }}</router-link>
-                  <router-link to="/settings?tab=time" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabTime') || 'Time' }}</router-link>
-                  <router-link to="/settings?tab=backup" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabBackup') || 'Backup' }}</router-link>
+                  <router-link to="/settings?tab=general" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabGeneral') }}</router-link>
+                  <router-link to="/settings?tab=network" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabNetwork') }}</router-link>
+                  <router-link to="/settings?tab=time" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabTime') }}</router-link>
+                  <router-link to="/settings?tab=backup" class="dropdown-link" @click="settingsOpen = false">{{ t('settings.tabBackup') }}</router-link>
                   <div class="dropdown-divider"></div>
                   <router-link to="/firmware" class="dropdown-link" @click="settingsOpen = false">
                     {{ t('nav.firmware') }}
@@ -161,10 +161,10 @@
                 </button>
                 <Transition name="expand">
                   <div v-show="mobileSettingsExpanded" class="mobile-nav-subitems">
-                    <router-link to="/settings?tab=general" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabGeneral') || 'General' }}</router-link>
-                    <router-link to="/settings?tab=network" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabNetwork') || 'Network' }}</router-link>
-                    <router-link to="/settings?tab=time" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabTime') || 'Time' }}</router-link>
-                    <router-link to="/settings?tab=backup" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabBackup') || 'Backup' }}</router-link>
+                    <router-link to="/settings?tab=general" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabGeneral') }}</router-link>
+                    <router-link to="/settings?tab=network" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabNetwork') }}</router-link>
+                    <router-link to="/settings?tab=time" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabTime') }}</router-link>
+                    <router-link to="/settings?tab=backup" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('settings.tabBackup') }}</router-link>
                     <div class="mobile-divider"></div>
                     <router-link to="/firmware" class="mobile-nav-sublink" @click="mobileMenuOpen = false">
                       {{ t('nav.firmware') }}
@@ -187,7 +187,7 @@
           <div class="mobile-actions-section">
             <!-- Language -->
             <div class="mobile-locale-row">
-              <span class="mobile-action-label">{{ t('nav.language') || 'Language' }}</span>
+              <span class="mobile-action-label">{{ t('nav.language') }}</span>
               <div class="mobile-locale-chips">
                 <button
                   v-for="loc in availableLocales"

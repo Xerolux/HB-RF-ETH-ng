@@ -1,7 +1,7 @@
 <template>
   <BModal
     v-model="show"
-    :title="t('changelog.title') || 'Changelog'"
+    :title="t('changelog.title')"
     size="xl"
     scrollable
     centered
@@ -16,17 +16,17 @@
 
     <div v-if="loading" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">{{ t('changelog.loading') || 'Loading...' }}</span>
+        <span class="visually-hidden">{{ t('changelog.loading') }}</span>
       </div>
-      <p class="mt-3 text-muted">{{ t('changelog.fetching') || 'Fetching changelog from GitHub...' }}</p>
+      <p class="mt-3 text-muted">{{ t('changelog.fetching') }}</p>
     </div>
 
     <div v-else-if="error" class="text-center py-5">
       <div class="error-icon">⚠️</div>
-      <h5 class="mt-3">{{ t('changelog.error') || 'Failed to load changelog' }}</h5>
+      <h5 class="mt-3">{{ t('changelog.error') }}</h5>
       <p class="text-danger">{{ error }}</p>
       <BButton variant="outline-primary" @click="fetchChangelog">
-        {{ t('changelog.retry') || 'Retry' }}
+        {{ t('changelog.retry') }}
       </BButton>
     </div>
 
@@ -39,11 +39,11 @@
           target="_blank"
           class="text-decoration-none text-primary small fw-bold"
         >
-          {{ t('changelog.viewOnGithub') || 'View on GitHub' }}
+          {{ t('changelog.viewOnGithub') }}
           <span class="ms-1">↗</span>
         </a>
         <BButton variant="secondary" @click="close">
-          {{ t('changelog.close') || 'Close' }}
+          {{ t('changelog.close') }}
         </BButton>
       </div>
     </template>
@@ -101,7 +101,7 @@ const fetchChangelog = async () => {
     changelog.value = response.data
   } catch (err) {
     console.error('Error fetching changelog:', err)
-    error.value = t('changelog.fetchError') || 'Could not fetch changelog. Please check your internet connection.'
+    error.value = t('changelog.fetchError')
   } finally {
     loading.value = false
   }
