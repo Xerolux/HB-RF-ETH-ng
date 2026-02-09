@@ -19,6 +19,7 @@ export default {
     settings: 'Configuración',
     firmware: 'Firmware',
     monitoring: 'Monitoreo',
+    systemlog: 'System Log',
     about: 'Acerca de',
     logout: 'Cerrar sesión'
   },

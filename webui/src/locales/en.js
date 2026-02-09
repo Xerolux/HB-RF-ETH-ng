@@ -20,6 +20,7 @@ export default {
     settings: 'Settings',
     firmware: 'Firmware',
     monitoring: 'Monitoring',
+    systemlog: 'System Log',
     about: 'About',
     login: 'Login',
     logout: 'Logout',
@@ -329,6 +330,17 @@ export default {
     title: 'Support this Project',
     description: 'If you like this project and want to support its development, you can use one of the options below.',
     thanks: 'Thank you for your support!'
+  },
+
+  // System Log
+  systemlog: {
+    title: 'System Log',
+    description: 'Live view of system log output with download capability.',
+    liveLog: 'Live Log',
+    autoScroll: 'Auto-scroll',
+    clear: 'Clear',
+    download: 'Download',
+    empty: 'No log entries yet.'
   },
 
   // Changelog

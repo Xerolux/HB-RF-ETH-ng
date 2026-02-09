@@ -79,6 +79,7 @@
                     <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
                   </router-link>
                   <router-link to="/monitoring" class="dropdown-link" @click="settingsOpen = false">{{ t('nav.monitoring') }}</router-link>
+                  <router-link to="/systemlog" class="dropdown-link" @click="settingsOpen = false">{{ t('nav.systemlog') }}</router-link>
                 </div>
               </Transition>
             </div>
@@ -170,6 +171,7 @@
                       <span v-if="updateStore.shouldShowUpdateBadge" class="menu-badge"></span>
                     </router-link>
                     <router-link to="/monitoring" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('nav.monitoring') }}</router-link>
+                    <router-link to="/systemlog" class="mobile-nav-sublink" @click="mobileMenuOpen = false">{{ t('nav.systemlog') }}</router-link>
                   </div>
                 </Transition>
               </div>
@@ -251,7 +253,7 @@ const localeOpen = ref(false)
 // Computed: is current route a settings-related route?
 const isSettingsRoute = computed(() => {
   const path = route.path
-  return path.startsWith('/settings') || path === '/firmware' || path === '/monitoring'
+  return path.startsWith('/settings') || path === '/firmware' || path === '/monitoring' || path === '/systemlog'
 })
 
 // Close mobile menu on route change

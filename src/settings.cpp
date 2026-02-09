@@ -27,7 +27,6 @@
 #include "nvs_flash.h"
 #include "esp_mac.h"
 #include "esp_log.h"
-#include "secure_utils.h"
 #include <string.h>
 
 Settings::Settings()

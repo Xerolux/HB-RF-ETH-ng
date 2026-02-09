@@ -30,6 +30,7 @@
 #include "cJSON.h"
 #include "reset_info.h"
 #include "system_reset.h"
+#include "semver.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -57,21 +58,6 @@ void UpdateCheck::stop()
 const char *UpdateCheck::getLatestVersion()
 {
   return _latestVersion;
-}
-
-// Helper function to compare semantic versions
-// Returns: negative if v1 < v2, 0 if v1 == v2, positive if v1 > v2
-static int compareVersions(const char* v1, const char* v2)
-{
-    int major1 = 0, minor1 = 0, patch1 = 0;
-    int major2 = 0, minor2 = 0, patch2 = 0;
-
-    sscanf(v1, "%d.%d.%d", &major1, &minor1, &patch1);
-    sscanf(v2, "%d.%d.%d", &major2, &minor2, &patch2);
-
-    if (major1 != major2) return major1 - major2;
-    if (minor1 != minor2) return minor1 - minor2;
-    return patch1 - patch2;
 }
 
 // Buffer for HTTP event handler to collect response body
