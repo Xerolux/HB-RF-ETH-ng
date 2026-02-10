@@ -150,7 +150,7 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-content {
-  color: #2c3e50;
+  color: #343a40;
   line-height: 1.8;
 }
 

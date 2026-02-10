@@ -594,27 +594,73 @@ onBeforeUnmount(() => {
 
 @media (max-width: 600px) {
   .widgets-row {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    padding-bottom: 1rem;
-    margin: 0 -1rem;
-    padding: 0 1rem 1rem 1rem;
-    gap: var(--spacing-md);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow-x: visible;
+    scroll-snap-type: none;
+    padding: 0;
+    margin: 0;
+    gap: 8px;
   }
 
   .widget {
-    min-width: 85%;
-    scroll-snap-align: center;
-    height: 140px;
+    min-width: 0;
+    width: 100%;
+    height: auto;
+    min-height: 100px;
+    padding: 12px 8px;
+    scroll-snap-align: none;
     margin-bottom: 0;
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
+    text-align: center;
   }
 
   .widget-top {
-    flex-direction: row;
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .widget-icon-bg {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    margin-bottom: 0;
+  }
+
+  .widget-trend {
+    font-size: 1rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .widget-bottom {
+    width: 100%;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .widget-label {
+    font-size: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .widget-progress {
+    height: 4px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .widget-status-text {
+    display: none;
   }
 }
 </style>
