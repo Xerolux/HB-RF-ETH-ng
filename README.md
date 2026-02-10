@@ -1,4 +1,4 @@
-# HB-RF-ETH-ng Firmware v2.1.4
+# HB-RF-ETH-ng Firmware v2.1.5
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
@@ -15,6 +15,18 @@
 ## Modernisierte Fork von Xerolux (2025)
 
 Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
+
+**Version 2.1.5 Änderungen:**
+* **Sicherheit & Stabilität**
+  * Umfassendes Refactoring der JSON-Verarbeitung (cJSON) für erhöhte Sicherheit
+  * Implementierung von `secure_zero` zum sicheren Löschen sensibler Daten im RAM
+  * Speicherleck in UDP-Listener behoben (Memory Leak Fix)
+  * Verbesserter Rate-Limiter mit IPv6-Support
+* **WebUI & UX**
+  * Sponsor-Button im Footer hinzugefügt
+  * Verbesserte Lesbarkeit des System-Logs (High Contrast)
+  * Barrierefreiheits-Optimierungen (Accessibility)
+  * Zuverlässigeres Laden des Changelogs (Raw GitHub URL)
 
 **Version 2.1.4 Änderungen:**
 * **Fehlerbehebungen (Notfall-Fixes)**

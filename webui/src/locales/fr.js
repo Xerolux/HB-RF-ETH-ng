@@ -138,7 +138,7 @@ export default {
     title: 'Micrologiciel',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
-    versionInfo: 'Fork modernisé v2.1.4 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
+    versionInfo: 'Fork modernisé v2.1.5 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
     onlineUpdate: 'Mise à jour en ligne',
     onlineUpdateConfirm: 'Voulez-vous vraiment télécharger et installer la mise à jour ? Le système redémarrera automatiquement.',
@@ -210,7 +210,7 @@ export default {
   // About Page
   about: {
     title: 'À propos',
-    version: 'Version 2.1.4',
+    version: 'Version 2.1.5',
     fork: 'Fork Modernisé',
     forkDescription: 'Cette version est un fork modernisé par Xerolux (2025), basé sur le firmware original HB-RF-ETH. Mis à jour vers ESP-IDF 5.3, chaînes d\'outils modernes (GCC 13.2.0) et technologies WebUI actuelles (Vue 3, Parcel 2, Pinia).',
     original: 'Auteur Original',

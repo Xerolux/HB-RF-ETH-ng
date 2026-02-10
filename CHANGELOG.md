@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Enhanced monitoring capabilities
 
+## [2.1.5] - 2025-02-17
+
+### Added
+- 💖 **Sponsor Button** - Added a "Sponsor" button in the footer with options for PayPal, Buy Me a Coffee, and Tesla referral.
+- 👁️ **High Contrast Logs** - Improved `SystemLog` readability with high-contrast colors (black text on white background).
+
+### Changed
+- 🔒 **Security Refactoring** - Extensive refactoring of JSON handling in System Info, Settings, and Login to use `cJSON` library, eliminating buffer overflow risks and injection vulnerabilities.
+- 🧹 **Memory Safety** - Implemented `secure_zero` to securely clear sensitive data (tokens, passwords) from memory immediately after use.
+- 🚀 **Rate Limiting** - Improved Rate Limiter with IPv6 support and better whitelist handling for CCU connections.
+- ♿ **Accessibility** - Removed low-contrast `text-muted` classes and added `aria-hidden` attributes to decorative icons for better screen reader support.
+- 📄 **Changelog Fetching** - Changed changelog fetching to use the raw GitHub URL to avoid CORS issues and improve reliability.
+
+### Fixed
+- 🐛 **Memory Leak** - Fixed a memory leak in `RawUartUdpListener` by properly draining the packet queue before deletion.
+- 🐛 **Validation** - Fixed strict IP validation in CheckMK agent configuration.
+- 🐛 **Static Analysis** - Resolved various static analysis warnings (cppcheck) for better code quality.
+
 ## [2.1.4] - 2025-02-17
 
 ### Fixed
