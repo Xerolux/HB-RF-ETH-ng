@@ -363,6 +363,7 @@ export default {
     autoScroll: 'Auto-Scroll',
     enabled: 'Aktiv',
     disabledMessage: 'Log-Anzeige ist deaktiviert. Schalten Sie den Schalter ein, um Live-Logs zu sehen.',
+    refresh: 'Aktualisieren',
     clear: 'Leeren',
     download: 'Download',
     empty: 'Noch keine Log-Einträge vorhanden.'
