@@ -507,10 +507,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         cJSON_Delete(root);
 
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings saved. Restarting...\"}");
-
-        // Restart to apply new whitelist settings immediately
-        xTaskCreate(delayed_restart_task, "restart_task", 2048, NULL, 5, NULL);
+        httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings saved.\"}");
 
         return ESP_OK;
     }
