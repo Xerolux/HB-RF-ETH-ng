@@ -316,7 +316,7 @@ onBeforeUnmount(() => {
 }
 
 .widget:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1.01);
   box-shadow: var(--shadow-lg);
 }
 
@@ -334,12 +334,13 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
-.widget-icon-bg.primary { background-color: var(--color-primary-light); color: var(--color-primary); }
-.widget-icon-bg.success { background-color: var(--color-success-light); color: var(--color-success); }
-.widget-icon-bg.info { background-color: var(--color-info-light); color: var(--color-info); }
-.widget-icon-bg.danger { background-color: var(--color-danger-light); color: var(--color-danger); }
+.widget-icon-bg.primary { background: linear-gradient(135deg, var(--color-primary-light), var(--color-surface)); color: var(--color-primary); }
+.widget-icon-bg.success { background: linear-gradient(135deg, var(--color-success-light), var(--color-surface)); color: var(--color-success); }
+.widget-icon-bg.info { background: linear-gradient(135deg, var(--color-info-light), var(--color-surface)); color: var(--color-info); }
+.widget-icon-bg.danger { background: linear-gradient(135deg, var(--color-danger-light), var(--color-surface)); color: var(--color-danger); }
 
 .widget-trend {
   font-size: 1.5rem;
@@ -378,8 +379,8 @@ onBeforeUnmount(() => {
   transition: width 0.5s ease;
 }
 
-.progress-fill.primary { background-color: var(--color-primary); }
-.progress-fill.success { background-color: var(--color-success); }
+.progress-fill.primary { background-image: linear-gradient(90deg, var(--color-primary), #ff8a5c); }
+.progress-fill.success { background-image: linear-gradient(90deg, var(--color-success), #66d985); }
 
 .widget-status-text {
   font-size: 0.9375rem;
@@ -591,28 +592,29 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 600px) {
   .widgets-row {
-    grid-template-columns: 1fr;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 1rem;
+    margin: 0 -1rem;
+    padding: 0 1rem 1rem 1rem;
+    gap: var(--spacing-md);
   }
 
   .widget {
-    height: auto;
-    padding: 16px;
-    flex-direction: row;
-    align-items: center;
-    gap: var(--spacing-md);
+    min-width: 85%;
+    scroll-snap-align: center;
+    height: 140px;
+    margin-bottom: 0;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .widget-top {
     flex-direction: row;
-    align-items: center;
-    gap: var(--spacing-md);
-    flex-shrink: 0;
-  }
-
-  .widget-bottom {
-    flex: 1;
+    align-items: flex-start;
   }
 }
 </style>
