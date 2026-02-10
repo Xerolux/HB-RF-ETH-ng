@@ -89,15 +89,10 @@ const fetchChangelog = async () => {
   error.value = null
 
   try {
-    // Try to fetch from GitHub raw URL first
-    // Using a simple GET request without custom headers to avoid preflight CORS issues if possible
-    // Note: GitHub Raw supports CORS for GET requests
-    const response = await axios.get(
-      'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md',
-      {
-        timeout: 10000
-      }
-    )
+    // Fetch from backend proxy to avoid CORS/network issues
+    const response = await axios.get('/api/changelog', {
+      timeout: 10000
+    })
     changelog.value = response.data
   } catch (err) {
     console.error('Error fetching changelog:', err)
