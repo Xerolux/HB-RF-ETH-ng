@@ -25,7 +25,7 @@
       <div class="error-icon">⚠️</div>
       <h5 class="mt-3">{{ t('changelog.error') }}</h5>
       <p class="text-danger">{{ error }}</p>
-      <BButton variant="outline-primary" @click="fetchChangelog">
+      <BButton variant="outline-secondary" class="btn-retry" @click="fetchChangelog">
         {{ t('changelog.retry') }}
       </BButton>
     </div>
@@ -42,7 +42,7 @@
           {{ t('changelog.viewOnGithub') }}
           <span class="ms-1">↗</span>
         </a>
-        <BButton variant="secondary" @click="close">
+        <BButton variant="secondary" class="btn-close-modal" @click="close">
           {{ t('changelog.close') }}
         </BButton>
       </div>
@@ -101,7 +101,7 @@ const fetchChangelog = async () => {
     changelog.value = response.data
   } catch (err) {
     console.error('Error fetching changelog:', err)
-    error.value = t('changelog.fetchError')
+    error.value = `${t('changelog.fetchError')} (${err.message})`
   } finally {
     loading.value = false
   }
@@ -291,5 +291,33 @@ watch(() => props.modelValue, (newValue) => {
 :deep(.dark) .changelog-footer {
   background: #1e1e2d;
   border-top-color: #2d2d3a;
+}
+
+.btn-retry {
+  color: #343a40 !important;
+  border-color: #343a40 !important;
+}
+
+.btn-retry:hover {
+  background-color: #343a40 !important;
+  color: white !important;
+}
+
+.btn-close-modal {
+  color: #343a40 !important;
+}
+
+:deep(.dark) .btn-retry {
+  color: #e4e6eb !important;
+  border-color: #e4e6eb !important;
+}
+
+:deep(.dark) .btn-retry:hover {
+  background-color: #e4e6eb !important;
+  color: #1e1e2d !important;
+}
+
+:deep(.dark) .btn-close-modal {
+  color: #e4e6eb !important;
 }
 </style>
