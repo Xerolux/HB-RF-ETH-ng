@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 2.1.5 Final
 
 ### Added
 - 🔄 **Restart Confirmation Modal** - Settings page now shows a confirmation dialog before restarting the device after saving settings.
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🐛 **Changelog Display** - Removed unnecessary headers from GitHub Raw request to fix CORS issues.
 - 🐛 **Password Validation** - Fixed `PasswordChangeModal` validation blocking settings save by using `$stopPropagation` in `useVuelidate`.
 
-## [2.1.5] - 2025-02-17
+## [2.1.5] - 2026-02-09
 
 ### Added
 - 📋 **System Log Viewer** - New dedicated page (`systemlog.vue`) for viewing system logs with live polling every 3 seconds and log file download.
@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📦 Bumped `axios` from 1.13.4 to 1.13.5.
 - 📦 Bumped `crate-ci/typos` from 1.42.3 to 1.43.3.
 
-## [2.1.4] - 2025-02-17
+## [2.1.4] - 2026-02-06
 
 ### Fixed
 - 🐛 **Memory Leak** - Fixed memory leak in OTA URL handler (`args` not freed on error)
@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔧 **Const Correctness** - Improved C++ standards compliance in Settings class
 - 🌍 **Localization** - Corrected version display in French translation
 
-## [2.1.3] - 2025-02-08
+## [2.1.3]
 
 ### Added
 - 📋 **Changelog Modal** - View full changelog directly in WebUI with markdown rendering
@@ -107,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔒 Removed all vulnerable Parcel dependencies
 - 🔒 Updated to Vite with better security practices
 
-## [2.1.2] - 2025-01-XX
+## [2.1.2]
 
 ### Added
 - 🔐 **Enhanced Security**
