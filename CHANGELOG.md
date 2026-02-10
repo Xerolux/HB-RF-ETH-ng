@@ -7,26 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned
-- Enhanced monitoring capabilities
+### Added
+- 🔄 **Restart Confirmation Modal** - Settings page now shows a confirmation dialog before restarting the device after saving settings.
+- 🌐 **CCU IP Settings** - CCU IP address is now properly saved and reactive in the settings store.
+- 🔃 **System Log Refresh Button** - Manual refresh button to recover if log polling stalls.
+
+### Changed
+- 📱 **Mobile Widget Layout** - Dashboard widgets now use a compact 3-column grid layout on mobile devices instead of horizontal scroll container.
+- 📖 **Changelog Readability** - Darker text color (`#343a40`) in changelog modal for improved readability.
+
+### Fixed
+- 🐛 **System Log Download** - Fixed 401 Unauthorized error by using authenticated axios request instead of direct link.
+- 🐛 **System Log Polling** - Added timeout to polling to prevent silent failures.
+- 🐛 **Changelog Display** - Removed unnecessary headers from GitHub Raw request to fix CORS issues.
+- 🐛 **Password Validation** - Fixed `PasswordChangeModal` validation blocking settings save by using `$stopPropagation` in `useVuelidate`.
 
 ## [2.1.5] - 2025-02-17
 
 ### Added
+- 📋 **System Log Viewer** - New dedicated page (`systemlog.vue`) for viewing system logs with live polling every 3 seconds and log file download.
+- 🔛 **Log Toggle** - Enable/disable switch for system log polling to reduce unnecessary network traffic when not needed.
+- 📡 **Log Manager API** - New `/api/log` and `/api/log/download` backend endpoints for system log access.
+- 🕐 **10-Minute Idle Logout** - Automatic logout after 10 minutes of inactivity, with cross-tab synchronization via `localStorage`.
+- 💾 **Persistent Sessions** - Session tokens stored in `localStorage` instead of `sessionStorage`, surviving tab closures and page reloads.
+- 🧭 **System Log Navigation** - Navigation links for System Log added to both desktop and mobile menus.
 - 💖 **Sponsor Button** - Added a "Sponsor" button in the footer with options for PayPal, Buy Me a Coffee, and Tesla referral.
-- 👁️ **High Contrast Logs** - Improved `SystemLog` readability with high-contrast colors (black text on white background).
+- 🌍 **System Log Translations** - Translations for the log viewer added to all 10 supported languages.
 
 ### Changed
+- 🎨 **UI/UX Modernization** - Comprehensive visual overhaul with custom scrollbars, glassmorphism effects, layered shadows, and smooth page transitions.
+- 📊 **Dashboard Widgets** - Gradient icons, hover effects, and horizontal scrolling on mobile for a polished dashboard experience.
+- 🧭 **Navigation Header** - Floating notifications and hardware-accelerated animations for smoother interaction.
 - 🔒 **Security Refactoring** - Extensive refactoring of JSON handling in System Info, Settings, and Login to use `cJSON` library, eliminating buffer overflow risks and injection vulnerabilities.
-- 🧹 **Memory Safety** - Implemented `secure_zero` to securely clear sensitive data (tokens, passwords) from memory immediately after use.
-- 🚀 **Rate Limiting** - Improved Rate Limiter with IPv6 support and better whitelist handling for CCU connections.
+- 🧹 **Memory Safety** - Implemented `secure_zero` to securely clear sensitive data (tokens, passwords) from memory; shared `secure_utils.h` with NULL-safe, XOR-based constant-time `secure_strcmp`.
+- 🚀 **Rate Limiting** - Improved Rate Limiter with full IPv6 support (`AF_INET6`) for dual-stack networks, using `inet_ntop` for human-readable logging.
+- 🌐 **Translation Keys** - Replaced all hardcoded fallback strings with proper `t()` translation keys across all WebUI components (login, settings, header, change-password, firmware update, changelog modal).
+- 🧹 **Code Deduplication** - Removed duplicate `secure_strcmp` from `webui.cpp` (uses shared header) and duplicate `compareVersions` from `updatecheck.cpp` (uses `semver.h`).
 - ♿ **Accessibility** - Removed low-contrast `text-muted` classes and added `aria-hidden` attributes to decorative icons for better screen reader support.
 - 📄 **Changelog Fetching** - Changed changelog fetching to use the raw GitHub URL to avoid CORS issues and improve reliability.
+- 👁️ **High Contrast Logs** - System log viewer uses black text on white background with orange accent border for maximum readability.
 
 ### Fixed
+- 🐛 **CCU Connection Stability** - Fixed critical bug where `portMAX_DELAY` in lwIP UDP receive callback could block the entire network stack when the queue was full; changed to non-blocking send with drop warning.
+- 🐛 **UDP Keep-Alive** - Increased timeout from 5s to 10s to prevent false disconnects; immediate keep-alive response sent back to CCU for better health detection.
+- 🐛 **UDP Queue** - Increased from 32 to 64 entries for better burst handling; reduced poll timeout from 100ms to 10ms for lower packet processing latency.
+- 🐛 **Disconnect Handling** - Fixed stale `_connectionStarted` state not being reset on keep-alive timeout; fixed race condition in disconnect ordering.
 - 🐛 **Memory Leak** - Fixed a memory leak in `RawUartUdpListener` by properly draining the packet queue before deletion.
+- 🐛 **Compilation** - Fixed `delayed_restart_task` not declared in scope by moving definition before `post_settings_json_handler_func`.
 - 🐛 **Validation** - Fixed strict IP validation in CheckMK agent configuration.
 - 🐛 **Static Analysis** - Resolved various static analysis warnings (cppcheck) for better code quality.
+
+### Dependencies
+- 📦 Bumped `axios` from 1.13.4 to 1.13.5.
+- 📦 Bumped `crate-ci/typos` from 1.42.3 to 1.43.3.
 
 ## [2.1.4] - 2025-02-17
 
@@ -178,7 +211,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...HEAD
+[2.1.5]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...v2.1.5
 [2.1.4]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...v2.1.4
 [2.1.3]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.2...v2.1.3
 [2.1.2]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.1...v2.1.2
