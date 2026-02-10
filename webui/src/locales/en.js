@@ -109,8 +109,12 @@ export default {
     language: 'Language',
 
     // Messages
-    saveSuccess: 'Settings were successfully saved. Please restart to take them effect.',
+    saveSuccess: 'Settings were successfully saved.',
     saveError: 'An error occurred while saving the settings.',
+    restartTitle: 'Restart Required',
+    restartMessage: 'Settings have been saved. Do you want to restart the device now for changes to take effect?',
+    restartNow: 'Restart Now',
+    restartLater: 'Restart Later',
 
     // Backup & Restore
     backupRestore: 'Backup & Restore',
@@ -359,6 +363,7 @@ export default {
     autoScroll: 'Auto-scroll',
     enabled: 'Enabled',
     disabledMessage: 'Log viewer is disabled. Turn on the switch to see live logs.',
+    refresh: 'Refresh',
     clear: 'Clear',
     download: 'Download',
     empty: 'No log entries yet.'

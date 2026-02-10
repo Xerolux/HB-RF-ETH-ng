@@ -124,7 +124,7 @@ const rules = computed(() => ({
   confirmPassword: { required, sameAs: sameAs(newPassword.value) }
 }))
 
-const v$ = useVuelidate(rules, { newPassword, confirmPassword })
+const v$ = useVuelidate(rules, { newPassword, confirmPassword }, { $stopPropagation: true })
 
 // Watch for prop changes
 watch(() => props.modelValue, (newVal) => {

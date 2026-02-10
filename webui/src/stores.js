@@ -123,6 +123,7 @@ export const useSettingsStore = defineStore('settings', {
     gateway: "",
     dns1: "",
     dns2: "",
+    ccuIP: "",
     // IPv6 settings
     enableIPv6: false,
     ipv6Mode: "auto",

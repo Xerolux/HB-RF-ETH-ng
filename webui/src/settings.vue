@@ -370,6 +370,25 @@
 
     <!-- Password Change Modal -->
     <PasswordChangeModal v-model="showPasswordModal" :force-redirect="false" />
+
+    <!-- Restart Confirmation Modal -->
+    <BModal
+      v-model="showRestartModal"
+      :title="t('settings.restartTitle')"
+      centered
+      no-fade
+    >
+      <p>{{ t('settings.restartMessage') }}</p>
+      <template #footer>
+        <BButton variant="secondary" @click="showRestartModal = false">
+          {{ t('settings.restartLater') }}
+        </BButton>
+        <BButton variant="danger" @click="performRestart" :disabled="isRestarting">
+          <span v-if="isRestarting" class="spinner-border spinner-border-sm me-2"></span>
+          {{ t('settings.restartNow') }}
+        </BButton>
+      </template>
+    </BModal>
   </div>
 </template>
 
@@ -459,6 +478,8 @@ const ledBrightness = ref(100)
 
 const showSuccess = ref(null)
 const showError = ref(null)
+const showRestartModal = ref(false)
+const isRestarting = ref(false)
 
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
@@ -624,13 +645,26 @@ const saveSettingsClick = async () => {
     await settingsStore.save(settings)
     showSuccess.value = true
 
-    // Wait briefly then show restarting message
+    // Show restart modal after a short delay
     setTimeout(() => {
-      alert("Settings saved. The device is restarting...")
-      // Optional: Redirect or reload after delay
-    }, 500)
+      showRestartModal.value = true
+    }, 1000)
   } catch (error) {
     showError.value = true
+  }
+}
+
+const performRestart = async () => {
+  isRestarting.value = true
+  try {
+    await axios.post('/api/restart')
+    showRestartModal.value = false
+    alert(t('firmware.restartingText'))
+    window.location.reload()
+  } catch (e) {
+    console.error("Restart request failed", e)
+    alert("Error restarting device")
+    isRestarting.value = false
   }
 }
 

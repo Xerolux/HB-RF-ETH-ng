@@ -16,15 +16,18 @@
             <input class="form-check-input" type="checkbox" id="logEnabled" v-model="logEnabled">
             <label class="form-check-label" for="logEnabled">{{ t('systemlog.enabled') }}</label>
           </div>
+          <button class="btn btn-sm btn-outline-secondary me-2" @click="refreshLog" :disabled="!logEnabled" :title="t('systemlog.refresh') || 'Refresh'">
+            🔄
+          </button>
           <button class="btn btn-sm btn-outline-secondary me-2" @click="toggleAutoScroll" :disabled="!logEnabled" :title="t('systemlog.autoScroll')">
             {{ autoScroll ? '⏸' : '▶' }}
           </button>
           <button class="btn btn-sm btn-outline-secondary me-2" @click="clearLog" :title="t('systemlog.clear')">
             🗑
           </button>
-          <a class="btn btn-sm btn-outline-primary" :href="downloadUrl" :title="t('systemlog.download')">
+          <button class="btn btn-sm btn-outline-primary" @click="downloadLog" :title="t('systemlog.download')">
             ⬇ {{ t('systemlog.download') }}
-          </a>
+          </button>
         </div>
       </div>
 
@@ -54,8 +57,6 @@ const autoScroll = ref(true)
 const offset = ref(0)
 let pollTimer = null
 
-const downloadUrl = computed(() => '/api/log/download')
-
 const startPolling = () => {
   stopPolling()
   fetchLog()
@@ -80,7 +81,8 @@ watch(logEnabled, (enabled) => {
 const fetchLog = async () => {
   try {
     const response = await axios.get('/api/log', {
-      params: { offset: offset.value }
+      params: { offset: offset.value },
+      timeout: 5000
     })
     if (response.data) {
       logContent.value += response.data
@@ -91,7 +93,32 @@ const fetchLog = async () => {
       }
     }
   } catch (error) {
-    // Silently ignore poll errors
+    console.warn("Log poll failed", error)
+  }
+}
+
+const refreshLog = () => {
+  offset.value = 0
+  logContent.value = ''
+  fetchLog()
+}
+
+const downloadLog = async () => {
+  try {
+    const response = await axios.get('/api/log/download', {
+      responseType: 'blob'
+    })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'hb-rf-eth-log.txt')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(() => window.URL.revokeObjectURL(url), 100)
+  } catch (error) {
+    console.error('Log download failed:', error)
+    alert(t('common.error') + ': ' + (error.response?.status || error.message))
   }
 }
 
