@@ -7,6 +7,7 @@ export default {
     cancel: 'Annuler',
     close: 'Fermer',
     loading: 'Chargement...',
+    changing: 'Modification...',
     error: 'Erreur',
     success: 'Succès',
     yes: 'Oui',
@@ -19,29 +20,55 @@ export default {
     settings: 'Paramètres',
     firmware: 'Micrologiciel',
     monitoring: 'Surveillance',
-    systemlog: 'System Log',
+    systemlog: 'Journal système',
     about: 'À propos',
     login: 'Connexion',
-    logout: 'Déconnexion'
+    logout: 'Déconnexion',
+    toggleTheme: 'Changer de thème',
+    language: 'Langue'
   },
 
   // Login Page
   login: {
     title: 'Veuillez vous connecter',
+    subtitle: 'Veuillez entrer votre mot de passe pour continuer',
     username: 'Nom d\'utilisateur',
     password: 'Mot de passe',
+    passwordPlaceholder: 'Mot de passe',
     login: 'Connexion',
     loginFailed: 'Échec de la connexion',
     invalidCredentials: 'Identifiants invalides',
-    loginError: 'La connexion a échoué.'
+    loginError: 'La connexion a échoué.',
+    passwordRequired: 'Le mot de passe est requis',
+    loggingIn: 'Connexion en cours...'
   },
 
   // Settings Page
   settings: {
     title: 'Paramètres',
+    ccuSettings: 'Connexion CCU',
+    ccuIpAddress: 'Adresse IP CCU',
+    ccuIpHint: 'Veuillez saisir l\'adresse IP de votre CCU pour éviter le blocage de la connexion. Le système redémarrera après l\'enregistrement.',
+    tabGeneral: 'Général',
+    tabNetwork: 'Réseau',
+    tabTime: 'Heure',
+    tabBackup: 'Sauvegarde',
     changePassword: 'Changer le mot de passe',
     repeatPassword: 'Répéter le mot de passe',
     hostname: 'Nom d\'hôte',
+
+    // Security Settings
+    security: 'Sécurité',
+    changePasswordHint: 'Changez votre mot de passe administrateur pour un accès sécurisé',
+    otaPassword: 'Mot de passe OTA',
+    otaPasswordHint: 'Mot de passe séparé requis pour les mises à jour du micrologiciel',
+    changePasswordBtn: 'Changer le mot de passe',
+    changeOtaPassword: 'Changer',
+    setOtaPassword: 'Définir le mot de passe',
+    clearOtaPassword: 'Effacer',
+    clearOtaPasswordConfirm: 'Êtes-vous sûr de vouloir supprimer le mot de passe OTA ? Les mises à jour du micrologiciel ne seront pas possibles tant qu\'un nouveau mot de passe n\'aura pas été défini.',
+    clearOtaPasswordSuccess: 'Le mot de passe OTA a été supprimé.',
+    clearOtaPasswordError: 'Échec de la suppression du mot de passe OTA',
 
     // Network Settings
     networkSettings: 'Paramètres réseau',
@@ -78,11 +105,16 @@ export default {
     systemSettings: 'Paramètres système',
     ledBrightness: 'Luminosité LED',
     checkUpdates: 'Vérifier les mises à jour',
+    allowPrerelease: 'Autoriser les mises à jour anticipées (Beta/Alpha)',
     language: 'Langue',
 
     // Messages
-    saveSuccess: 'Les paramètres ont été enregistrés avec succès. Veuillez redémarrer le système pour les appliquer.',
+    saveSuccess: 'Les paramètres ont été enregistrés avec succès.',
     saveError: 'Une erreur s\'est produite lors de l\'enregistrement des paramètres.',
+    restartTitle: 'Redémarrage requis',
+    restartMessage: 'Les paramètres ont été enregistrés. Voulez-vous redémarrer l\'appareil maintenant pour appliquer les modifications ?',
+    restartNow: 'Redémarrer maintenant',
+    restartLater: 'Redémarrer plus tard',
 
     // Backup & Restore
     backupRestore: 'Sauvegarde et restauration',
@@ -90,6 +122,8 @@ export default {
     restoreInfo: 'Téléchargez un fichier de sauvegarde pour restaurer les paramètres. Le système redémarrera ensuite.',
     downloadBackup: 'Télécharger la sauvegarde',
     restore: 'Restaurer',
+    restoreBtn: 'Restaurer',
+    download: 'Télécharger',
     noFileChosen: 'Aucun fichier choisi',
     browse: 'Parcourir',
     restoreConfirm: 'Êtes-vous sûr ? Les paramètres actuels seront écrasés et le système redémarrera.',
@@ -101,6 +135,9 @@ export default {
   // System Info
   sysinfo: {
     title: 'Informations système',
+    goodMorning: 'Bonjour',
+    goodAfternoon: 'Bon après-midi',
+    goodEvening: 'Bonsoir',
     serial: 'Numéro de série',
     boardRevision: 'Révision de la carte',
     uptime: 'Temps de fonctionnement',
@@ -130,25 +167,59 @@ export default {
     moduleType: 'Type de module',
     firmwareVersion: 'Version du micrologiciel',
     bidcosMAC: 'MAC Radio BidCoS',
-    hmipMAC: 'MAC Radio HmIP'
+    hmipMAC: 'MAC Radio HmIP',
+    system: 'Système',
+    network: 'Réseau',
+    down: 'Bas',
+    mbits: 'Mbit/s',
+    online: 'En ligne',
+    offline: 'Hors ligne',
+    dashboardTitle: 'État du système'
+  },
+
+  // Update
+  update: {
+    available: 'Mise à jour disponible',
+    updateNow: 'Mettre à jour maintenant'
   },
 
   // Firmware Update
   firmware: {
     title: 'Micrologiciel',
+    subtitle: 'Mettre à jour le micrologiciel de votre appareil',
+    restarting: 'Redémarrage...',
+    restartingText: 'L\'appareil redémarre. La page se rechargera automatiquement.',
+    fileUpload: 'Téléchargement de fichier',
+    fileUploadHint: 'Télécharger un fichier de micrologiciel .bin',
+    networkUpdate: 'Mise à jour réseau',
+    networkUpdateHint: 'Télécharger depuis une URL',
+    urlPlaceholder: 'https://exemple.com/firmware.bin',
+    downloading: 'Téléchargement...',
+    downloadInstall: 'Télécharger et installer',
+    factoryReset: 'Réinitialiser',
+    factoryResetHint: 'Réinitialiser aux paramètres d\'usine',
+    factoryResetConfirm: 'Voulez-vous vraiment réinitialiser aux paramètres d\'usine ? Tous les paramètres seront perdus.',
+    otaProgress: 'Téléchargement de la mise à jour du micrologiciel...',
+    otaSuccess: 'Téléchargement réussi. Installation...',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
     versionInfo: 'Fork modernisé v2.1.5 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
+    newVersionAvailable: 'Nouvelle version {version} disponible !',
+    viewUpdate: 'Voir',
     onlineUpdate: 'Mise à jour en ligne',
     onlineUpdateConfirm: 'Voulez-vous vraiment télécharger et installer la mise à jour ? Le système redémarrera automatiquement.',
     onlineUpdateStarted: 'Mise à jour commencée. L\'appareil redémarrera automatiquement une fois terminé.',
+    showReleaseNotes: 'Afficher les notes de version',
+    releaseNotesTitle: 'Notes de version pour v{version}',
+    releaseNotesError: 'Échec du chargement des notes de version depuis GitHub.',
     updateFile: 'Fichier du micrologiciel',
     noFileChosen: 'Aucun fichier choisi',
     browse: 'Parcourir',
-    selectFile: 'Sélectionner un fichier',
-    upload: 'Télécharger',
-    restart: 'Redémarrer le système',
+    selectFile: 'Sélectionner ou déposer un fichier .bin',
+    upload: 'Installer le micrologiciel',
+    restart: 'Redémarrer',
+    restartHint: 'Redémarrer l\'appareil',
     uploading: 'Téléchargement...',
     uploadSuccess: 'Mise à jour du micrologiciel téléchargée avec succès. Le système redémarrera automatiquement dans 3 secondes...',
     uploadError: 'Une erreur est survenue.',
@@ -212,7 +283,7 @@ export default {
     title: 'À propos',
     version: 'Version 2.1.5',
     fork: 'Fork Modernisé',
-    forkDescription: 'Cette version est un fork modernisé par Xerolux (2025), basé sur le firmware original HB-RF-ETH. Mis à jour vers ESP-IDF 5.3, chaînes d\'outils modernes (GCC 13.2.0) et technologies WebUI actuelles (Vue 3, Parcel 2, Pinia).',
+    forkDescription: 'Cette version est un fork modernisé par Xerolux (2025), basé sur le firmware original HB-RF-ETH. Mis à jour vers ESP-IDF 5.3, chaînes d\'outils modernes et technologies WebUI actuelles (Vue 3, Vite, Pinia).',
     original: 'Auteur Original',
     firmwareLicense: 'Le',
     hardwareLicense: 'Le',
@@ -235,6 +306,11 @@ export default {
   // Change Password
   changePassword: {
     title: 'Changement de mot de passe requis',
+    subtitle: 'Sécurisez votre compte',
+    warningTitle: 'Requis',
+    requirementsTitle: 'Exigences du mot de passe :',
+    reqMinLength: 'Au moins 6 caractères',
+    reqLettersNumbers: 'Doit contenir des lettres et des chiffres',
     currentPassword: 'Mot de passe actuel',
     newPassword: 'Nouveau mot de passe',
     confirmPassword: 'Confirmer le mot de passe',
@@ -243,8 +319,65 @@ export default {
     changeError: 'Erreur lors du changement de mot de passe',
     passwordMismatch: 'Les mots de passe ne correspondent pas',
     passwordTooShort: 'Le mot de passe doit comporter au moins 6 caractères et contenir des lettres et des chiffres.',
+    passwordRequirements: 'Doit contenir des lettres et des chiffres',
     passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
     warningMessage: 'Ceci est votre première connexion ou le mot de passe est toujours défini sur "admin". Pour des raisons de sécurité, vous devez changer le mot de passe.',
-    success: 'Mot de passe changé avec succès'
+    success: 'Mot de passe changé avec succès',
+    newPasswordPlaceholder: 'Entrer le nouveau mot de passe',
+    confirmPasswordPlaceholder: 'Confirmer le nouveau mot de passe'
+  },
+
+  // OTA Password Modal
+  otaPassword: {
+    title: 'Définir le mot de passe OTA',
+    warningMessage: 'Définissez un mot de passe distinct pour les mises à jour du micrologiciel. Ceci est requis pour les mises à jour OTA.',
+    otaPassword: 'Mot de passe OTA',
+    otaPasswordPlaceholder: 'Entrer le mot de passe OTA',
+    confirmPassword: 'Confirmer le mot de passe',
+    confirmPasswordPlaceholder: 'Confirmer le mot de passe OTA',
+    passwordTooShort: 'Le mot de passe doit comporter au moins 8 caractères',
+    passwordRequirements: 'Doit contenir des majuscules, des minuscules et des chiffres',
+    passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
+    requirementsTitle: 'Exigences du mot de passe :',
+    reqMinLength: 'Au moins 8 caractères',
+    reqMixedCase: 'Lettres majuscules et minuscules',
+    reqNumbers: 'Au moins un chiffre',
+    strengthWeak: 'Faible',
+    strengthMedium: 'Moyen',
+    strengthGood: 'Bon',
+    strengthStrong: 'Fort'
+  },
+
+  // Sponsor
+  sponsor: {
+    title: 'Soutenir ce projet',
+    description: 'Si vous aimez ce projet et souhaitez soutenir son développement, vous pouvez utiliser l\'une des options ci-dessous.',
+    thanks: 'Merci pour votre soutien !'
+  },
+
+  // System Log
+  systemlog: {
+    title: 'Journal système',
+    description: 'Vue en direct de la sortie du journal système avec capacité de téléchargement.',
+    liveLog: 'Journal en direct',
+    autoScroll: 'Défilement automatique',
+    enabled: 'Activé',
+    disabledMessage: 'La visionneuse de journaux est désactivée. Activez l\'interrupteur pour voir les journaux en direct.',
+    refresh: 'Actualiser',
+    clear: 'Effacer',
+    download: 'Télécharger',
+    empty: 'Aucune entrée de journal pour le moment.'
+  },
+
+  // Changelog
+  changelog: {
+    title: 'Journal des modifications',
+    loading: 'Chargement...',
+    fetching: 'Récupération du journal des modifications depuis GitHub...',
+    error: 'Échec du chargement du journal des modifications',
+    fetchError: 'Impossible de récupérer le journal des modifications. Veuillez vérifier votre connexion Internet.',
+    retry: 'Réessayer',
+    close: 'Fermer',
+    viewOnGithub: 'Voir sur GitHub'
   }
 }
