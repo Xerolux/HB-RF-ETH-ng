@@ -11,9 +11,9 @@
       </main>
       <footer class="app-footer">
         <div class="footer-content">
-          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2026 Xerolux</small>
+          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025-2026 Xerolux</small>
           <button class="sponsor-btn" @click="showSponsorModal = true">
-            <span>❤️</span> Sponsor
+            <span aria-hidden="true">❤️</span> Sponsor
           </button>
         </div>
       </footer>
@@ -37,6 +37,19 @@ const showSponsorModal = ref(false)
 let idleTimer = null
 const IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
 
+const throttle = (func, limit) => {
+  let inThrottle
+  return function() {
+    const args = arguments
+    const context = this
+    if (!inThrottle) {
+      func.apply(context, args)
+      inThrottle = true
+      setTimeout(() => inThrottle = false, limit)
+    }
+  }
+}
+
 const resetTimer = () => {
   if (idleTimer) clearTimeout(idleTimer)
   if (loginStore.isLoggedIn) {
@@ -44,25 +57,27 @@ const resetTimer = () => {
   }
 }
 
+const throttledResetTimer = throttle(resetTimer, 1000)
+
 const logout = () => {
   loginStore.logout()
   router.push('/login')
 }
 
 const setupIdleListeners = () => {
-  window.addEventListener('mousemove', resetTimer)
-  window.addEventListener('mousedown', resetTimer)
-  window.addEventListener('keypress', resetTimer)
-  window.addEventListener('touchmove', resetTimer)
-  window.addEventListener('scroll', resetTimer)
+  window.addEventListener('mousemove', throttledResetTimer)
+  window.addEventListener('mousedown', throttledResetTimer)
+  window.addEventListener('keypress', throttledResetTimer)
+  window.addEventListener('touchmove', throttledResetTimer)
+  window.addEventListener('scroll', throttledResetTimer)
 }
 
 const removeIdleListeners = () => {
-  window.removeEventListener('mousemove', resetTimer)
-  window.removeEventListener('mousedown', resetTimer)
-  window.removeEventListener('keypress', resetTimer)
-  window.removeEventListener('touchmove', resetTimer)
-  window.removeEventListener('scroll', resetTimer)
+  window.removeEventListener('mousemove', throttledResetTimer)
+  window.removeEventListener('mousedown', throttledResetTimer)
+  window.removeEventListener('keypress', throttledResetTimer)
+  window.removeEventListener('touchmove', throttledResetTimer)
+  window.removeEventListener('scroll', throttledResetTimer)
   if (idleTimer) clearTimeout(idleTimer)
 }
 

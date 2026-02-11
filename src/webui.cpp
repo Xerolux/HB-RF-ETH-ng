@@ -356,7 +356,7 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
 
     add_settings(root);
 
-    const char *json = cJSON_Print(root);
+    const char *json = cJSON_PrintUnformatted(root);
     if (json) {
         httpd_resp_sendstr(req, json);
         free((void *)json);
