@@ -185,19 +185,28 @@
 
           <!-- Mobile Actions -->
           <div class="mobile-actions-section">
-            <!-- Language -->
-            <div class="mobile-locale-row">
-              <span class="mobile-action-label">{{ t('nav.language') }}</span>
-              <div class="mobile-locale-chips">
-                <button
-                  v-for="loc in availableLocales"
-                  :key="loc.code"
-                  @click="changeLocale(loc.code)"
-                  :class="['locale-chip', { active: loc.code === currentLocale }]"
-                >
-                  {{ loc.flag || loc.code.toUpperCase() }}
-                </button>
-              </div>
+            <!-- Language (Collapsible) -->
+            <div class="mobile-nav-group">
+              <button class="mobile-nav-group-header" @click="mobileLanguageExpanded = !mobileLanguageExpanded">
+                <span class="mobile-nav-icon">🌍</span>
+                {{ t('nav.language') }}
+                <span class="current-lang-code">{{ currentLocale.toUpperCase() }}</span>
+                <svg class="mobile-chevron" :class="{ 'expanded': mobileLanguageExpanded }" width="12" height="7" viewBox="0 0 12 7"><path d="M1 1l5 5 5-5" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+              </button>
+              <Transition name="expand">
+                <div v-show="mobileLanguageExpanded" class="mobile-nav-subitems">
+                  <button
+                    v-for="loc in availableLocales"
+                    :key="loc.code"
+                    @click="changeLocale(loc.code); mobileMenuOpen = false"
+                    class="mobile-nav-sublink mobile-lang-btn"
+                    :class="{ 'active': loc.code === currentLocale }"
+                  >
+                    <span class="mobile-flag">{{ loc.flag || '' }}</span>
+                    {{ loc.name }}
+                  </button>
+                </div>
+              </Transition>
             </div>
 
             <!-- Login / Logout -->
@@ -245,6 +254,7 @@ const dismissedVersion = ref(localStorage.getItem('dismissedUpdate'))
 // Mobile menu state
 const mobileMenuOpen = ref(false)
 const mobileSettingsExpanded = ref(false)
+const mobileLanguageExpanded = ref(false)
 
 // Desktop dropdown state
 const settingsOpen = ref(false)
@@ -805,45 +815,29 @@ onMounted(async () => {
   gap: var(--spacing-md);
 }
 
-.mobile-locale-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.mobile-action-label {
-  font-size: 0.75rem;
+.current-lang-code {
+  margin-left: auto;
+  margin-right: 8px;
+  font-size: 0.8rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-text-secondary);
-  padding-left: 4px;
-}
-
-.mobile-locale-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.locale-chip {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-size: 1.125rem;
-  border: 2px solid var(--color-border);
   background: var(--color-bg);
-  cursor: pointer;
-  transition: all 0.2s;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.locale-chip.active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-  box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+.mobile-lang-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mobile-flag {
+  width: 24px;
+  display: inline-block;
+  text-align: center;
 }
 
 .mobile-auth-btn {
