@@ -1,9 +1,4 @@
 # HB-RF-ETH Default Configuration
-
-# SNMP Support for Monitoring
-CONFIG_LWIP_SNMP=y
-CONFIG_LWIP_SNMP_MAX_OBJ_ID_LEN=50
-CONFIG_LWIP_MIB2_CALLBACKS=y
-
-# HTTP Server
-CONFIG_HTTPD_MAX_URI_HANDLERS=15
+# Note: SNMP defines (CONFIG_LWIP_SNMP, CONFIG_LWIP_SNMP_MAX_OBJ_ID_LEN,
+# CONFIG_LWIP_MIB2_CALLBACKS) are set via build_flags in platformio.ini.
+# HTTPD max_uri_handlers is configured programmatically in webui.cpp.
