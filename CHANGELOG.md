@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2026-02-12
+
+### Added
+- 🌟 **Update LED Control** - New setting to enable/disable the status LED blinking when a firmware update is available (default: enabled).
+- 🔒 **Enhanced Password Security** - Enforced stronger password policy (min 8 chars, uppercase, lowercase, digit).
+
+### Changed
+- 📄 **Changelog Fetching** - Now fetched via backend proxy (`/api/changelog`) to avoid CORS issues and improve reliability.
+- ⚡ **Performance** - Optimized idle timer events in WebUI to reduce CPU usage.
+- 🔧 **Network Validation** - Stricter validation prevents saving invalid network settings.
+- 🛑 **MQTT Stability** - Improved MQTT task termination sequence to prevent system restart delays.
+- 🔒 **API Security** - Removed wildcard CORS headers from monitoring API.
+
+### Fixed
+- 🐛 **Settings Error Handling** - Proper error propagation when saving invalid network settings.
+- ♿ **Accessibility** - Added `aria-hidden` attributes to decorative icons.
+
 ## 2.1.5 Final
 
 ### Added
@@ -211,7 +228,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.6...HEAD
+[2.1.6]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...v2.1.6
 [2.1.5]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...v2.1.5
 [2.1.4]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...v2.1.4
 [2.1.3]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.2...v2.1.3

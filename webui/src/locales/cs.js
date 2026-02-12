@@ -203,7 +203,7 @@ export default {
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.1.5 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.1.6 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     newVersionAvailable: 'Nová verze {version} je k dispozici!',
     viewUpdate: 'Zobrazit',
@@ -281,7 +281,7 @@ export default {
   // About Page
   about: {
     title: 'O programu',
-    version: 'Verze 2.1.5',
+    version: 'Verze 2.1.6',
     fork: 'Modernizovaný Fork',
     forkDescription: 'Tato verze je modernizovaný fork od Xerolux (2025), založený na původním firmwaru HB-RF-ETH. Aktualizováno na ESP-IDF 5.3, moderní toolchainy a současné technologie WebUI (Vue 3, Vite, Pinia).',
     original: 'Původní Autor',
