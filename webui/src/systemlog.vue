@@ -86,7 +86,13 @@ const fetchLog = async () => {
     })
     if (response.data) {
       logContent.value += response.data
-      offset.value += response.data.length
+      // Use X-Log-Total header for accurate offset (handles ring buffer overflow)
+      const totalWritten = parseInt(response.headers['x-log-total'])
+      if (!isNaN(totalWritten)) {
+        offset.value = totalWritten
+      } else {
+        offset.value += response.data.length
+      }
       if (autoScroll.value) {
         await nextTick()
         scrollToBottom()

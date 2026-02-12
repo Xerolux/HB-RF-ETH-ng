@@ -68,7 +68,7 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_Delete(root);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, json_string);
 
     free(json_string);
@@ -97,7 +97,10 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
 
+    // Load current config first to preserve fields not sent by frontend
+    // (e.g., MQTT password is never sent back for security reasons)
     monitoring_config_t config = {};
+    monitoring_get_config(&config);
 
     // Parse SNMP config
     cJSON *snmp = cJSON_GetObjectItem(root, "snmp");
@@ -228,7 +231,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
     return ESP_OK;
