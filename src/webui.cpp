@@ -1015,9 +1015,8 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
     args->url = strdup(url_buf);
     if (args->url == NULL) {
         ESP_LOGE(TAG, "Failed to allocate memory for URL");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Memory allocation failed\"}");
         delete args;
+        // Response already sent above, just log the error
         return ESP_OK;
     }
     args->statusLED = _statusLED;

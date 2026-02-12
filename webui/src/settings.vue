@@ -497,7 +497,7 @@ const isDcfActivated = computed(() => timesource.value === 1)
 const isGpsActivated = computed(() => timesource.value === 2)
 const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'static')
 
-const hostname_validator = helpers.regex(/^[a-zA-Z0-9_-]{1,63}$/)
+const hostname_validator = helpers.regex(/^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
 const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
 
@@ -569,6 +569,7 @@ const v$ = useVuelidate(rules, {
   gateway,
   dns1,
   dns2,
+  ccuIP,
   ipv6Address,
   ipv6PrefixLength,
   ipv6Gateway,
