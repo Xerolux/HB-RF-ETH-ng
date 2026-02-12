@@ -1,4 +1,4 @@
-# HB-RF-ETH-ng Firmware v2.1.5
+# HB-RF-ETH-ng Firmware v2.1.6
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]

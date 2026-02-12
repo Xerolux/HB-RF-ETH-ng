@@ -47,14 +47,22 @@ def update_locales(version: str):
     """Update version in locale files"""
     # Use full version for display (e.g. "Version 2.1.0")
 
-    for locale in ["de.js", "en.js"]:
+    locales = ["cs.js", "de.js", "en.js", "es.js", "fr.js", "it.js", "nl.js", "no.js", "pl.js", "sv.js"]
+
+    for locale in locales:
         file_path = Path(f"webui/src/locales/{locale}")
         if file_path.exists():
             content = file_path.read_text()
-            # Update version: 'Version X.X'
+            # Update version: 'Word X.X' (preserves localized "Version" word)
             content = re.sub(
-                r"version: 'Version [\d.]+',",
-                f"version: 'Version {version}',",
+                r"(version: '.*? )([\d.]+)(',)",
+                f"\\g<1>{version}\\g<3>",
+                content
+            )
+            # Update versionInfo: '... v2.1.5 ...'
+            content = re.sub(
+                r"(versionInfo:.*v)(\d+\.\d+\.\d+)",
+                f"\\g<1>{version}",
                 content
             )
             file_path.write_text(content)
@@ -92,6 +100,26 @@ def update_package_json(version: str):
         f.write('\n')  # Add trailing newline
 
     print(f"✓ Updated package.json to version {version}")
+
+def update_package_lock_json(version: str):
+    """Update webui/package-lock.json with new version"""
+    lock_file = Path("webui/package-lock.json")
+    if not lock_file.exists():
+        print("⚠ webui/package-lock.json not found, skipping")
+        return
+
+    with open(lock_file, 'r') as f:
+        lock_data = json.load(f)
+
+    lock_data['version'] = version
+    if "" in lock_data.get('packages', {}):
+         lock_data['packages'][""]['version'] = version
+
+    with open(lock_file, 'w') as f:
+        json.dump(lock_data, f, indent=2)
+        f.write('\n')
+
+    print(f"✓ Updated package-lock.json to version {version}")
 
 def update_openapi_yaml(version: str):
     """Update docs/openapi.yaml with new version"""
@@ -154,6 +182,7 @@ def main():
         update_locales(version)
         update_about_vue(version)
         update_package_json(version)
+        update_package_lock_json(version)
         update_openapi_yaml(version)
         update_troubleshooting(version)
 
