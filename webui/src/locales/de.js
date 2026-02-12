@@ -284,7 +284,7 @@ export default {
     title: 'Über',
     version: 'Version 2.1.6',
     fork: 'Modernisierte Fork',
-    forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.3, moderne Toolchains und aktuelle WebUI-Technologien (Vue 3, Vite, Pinia).',
+    forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 5.5.1, moderne Toolchains und aktuelle WebUI-Technologien (Vue 3, Vite, Pinia).',
     original: 'Original-Autor',
     firmwareLicense: 'Die',
     hardwareLicense: 'Die',

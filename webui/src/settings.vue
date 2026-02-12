@@ -341,7 +341,7 @@
 
     <!-- Floating Action Bar for Save -->
     <Transition name="slide-up">
-      <div class="floating-footer" v-if="!showSuccess">
+      <div class="floating-footer">
         <div class="footer-container">
           <BAlert
             variant="danger"
@@ -361,18 +361,6 @@
           >
             {{ t('common.save') }}
           </BButton>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Success Toast/Overlay -->
-    <Transition name="fade">
-      <div v-if="showSuccess" class="success-overlay">
-        <div class="success-card">
-          <div class="success-icon">✓</div>
-          <h3>{{ t('common.success') }}</h3>
-          <p>{{ t('settings.saveSuccess') }}</p>
-          <BButton variant="outline-primary" @click="showSuccess = false">OK</BButton>
         </div>
       </div>
     </Transition>
@@ -486,7 +474,6 @@ const ntpServer = ref('')
 const ledBrightness = ref(100)
 const updateLedBlink = ref(true)
 
-const showSuccess = ref(null)
 const showError = ref(null)
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
@@ -627,7 +614,6 @@ const saveSettingsClick = async () => {
   if (v$.value.$error) return
 
   showError.value = false
-  showSuccess.value = false
 
   try {
     const settings = {
@@ -656,12 +642,7 @@ const saveSettingsClick = async () => {
     }
 
     await settingsStore.save(settings)
-    showSuccess.value = true
-
-    // Show restart modal after a short delay
-    setTimeout(() => {
-      showRestartModal.value = true
-    }, 1000)
+    showRestartModal.value = true
   } catch (error) {
     showError.value = true
   }
