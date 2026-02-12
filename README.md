@@ -51,12 +51,13 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * Initiales Passwort: `admin` (muss nach dem ersten Login geändert werden)
 * **Dark/Light Theme Toggle** für helles und dunkles Design
 * **Multi-Language Support** (10 Sprachen: Deutsch, Englisch, Spanisch, Französisch, Italienisch, Niederländisch, Norwegisch, Polnisch, Tschechisch, Schwedisch)
-* **System Log Viewer** - Live-Ansicht der Systemlogs mit 3-Sekunden-Polling, Download-Funktion und Ein/Aus-Schalter
+* **System Log Viewer** - Live-Ansicht der Systemlogs mit 3-Sekunden-Polling, Download-Funktion, Ein/Aus-Schalter und manueller Aktualisierung (High-Contrast)
 * **Changelog Modal** - Vollständiger Changelog direkt in der WebUI mit Markdown-Rendering
 * **Dashboard** mit Gradient-Icons, Hover-Effekten und kompaktem 3-Spalten-Grid auf Mobile
+* **Sponsor-Button** im Footer mit verschiedenen Optionen (PayPal, Buy Me a Coffee, Tesla referral)
 * **LED-Helligkeitssteuerung** (0-100%) für alle Status-LEDs
 * Detaillierte Systeminformationen und Neustart-Gründe
-* **CCU IP-Konfiguration** mit Neustart-Bestätigungsdialog
+* **Neustart-Bestätigungsdialog** beim Speichern von Einstellungen (z.B. CCU IP)
 * Barrierefreiheits-Optimierungen (Accessibility, `aria-hidden` für dekorative Icons)
 
 #### Firmware Updates
