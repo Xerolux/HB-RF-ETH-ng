@@ -68,7 +68,7 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_Delete(root);
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, json_string);
 
     free(json_string);
@@ -231,7 +231,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
     return ESP_OK;

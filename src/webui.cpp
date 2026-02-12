@@ -666,6 +666,21 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     }
     _settings->setLEDBrightness(ledBrightness);
 
+    cJSON *checkUpdatesItem = cJSON_GetObjectItem(root, "checkUpdates");
+    if (checkUpdatesItem && cJSON_IsBool(checkUpdatesItem)) {
+        _settings->setCheckUpdates(cJSON_IsTrue(checkUpdatesItem));
+    }
+
+    cJSON *allowPrereleaseItem = cJSON_GetObjectItem(root, "allowPrerelease");
+    if (allowPrereleaseItem && cJSON_IsBool(allowPrereleaseItem)) {
+        _settings->setAllowPrerelease(cJSON_IsTrue(allowPrereleaseItem));
+    }
+
+    cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
+    if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
+        _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
+    }
+
     if (ipv6Mode) {
          _settings->setIPv6Settings(
             enableIPv6,
@@ -676,6 +691,11 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
             ipv6Dns1 ? ipv6Dns1 : "",
             ipv6Dns2 ? ipv6Dns2 : ""
         );
+    }
+
+    char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
+    if (ccuIP) {
+        _settings->setCCUIP(ccuIP);
     }
 
     _settings->save();
