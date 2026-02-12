@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Systemeinstellungen',
     ledBrightness: 'LED Helligkeit',
+    updateLedBlink: 'LED bei Updates blinken lassen',
     checkUpdates: 'Nach Updates suchen',
     allowPrerelease: 'Frühe Updates erlauben (Beta/Alpha)',
     language: 'Sprache',
