@@ -127,6 +127,7 @@ void Settings::load()
 
   GET_BOOL(handle, "checkUpdates", _checkUpdates, true);
   GET_BOOL(handle, "allowPrerelease", _allowPrerelease, false);
+  GET_BOOL(handle, "updateLedBlink", _updateLedBlink, true);
 
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
 
@@ -184,6 +185,7 @@ void Settings::save()
 
   SET_BOOL(handle, "checkUpdates", _checkUpdates);
   SET_BOOL(handle, "allowPrerelease", _allowPrerelease);
+  SET_BOOL(handle, "updateLedBlink", _updateLedBlink);
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
 
@@ -405,6 +407,16 @@ bool Settings::getAllowPrerelease()
 void Settings::setAllowPrerelease(bool allowPrerelease)
 {
   _allowPrerelease = allowPrerelease;
+}
+
+bool Settings::getUpdateLedBlink()
+{
+  return _updateLedBlink;
+}
+
+void Settings::setUpdateLedBlink(bool enabled)
+{
+  _updateLedBlink = enabled;
 }
 
 // IPv6 Getters

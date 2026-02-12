@@ -324,6 +324,7 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
+    cJSON_AddBoolToObject(settings, "updateLedBlink", _settings->getUpdateLedBlink());
 
     cJSON_AddBoolToObject(settings, "checkUpdates", _settings->getCheckUpdates());
     cJSON_AddBoolToObject(settings, "allowPrerelease", _settings->getAllowPrerelease());
@@ -448,6 +449,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
         cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
         int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
+
+        cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
+        if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
+            _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
+        }
 
         // IPv6
         bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));

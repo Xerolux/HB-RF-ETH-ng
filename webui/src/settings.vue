@@ -78,6 +78,15 @@
                   <span class="brightness-value">{{ ledBrightness }}%</span>
                 </div>
               </div>
+
+              <div class="form-group mt-3">
+                <div class="switch-row">
+                  <label class="switch-label">{{ t('settings.updateLedBlink') }}</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" v-model="updateLedBlink">
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -475,6 +484,7 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
+const updateLedBlink = ref(true)
 
 const showSuccess = ref(null)
 const showError = ref(null)
@@ -583,6 +593,7 @@ const loadSettings = () => {
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
+  updateLedBlink.value = settingsStore.updateLedBlink !== undefined ? settingsStore.updateLedBlink : true
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -632,6 +643,7 @@ const saveSettingsClick = async () => {
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
+      updateLedBlink: updateLedBlink.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
