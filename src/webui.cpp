@@ -1081,8 +1081,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to create OTA update task");
         free(args->url);
         delete args;
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Failed to start update task\"}");
+        // Response already sent above, just log the error
         return ESP_OK;
     }
 
@@ -1280,6 +1279,12 @@ esp_err_t get_log_handler_func(httpd_req_t *req)
 
     httpd_resp_set_type(req, "text/plain");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    // Send totalWritten so frontend can sync its offset after ring buffer overflow
+    size_t totalWritten = LogManager::instance().getTotalWritten();
+    char totalWrittenStr[24];
+    snprintf(totalWrittenStr, sizeof(totalWrittenStr), "%zu", totalWritten);
+    httpd_resp_set_hdr(req, "X-Log-Total", totalWrittenStr);
 
     std::string content = LogManager::instance().getLogContent(offset);
     httpd_resp_send(req, content.c_str(), content.length());
