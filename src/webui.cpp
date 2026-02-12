@@ -471,7 +471,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
             _settings->setAdminPassword(adminPassword);
 
         if (hostname) {
-            _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+            if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
+            }
         }
         _settings->setTimesource(timesource);
         _settings->setDcfOffset(dcfOffset);
