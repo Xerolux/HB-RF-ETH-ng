@@ -367,7 +367,7 @@ const factoryResetClick = async () => {
 const setGithubUrl = () => {
   const version = sysInfoStore.latestVersion
   if (version && version !== 'n/a') {
-    otaUrl.value = `https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v${version}/firmware.bin`
+    otaUrl.value = `https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v${version}/firmware_${version}.bin`
   }
 }
 
