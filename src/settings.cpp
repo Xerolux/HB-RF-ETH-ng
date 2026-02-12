@@ -268,13 +268,13 @@ ip4_addr_t Settings::getDns2()
   return _dns2;
 }
 
-void Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2)
+bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2)
 {
   // Validate hostname
   if (!validateHostname(hostname))
   {
     ESP_LOGE(TAG, "Invalid hostname provided, keeping current value");
-    return;
+    return false;
   }
 
   // Validate IP addresses if not using DHCP
@@ -283,17 +283,17 @@ void Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
     if (!validateIPAddress(localIP))
     {
       ESP_LOGE(TAG, "Invalid local IP address, keeping current settings");
-      return;
+      return false;
     }
     if (!validateIPAddress(netmask))
     {
       ESP_LOGE(TAG, "Invalid netmask, keeping current settings");
-      return;
+      return false;
     }
     if (!validateIPAddress(gateway))
     {
       ESP_LOGE(TAG, "Invalid gateway, keeping current settings");
-      return;
+      return false;
     }
   }
 
@@ -301,12 +301,12 @@ void Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
   if (dns1.addr != IPADDR_ANY && !validateIPAddress(dns1))
   {
     ESP_LOGE(TAG, "Invalid DNS1 address, keeping current settings");
-    return;
+    return false;
   }
   if (dns2.addr != IPADDR_ANY && !validateIPAddress(dns2))
   {
     ESP_LOGE(TAG, "Invalid DNS2 address, keeping current settings");
-    return;
+    return false;
   }
 
   // All validations passed, update settings
@@ -317,6 +317,8 @@ void Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
   _gateway = gateway;
   _dns1 = dns1;
   _dns2 = dns2;
+
+  return true;
 }
 
 int Settings::getDcfOffset()

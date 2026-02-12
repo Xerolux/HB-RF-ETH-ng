@@ -79,7 +79,7 @@
             block
             size="lg"
             type="submit"
-            :disabled="v$.$invalid || loading"
+            :disabled="loading"
             class="submit-btn"
           >
             <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
@@ -110,16 +110,17 @@ const confirmPassword = ref('')
 const error = ref(null)
 const loading = ref(false)
 
-const password_validator = helpers.regex(/^(?=.*[A-Za-z])(?=.*\d).{6,}$/)
+const password_validator = helpers.regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/)
 
 const rules = computed(() => ({
-  newPassword: { required, minLength: minLength(6), password_validator },
+  newPassword: { required, minLength: minLength(8), password_validator },
   confirmPassword: { required, sameAs: sameAs(newPassword.value) }
 }))
 
 const v$ = useVuelidate(rules, { newPassword, confirmPassword })
 
 const handleSubmit = async () => {
+  v$.value.$touch()
   if (v$.value.$invalid || loading.value) return
 
   error.value = null

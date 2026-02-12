@@ -89,7 +89,7 @@ public:
   ip4_addr_t getDns1();
   ip4_addr_t getDns2();
 
-  void setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2);
+  bool setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2);
 
   timesource_t getTimesource();
   void setTimesource(timesource_t timesource);
