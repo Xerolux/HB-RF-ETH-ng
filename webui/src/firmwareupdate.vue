@@ -294,29 +294,52 @@ const startOtaUpdate = async () => {
   executeOtaUpdate()
 }
 
+const pollOtaStatus = () => {
+  return new Promise((resolve, reject) => {
+    const poll = async () => {
+      try {
+        const res = await axios.get('/api/ota_status', { timeout: 3000 })
+        const { status, progress, error: otaError } = res.data
+
+        otaProgress.value = progress || 0
+
+        if (status === 'downloading') {
+          setTimeout(poll, 1000)
+        } else if (status === 'success') {
+          otaProgress.value = 100
+          resolve()
+        } else if (status === 'failed') {
+          reject(new Error(otaError || 'OTA update failed'))
+        } else {
+          // idle - OTA might have finished and device is restarting
+          resolve()
+        }
+      } catch (err) {
+        // Network error likely means device is restarting after success
+        resolve()
+      }
+    }
+    setTimeout(poll, 1000)
+  })
+}
+
 const executeOtaUpdate = async () => {
   otaUpdating.value = true
   otaProgress.value = 0
 
-  // Show non-closable status modal
   showStatus('Downloading', t('firmware.otaProgress'), '📥', 'info', true)
 
   try {
-    const progressInterval = setInterval(() => {
-      if (otaProgress.value < 90) otaProgress.value += 5
-    }, 200)
-
     const response = await axios.post('/api/ota_url', { url: otaUrl.value })
 
-    clearInterval(progressInterval)
-    otaProgress.value = 100
-
     if (response.data.success) {
+      // Poll real OTA progress from backend
+      await pollOtaStatus()
       showStatus('Success', t('firmware.otaSuccess'), '✓', 'success', true)
       setTimeout(startCountdown, 1000)
     }
   } catch (error) {
-    showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')
+    showStatus('Error', error.response?.data?.error || error.message || 'OTA update failed', '❌', 'error')
   } finally {
     otaUpdating.value = false
   }

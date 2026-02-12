@@ -945,6 +945,59 @@ httpd_uri_t post_factory_reset_handler = {
     .handler = post_factory_reset_handler_func,
     .user_ctx = NULL};
 
+// OTA status tracking
+enum ota_status_t {
+    OTA_IDLE = 0,
+    OTA_DOWNLOADING,
+    OTA_SUCCESS,
+    OTA_FAILED
+};
+
+static volatile ota_status_t _ota_status = OTA_IDLE;
+static volatile int _ota_progress = 0;  // 0-100
+static char _ota_error[128] = {0};
+
+static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    cJSON *root = cJSON_CreateObject();
+
+    const char *status_str;
+    switch (_ota_status) {
+        case OTA_DOWNLOADING: status_str = "downloading"; break;
+        case OTA_SUCCESS:     status_str = "success"; break;
+        case OTA_FAILED:      status_str = "failed"; break;
+        default:              status_str = "idle"; break;
+    }
+
+    cJSON_AddStringToObject(root, "status", status_str);
+    cJSON_AddNumberToObject(root, "progress", _ota_progress);
+    if (_ota_status == OTA_FAILED && _ota_error[0] != '\0') {
+        cJSON_AddStringToObject(root, "error", _ota_error);
+    }
+
+    char *json_string = cJSON_Print(root);
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_string);
+    free(json_string);
+
+    return ESP_OK;
+}
+
+httpd_uri_t get_ota_status_handler = {
+    .uri = "/api/ota_status",
+    .method = HTTP_GET,
+    .handler = get_ota_status_handler_func,
+    .user_ctx = NULL};
+
 // OTA update from URL handler
 static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 {
@@ -1026,41 +1079,64 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 
         ESP_LOGI(TAG, "OTA task started, downloading from: %s", a->url);
 
+        _ota_status = OTA_DOWNLOADING;
+        _ota_progress = 0;
+        _ota_error[0] = '\0';
+
         esp_http_client_config_t config = {};
         config.url = a->url;
         config.crt_bundle_attach = esp_crt_bundle_attach;
         config.keep_alive_enable = true;
-        config.timeout_ms = 30000;  // 30 second timeout for downloads
-        config.buffer_size = 4096;   // Larger buffer for better performance
-        config.max_redirection_count = 5;  // Allow redirects
+        config.timeout_ms = 30000;
+        config.buffer_size = 4096;
+        config.max_redirection_count = 5;
 
         esp_https_ota_config_t ota_config = {};
         ota_config.http_config = &config;
 
         a->statusLED->setState(LED_STATE_BLINK_FAST);
 
-        esp_err_t ret = esp_https_ota(&ota_config);
+        // Use advanced OTA API for progress tracking
+        esp_https_ota_handle_t ota_handle = NULL;
+        esp_err_t ret = esp_https_ota_begin(&ota_config, &ota_handle);
+
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "OTA begin failed: %s", esp_err_to_name(ret));
+            snprintf(_ota_error, sizeof(_ota_error), "OTA begin failed: %s", esp_err_to_name(ret));
+            _ota_status = OTA_FAILED;
+            a->statusLED->setState(LED_STATE_ON);
+            free(a->url);
+            delete a;
+            vTaskDelete(NULL);
+            return;
+        }
+
+        int image_size = esp_https_ota_get_image_size(ota_handle);
+        ESP_LOGI(TAG, "OTA image size: %d bytes", image_size);
+
+        while (true) {
+            ret = esp_https_ota_perform(ota_handle);
+            if (ret != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+                break;
+            }
+            // Update progress
+            if (image_size > 0) {
+                int downloaded = esp_https_ota_get_image_len_read(ota_handle);
+                _ota_progress = (int)((int64_t)downloaded * 100 / image_size);
+            }
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
 
         if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "OTA Update successful, validating firmware...");
+            _ota_progress = 100;
+            ret = esp_https_ota_finish(ota_handle);
+        } else {
+            esp_https_ota_abort(ota_handle);
+        }
 
-            // Validate the new partition
-            const esp_partition_t *running = esp_ota_get_running_partition();
-            const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-
-            if (update_partition != NULL && update_partition != running) {
-                // Verify the partition can be booted
-                esp_app_desc_t running_app_desc;
-                esp_app_desc_t new_app_desc;
-
-                if (esp_ota_get_partition_description(running, &running_app_desc) == ESP_OK &&
-                    esp_ota_get_partition_description(update_partition, &new_app_desc) == ESP_OK) {
-                    ESP_LOGI(TAG, "Running firmware: %s %s", running_app_desc.project_name, running_app_desc.version);
-                    ESP_LOGI(TAG, "New firmware: %s %s", new_app_desc.project_name, new_app_desc.version);
-                }
-            }
-
-            ESP_LOGI(TAG, "Firmware validation complete, restarting...");
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "OTA Update successful, restarting...");
+            _ota_status = OTA_SUCCESS;
             ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
             a->statusLED->setState(LED_STATE_OFF);
             free(a->url);
@@ -1069,6 +1145,8 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             full_system_restart();
         } else {
             ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+            snprintf(_ota_error, sizeof(_ota_error), "OTA failed: %s", esp_err_to_name(ret));
+            _ota_status = OTA_FAILED;
             ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
             a->statusLED->setState(LED_STATE_ON);
             free(a->url);
@@ -1347,7 +1425,7 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 21;
+    config.max_uri_handlers = 22;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     _httpd_handle = NULL;
@@ -1362,6 +1440,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
         httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &post_ota_url_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_ota_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
