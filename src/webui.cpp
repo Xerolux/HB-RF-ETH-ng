@@ -1443,6 +1443,10 @@ void WebUI::start()
     // Initialize rate limiter
     rate_limiter_init();
 
+    // Suppress noisy httpd warnings
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_uri", ESP_LOG_ERROR);
+
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
     config.max_uri_handlers = 22;
