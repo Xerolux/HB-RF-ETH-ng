@@ -18,7 +18,7 @@
     <div class="settings-content">
       <!-- General Tab -->
       <Transition name="fade" mode="out-in">
-        <div v-show="activeTab === 'general'" class="tab-panel">
+        <div v-if="activeTab === 'general'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3>{{ t('settings.security') }}</h3>
@@ -94,7 +94,7 @@
 
       <!-- Network Tab -->
       <Transition name="fade" mode="out-in">
-        <div v-show="activeTab === 'network'" class="tab-panel">
+        <div v-if="activeTab === 'network'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3>{{ t('settings.networkSettings') }}</h3>
@@ -238,7 +238,7 @@
 
       <!-- Time Tab -->
       <Transition name="fade" mode="out-in">
-        <div v-show="activeTab === 'time'" class="tab-panel">
+        <div v-if="activeTab === 'time'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3>{{ t('settings.timeSettings') }}</h3>
@@ -294,7 +294,7 @@
 
       <!-- Backup Tab -->
       <Transition name="fade" mode="out-in">
-        <div v-show="activeTab === 'backup'" class="tab-panel">
+        <div v-if="activeTab === 'backup'" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3>{{ t('settings.backupRestore') }}</h3>

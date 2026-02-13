@@ -24,82 +24,20 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
 import { useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
 import SponsorModal from './components/SponsorModal.vue'
 
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
-const router = useRouter()
 const showSponsorModal = ref(false)
-let idleTimer = null
-const IDLE_TIMEOUT = 5 * 60 * 1000 // 5 minutes
 
-const throttle = (func, limit) => {
-  let inThrottle
-  return function() {
-    const args = arguments
-    const context = this
-    if (!inThrottle) {
-      func.apply(context, args)
-      inThrottle = true
-      setTimeout(() => inThrottle = false, limit)
-    }
-  }
-}
-
-const resetTimer = () => {
-  if (idleTimer) clearTimeout(idleTimer)
-  if (loginStore.isLoggedIn) {
-    idleTimer = setTimeout(logout, IDLE_TIMEOUT)
-  }
-}
-
-const throttledResetTimer = throttle(resetTimer, 1000)
-
-const logout = () => {
-  loginStore.logout()
-  router.push('/login')
-}
-
-const setupIdleListeners = () => {
-  window.addEventListener('mousemove', throttledResetTimer)
-  window.addEventListener('mousedown', throttledResetTimer)
-  window.addEventListener('keypress', throttledResetTimer)
-  window.addEventListener('touchmove', throttledResetTimer)
-  window.addEventListener('scroll', throttledResetTimer)
-}
-
-const removeIdleListeners = () => {
-  window.removeEventListener('mousemove', throttledResetTimer)
-  window.removeEventListener('mousedown', throttledResetTimer)
-  window.removeEventListener('keypress', throttledResetTimer)
-  window.removeEventListener('touchmove', throttledResetTimer)
-  window.removeEventListener('scroll', throttledResetTimer)
-  if (idleTimer) clearTimeout(idleTimer)
-}
-
-watch(() => loginStore.isLoggedIn, (isLoggedIn) => {
-  if (isLoggedIn) {
-    setupIdleListeners()
-    resetTimer()
-  } else {
-    removeIdleListeners()
-  }
-})
+// Idle timeout is handled globally in main.js via the login store's
+// activity tracking (10-minute timeout with cross-tab sync via localStorage).
 
 onMounted(() => {
   sysInfoStore.update().catch(() => {})
-  if (loginStore.isLoggedIn) {
-    setupIdleListeners()
-    resetTimer()
-  }
-})
-
-onUnmounted(() => {
-  removeIdleListeners()
 })
 </script>
 

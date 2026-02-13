@@ -224,8 +224,8 @@ onUnmounted(() => {
 .log-container {
   height: 500px;
   overflow-y: auto;
-  background: #ffffff;
-  border: 2px solid #fd7e14;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
   border-radius: var(--radius-lg);
   margin: var(--spacing-sm);
 }
@@ -236,7 +236,7 @@ onUnmounted(() => {
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
   line-height: 1.6;
-  color: #000000;
+  color: var(--color-text);
   font-weight: 500;
   white-space: pre-wrap;
   word-break: break-all;
@@ -247,9 +247,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8f9fa;
+  background: var(--color-bg);
   border: 1px solid var(--color-border-light);
-  color: var(--color-text-secondary, #666);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 

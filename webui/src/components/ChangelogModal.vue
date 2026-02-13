@@ -140,12 +140,12 @@ watch(() => props.modelValue, (newValue) => {
 
 .changelog-body {
   padding: 2rem;
-  background: #f8f9fa;
+  background: var(--color-bg, #f8f9fa);
   max-height: 60vh;
 }
 
 .changelog-content {
-  color: #343a40;
+  color: var(--color-text, #343a40);
   line-height: 1.8;
 }
 
@@ -169,7 +169,7 @@ watch(() => props.modelValue, (newValue) => {
 .changelog-content :deep(h3) {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text, #495057);
   margin-top: 1.5rem;
   margin-bottom: 0.75rem;
 }
@@ -177,7 +177,7 @@ watch(() => props.modelValue, (newValue) => {
 .changelog-content :deep(h4) {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
@@ -193,7 +193,7 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-content :deep(code) {
-  background: #e9ecef;
+  background: var(--color-border-light, #e9ecef);
   color: #d63384;
   padding: 0.125rem 0.375rem;
   border-radius: 4px;
@@ -230,13 +230,13 @@ watch(() => props.modelValue, (newValue) => {
   border-left: 4px solid #667eea;
   padding-left: 1rem;
   margin: 1rem 0;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
   font-style: italic;
 }
 
 .changelog-content :deep(hr) {
   border: 0;
-  border-top: 1px solid #dee2e6;
+  border-top: 1px solid var(--color-border, #dee2e6);
   margin: 2rem 0;
 }
 
@@ -246,73 +246,25 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-footer {
-  background: white;
-  border-top: 1px solid #e9ecef;
+  background: var(--color-surface, white);
+  border-top: 1px solid var(--color-border, #e9ecef);
   padding: 1rem 1.5rem;
 }
 
-/* Dark mode support */
-:deep(.dark) .changelog-body {
-  background: #1e1e2d;
-}
-
-:deep(.dark) .changelog-content {
-  color: #e4e6eb;
-}
-
-:deep(.dark) .changelog-content h1,
-:deep(.dark) .changelog-content h2,
-:deep(.dark) .changelog-content h3 {
-  color: #a78bfa;
-}
-
-:deep(.dark) .changelog-content code {
-  background: #2d2d3a;
-  color: #f472b6;
-}
-
-:deep(.dark) .changelog-content pre {
-  background: #0d0d14;
-}
-
-:deep(.dark) .changelog-content a {
-  color: #a78bfa;
-}
-
-:deep(.dark) .changelog-content a:hover {
-  color: #c4b5fd;
-}
-
-:deep(.dark) .changelog-footer {
-  background: #1e1e2d;
-  border-top-color: #2d2d3a;
-}
+/* Dark mode is handled via CSS variables (--color-bg, --color-text, etc.)
+   which automatically adapt when [data-bs-theme="dark"] is set on <html> */
 
 .btn-retry {
-  color: #343a40 !important;
-  border-color: #343a40 !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-text) !important;
 }
 
 .btn-retry:hover {
-  background-color: #343a40 !important;
-  color: white !important;
+  background-color: var(--color-text) !important;
+  color: var(--color-surface) !important;
 }
 
 .btn-close-modal {
-  color: #343a40 !important;
-}
-
-:deep(.dark) .btn-retry {
-  color: #e4e6eb !important;
-  border-color: #e4e6eb !important;
-}
-
-:deep(.dark) .btn-retry:hover {
-  background-color: #e4e6eb !important;
-  color: #1e1e2d !important;
-}
-
-:deep(.dark) .btn-close-modal {
-  color: #e4e6eb !important;
+  color: var(--color-text) !important;
 }
 </style>
