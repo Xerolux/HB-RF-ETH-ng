@@ -274,12 +274,11 @@ const executeUpload = async () => {
   uploadProgress.value = 0
 
   try {
-    const config = {
+    await firmwareUpdateStore.update(file.value, {
       onUploadProgress: (p) => {
         if (p.lengthComputable) uploadProgress.value = Math.round((p.loaded / p.total) * 100)
       }
-    }
-    await firmwareUpdateStore.update(file.value, config)
+    })
     startCountdown()
   } catch (error) {
     showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')

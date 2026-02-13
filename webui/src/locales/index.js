@@ -23,16 +23,16 @@ export const messages = {
 }
 
 export const availableLocales = [
-  { code: 'de', name: 'Deutsch' },
-  { code: 'en', name: 'English' },
-  { code: 'fr', name: 'Français' },
-  { code: 'nl', name: 'Nederlands' },
-  { code: 'it', name: 'Italiano' },
-  { code: 'es', name: 'Español' },
-  { code: 'pl', name: 'Polski' },
-  { code: 'cs', name: 'Čeština' },
-  { code: 'no', name: 'Norsk' },
-  { code: 'sv', name: 'Svenska' }
+  { code: 'de', name: 'Deutsch', flag: '\uD83C\uDDE9\uD83C\uDDEA' },
+  { code: 'en', name: 'English', flag: '\uD83C\uDDEC\uD83C\uDDE7' },
+  { code: 'fr', name: 'Fran\u00E7ais', flag: '\uD83C\uDDEB\uD83C\uDDF7' },
+  { code: 'nl', name: 'Nederlands', flag: '\uD83C\uDDF3\uD83C\uDDF1' },
+  { code: 'it', name: 'Italiano', flag: '\uD83C\uDDEE\uD83C\uDDF9' },
+  { code: 'es', name: 'Espa\u00F1ol', flag: '\uD83C\uDDEA\uD83C\uDDF8' },
+  { code: 'pl', name: 'Polski', flag: '\uD83C\uDDF5\uD83C\uDDF1' },
+  { code: 'cs', name: '\u010Ce\u0161tina', flag: '\uD83C\uDDE8\uD83C\uDDFF' },
+  { code: 'no', name: 'Norsk', flag: '\uD83C\uDDF3\uD83C\uDDF4' },
+  { code: 'sv', name: 'Svenska', flag: '\uD83C\uDDF8\uD83C\uDDEA' }
 ]
 
 // Function to get browser language and map it to available locale

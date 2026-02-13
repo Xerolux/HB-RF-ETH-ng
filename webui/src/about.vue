@@ -110,7 +110,7 @@ const libs = ref([
   { name: 'Vuelidate', license: 'MIT', website: 'https://vuelidate-next.netlify.app/' },
   { name: 'Vue I18n', license: 'MIT', website: 'https://vue-i18n.intlify.dev/' },
   { name: 'axios', license: 'MIT', website: 'https://github.com/axios/axios' },
-  { name: 'Parcel', license: 'MIT', website: 'https://parceljs.org/' },
+  { name: 'Vite', license: 'MIT', website: 'https://vitejs.dev/' },
   { name: 'ESP-IDF', license: 'Apache 2.0', website: 'https://docs.espressif.com/projects/esp-idf/' }
 ])
 </script>

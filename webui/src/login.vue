@@ -29,11 +29,11 @@
             </div>
 
             <BAlert
-              v-if="showError"
+              :model-value="showError"
               variant="danger"
               class="login-alert"
               dismissible
-              @dismissed="showError = false"
+              @close="showError = false"
             >
               {{ t('login.loginError') }}
             </BAlert>

@@ -177,11 +177,16 @@ export const useFirmwareUpdateStore = defineStore('firmwareUpdate', {
           headers['X-OTA-Password'] = options.otaPassword
         }
 
+        const externalProgressCb = options.onUploadProgress
+
         await axios.post("/ota_update", file, {
           headers,
           onUploadProgress: event => {
             if (event.lengthComputable) {
               this.progress = Math.ceil((event.loaded || event.position) / event.total * 100)
+            }
+            if (externalProgressCb) {
+              externalProgressCb(event)
             }
           }
         })

@@ -220,7 +220,7 @@
             </router-link>
             <button
               v-if="loginStore.isLoggedIn"
-              @click="logout; mobileMenuOpen = false"
+              @click="logout()"
               class="mobile-logout-btn"
             >
               <span>🚪</span>
