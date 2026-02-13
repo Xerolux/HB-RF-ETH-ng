@@ -367,6 +367,7 @@ const startCountdown = () => {
 }
 
 const restartClick = async () => {
+  if (!confirm(t('firmware.restartConfirm'))) return
   try {
     await axios.post('/api/restart')
     startCountdown()

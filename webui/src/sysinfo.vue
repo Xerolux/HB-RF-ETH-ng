@@ -292,7 +292,10 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   background-color: currentColor;
-  box-shadow: 0 0 0 2px rgba(currentColor, 0.2);
+}
+
+.status-indicator.online .indicator-dot {
+  box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.2);
 }
 
 /* Widgets Row */
