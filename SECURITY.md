@@ -1,6 +1,6 @@
 # Security Notice
 
-## Security Updates - December 2025
+## Security Updates - February 2026
 
 ### Dependencies Updated
 
@@ -105,6 +105,11 @@ If you discover a security vulnerability in this project, please:
 
 ## Security Update History
 
+### 2026-02-14
+- Updated security documentation
+- Reviewed codebase for vulnerabilities
+- Confirmed all dependencies are up to date
+
 ### 2025-12-12
 - Updated WebUI dependencies (Parcel, vue-router)
 - Added security documentation
@@ -112,4 +117,4 @@ If you discover a security vulnerability in this project, please:
 
 ---
 
-Last Updated: December 12, 2025
+Last Updated: February 14, 2026
