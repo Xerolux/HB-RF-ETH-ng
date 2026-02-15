@@ -434,21 +434,77 @@ char *Settings::getIPv6Dns2() { return _ipv6Dns2; }
 void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char *ipv6Address, int ipv6PrefixLength, const char *ipv6Gateway, const char *ipv6Dns1, const char *ipv6Dns2)
 {
     _enableIPv6 = enableIPv6;
-    strncpy(_ipv6Mode, ipv6Mode, sizeof(_ipv6Mode) - 1);
 
-    // In a real scenario, we should validate IPv6 addresses here.
-    // Since we don't have a robust IPv6 validator in validation.cpp yet, we trust the WebUI regex or just store it.
-    // Ideally use inet_pton(AF_INET6, ...) to validate.
+    // Validate IPv6 mode
+    if (ipv6Mode != NULL && (strcmp(ipv6Mode, "auto") == 0 || strcmp(ipv6Mode, "static") == 0 || strcmp(ipv6Mode, "disabled") == 0))
+    {
+        strncpy(_ipv6Mode, ipv6Mode, sizeof(_ipv6Mode) - 1);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Invalid IPv6 mode, defaulting to 'auto'");
+        strncpy(_ipv6Mode, "auto", sizeof(_ipv6Mode) - 1);
+    }
 
-    strncpy(_ipv6Address, ipv6Address, sizeof(_ipv6Address) - 1);
+    // Validate IPv6 address if provided
+    if (ipv6Address != NULL && strlen(ipv6Address) > 0)
+    {
+        if (!validateIPv6Address(ipv6Address))
+        {
+            ESP_LOGE(TAG, "Invalid IPv6 address, keeping current value");
+            // Don't update _ipv6Address if invalid
+        }
+        else
+        {
+            strncpy(_ipv6Address, ipv6Address, sizeof(_ipv6Address) - 1);
+        }
+    }
 
+    // Validate and clamp prefix length
     if (ipv6PrefixLength < 1) ipv6PrefixLength = 1;
     if (ipv6PrefixLength > 128) ipv6PrefixLength = 128;
     _ipv6PrefixLength = ipv6PrefixLength;
 
-    strncpy(_ipv6Gateway, ipv6Gateway, sizeof(_ipv6Gateway) - 1);
-    strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
-    strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
+    // Validate IPv6 gateway if provided
+    if (ipv6Gateway != NULL && strlen(ipv6Gateway) > 0)
+    {
+        if (!validateIPv6Address(ipv6Gateway))
+        {
+            ESP_LOGE(TAG, "Invalid IPv6 gateway, keeping current value");
+            // Don't update _ipv6Gateway if invalid
+        }
+        else
+        {
+            strncpy(_ipv6Gateway, ipv6Gateway, sizeof(_ipv6Gateway) - 1);
+        }
+    }
+
+    // Validate IPv6 DNS servers if provided
+    if (ipv6Dns1 != NULL && strlen(ipv6Dns1) > 0)
+    {
+        if (!validateIPv6Address(ipv6Dns1))
+        {
+            ESP_LOGE(TAG, "Invalid IPv6 DNS1, keeping current value");
+            // Don't update _ipv6Dns1 if invalid
+        }
+        else
+        {
+            strncpy(_ipv6Dns1, ipv6Dns1, sizeof(_ipv6Dns1) - 1);
+        }
+    }
+
+    if (ipv6Dns2 != NULL && strlen(ipv6Dns2) > 0)
+    {
+        if (!validateIPv6Address(ipv6Dns2))
+        {
+            ESP_LOGE(TAG, "Invalid IPv6 DNS2, keeping current value");
+            // Don't update _ipv6Dns2 if invalid
+        }
+        else
+        {
+            strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
+        }
+    }
 }
 
 char *Settings::getCCUIP()

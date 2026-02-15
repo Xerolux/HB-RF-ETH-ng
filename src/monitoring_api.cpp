@@ -7,11 +7,12 @@
 
 #include "monitoring_api.h"
 #include "monitoring.h"
+#include "validation.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
 
-// static const char *TAG = "MONITORING_API";
+static const char *TAG = "MONITORING_API";
 
 // Helper function to validate authentication (extern from webui.cpp)
 extern esp_err_t validate_auth(httpd_req_t *req);
@@ -133,11 +134,33 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *port = cJSON_GetObjectItem(snmp, "port");
         if (port != NULL && cJSON_IsNumber(port))
         {
+            if (!validatePort(port->valueint))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid SNMP port");
+            }
             config.snmp.port = port->valueint;
         }
         else
         {
             config.snmp.port = 161; // default
+        }
+
+        // Validate string lengths
+        if (!validateStringLength(config.snmp.community, sizeof(config.snmp.community) - 1))
+        {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP community string too long");
+        }
+        if (!validateStringLength(config.snmp.location, sizeof(config.snmp.location) - 1))
+        {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP location string too long");
+        }
+        if (!validateStringLength(config.snmp.contact, sizeof(config.snmp.contact) - 1))
+        {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP contact string too long");
         }
     }
 
@@ -154,6 +177,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *port = cJSON_GetObjectItem(checkmk, "port");
         if (port != NULL && cJSON_IsNumber(port))
         {
+            if (!validatePort(port->valueint))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid CheckMK port");
+            }
             config.checkmk.port = port->valueint;
         }
         else
@@ -165,6 +193,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         if (allowedHosts != NULL && cJSON_IsString(allowedHosts))
         {
             strncpy(config.checkmk.allowed_hosts, allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1);
+            if (!validateStringLength(config.checkmk.allowed_hosts, sizeof(config.checkmk.allowed_hosts) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "CheckMK allowed hosts string too long");
+            }
         }
     }
 
@@ -187,6 +220,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *port = cJSON_GetObjectItem(mqtt, "port");
         if (port != NULL && cJSON_IsNumber(port))
         {
+            if (!validatePort(port->valueint))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid MQTT port");
+            }
             config.mqtt.port = port->valueint;
         }
 
@@ -194,6 +232,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         if (user != NULL && cJSON_IsString(user))
         {
             strncpy(config.mqtt.user, user->valuestring, sizeof(config.mqtt.user) - 1);
+            if (!validateStringLength(config.mqtt.user, sizeof(config.mqtt.user) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT user string too long");
+            }
         }
 
         cJSON *password = cJSON_GetObjectItem(mqtt, "password");
@@ -201,12 +244,22 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         {
             // Only update password if provided
             strncpy(config.mqtt.password, password->valuestring, sizeof(config.mqtt.password) - 1);
+            if (!validateStringLength(config.mqtt.password, sizeof(config.mqtt.password) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT password too long");
+            }
         }
 
         cJSON *topicPrefix = cJSON_GetObjectItem(mqtt, "topicPrefix");
         if (topicPrefix != NULL && cJSON_IsString(topicPrefix))
         {
             strncpy(config.mqtt.topic_prefix, topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1);
+            if (!validateStringLength(config.mqtt.topic_prefix, sizeof(config.mqtt.topic_prefix) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT topic prefix too long");
+            }
         }
 
         cJSON *haDiscoveryEnabled = cJSON_GetObjectItem(mqtt, "haDiscoveryEnabled");
@@ -219,6 +272,18 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         if (haDiscoveryPrefix != NULL && cJSON_IsString(haDiscoveryPrefix))
         {
             strncpy(config.mqtt.ha_discovery_prefix, haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1);
+            if (!validateStringLength(config.mqtt.ha_discovery_prefix, sizeof(config.mqtt.ha_discovery_prefix) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT HA discovery prefix too long");
+            }
+        }
+
+        // Validate MQTT server string length
+        if (!validateStringLength(config.mqtt.server, sizeof(config.mqtt.server) - 1))
+        {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT server address too long");
         }
     }
 

@@ -85,8 +85,8 @@ bool validateIPAddress(ip4_addr_t addr)
         return true;
     }
 
-    // Extract first octet
-    uint8_t firstOctet = (ip & 0xFF);
+    // Extract first octet (most significant byte in network byte order)
+    uint8_t firstOctet = (ip >> 24) & 0xFF;
 
     // Reject class E addresses (240-255) except for limited broadcast (255.255.255.255)
     if (firstOctet >= 240 && ip != IPADDR_BROADCAST)
@@ -162,6 +162,100 @@ bool validateNtpServer(const char *ntpServer)
             ESP_LOGW(TAG, "Invalid character in NTP server: '%c'", c);
             return false;
         }
+    }
+
+    return true;
+}
+
+bool validatePort(int port)
+{
+    // Port must be in valid range: 1-65535
+    // Port 0 is reserved and should not be used
+    if (port < 1 || port > 65535)
+    {
+        ESP_LOGW(TAG, "Invalid port number: %d (must be 1-65535)", port);
+        return false;
+    }
+    return true;
+}
+
+bool validateStringLength(const char *str, size_t maxLength)
+{
+    if (str == NULL)
+    {
+        ESP_LOGW(TAG, "String is NULL");
+        return false;
+    }
+
+    size_t len = strlen(str);
+    if (len > maxLength)
+    {
+        ESP_LOGW(TAG, "String too long: %zu (max %zu)", len, maxLength);
+        return false;
+    }
+
+    return true;
+}
+
+bool validateIPv6Address(const char *ipv6)
+{
+    if (ipv6 == NULL || ipv6[0] == '\0')
+    {
+        // Empty IPv6 address is valid (disabled/auto mode)
+        return true;
+    }
+
+    // Basic IPv6 format validation
+    // IPv6 addresses can contain hex digits, colons, and dots (for IPv4-mapped addresses)
+    int colons = 0;
+    int dots = 0;
+    int hexDigits = 0;
+    int doubleColons = 0;
+
+    for (size_t i = 0; ipv6[i] != '\0'; i++)
+    {
+        char c = ipv6[i];
+
+        if (c == ':')
+        {
+            colons++;
+            if (i > 0 && ipv6[i-1] == ':')
+            {
+                doubleColons++;
+            }
+            if (doubleColons > 1)
+            {
+                ESP_LOGW(TAG, "Invalid IPv6: multiple double colons");
+                return false;
+            }
+        }
+        else if (c == '.')
+        {
+            dots++;
+        }
+        else if (isxdigit(c))
+        {
+            hexDigits++;
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: invalid character '%c'", c);
+            return false;
+        }
+    }
+
+    // Must have at least some colons for a valid IPv6 address
+    if (colons < 2 && colons > 0)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: not enough colons");
+        return false;
+    }
+
+    // If we have dots (IPv4-mapped), we should have a reasonable number
+    if (dots > 0 && dots != 3 && dots != 4)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: invalid number of dots for IPv4-mapped address");
+        return false;
     }
 
     return true;

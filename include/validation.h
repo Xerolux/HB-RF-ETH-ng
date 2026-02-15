@@ -42,3 +42,12 @@ bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
 bool validateNtpServer(const char *ntpServer);
+
+// Port validation
+bool validatePort(int port);
+
+// String length validation
+bool validateStringLength(const char *str, size_t maxLength);
+
+// IPv6 validation (basic format check)
+bool validateIPv6Address(const char *ipv6);
