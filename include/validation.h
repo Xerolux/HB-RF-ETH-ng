@@ -34,6 +34,8 @@
 #define MIN_DCF_OFFSET -60000
 #define MAX_DCF_OFFSET 60000
 #define MAX_NTP_SERVER_LENGTH 64
+#define MAX_SERVER_ADDRESS_LENGTH 128
+#define MAX_SNMP_COMMUNITY_LENGTH 32
 
 // Validation functions
 bool validateHostname(const char *hostname);
@@ -52,3 +54,10 @@ bool validateStringLength(const char *str, size_t maxLength);
 
 // IPv6 validation (comprehensive format check with segment validation)
 bool validateIPv6Address(const char *ipv6);
+
+// Server address validation (hostname, IPv4, IPv6, with optional port)
+// Used for MQTT, NTP, and other network services
+bool validateServerAddress(const char *server, size_t maxLength);
+
+// SNMP community string validation (alphanumeric, hyphen, underscore only)
+bool validateSnmpCommunity(const char *community);

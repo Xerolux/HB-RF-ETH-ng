@@ -253,29 +253,29 @@ static bool isValidHostname(const char *hostname, size_t len)
     return true;
 }
 
-bool validateNtpServer(const char *ntpServer)
+bool validateServerAddress(const char *server, size_t maxLength)
 {
-    if (ntpServer == NULL || ntpServer[0] == '\0')
+    if (server == NULL || server[0] == '\0')
     {
-        ESP_LOGW(TAG, "NTP server is NULL or empty");
+        ESP_LOGW(TAG, "Server address is NULL or empty");
         return false;
     }
 
-    size_t len = strlen(ntpServer);
-    if (len > MAX_NTP_SERVER_LENGTH)
+    size_t len = strlen(server);
+    if (len > maxLength)
     {
-        ESP_LOGW(TAG, "NTP server string too long: %zu (max %d)", len, MAX_NTP_SERVER_LENGTH);
+        ESP_LOGW(TAG, "Server address string too long: %zu (max %zu)", len, maxLength);
         return false;
     }
 
     // Check for IPv6 in brackets: [2001:db8::1] or [2001:db8::1]:123
-    if (ntpServer[0] == '[')
+    if (server[0] == '[')
     {
         // Find closing bracket
         size_t closeBracket = 0;
         for (size_t i = 1; i < len; i++)
         {
-            if (ntpServer[i] == ']')
+            if (server[i] == ']')
             {
                 closeBracket = i;
                 break;
@@ -284,7 +284,7 @@ bool validateNtpServer(const char *ntpServer)
 
         if (closeBracket == 0)
         {
-            ESP_LOGW(TAG, "Invalid NTP server: unclosed bracket for IPv6");
+            ESP_LOGW(TAG, "Invalid server address: unclosed bracket for IPv6");
             return false;
         }
 
@@ -293,24 +293,24 @@ bool validateNtpServer(const char *ntpServer)
         size_t ipv6Len = closeBracket - 1;
         if (ipv6Len >= sizeof(ipv6))
         {
-            ESP_LOGW(TAG, "Invalid NTP server: IPv6 address too long");
+            ESP_LOGW(TAG, "Invalid server address: IPv6 address too long");
             return false;
         }
-        strncpy(ipv6, &ntpServer[1], ipv6Len);
+        strncpy(ipv6, &server[1], ipv6Len);
         ipv6[ipv6Len] = '\0';
 
         if (!validateIPv6Address(ipv6))
         {
-            ESP_LOGW(TAG, "Invalid NTP server: invalid IPv6 address");
+            ESP_LOGW(TAG, "Invalid server address: invalid IPv6 address");
             return false;
         }
 
         // Check for optional port after bracket
         if (closeBracket + 1 < len)
         {
-            if (ntpServer[closeBracket + 1] != ':')
+            if (server[closeBracket + 1] != ':')
             {
-                ESP_LOGW(TAG, "Invalid NTP server: expected ':' after IPv6 bracket");
+                ESP_LOGW(TAG, "Invalid server address: expected ':' after IPv6 bracket");
                 return false;
             }
 
@@ -318,17 +318,17 @@ bool validateNtpServer(const char *ntpServer)
             int port = 0;
             for (size_t i = closeBracket + 2; i < len; i++)
             {
-                if (!isdigit(ntpServer[i]))
+                if (!isdigit(server[i]))
                 {
-                    ESP_LOGW(TAG, "Invalid NTP server: invalid port character");
+                    ESP_LOGW(TAG, "Invalid server address: invalid port character");
                     return false;
                 }
-                port = port * 10 + (ntpServer[i] - '0');
+                port = port * 10 + (server[i] - '0');
             }
 
             if (!validatePort(port))
             {
-                ESP_LOGW(TAG, "Invalid NTP server: invalid port number");
+                ESP_LOGW(TAG, "Invalid server address: invalid port number");
                 return false;
             }
         }
@@ -340,7 +340,7 @@ bool validateNtpServer(const char *ntpServer)
     size_t portSep = 0;
     for (size_t i = 0; i < len; i++)
     {
-        if (ntpServer[i] == ':')
+        if (server[i] == ':')
         {
             portSep = i;
         }
@@ -348,13 +348,13 @@ bool validateNtpServer(const char *ntpServer)
 
     // Extract hostname/IP part (before optional port)
     size_t hostLen = (portSep > 0) ? portSep : len;
-    char host[MAX_NTP_SERVER_LENGTH + 1];
+    char host[MAX_SERVER_ADDRESS_LENGTH + 1];
     if (hostLen >= sizeof(host))
     {
-        ESP_LOGW(TAG, "Invalid NTP server: hostname too long");
+        ESP_LOGW(TAG, "Invalid server address: hostname too long");
         return false;
     }
-    strncpy(host, ntpServer, hostLen);
+    strncpy(host, server, hostLen);
     host[hostLen] = '\0';
 
     // Validate port if present
@@ -363,17 +363,17 @@ bool validateNtpServer(const char *ntpServer)
         int port = 0;
         for (size_t i = portSep + 1; i < len; i++)
         {
-            if (!isdigit(ntpServer[i]))
+            if (!isdigit(server[i]))
             {
-                ESP_LOGW(TAG, "Invalid NTP server: invalid port character");
+                ESP_LOGW(TAG, "Invalid server address: invalid port character");
                 return false;
             }
-            port = port * 10 + (ntpServer[i] - '0');
+            port = port * 10 + (server[i] - '0');
         }
 
         if (!validatePort(port))
         {
-            ESP_LOGW(TAG, "Invalid NTP server: invalid port number");
+            ESP_LOGW(TAG, "Invalid server address: invalid port number");
             return false;
         }
     }
@@ -396,8 +396,56 @@ bool validateNtpServer(const char *ntpServer)
         return true;
     }
 
-    ESP_LOGW(TAG, "Invalid NTP server: not a valid hostname, IPv4, or IPv6 address");
+    ESP_LOGW(TAG, "Invalid server address: not a valid hostname, IPv4, or IPv6 address");
     return false;
+}
+
+bool validateNtpServer(const char *ntpServer)
+{
+    // NTP server validation uses the generic server address validation
+    return validateServerAddress(ntpServer, MAX_NTP_SERVER_LENGTH);
+}
+
+bool validateSnmpCommunity(const char *community)
+{
+    if (community == NULL || community[0] == '\0')
+    {
+        ESP_LOGW(TAG, "SNMP community string is NULL or empty");
+        return false;
+    }
+
+    size_t len = strlen(community);
+    if (len > MAX_SNMP_COMMUNITY_LENGTH)
+    {
+        ESP_LOGW(TAG, "SNMP community string too long: %zu (max %d)", len, MAX_SNMP_COMMUNITY_LENGTH);
+        return false;
+    }
+
+    // SNMP community strings should only contain:
+    // - Alphanumeric characters (a-z, A-Z, 0-9)
+    // - Hyphens (-)
+    // - Underscores (_)
+    // No spaces, special characters, or control characters for security
+    for (size_t i = 0; i < len; i++)
+    {
+        char c = community[i];
+        if (!isalnum(c) && c != '-' && c != '_')
+        {
+            ESP_LOGW(TAG, "Invalid character in SNMP community string: '%c' (only alphanumeric, hyphen, underscore allowed)", c);
+            return false;
+        }
+    }
+
+    // Community string should not start or end with hyphen or underscore
+    // (best practice for readability and consistency)
+    if (community[0] == '-' || community[0] == '_' ||
+        community[len - 1] == '-' || community[len - 1] == '_')
+    {
+        ESP_LOGW(TAG, "SNMP community string should not start or end with hyphen or underscore");
+        return false;
+    }
+
+    return true;
 }
 
 bool validatePort(int port)
