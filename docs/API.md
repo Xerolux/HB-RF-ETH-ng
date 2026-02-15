@@ -221,28 +221,54 @@ Retrieve current device settings.
     "gateway": "string",
     "dns1": "string",
     "dns2": "string",
+    "ccuIP": "string",
+    "enableIPv6": false,
+    "ipv6Mode": "auto",
+    "ipv6Address": "string",
+    "ipv6PrefixLength": 64,
+    "ipv6Gateway": "string",
+    "ipv6Dns1": "string",
+    "ipv6Dns2": "string",
     "timesource": 0,
     "dcfOffset": 40000,
     "gpsBaudrate": 9600,
     "ntpServer": "string",
-    "ledBrightness": 100
+    "ledBrightness": 100,
+    "updateLedBlink": true
   }
 }
 ```
 
 **Fields:**
-- `hostname`: Device hostname (max 63 characters)
-- `useDHCP`: Enable/disable DHCP
-- `localIP`: Static IP address (used when DHCP is disabled)
+
+**Network Settings:**
+- `hostname`: Device hostname (max 63 characters, alphanumeric and hyphens)
+- `useDHCP`: Enable/disable DHCP for IPv4
+- `localIP`: Static IPv4 address (used when DHCP is disabled)
 - `netmask`: Network mask (used when DHCP is disabled)
 - `gateway`: Default gateway (used when DHCP is disabled)
-- `dns1`: Primary DNS server
-- `dns2`: Secondary DNS server
+- `dns1`: Primary DNS server (IPv4)
+- `dns2`: Secondary DNS server (IPv4)
+- `ccuIP`: CCU IP address (supports both IPv4 and IPv6)
+
+**IPv6 Settings:**
+- `enableIPv6`: Enable/disable IPv6
+- `ipv6Mode`: IPv6 configuration mode ("auto" for SLAAC or "static")
+- `ipv6Address`: Static IPv6 address (when mode is "static")
+- `ipv6PrefixLength`: IPv6 prefix length (1-128, typically 64)
+- `ipv6Gateway`: IPv6 default gateway (when mode is "static")
+- `ipv6Dns1`: Primary DNS server (IPv6, when mode is "static")
+- `ipv6Dns2`: Secondary DNS server (IPv6, when mode is "static")
+
+**Time Settings:**
 - `timesource`: Time source (0 = NTP, 1 = DCF77, 2 = GPS)
 - `dcfOffset`: DCF77 signal offset in microseconds (-60000 to 60000)
 - `gpsBaudrate`: GPS module baud rate (4800, 9600, 19200, 38400, 57600, 115200)
-- `ntpServer`: NTP server hostname or IP
+- `ntpServer`: NTP server hostname or IP (max 64 characters)
+
+**System Settings:**
 - `ledBrightness`: LED brightness (0-100)
+- `updateLedBlink`: Enable/disable LED blinking for update notifications
 
 **Example:**
 ```bash
@@ -284,12 +310,30 @@ Update device settings.
 ```
 
 **Validation:**
-- Hostname: Must be valid DNS hostname (alphanumeric, hyphen, dot), max 63 chars
-- IP addresses: Must be valid IPv4 addresses
-- LED brightness: 0-100
-- GPS baudrate: Must be one of: 4800, 9600, 19200, 38400, 57600, 115200
-- DCF offset: -60000 to 60000
-- NTP server: Valid hostname or IP, max 64 chars
+
+All settings are validated on the backend before being applied. Invalid values will be rejected with a 400 Bad Request response.
+
+**Network Validation:**
+- `hostname`: Must be valid DNS hostname (alphanumeric, hyphen, dot), max 32 chars
+- `localIP`, `netmask`, `gateway`, `dns1`, `dns2`: Must be valid IPv4 addresses
+- `ccuIP`: Must be valid IPv4 or IPv6 address
+- `ipv6Address`, `ipv6Gateway`, `ipv6Dns1`, `ipv6Dns2`: Must be valid IPv6 addresses
+- `ipv6PrefixLength`: Must be between 1 and 128
+
+**Time Validation:**
+- `ntpServer`: Valid hostname or IP address, max 64 chars, must comply with DNS naming rules
+- `dcfOffset`: -60000 to 60000 microseconds
+- `gpsBaudrate`: Must be one of: 4800, 9600, 19200, 38400, 57600, 115200
+
+**System Validation:**
+- `ledBrightness`: 0-100
+
+**Security Note:** All string inputs are validated for length and content to prevent buffer overflow and injection attacks. The backend performs comprehensive validation including:
+- String length validation before buffer operations
+- IP address format validation (both IPv4 and IPv6)
+- Hostname and domain name DNS compliance checking
+- Port number range validation
+- SNMP community string validation
 
 **Example:**
 ```bash
@@ -331,15 +375,15 @@ Retrieve monitoring configuration for SNMP and CheckMK.
 
 **SNMP:**
 - `enabled`: Enable/disable SNMP agent
-- `community`: SNMP community string
+- `community`: SNMP community string (max 32 characters, validated for length and content)
 - `location`: SNMP system location
 - `contact`: SNMP system contact
-- `port`: SNMP agent port (default: 161)
+- `port`: SNMP agent port (default: 161, range: 1-65535)
 
 **CheckMK:**
 - `enabled`: Enable/disable CheckMK agent
-- `port`: CheckMK agent port (default: 6556)
-- `allowedHosts`: Comma-separated list of allowed IP addresses/ranges
+- `port`: CheckMK agent port (default: 6556, range: 1-65535)
+- `allowedHosts`: Comma-separated list of allowed IP addresses/ranges (validated for IPv4/IPv6 format)
 
 **Example:**
 ```bash

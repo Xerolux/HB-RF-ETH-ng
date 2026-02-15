@@ -47,7 +47,7 @@
                   type="text"
                   v-model="ccuIP"
                   trim
-                  placeholder="192.168.x.x"
+                  placeholder="192.168.x.x or 2001:db8::1"
                   :state="v$.ccuIP.$error ? false : null"
                 />
                 <div class="form-text text-warning mt-2">
@@ -488,6 +488,18 @@ const hostname_validator = helpers.regex(/^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
 const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
 
+// Custom validator for CCU IP that accepts both IPv4 and IPv6
+const ccuIPValidator = (value) => {
+  if (!value || value.trim() === '') return true // Allow empty
+  // Check if it's a valid IPv4
+  const ipv4Regex = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
+  if (ipv4Regex.test(value)) return true
+  // Check if it's a valid IPv6
+  const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/
+  if (ipv6Regex.test(value)) return true
+  return false
+}
+
 // Validation rules
 const rules = {
   hostname: {
@@ -515,7 +527,7 @@ const rules = {
     ipAddress
   },
   ccuIP: {
-    ipAddress
+    ccuIPValidator: helpers.withMessage('Invalid IPv4 or IPv6 address', ccuIPValidator)
   },
   ipv6Address: {
     required: requiredIf(isIPv6Static),
