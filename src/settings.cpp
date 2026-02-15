@@ -514,9 +514,15 @@ char *Settings::getCCUIP()
 
 void Settings::setCCUIP(const char *ip)
 {
-  if (ip) {
-    strncpy(_ccuIP, ip, sizeof(_ccuIP) - 1);
-  } else {
+  if (ip == NULL || ip[0] == '\0') {
     _ccuIP[0] = 0;
+    return;
   }
+
+  if (!validateCcuAddress(ip)) {
+    ESP_LOGE(TAG, "Invalid CCU address, keeping current value");
+    return;
+  }
+
+  strncpy(_ccuIP, ip, sizeof(_ccuIP) - 1);
 }

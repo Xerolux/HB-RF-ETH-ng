@@ -138,33 +138,416 @@ bool validateDcfOffset(int offset)
     return true;
 }
 
-bool validateNtpServer(const char *ntpServer)
+// Helper function to check if a string is a valid IPv4 address
+static bool isValidIPv4(const char *str, size_t len)
 {
-    if (ntpServer == NULL || ntpServer[0] == '\0')
-    {
-        ESP_LOGW(TAG, "NTP server is NULL or empty");
-        return false;
-    }
+    int octets[4];
+    int octetIndex = 0;
+    int currentNum = -1;
 
-    size_t len = strlen(ntpServer);
-    if (len > MAX_NTP_SERVER_LENGTH)
+    for (size_t i = 0; i <= len; i++)
     {
-        ESP_LOGW(TAG, "NTP server string too long: %zu (max %d)", len, MAX_NTP_SERVER_LENGTH);
-        return false;
-    }
+        char c = (i < len) ? str[i] : '\0';
 
-    // Basic validation: check for valid hostname/IP characters
-    for (size_t i = 0; i < len; i++)
-    {
-        char c = ntpServer[i];
-        if (!isalnum(c) && c != '.' && c != '-' && c != ':')
+        if (isdigit(c))
         {
-            ESP_LOGW(TAG, "Invalid character in NTP server: '%c'", c);
+            if (currentNum == -1) currentNum = 0;
+            currentNum = currentNum * 10 + (c - '0');
+
+            if (currentNum > 255)
+            {
+                return false;
+            }
+        }
+        else if (c == '.' || c == '\0')
+        {
+            if (currentNum == -1 || octetIndex >= 4)
+            {
+                return false;
+            }
+            octets[octetIndex++] = currentNum;
+            currentNum = -1;
+
+            if (c == '\0') break;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return (octetIndex == 4);
+}
+
+// Helper function to validate a hostname label (part between dots)
+static bool isValidHostnameLabel(const char *label, size_t len)
+{
+    if (len == 0 || len > 63)
+    {
+        return false;
+    }
+
+    // Must start and end with alphanumeric
+    if (!isalnum(label[0]) || !isalnum(label[len - 1]))
+    {
+        return false;
+    }
+
+    // Middle can contain alphanumeric and hyphens
+    for (size_t i = 1; i < len - 1; i++)
+    {
+        if (!isalnum(label[i]) && label[i] != '-')
+        {
             return false;
         }
     }
 
     return true;
+}
+
+// Helper function to validate a complete hostname
+static bool isValidHostname(const char *hostname, size_t len)
+{
+    if (len == 0 || len > MAX_HOSTNAME_LENGTH)
+    {
+        return false;
+    }
+
+    // Must start with alphanumeric
+    if (!isalnum(hostname[0]))
+    {
+        return false;
+    }
+
+    size_t labelStart = 0;
+    for (size_t i = 0; i <= len; i++)
+    {
+        if (i == len || hostname[i] == '.')
+        {
+            size_t labelLen = i - labelStart;
+
+            if (labelLen == 0)
+            {
+                return false;  // Empty label (consecutive dots)
+            }
+
+            if (!isValidHostnameLabel(&hostname[labelStart], labelLen))
+            {
+                return false;
+            }
+
+            labelStart = i + 1;
+        }
+        else if (!isalnum(hostname[i]) && hostname[i] != '-' && hostname[i] != '.')
+        {
+            return false;  // Invalid character
+        }
+    }
+
+    // Must not end with a dot
+    if (len > 0 && hostname[len - 1] == '.')
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool validateServerAddress(const char *server, size_t maxLength)
+{
+    if (server == NULL || server[0] == '\0')
+    {
+        ESP_LOGW(TAG, "Server address is NULL or empty");
+        return false;
+    }
+
+    size_t len = strlen(server);
+    if (len > maxLength)
+    {
+        ESP_LOGW(TAG, "Server address string too long: %zu (max %zu)", len, maxLength);
+        return false;
+    }
+
+    // Check for IPv6 in brackets: [2001:db8::1] or [2001:db8::1]:123
+    if (server[0] == '[')
+    {
+        // Find closing bracket
+        size_t closeBracket = 0;
+        for (size_t i = 1; i < len; i++)
+        {
+            if (server[i] == ']')
+            {
+                closeBracket = i;
+                break;
+            }
+        }
+
+        if (closeBracket == 0)
+        {
+            ESP_LOGW(TAG, "Invalid server address: unclosed bracket for IPv6");
+            return false;
+        }
+
+        // Extract IPv6 address (without brackets)
+        char ipv6[46];
+        size_t ipv6Len = closeBracket - 1;
+        if (ipv6Len >= sizeof(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid server address: IPv6 address too long");
+            return false;
+        }
+        strncpy(ipv6, &server[1], ipv6Len);
+        ipv6[ipv6Len] = '\0';
+
+        if (!validateIPv6Address(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid server address: invalid IPv6 address");
+            return false;
+        }
+
+        // Check for optional port after bracket
+        if (closeBracket + 1 < len)
+        {
+            if (server[closeBracket + 1] != ':')
+            {
+                ESP_LOGW(TAG, "Invalid server address: expected ':' after IPv6 bracket");
+                return false;
+            }
+
+            // Validate port number
+            int port = 0;
+            for (size_t i = closeBracket + 2; i < len; i++)
+            {
+                if (!isdigit(server[i]))
+                {
+                    ESP_LOGW(TAG, "Invalid server address: invalid port character");
+                    return false;
+                }
+                port = port * 10 + (server[i] - '0');
+            }
+
+            if (!validatePort(port))
+            {
+                ESP_LOGW(TAG, "Invalid server address: invalid port number");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Find optional port (last occurrence of ':')
+    size_t portSep = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (server[i] == ':')
+        {
+            portSep = i;
+        }
+    }
+
+    // Extract hostname/IP part (before optional port)
+    size_t hostLen = (portSep > 0) ? portSep : len;
+    char host[MAX_SERVER_ADDRESS_LENGTH + 1];
+    if (hostLen >= sizeof(host))
+    {
+        ESP_LOGW(TAG, "Invalid server address: hostname too long");
+        return false;
+    }
+    strncpy(host, server, hostLen);
+    host[hostLen] = '\0';
+
+    // Validate port if present
+    if (portSep > 0)
+    {
+        int port = 0;
+        for (size_t i = portSep + 1; i < len; i++)
+        {
+            if (!isdigit(server[i]))
+            {
+                ESP_LOGW(TAG, "Invalid server address: invalid port character");
+                return false;
+            }
+            port = port * 10 + (server[i] - '0');
+        }
+
+        if (!validatePort(port))
+        {
+            ESP_LOGW(TAG, "Invalid server address: invalid port number");
+            return false;
+        }
+    }
+
+    // Check if host is a valid IPv4 address
+    if (isValidIPv4(host, hostLen))
+    {
+        return true;
+    }
+
+    // Check if host is a valid IPv6 address (without brackets)
+    if (validateIPv6Address(host))
+    {
+        return true;
+    }
+
+    // Check if host is a valid hostname
+    if (isValidHostname(host, hostLen))
+    {
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Invalid server address: not a valid hostname, IPv4, or IPv6 address");
+    return false;
+}
+
+bool validateNtpServer(const char *ntpServer)
+{
+    // NTP server validation uses the generic server address validation
+    return validateServerAddress(ntpServer, MAX_NTP_SERVER_LENGTH);
+}
+
+bool validateSnmpCommunity(const char *community)
+{
+    if (community == NULL || community[0] == '\0')
+    {
+        ESP_LOGW(TAG, "SNMP community string is NULL or empty");
+        return false;
+    }
+
+    size_t len = strlen(community);
+    if (len > MAX_SNMP_COMMUNITY_LENGTH)
+    {
+        ESP_LOGW(TAG, "SNMP community string too long: %zu (max %d)", len, MAX_SNMP_COMMUNITY_LENGTH);
+        return false;
+    }
+
+    // SNMP community strings should only contain:
+    // - Alphanumeric characters (a-z, A-Z, 0-9)
+    // - Hyphens (-)
+    // - Underscores (_)
+    // No spaces, special characters, or control characters for security
+    for (size_t i = 0; i < len; i++)
+    {
+        char c = community[i];
+        if (!isalnum(c) && c != '-' && c != '_')
+        {
+            ESP_LOGW(TAG, "Invalid character in SNMP community string: '%c' (only alphanumeric, hyphen, underscore allowed)", c);
+            return false;
+        }
+    }
+
+    // Community string should not start or end with hyphen or underscore
+    // (best practice for readability and consistency)
+    if (community[0] == '-' || community[0] == '_' ||
+        community[len - 1] == '-' || community[len - 1] == '_')
+    {
+        ESP_LOGW(TAG, "SNMP community string should not start or end with hyphen or underscore");
+        return false;
+    }
+
+    return true;
+}
+
+bool validateCcuAddress(const char *address)
+{
+    if (address == NULL || address[0] == '\0')
+    {
+        ESP_LOGW(TAG, "CCU address is NULL or empty");
+        return false;
+    }
+
+    size_t len = strlen(address);
+    if (len > MAX_HOSTNAME_LENGTH)
+    {
+        ESP_LOGW(TAG, "CCU address string too long: %zu (max %d)", len, MAX_HOSTNAME_LENGTH);
+        return false;
+    }
+
+    // Check for IPv6 in brackets: [2001:db8::1]
+    // Port is NOT allowed for CCU addresses
+    if (address[0] == '[')
+    {
+        // Find closing bracket
+        size_t closeBracket = 0;
+        for (size_t i = 1; i < len; i++)
+        {
+            if (address[i] == ']')
+            {
+                closeBracket = i;
+                break;
+            }
+        }
+
+        if (closeBracket == 0)
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: unclosed bracket for IPv6");
+            return false;
+        }
+
+        // Must end with bracket (no port allowed)
+        if (closeBracket != len - 1)
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: port not allowed (found characters after IPv6 bracket)");
+            return false;
+        }
+
+        // Extract IPv6 address (without brackets)
+        char ipv6[46];
+        size_t ipv6Len = closeBracket - 1;
+        if (ipv6Len >= sizeof(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: IPv6 address too long");
+            return false;
+        }
+        strncpy(ipv6, &address[1], ipv6Len);
+        ipv6[ipv6Len] = '\0';
+
+        if (!validateIPv6Address(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: invalid IPv6 address");
+            return false;
+        }
+
+        return true;
+    }
+
+    // Check if address contains colon (could be IPv6 without brackets or invalid port)
+    bool hasColon = false;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (address[i] == ':')
+        {
+            hasColon = true;
+            break;
+        }
+    }
+
+    // If has colon, must be IPv6 (port not allowed)
+    if (hasColon)
+    {
+        if (validateIPv6Address(address))
+        {
+            return true;
+        }
+        // If it's not a valid IPv6, it might be someone trying to add a port
+        ESP_LOGW(TAG, "Invalid CCU address: port not allowed for CCU connection");
+        return false;
+    }
+
+    // No colon - check if it's a valid IPv4 address
+    if (isValidIPv4(address, len))
+    {
+        return true;
+    }
+
+    // Check if it's a valid hostname
+    if (isValidHostname(address, len))
+    {
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Invalid CCU address: not a valid hostname, IPv4, or IPv6 address");
+    return false;
 }
 
 bool validatePort(int port)
@@ -205,37 +588,88 @@ bool validateIPv6Address(const char *ipv6)
         return true;
     }
 
-    // Basic IPv6 format validation
-    // IPv6 addresses can contain hex digits, colons, and dots (for IPv4-mapped addresses)
-    int colons = 0;
-    int dots = 0;
-    int hexDigits = 0;
-    int doubleColons = 0;
+    size_t len = strlen(ipv6);
+    if (len < 2 || len > 45)  // IPv6 max length is 45 chars (8 groups of 4 hex + 7 colons + potential IPv4 suffix)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: length %zu out of range", len);
+        return false;
+    }
 
-    for (size_t i = 0; ipv6[i] != '\0'; i++)
+    int segmentCount = 0;
+    int segmentLen = 0;
+    bool hasDoubleColon = false;
+    bool hasIPv4Suffix = false;
+    int dotCount = 0;
+
+    for (size_t i = 0; i < len; i++)
     {
         char c = ipv6[i];
 
         if (c == ':')
         {
-            colons++;
-            if (i > 0 && ipv6[i-1] == ':')
+            // Check for double colon
+            if (i + 1 < len && ipv6[i + 1] == ':')
             {
-                doubleColons++;
+                if (hasDoubleColon)
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: multiple double colons");
+                    return false;
+                }
+                hasDoubleColon = true;
+
+                // Allow :: at start or in middle, but validate segment before it
+                if (segmentLen > 4)
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: segment too long (%d hex digits)", segmentLen);
+                    return false;
+                }
+                if (segmentLen > 0) segmentCount++;
+                segmentLen = 0;
+                i++;  // Skip second colon
+                continue;
             }
-            if (doubleColons > 1)
+
+            // Single colon - end of segment
+            if (segmentLen > 4)
             {
-                ESP_LOGW(TAG, "Invalid IPv6: multiple double colons");
+                ESP_LOGW(TAG, "Invalid IPv6: segment too long (%d hex digits)", segmentLen);
                 return false;
             }
+            if (segmentLen > 0 || i == 0)  // Allow empty segment only at start after ::
+            {
+                segmentCount++;
+            }
+            segmentLen = 0;
         }
         else if (c == '.')
         {
-            dots++;
+            // Potential IPv4 suffix (e.g., ::ffff:192.168.1.1)
+            hasIPv4Suffix = true;
+            dotCount++;
+
+            if (dotCount > 3)
+            {
+                ESP_LOGW(TAG, "Invalid IPv6: too many dots in IPv4 suffix");
+                return false;
+            }
         }
         else if (isxdigit(c))
         {
-            hexDigits++;
+            if (hasIPv4Suffix)
+            {
+                // After seeing a dot, we should only see decimal digits
+                if (!isdigit(c))
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: non-decimal digit in IPv4 suffix");
+                    return false;
+                }
+            }
+            segmentLen++;
+        }
+        else if (isdigit(c) && hasIPv4Suffix)
+        {
+            // Allow decimal digits in IPv4 suffix
+            continue;
         }
         else
         {
@@ -244,18 +678,43 @@ bool validateIPv6Address(const char *ipv6)
         }
     }
 
-    // Must have at least some colons for a valid IPv6 address
-    if (colons < 2 && colons > 0)
+    // Count the last segment
+    if (segmentLen > 0)
     {
-        ESP_LOGW(TAG, "Invalid IPv6: not enough colons");
+        if (!hasIPv4Suffix && segmentLen > 4)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: final segment too long (%d hex digits)", segmentLen);
+            return false;
+        }
+        segmentCount++;
+    }
+
+    // Validate IPv4 suffix if present
+    if (hasIPv4Suffix && dotCount != 3)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: IPv4 suffix must have exactly 3 dots");
         return false;
     }
 
-    // If we have dots (IPv4-mapped), we should have a reasonable number
-    if (dots > 0 && dots != 3 && dots != 4)
+    // IPv6 addresses have 8 segments (or fewer with ::)
+    // If :: is present, we can have 0-7 segments
+    // If :: is not present, we must have exactly 8 segments (or 6 + IPv4)
+    if (hasDoubleColon)
     {
-        ESP_LOGW(TAG, "Invalid IPv6: invalid number of dots for IPv4-mapped address");
-        return false;
+        if (segmentCount > 7)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: too many segments (%d) with double colon", segmentCount);
+            return false;
+        }
+    }
+    else
+    {
+        int expectedSegments = hasIPv4Suffix ? 6 : 8;
+        if (segmentCount != expectedSegments)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: expected %d segments, got %d", expectedSegments, segmentCount);
+            return false;
+        }
     }
 
     return true;
