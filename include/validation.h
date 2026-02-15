@@ -41,6 +41,7 @@ bool validateIPAddress(ip4_addr_t addr);
 bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
+// NTP server validation (hostname, IPv4, IPv6, with optional port)
 bool validateNtpServer(const char *ntpServer);
 
 // Port validation

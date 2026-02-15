@@ -138,6 +138,121 @@ bool validateDcfOffset(int offset)
     return true;
 }
 
+// Helper function to check if a string is a valid IPv4 address
+static bool isValidIPv4(const char *str, size_t len)
+{
+    int octets[4];
+    int octetIndex = 0;
+    int currentNum = -1;
+
+    for (size_t i = 0; i <= len; i++)
+    {
+        char c = (i < len) ? str[i] : '\0';
+
+        if (isdigit(c))
+        {
+            if (currentNum == -1) currentNum = 0;
+            currentNum = currentNum * 10 + (c - '0');
+
+            if (currentNum > 255)
+            {
+                return false;
+            }
+        }
+        else if (c == '.' || c == '\0')
+        {
+            if (currentNum == -1 || octetIndex >= 4)
+            {
+                return false;
+            }
+            octets[octetIndex++] = currentNum;
+            currentNum = -1;
+
+            if (c == '\0') break;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return (octetIndex == 4);
+}
+
+// Helper function to validate a hostname label (part between dots)
+static bool isValidHostnameLabel(const char *label, size_t len)
+{
+    if (len == 0 || len > 63)
+    {
+        return false;
+    }
+
+    // Must start and end with alphanumeric
+    if (!isalnum(label[0]) || !isalnum(label[len - 1]))
+    {
+        return false;
+    }
+
+    // Middle can contain alphanumeric and hyphens
+    for (size_t i = 1; i < len - 1; i++)
+    {
+        if (!isalnum(label[i]) && label[i] != '-')
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Helper function to validate a complete hostname
+static bool isValidHostname(const char *hostname, size_t len)
+{
+    if (len == 0 || len > MAX_HOSTNAME_LENGTH)
+    {
+        return false;
+    }
+
+    // Must start with alphanumeric
+    if (!isalnum(hostname[0]))
+    {
+        return false;
+    }
+
+    size_t labelStart = 0;
+    for (size_t i = 0; i <= len; i++)
+    {
+        if (i == len || hostname[i] == '.')
+        {
+            size_t labelLen = i - labelStart;
+
+            if (labelLen == 0)
+            {
+                return false;  // Empty label (consecutive dots)
+            }
+
+            if (!isValidHostnameLabel(&hostname[labelStart], labelLen))
+            {
+                return false;
+            }
+
+            labelStart = i + 1;
+        }
+        else if (!isalnum(hostname[i]) && hostname[i] != '-' && hostname[i] != '.')
+        {
+            return false;  // Invalid character
+        }
+    }
+
+    // Must not end with a dot
+    if (len > 0 && hostname[len - 1] == '.')
+    {
+        return false;
+    }
+
+    return true;
+}
+
 bool validateNtpServer(const char *ntpServer)
 {
     if (ntpServer == NULL || ntpServer[0] == '\0')
@@ -153,18 +268,136 @@ bool validateNtpServer(const char *ntpServer)
         return false;
     }
 
-    // Basic validation: check for valid hostname/IP characters
+    // Check for IPv6 in brackets: [2001:db8::1] or [2001:db8::1]:123
+    if (ntpServer[0] == '[')
+    {
+        // Find closing bracket
+        size_t closeBracket = 0;
+        for (size_t i = 1; i < len; i++)
+        {
+            if (ntpServer[i] == ']')
+            {
+                closeBracket = i;
+                break;
+            }
+        }
+
+        if (closeBracket == 0)
+        {
+            ESP_LOGW(TAG, "Invalid NTP server: unclosed bracket for IPv6");
+            return false;
+        }
+
+        // Extract IPv6 address (without brackets)
+        char ipv6[46];
+        size_t ipv6Len = closeBracket - 1;
+        if (ipv6Len >= sizeof(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid NTP server: IPv6 address too long");
+            return false;
+        }
+        strncpy(ipv6, &ntpServer[1], ipv6Len);
+        ipv6[ipv6Len] = '\0';
+
+        if (!validateIPv6Address(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid NTP server: invalid IPv6 address");
+            return false;
+        }
+
+        // Check for optional port after bracket
+        if (closeBracket + 1 < len)
+        {
+            if (ntpServer[closeBracket + 1] != ':')
+            {
+                ESP_LOGW(TAG, "Invalid NTP server: expected ':' after IPv6 bracket");
+                return false;
+            }
+
+            // Validate port number
+            int port = 0;
+            for (size_t i = closeBracket + 2; i < len; i++)
+            {
+                if (!isdigit(ntpServer[i]))
+                {
+                    ESP_LOGW(TAG, "Invalid NTP server: invalid port character");
+                    return false;
+                }
+                port = port * 10 + (ntpServer[i] - '0');
+            }
+
+            if (!validatePort(port))
+            {
+                ESP_LOGW(TAG, "Invalid NTP server: invalid port number");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Find optional port (last occurrence of ':')
+    size_t portSep = 0;
     for (size_t i = 0; i < len; i++)
     {
-        char c = ntpServer[i];
-        if (!isalnum(c) && c != '.' && c != '-' && c != ':')
+        if (ntpServer[i] == ':')
         {
-            ESP_LOGW(TAG, "Invalid character in NTP server: '%c'", c);
+            portSep = i;
+        }
+    }
+
+    // Extract hostname/IP part (before optional port)
+    size_t hostLen = (portSep > 0) ? portSep : len;
+    char host[MAX_NTP_SERVER_LENGTH + 1];
+    if (hostLen >= sizeof(host))
+    {
+        ESP_LOGW(TAG, "Invalid NTP server: hostname too long");
+        return false;
+    }
+    strncpy(host, ntpServer, hostLen);
+    host[hostLen] = '\0';
+
+    // Validate port if present
+    if (portSep > 0)
+    {
+        int port = 0;
+        for (size_t i = portSep + 1; i < len; i++)
+        {
+            if (!isdigit(ntpServer[i]))
+            {
+                ESP_LOGW(TAG, "Invalid NTP server: invalid port character");
+                return false;
+            }
+            port = port * 10 + (ntpServer[i] - '0');
+        }
+
+        if (!validatePort(port))
+        {
+            ESP_LOGW(TAG, "Invalid NTP server: invalid port number");
             return false;
         }
     }
 
-    return true;
+    // Check if host is a valid IPv4 address
+    if (isValidIPv4(host, hostLen))
+    {
+        return true;
+    }
+
+    // Check if host is a valid IPv6 address (without brackets)
+    if (validateIPv6Address(host))
+    {
+        return true;
+    }
+
+    // Check if host is a valid hostname
+    if (isValidHostname(host, hostLen))
+    {
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Invalid NTP server: not a valid hostname, IPv4, or IPv6 address");
+    return false;
 }
 
 bool validatePort(int port)
