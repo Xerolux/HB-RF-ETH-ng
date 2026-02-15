@@ -61,3 +61,7 @@ bool validateServerAddress(const char *server, size_t maxLength);
 
 // SNMP community string validation (alphanumeric, hyphen, underscore only)
 bool validateSnmpCommunity(const char *community);
+
+// CCU address validation (hostname, IPv4, IPv6, WITHOUT port)
+// Used for HomeMatic CCU connection - does not allow port specification
+bool validateCcuAddress(const char *address);

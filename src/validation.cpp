@@ -448,6 +448,108 @@ bool validateSnmpCommunity(const char *community)
     return true;
 }
 
+bool validateCcuAddress(const char *address)
+{
+    if (address == NULL || address[0] == '\0')
+    {
+        ESP_LOGW(TAG, "CCU address is NULL or empty");
+        return false;
+    }
+
+    size_t len = strlen(address);
+    if (len > MAX_HOSTNAME_LENGTH)
+    {
+        ESP_LOGW(TAG, "CCU address string too long: %zu (max %d)", len, MAX_HOSTNAME_LENGTH);
+        return false;
+    }
+
+    // Check for IPv6 in brackets: [2001:db8::1]
+    // Port is NOT allowed for CCU addresses
+    if (address[0] == '[')
+    {
+        // Find closing bracket
+        size_t closeBracket = 0;
+        for (size_t i = 1; i < len; i++)
+        {
+            if (address[i] == ']')
+            {
+                closeBracket = i;
+                break;
+            }
+        }
+
+        if (closeBracket == 0)
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: unclosed bracket for IPv6");
+            return false;
+        }
+
+        // Must end with bracket (no port allowed)
+        if (closeBracket != len - 1)
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: port not allowed (found characters after IPv6 bracket)");
+            return false;
+        }
+
+        // Extract IPv6 address (without brackets)
+        char ipv6[46];
+        size_t ipv6Len = closeBracket - 1;
+        if (ipv6Len >= sizeof(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: IPv6 address too long");
+            return false;
+        }
+        strncpy(ipv6, &address[1], ipv6Len);
+        ipv6[ipv6Len] = '\0';
+
+        if (!validateIPv6Address(ipv6))
+        {
+            ESP_LOGW(TAG, "Invalid CCU address: invalid IPv6 address");
+            return false;
+        }
+
+        return true;
+    }
+
+    // Check if address contains colon (could be IPv6 without brackets or invalid port)
+    bool hasColon = false;
+    for (size_t i = 0; i < len; i++)
+    {
+        if (address[i] == ':')
+        {
+            hasColon = true;
+            break;
+        }
+    }
+
+    // If has colon, must be IPv6 (port not allowed)
+    if (hasColon)
+    {
+        if (validateIPv6Address(address))
+        {
+            return true;
+        }
+        // If it's not a valid IPv6, it might be someone trying to add a port
+        ESP_LOGW(TAG, "Invalid CCU address: port not allowed for CCU connection");
+        return false;
+    }
+
+    // No colon - check if it's a valid IPv4 address
+    if (isValidIPv4(address, len))
+    {
+        return true;
+    }
+
+    // Check if it's a valid hostname
+    if (isValidHostname(address, len))
+    {
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Invalid CCU address: not a valid hostname, IPv4, or IPv6 address");
+    return false;
+}
+
 bool validatePort(int port)
 {
     // Port must be in valid range: 1-65535
