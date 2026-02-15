@@ -205,37 +205,88 @@ bool validateIPv6Address(const char *ipv6)
         return true;
     }
 
-    // Basic IPv6 format validation
-    // IPv6 addresses can contain hex digits, colons, and dots (for IPv4-mapped addresses)
-    int colons = 0;
-    int dots = 0;
-    int hexDigits = 0;
-    int doubleColons = 0;
+    size_t len = strlen(ipv6);
+    if (len < 2 || len > 45)  // IPv6 max length is 45 chars (8 groups of 4 hex + 7 colons + potential IPv4 suffix)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: length %zu out of range", len);
+        return false;
+    }
 
-    for (size_t i = 0; ipv6[i] != '\0'; i++)
+    int segmentCount = 0;
+    int segmentLen = 0;
+    bool hasDoubleColon = false;
+    bool hasIPv4Suffix = false;
+    int dotCount = 0;
+
+    for (size_t i = 0; i < len; i++)
     {
         char c = ipv6[i];
 
         if (c == ':')
         {
-            colons++;
-            if (i > 0 && ipv6[i-1] == ':')
+            // Check for double colon
+            if (i + 1 < len && ipv6[i + 1] == ':')
             {
-                doubleColons++;
+                if (hasDoubleColon)
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: multiple double colons");
+                    return false;
+                }
+                hasDoubleColon = true;
+
+                // Allow :: at start or in middle, but validate segment before it
+                if (segmentLen > 4)
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: segment too long (%d hex digits)", segmentLen);
+                    return false;
+                }
+                if (segmentLen > 0) segmentCount++;
+                segmentLen = 0;
+                i++;  // Skip second colon
+                continue;
             }
-            if (doubleColons > 1)
+
+            // Single colon - end of segment
+            if (segmentLen > 4)
             {
-                ESP_LOGW(TAG, "Invalid IPv6: multiple double colons");
+                ESP_LOGW(TAG, "Invalid IPv6: segment too long (%d hex digits)", segmentLen);
                 return false;
             }
+            if (segmentLen > 0 || i == 0)  // Allow empty segment only at start after ::
+            {
+                segmentCount++;
+            }
+            segmentLen = 0;
         }
         else if (c == '.')
         {
-            dots++;
+            // Potential IPv4 suffix (e.g., ::ffff:192.168.1.1)
+            hasIPv4Suffix = true;
+            dotCount++;
+
+            if (dotCount > 3)
+            {
+                ESP_LOGW(TAG, "Invalid IPv6: too many dots in IPv4 suffix");
+                return false;
+            }
         }
         else if (isxdigit(c))
         {
-            hexDigits++;
+            if (hasIPv4Suffix)
+            {
+                // After seeing a dot, we should only see decimal digits
+                if (!isdigit(c))
+                {
+                    ESP_LOGW(TAG, "Invalid IPv6: non-decimal digit in IPv4 suffix");
+                    return false;
+                }
+            }
+            segmentLen++;
+        }
+        else if (isdigit(c) && hasIPv4Suffix)
+        {
+            // Allow decimal digits in IPv4 suffix
+            continue;
         }
         else
         {
@@ -244,18 +295,43 @@ bool validateIPv6Address(const char *ipv6)
         }
     }
 
-    // Must have at least some colons for a valid IPv6 address
-    if (colons < 2 && colons > 0)
+    // Count the last segment
+    if (segmentLen > 0)
     {
-        ESP_LOGW(TAG, "Invalid IPv6: not enough colons");
+        if (!hasIPv4Suffix && segmentLen > 4)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: final segment too long (%d hex digits)", segmentLen);
+            return false;
+        }
+        segmentCount++;
+    }
+
+    // Validate IPv4 suffix if present
+    if (hasIPv4Suffix && dotCount != 3)
+    {
+        ESP_LOGW(TAG, "Invalid IPv6: IPv4 suffix must have exactly 3 dots");
         return false;
     }
 
-    // If we have dots (IPv4-mapped), we should have a reasonable number
-    if (dots > 0 && dots != 3 && dots != 4)
+    // IPv6 addresses have 8 segments (or fewer with ::)
+    // If :: is present, we can have 0-7 segments
+    // If :: is not present, we must have exactly 8 segments (or 6 + IPv4)
+    if (hasDoubleColon)
     {
-        ESP_LOGW(TAG, "Invalid IPv6: invalid number of dots for IPv4-mapped address");
-        return false;
+        if (segmentCount > 7)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: too many segments (%d) with double colon", segmentCount);
+            return false;
+        }
+    }
+    else
+    {
+        int expectedSegments = hasIPv4Suffix ? 6 : 8;
+        if (segmentCount != expectedSegments)
+        {
+            ESP_LOGW(TAG, "Invalid IPv6: expected %d segments, got %d", expectedSegments, segmentCount);
+            return false;
+        }
     }
 
     return true;

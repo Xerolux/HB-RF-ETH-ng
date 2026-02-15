@@ -49,5 +49,5 @@ bool validatePort(int port);
 // String length validation
 bool validateStringLength(const char *str, size_t maxLength);
 
-// IPv6 validation (basic format check)
+// IPv6 validation (comprehensive format check with segment validation)
 bool validateIPv6Address(const char *ipv6);
