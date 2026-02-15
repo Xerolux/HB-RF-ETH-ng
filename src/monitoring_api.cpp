@@ -116,18 +116,33 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *community = cJSON_GetObjectItem(snmp, "community");
         if (community != NULL && cJSON_IsString(community))
         {
+            if (!validateStringLength(community->valuestring, sizeof(config.snmp.community) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP community string too long");
+            }
             strncpy(config.snmp.community, community->valuestring, sizeof(config.snmp.community) - 1);
         }
 
         cJSON *location = cJSON_GetObjectItem(snmp, "location");
         if (location != NULL && cJSON_IsString(location))
         {
+            if (!validateStringLength(location->valuestring, sizeof(config.snmp.location) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP location string too long");
+            }
             strncpy(config.snmp.location, location->valuestring, sizeof(config.snmp.location) - 1);
         }
 
         cJSON *contact = cJSON_GetObjectItem(snmp, "contact");
         if (contact != NULL && cJSON_IsString(contact))
         {
+            if (!validateStringLength(contact->valuestring, sizeof(config.snmp.contact) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP contact string too long");
+            }
             strncpy(config.snmp.contact, contact->valuestring, sizeof(config.snmp.contact) - 1);
         }
 
@@ -144,23 +159,6 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         else
         {
             config.snmp.port = 161; // default
-        }
-
-        // Validate string lengths
-        if (!validateStringLength(config.snmp.community, sizeof(config.snmp.community) - 1))
-        {
-            cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP community string too long");
-        }
-        if (!validateStringLength(config.snmp.location, sizeof(config.snmp.location) - 1))
-        {
-            cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP location string too long");
-        }
-        if (!validateStringLength(config.snmp.contact, sizeof(config.snmp.contact) - 1))
-        {
-            cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP contact string too long");
         }
     }
 
@@ -192,12 +190,12 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *allowedHosts = cJSON_GetObjectItem(checkmk, "allowedHosts");
         if (allowedHosts != NULL && cJSON_IsString(allowedHosts))
         {
-            strncpy(config.checkmk.allowed_hosts, allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1);
-            if (!validateStringLength(config.checkmk.allowed_hosts, sizeof(config.checkmk.allowed_hosts) - 1))
+            if (!validateStringLength(allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1))
             {
                 cJSON_Delete(root);
                 return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "CheckMK allowed hosts string too long");
             }
+            strncpy(config.checkmk.allowed_hosts, allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1);
         }
     }
 
@@ -214,6 +212,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *server = cJSON_GetObjectItem(mqtt, "server");
         if (server != NULL && cJSON_IsString(server))
         {
+            if (!validateStringLength(server->valuestring, sizeof(config.mqtt.server) - 1))
+            {
+                cJSON_Delete(root);
+                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT server address too long");
+            }
             strncpy(config.mqtt.server, server->valuestring, sizeof(config.mqtt.server) - 1);
         }
 
@@ -231,35 +234,35 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *user = cJSON_GetObjectItem(mqtt, "user");
         if (user != NULL && cJSON_IsString(user))
         {
-            strncpy(config.mqtt.user, user->valuestring, sizeof(config.mqtt.user) - 1);
-            if (!validateStringLength(config.mqtt.user, sizeof(config.mqtt.user) - 1))
+            if (!validateStringLength(user->valuestring, sizeof(config.mqtt.user) - 1))
             {
                 cJSON_Delete(root);
                 return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT user string too long");
             }
+            strncpy(config.mqtt.user, user->valuestring, sizeof(config.mqtt.user) - 1);
         }
 
         cJSON *password = cJSON_GetObjectItem(mqtt, "password");
         if (password != NULL && cJSON_IsString(password) && strlen(password->valuestring) > 0)
         {
-            // Only update password if provided
-            strncpy(config.mqtt.password, password->valuestring, sizeof(config.mqtt.password) - 1);
-            if (!validateStringLength(config.mqtt.password, sizeof(config.mqtt.password) - 1))
+            if (!validateStringLength(password->valuestring, sizeof(config.mqtt.password) - 1))
             {
                 cJSON_Delete(root);
                 return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT password too long");
             }
+            // Only update password if provided
+            strncpy(config.mqtt.password, password->valuestring, sizeof(config.mqtt.password) - 1);
         }
 
         cJSON *topicPrefix = cJSON_GetObjectItem(mqtt, "topicPrefix");
         if (topicPrefix != NULL && cJSON_IsString(topicPrefix))
         {
-            strncpy(config.mqtt.topic_prefix, topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1);
-            if (!validateStringLength(config.mqtt.topic_prefix, sizeof(config.mqtt.topic_prefix) - 1))
+            if (!validateStringLength(topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1))
             {
                 cJSON_Delete(root);
                 return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT topic prefix too long");
             }
+            strncpy(config.mqtt.topic_prefix, topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1);
         }
 
         cJSON *haDiscoveryEnabled = cJSON_GetObjectItem(mqtt, "haDiscoveryEnabled");
@@ -271,19 +274,12 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *haDiscoveryPrefix = cJSON_GetObjectItem(mqtt, "haDiscoveryPrefix");
         if (haDiscoveryPrefix != NULL && cJSON_IsString(haDiscoveryPrefix))
         {
-            strncpy(config.mqtt.ha_discovery_prefix, haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1);
-            if (!validateStringLength(config.mqtt.ha_discovery_prefix, sizeof(config.mqtt.ha_discovery_prefix) - 1))
+            if (!validateStringLength(haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1))
             {
                 cJSON_Delete(root);
                 return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT HA discovery prefix too long");
             }
-        }
-
-        // Validate MQTT server string length
-        if (!validateStringLength(config.mqtt.server, sizeof(config.mqtt.server) - 1))
-        {
-            cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT server address too long");
+            strncpy(config.mqtt.ha_discovery_prefix, haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1);
         }
     }
 
