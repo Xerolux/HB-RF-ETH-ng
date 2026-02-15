@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- 🔒 **Enhanced Backend Validation** - Comprehensive validation for all critical settings:
+  - CCU address validation with IPv4 and IPv6 support (130+ unit tests)
+  - MQTT server address validation (IPv4, IPv6, hostname, port)
+  - SNMP community string validation with length checks
+  - NTP server validation with DNS compliance checks
+  - IPv6 address validation with proper format verification
+- 🌐 **Frontend CCU IPv6 Support** - WebUI now accepts both IPv4 and IPv6 addresses for CCU settings
+  - Updated validation to support both address formats
+  - Improved placeholder text to show examples of both formats
+
+### Security
+- 🛡️ **Critical Security Fix** - Fixed string length validation bypass vulnerability
+  - Validates string length BEFORE strncpy to prevent buffer overflow
+  - Prevents attackers from bypassing length checks
+- 🔐 **Input Validation Hardening** - All user inputs now properly validated before processing
+
+### Changed
+- ✅ **Test Coverage** - Added 130+ comprehensive unit tests for validation functions
+  - IPv6 validation tests with edge cases
+  - CCU validation tests for both IPv4 and IPv6
+  - NTP server validation tests with DNS compliance
+  - MQTT and SNMP validation tests
+
 ## [2.1.6] - 2026-02-12
 
 ### Added
