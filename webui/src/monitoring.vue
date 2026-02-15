@@ -169,8 +169,8 @@
       <div v-if="showError" class="toast-overlay error">
         <div class="toast-card">
           <span class="toast-icon">⚠️</span>
-          <span class="toast-message">{{ t('monitoring.saveError') }}</span>
-          <button @click="showError = false" class="toast-close">✕</button>
+          <span class="toast-message">{{ showError || t('monitoring.saveError') }}</span>
+          <button @click="showError = null" class="toast-close">✕</button>
         </div>
       </div>
     </Transition>
@@ -194,7 +194,7 @@ const monitoringStore = useMonitoringStore()
 const { snmp: snmpConfig, checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
 
 const showSuccess = ref(false)
-const showError = ref(false)
+const showError = ref(null)  // Can be null or a string with error message
 const saving = ref(false)
 
 onMounted(async () => {
@@ -208,7 +208,7 @@ onMounted(async () => {
 const saveConfig = async () => {
   saving.value = true
   showSuccess.value = false
-  showError.value = false
+  showError.value = null
 
   try {
     // Force a small delay to show loading state
@@ -223,7 +223,9 @@ const saveConfig = async () => {
     showSuccess.value = true
     setTimeout(() => { showSuccess.value = false }, 3000)
   } catch (error) {
-    showError.value = true
+    // Extract specific error message from backend response
+    const errorMsg = error.response?.data || error.response?.data?.error || t('monitoring.saveError')
+    showError.value = errorMsg
   } finally {
     saving.value = false
   }

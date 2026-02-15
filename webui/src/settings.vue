@@ -345,12 +345,12 @@
         <div class="footer-container">
           <BAlert
             variant="danger"
-            :model-value="showError"
+            :model-value="!!showError"
             dismissible
             fade
             @update:model-value="showError = null"
             class="footer-alert"
-          >{{ t("settings.saveError") }}</BAlert>
+          >{{ showError || t("settings.saveError") }}</BAlert>
 
           <BButton
             variant="primary"
@@ -474,7 +474,7 @@ const ntpServer = ref('')
 const ledBrightness = ref(100)
 const updateLedBlink = ref(true)
 
-const showError = ref(null)
+const showError = ref(null)  // Can be null or a string with error message
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
 
@@ -644,7 +644,9 @@ const saveSettingsClick = async () => {
     await settingsStore.save(settings)
     showRestartModal.value = true
   } catch (error) {
-    showError.value = true
+    // Extract specific error message from backend response
+    const errorMsg = error.response?.data || error.response?.data?.error || t('settings.saveError')
+    showError.value = errorMsg
   }
 }
 
