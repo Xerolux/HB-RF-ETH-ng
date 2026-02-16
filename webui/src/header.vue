@@ -237,7 +237,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from './stores.js'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useSettingsStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 
 const { t, locale } = useI18n()
@@ -247,6 +247,7 @@ const loginStore = useLoginStore()
 const themeStore = useThemeStore()
 const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
+const settingsStore = useSettingsStore()
 
 const showBanner = ref(true)
 const dismissedVersion = ref(localStorage.getItem('dismissedUpdate'))
@@ -314,22 +315,26 @@ onMounted(async () => {
     showBanner.value = false
   }
 
+  // Load settings to get update check preference
+  await settingsStore.load()
+
   // Get current version from sysInfo
-  if (sysInfoStore.currentVersion) {
-    await updateStore.checkForUpdate(sysInfoStore.currentVersion)
-  } else {
-    // Fetch sysInfo first
+  if (!sysInfoStore.currentVersion) {
     try {
       await sysInfoStore.update()
-      await updateStore.checkForUpdate(sysInfoStore.currentVersion)
     } catch (e) {
       console.error('Failed to load sys info for update check', e)
     }
   }
 
+  // Check update if enabled and version is available
+  if (settingsStore.checkUpdates && sysInfoStore.currentVersion) {
+    await updateStore.checkForUpdate(sysInfoStore.currentVersion)
+  }
+
   // Re-check every 24 hours
   setInterval(() => {
-    if (sysInfoStore.currentVersion) {
+    if (settingsStore.checkUpdates && sysInfoStore.currentVersion) {
       updateStore.checkForUpdate(sysInfoStore.currentVersion)
     }
   }, 24 * 60 * 60 * 1000)

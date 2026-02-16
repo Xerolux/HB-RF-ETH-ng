@@ -87,6 +87,24 @@
                   </div>
                 </div>
               </div>
+
+              <div class="form-group mt-3">
+                <div class="switch-row">
+                  <label class="switch-label">{{ t('settings.checkUpdates') }}</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" v-model="checkUpdates">
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group mt-3">
+                <div class="switch-row">
+                  <label class="switch-label">{{ t('settings.allowPrerelease') }}</label>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" v-model="allowPrerelease">
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -473,6 +491,8 @@ const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
 const updateLedBlink = ref(true)
+const checkUpdates = ref(true)
+const allowPrerelease = ref(false)
 
 const showError = ref(null)  // Can be null or a string with error message
 const showRestartModal = ref(false)
@@ -594,6 +614,8 @@ const loadSettings = () => {
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
   updateLedBlink.value = settingsStore.updateLedBlink !== undefined ? settingsStore.updateLedBlink : true
+  checkUpdates.value = settingsStore.checkUpdates !== undefined ? settingsStore.checkUpdates : true
+  allowPrerelease.value = settingsStore.allowPrerelease !== undefined ? settingsStore.allowPrerelease : false
 
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
@@ -643,6 +665,8 @@ const saveSettingsClick = async () => {
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
       updateLedBlink: updateLedBlink.value,
+      checkUpdates: checkUpdates.value,
+      allowPrerelease: allowPrerelease.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
