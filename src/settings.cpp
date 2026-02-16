@@ -125,8 +125,6 @@ void Settings::load()
     strncpy(_ntpServer, "pool.ntp.org", sizeof(_ntpServer) - 1);
   }
 
-  GET_BOOL(handle, "checkUpdates", _checkUpdates, true);
-  GET_BOOL(handle, "allowPrerelease", _allowPrerelease, false);
   GET_BOOL(handle, "updateLedBlink", _updateLedBlink, true);
 
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
@@ -183,8 +181,6 @@ void Settings::save()
 
   SET_STR(handle, "ntpServer", _ntpServer);
 
-  SET_BOOL(handle, "checkUpdates", _checkUpdates);
-  SET_BOOL(handle, "allowPrerelease", _allowPrerelease);
   SET_BOOL(handle, "updateLedBlink", _updateLedBlink);
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
@@ -389,26 +385,6 @@ void Settings::setLEDBrightness(int ledBrightness)
     return;
   }
   _ledBrightness = ledBrightness;
-}
-
-bool Settings::getCheckUpdates()
-{
-  return _checkUpdates;
-}
-
-void Settings::setCheckUpdates(bool checkUpdates)
-{
-  _checkUpdates = checkUpdates;
-}
-
-bool Settings::getAllowPrerelease()
-{
-  return _allowPrerelease;
-}
-
-void Settings::setAllowPrerelease(bool allowPrerelease)
-{
-  _allowPrerelease = allowPrerelease;
 }
 
 bool Settings::getUpdateLedBlink()

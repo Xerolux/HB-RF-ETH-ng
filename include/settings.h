@@ -57,8 +57,6 @@ private:
   char _ntpServer[65] = {0};
 
   int32_t _ledBrightness;
-  bool _checkUpdates;
-  bool _allowPrerelease;
   bool _updateLedBlink;
 
   bool _enableIPv6;
@@ -105,12 +103,6 @@ public:
 
   int getLEDBrightness();
   void setLEDBrightness(int brightness);
-
-  bool getCheckUpdates();
-  void setCheckUpdates(bool checkUpdates);
-
-  bool getAllowPrerelease();
-  void setAllowPrerelease(bool allowPrerelease);
 
   bool getUpdateLedBlink();
   void setUpdateLedBlink(bool enabled);

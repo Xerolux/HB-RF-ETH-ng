@@ -145,42 +145,37 @@ void UpdateCheck::_taskFunc()
 
   for (;;)
   {
-    if (_settings->getCheckUpdates()) {
-      ESP_LOGI(TAG, "Checking for firmware updates...");
-      ESP_LOGI(TAG, "Current version: %s", _sysInfo->getCurrentVersion());
+    ESP_LOGI(TAG, "Checking for firmware updates...");
+    ESP_LOGI(TAG, "Current version: %s", _sysInfo->getCurrentVersion());
 
-      _updateLatestVersion();
+    _updateLatestVersion();
 
-      if (strcmp(_latestVersion, "n/a") != 0)
+    if (strcmp(_latestVersion, "n/a") != 0)
+    {
+      ESP_LOGI(TAG, "Latest available version: %s", _latestVersion);
+
+      if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
       {
-        ESP_LOGI(TAG, "Latest available version: %s", _latestVersion);
-
-        // Use semantic version comparison instead of string comparison
-        if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
-        {
-          ESP_LOGW(TAG, "An updated firmware with version %s is available!", _latestVersion);
-          if (_settings->getUpdateLedBlink()) {
-            _statusLED->setState(LED_STATE_BLINK_SLOW);
-          } else {
-            _statusLED->setState(LED_STATE_OFF);
-          }
+        ESP_LOGW(TAG, "An updated firmware with version %s is available!", _latestVersion);
+        if (_settings->getUpdateLedBlink()) {
+          _statusLED->setState(LED_STATE_BLINK_SLOW);
+        } else {
+          _statusLED->setState(LED_STATE_OFF);
         }
-        else if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) > 0)
-        {
-          ESP_LOGI(TAG, "Running version (%s) is newer than available version (%s)",
-                   _sysInfo->getCurrentVersion(), _latestVersion);
-        }
-        else
-        {
-          ESP_LOGI(TAG, "Firmware is up to date (version %s)", _latestVersion);
-        }
+      }
+      else if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) > 0)
+      {
+        ESP_LOGI(TAG, "Running version (%s) is newer than available version (%s)",
+                 _sysInfo->getCurrentVersion(), _latestVersion);
       }
       else
       {
-        ESP_LOGE(TAG, "Failed to determine latest version");
+        ESP_LOGI(TAG, "Firmware is up to date (version %s)", _latestVersion);
       }
-    } else {
-        ESP_LOGI(TAG, "Update check is disabled.");
+    }
+    else
+    {
+      ESP_LOGE(TAG, "Failed to determine latest version");
     }
 
     vTaskDelay((8 * 60 * 60000) / portTICK_PERIOD_MS); // 8h
