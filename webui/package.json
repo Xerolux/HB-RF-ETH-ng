@@ -15,7 +15,7 @@
     "@vuelidate/validators": "^2.0.4",
     "axios": "^1.13.5",
     "bootstrap": "^5.3.3",
-    "bootstrap-vue-next": "^0.43.0",
+    "bootstrap-vue-next": "^0.43.1",
     "marked": "^17.0.2",
     "pinia": "^3.0.4",
     "vue": "^3.5.28",
