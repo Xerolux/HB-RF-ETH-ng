@@ -151,8 +151,8 @@ export const useSettingsStore = defineStore('settings', {
     },
     async save(settings) {
       try {
-        const response = await axios.post("/settings.json", settings)
-        Object.assign(this.$state, response.data.settings)
+        await axios.post("/settings.json", settings)
+        Object.assign(this.$state, settings)
       } catch (error) {
         console.error('Failed to save settings:', error.response?.status || error.message)
         throw error

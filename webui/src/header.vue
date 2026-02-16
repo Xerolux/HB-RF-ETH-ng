@@ -237,7 +237,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from './stores.js'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useSettingsStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 
 const { t, locale } = useI18n()
@@ -247,6 +247,7 @@ const loginStore = useLoginStore()
 const themeStore = useThemeStore()
 const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
+const settingsStore = useSettingsStore()
 
 const showBanner = ref(true)
 const dismissedVersion = ref(localStorage.getItem('dismissedUpdate'))
@@ -312,6 +313,13 @@ onMounted(async () => {
   // Check if banner was dismissed
   if (dismissedVersion.value === updateStore.latestVersion) {
     showBanner.value = false
+  }
+
+  // Load settings
+  try {
+    await settingsStore.load()
+  } catch (e) {
+    console.error('Failed to load settings', e)
   }
 
   // Get current version from sysInfo
