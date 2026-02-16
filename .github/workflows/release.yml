@@ -1,13 +1,10 @@
 name: Release Firmware
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v2.1.2)'
+        description: 'Release tag (e.g., v2.1.7)'
         required: true
         type: string
       prerelease:
@@ -35,18 +32,51 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Get version
         id: get_version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.tag }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/}"
-          fi
-          # Remove 'v' prefix if present
+          VERSION="${{ inputs.tag }}"
           VERSION="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION_TAG=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Python for version update
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Update all version numbers
+        run: |
+          NEW_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          echo "Updating all version numbers to $NEW_VERSION..."
+          python update_version.py "$NEW_VERSION"
+          
+          echo ""
+          echo "Changed files:"
+          git status --short
+
+      - name: Commit version changes and create tag
+        run: |
+          NEW_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          VERSION_TAG="${{ steps.get_version.outputs.VERSION_TAG }}"
+          
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add -A
+            git commit -m "chore: bump version to $NEW_VERSION"
+            echo "Committed version changes"
+          fi
+          
+          git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG"
+          git push origin HEAD:main
+          git push origin "$VERSION_TAG"
+          echo "Created and pushed tag $VERSION_TAG"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -68,11 +98,6 @@ jobs:
       - name: Rename WebUI files
         run: python rename_webui_files.py
 
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-
       - name: Install PlatformIO
         run: |
           python -m pip install --upgrade pip
@@ -89,9 +114,8 @@ jobs:
       - name: Copy firmware files
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
-          VERSION_US="${VERSION//./_}"  # Replace dots with underscores
+          VERSION_US="${VERSION//./_}"
 
-          # Copy firmware (version in filename uses underscores)
           if [ -f ".pio/build/hb-rf-eth-ng/firmware_${VERSION_US}.bin" ]; then
             cp ".pio/build/hb-rf-eth-ng/firmware_${VERSION_US}.bin" "release/firmware_${VERSION}.bin"
             echo "Found firmware_${VERSION_US}.bin"
@@ -104,11 +128,8 @@ jobs:
             exit 1
           fi
 
-          # Copy bootloader and partitions
           cp ".pio/build/hb-rf-eth-ng/bootloader.bin" release/ 2>/dev/null || true
           cp ".pio/build/hb-rf-eth-ng/partitions.bin" release/ 2>/dev/null || true
-
-          # Copy version file
           cp version.txt release/
 
       - name: Generate release notes
@@ -128,17 +149,13 @@ jobs:
           IS_PRERELEASE="false"
           IS_DRAFT="false"
 
-          # Check if manual prerelease flag is set
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ inputs.prerelease }}" = "true" ]; then
-              IS_PRERELEASE="true"
-            fi
-            if [ "${{ inputs.draft }}" = "true" ]; then
-              IS_DRAFT="true"
-            fi
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            IS_PRERELEASE="true"
+          fi
+          if [ "${{ inputs.draft }}" = "true" ]; then
+            IS_DRAFT="true"
           fi
 
-          # Auto-detect prerelease from version string
           if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
             IS_PRERELEASE="true"
           fi
@@ -146,13 +163,11 @@ jobs:
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "IS_DRAFT=$IS_DRAFT" >> $GITHUB_OUTPUT
 
-          echo "Release type: prerelease=$IS_PRERELEASE, draft=$IS_DRAFT"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
-          name: 🚀 HB-RF-ETH-ng Firmware ${{ steps.get_version.outputs.VERSION_TAG }}
+          name: HB-RF-ETH-ng Firmware ${{ steps.get_version.outputs.VERSION_TAG }}
           body_path: release/RELEASE_NOTES.md
           files: |
             release/firmware_*.bin
