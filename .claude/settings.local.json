@@ -56,7 +56,9 @@
       "Bash(git checkout:*)",
       "Bash(gh pr create:*)",
       "mcp__zread__get_repo_structure",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(idf.py:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
+#include "math.h"
 
 static volatile uint8_t _blinkState = 0;
 static LED *_leds[MAX_LED_COUNT] = {0};
@@ -176,7 +177,8 @@ void LED::updatePinState()
         {
             int phase = _blinkState % 24;
             // Sinus-Wellenform für sanftes Ein/Aus-Blenden
-            int brightness = (sin((phase * 2 * 3.14159) / 24) + 1) * (_highDuty / 2);
+            float sine_val = sinf((phase * 2 * M_PI) / 24);
+            int brightness = (int)((sine_val + 1.0f) * (_highDuty / 2));
             ledc_set_duty(_channel_conf.speed_mode, _channel_conf.channel, brightness);
             ledc_update_duty(_channel_conf.speed_mode, _channel_conf.channel);
         }

@@ -23,21 +23,23 @@
 
 #include "ethernet.h"
 #include "pins.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "Ethernet";
 
 // DNS Cache Implementierung
-Ethernet::dns_cache_entry Ethernet::_dns_cache[DNS_CACHE_SIZE] = {0};
+Ethernet::dns_cache_entry Ethernet::_dns_cache[Ethernet::DNS_CACHE_SIZE] = {0};
 uint32_t Ethernet::_current_time = 0;
 
 void Ethernet::dnsCacheInit()
 {
     // Initialisiere DNS Cache
-    for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+    for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         _dns_cache[i].valid = false;
         _dns_cache[i].hostname[0] = '\0';
     }
-    ESP_LOGI(TAG, "DNS Cache initialized (%d entries)", DNS_CACHE_SIZE);
+    ESP_LOGI(TAG, "DNS Cache initialized (%d entries)", Ethernet::DNS_CACHE_SIZE);
 }
 
 bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
@@ -47,14 +49,14 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
     // Aktualisiere Zeit (simuliert - in echter Implementierung von Systemzeit)
     _current_time = xTaskGetTickCount() / portTICK_PERIOD_MS / 1000;
 
-    for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+    for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (_dns_cache[i].valid &&
             strcmp(_dns_cache[i].hostname, hostname) == 0) {
 
             // Prüfe TTL
             if (_current_time < _dns_cache[i].expiry_time) {
                 *ip_addr = _dns_cache[i].ip_addr;
-                ESP_LOGD(TAG, "DNS Cache hit: %s -> " IPSTR, hostname, IP2STR(&ip_addr->u_addr.ip4));
+                ESP_LOGD(TAG, "DNS Cache hit: %s -> " IPSTR, hostname, IP2STR(ip_addr));
                 return true;
             } else {
                 // TTL abgelaufen
@@ -74,7 +76,7 @@ void Ethernet::dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint
     int oldest_idx = -1;
     uint32_t oldest_time = UINT32_MAX;
 
-    for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+    for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (!_dns_cache[i].valid) {
             oldest_idx = i;
             break;
@@ -91,13 +93,13 @@ void Ethernet::dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint
         _dns_cache[oldest_idx].expiry_time = _current_time + ttl;
         _dns_cache[oldest_idx].valid = true;
         ESP_LOGD(TAG, "DNS Cache added: %s -> " IPSTR " (TTL: %lu)",
-                 hostname, IP2STR(&ip_addr->u_addr.ip4), ttl);
+                 hostname, IP2STR(ip_addr), ttl);
     }
 }
 
 void Ethernet::dnsCacheClear()
 {
-    for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+    for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         _dns_cache[i].valid = false;
         _dns_cache[i].hostname[0] = '\0';
     }
@@ -111,7 +113,7 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
         vTaskDelay(pdMS_TO_TICKS(60000)); // 1 Minute
         _current_time = xTaskGetTickCount() / portTICK_PERIOD_MS / 1000;
 
-        for (int i = 0; i < DNS_CACHE_SIZE; i++) {
+        for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
             if (_dns_cache[i].valid && _current_time >= _dns_cache[i].expiry_time) {
                 _dns_cache[i].valid = false;
                 ESP_LOGD(TAG, "DNS Cache entry expired: %s", _dns_cache[i].hostname);
