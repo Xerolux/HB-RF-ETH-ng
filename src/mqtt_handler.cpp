@@ -35,6 +35,34 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
+// Forward declarations for system commands
+extern "C" void esp_restart(void);
+extern "C" esp_err_t settings_factory_reset(void);
+
+static void handle_mqtt_command(const char* command)
+{
+    ESP_LOGI(TAG, "Received MQTT command: %s", command);
+
+    if (strcmp(command, "restart") == 0) {
+        ESP_LOGI(TAG, "Restart command received via MQTT");
+        esp_restart();
+    } else if (strcmp(command, "factory_reset") == 0) {
+        ESP_LOGI(TAG, "Factory reset command received via MQTT");
+        settings_factory_reset();
+        esp_restart();
+    } else if (strcmp(command, "update") == 0) {
+        ESP_LOGI(TAG, "Update command received via MQTT");
+        UpdateCheck* updateCheck = monitoring_get_updatecheck();
+        if (updateCheck) {
+            updateCheck->performOnlineUpdate();
+        } else {
+            ESP_LOGW(TAG, "UpdateCheck not available");
+        }
+    } else {
+        ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
+    }
+}
+
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32, base, event_id);
@@ -43,6 +71,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+        // Subscribe to command topic if HA discovery is enabled
+        if (current_mqtt_config.ha_discovery_enabled) {
+            char command_topic[128];
+            snprintf(command_topic, sizeof(command_topic), "%s/command/#", current_mqtt_config.topic_prefix);
+            esp_mqtt_client_subscribe(client, command_topic, 1);
+            ESP_LOGI(TAG, "Subscribed to command topic: %s", command_topic);
+        }
         // Publish initial status
         mqtt_handler_publish_status();
         // Publish HA discovery config if enabled
@@ -52,6 +87,19 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        break;
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+        // Handle incoming commands
+        if (current_mqtt_config.ha_discovery_enabled) {
+            char command_topic_prefix[128];
+            snprintf(command_topic_prefix, sizeof(command_topic_prefix), "%s/command/", current_mqtt_config.topic_prefix);
+
+            if (strncmp(event->topic, command_topic_prefix, strlen(command_topic_prefix)) == 0) {
+                const char* command = event->topic + strlen(command_topic_prefix);
+                handle_mqtt_command(command);
+            }
+        }
         break;
     case MQTT_EVENT_ERROR:
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
@@ -279,6 +327,96 @@ void mqtt_handler_publish_ha_discovery(void)
     // Board Revision
     publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");
 
+    // HA Buttons - Restart Button
+    {
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "name", "Restart");
+        char unique_id[128];
+        snprintf(unique_id, sizeof(unique_id), "%s_restart", identifiers);
+        cJSON_AddStringToObject(root, "unique_id", unique_id);
+
+        char command_topic[128];
+        snprintf(command_topic, sizeof(command_topic), "%s/command/restart", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "command_topic", command_topic);
+
+        cJSON_AddStringToObject(root, "entity_category", "config");
+        cJSON_AddStringToObject(root, "device_class", "restart");
+        cJSON_AddStringToObject(root, "payload_press", "restart");
+
+        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
+
+        char *json_str = cJSON_PrintUnformatted(root);
+        char topic[256];
+        snprintf(topic, sizeof(topic), "%s/button/hb-rf-eth-%s/restart/config",
+                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
+
+        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        free(json_str);
+        cJSON_Delete(root);
+    }
+
+    // HA Buttons - Factory Reset Button
+    {
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "name", "Factory Reset");
+        char unique_id[128];
+        snprintf(unique_id, sizeof(unique_id), "%s_factory_reset", identifiers);
+        cJSON_AddStringToObject(root, "unique_id", unique_id);
+
+        char command_topic[128];
+        snprintf(command_topic, sizeof(command_topic), "%s/command/factory_reset", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "command_topic", command_topic);
+
+        cJSON_AddStringToObject(root, "entity_category", "config");
+        cJSON_AddStringToObject(root, "device_class", "restart");
+        cJSON_AddStringToObject(root, "payload_press", "factory_reset");
+
+        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
+
+        char *json_str = cJSON_PrintUnformatted(root);
+        char topic[256];
+        snprintf(topic, sizeof(topic), "%s/button/hb-rf-eth-%s/factory_reset/config",
+                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
+
+        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        free(json_str);
+        cJSON_Delete(root);
+    }
+
+    // HA Update Entity - uses update entity type for firmware updates
+    {
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "name", "Firmware Update");
+        char unique_id[128];
+        snprintf(unique_id, sizeof(unique_id), "%s_firmware_update", identifiers);
+        cJSON_AddStringToObject(root, "unique_id", unique_id);
+
+        char command_topic[128];
+        snprintf(command_topic, sizeof(command_topic), "%s/command/update", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "command_topic", command_topic);
+
+        char state_topic[128];
+        snprintf(state_topic, sizeof(state_topic), "%s/status/latest_version", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "state_topic", state_topic);
+
+        cJSON_AddStringToObject(root, "entity_category", "config");
+        cJSON_AddStringToObject(root, "device_class", "firmware");
+        cJSON_AddStringToObject(root, "payload_install", "update");
+
+        // Add latest version as state
+        cJSON_AddStringToObject(root, "value_template", "{{ value_json }}");
+
+        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
+
+        char *json_str = cJSON_PrintUnformatted(root);
+        char topic[256];
+        snprintf(topic, sizeof(topic), "%s/update/hb-rf-eth-%s/firmware_update/config",
+                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
+
+        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        free(json_str);
+        cJSON_Delete(root);
+    }
 
     cJSON_Delete(device);
 }

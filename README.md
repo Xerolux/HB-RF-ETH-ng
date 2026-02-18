@@ -79,11 +79,14 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * **Backup & Restore** der Einstellungen über die WebUI
 
 #### Monitoring und Überwachung
-* **MQTT-Support**
+* **MQTT-Support mit Home Assistant Integration**
   * Vollständige MQTT-Client-Integration
-  * Home Assistant Auto-Discovery für automatische Einrichtung
+  * **Home Assistant Auto-Discovery** für automatische Einrichtung (Standard: deaktiviert)
   * Konfigurierbarer Server, Port und Authentifizierung
   * Status-Publishing für Systemmetriken
+  * **HA-Sensoren** für alle Systemmetriken (CPU, RAM, Temperatur, Spannung, Uptime)
+  * **HA-Buttons** für Restart, Factory Reset und Firmware-Updates
+  * **HA-Update-Integration** - OTA-Updates direkt aus Home Assistant
 * **SNMP Support** (Simple Network Management Protocol)
   * Überwachung von Systemmetriken (CPU, Speicher, Uptime, Temperatur, Spannung)
   * Standard MIB-2 Unterstützung
@@ -180,6 +183,149 @@ Die HB-RF-ETH-ng Platine funktioniert nahtlos mit OpenCCU und ermöglicht die Ne
 
 #### piVCCU3 und debmatic
 Die Unterstützung für die Platine HB-RF-ETH ist in piVCCU3 ab Version 3.51.6-41 und in debmatic ab Version 3.51.6-46 eingebaut. Die Installation der Platine erfolgt über das Paket "hb-rf-eth". Weitere Details finden Sie in der Installationsanleitung von piVCCU3 bzw. debmatic.
+
+### Home Assistant MQTT Integration
+
+Die HB-RF-ETH-ng Firmware bietet eine nahtlose Integration in Home Assistant via MQTT mit Auto-Discovery. Sobald MQTT in der WebUI konfiguriert und die HA-Integration aktiviert ist, werden alle Geräte und Sensoren automatisch in Home Assistant eingerichtet.
+
+#### Einrichtung
+
+**Voraussetzungen:**
+- MQTT-Broker muss in Home Assistant laufen (z.B. Mosquitto Add-on)
+- HB-RF-ETH-ng muss mit dem MQTT-Broker verbunden sein
+
+**Schritt-für-Schritt:**
+
+1. **MQTT in der WebUI konfigurieren:**
+   - Navigieren Sie zu "Monitoring" → "MQTT"
+   - Aktivieren Sie MQTT und geben Sie die Broker-Verbindungsdaten ein
+   - **WICHTIG:** Aktivieren Sie "Home Assistant Discovery" (Standard: deaktiviert)
+   - Passen Sie bei Bedarf die Topic-Präfixe an (Standardwerte sind meistens optimal)
+
+2. **Verbindung testen:**
+   - Nach dem Speichern verbindet sich die Firmware mit dem MQTT-Broker
+   - Die Status-LED zeigt eine erfolgreiche Verbindung an
+
+3. **Home Assistant Konfiguration:**
+   - In Home Assistant werden automatisch alle Geräte gefunden
+   - Keine manuelle Konfiguration erforderlich!
+
+#### Verfügbare HA-Entitäten
+
+Nach der Auto-Discovery stehen folgende Entitäten in Home Assistant zur Verfügung:
+
+**Sensoren (Diagnostic):**
+- `sensor.hb_rf_eth_ng_cpu_usage` - CPU-Auslastung in %
+- `sensor.hb_rf_eth_ng_memory_usage` - Speicherauslastung in %
+- `sensor.hb_rf_eth_ng_temperature` - Temperatur in °C
+- `sensor.hb_rf_eth_ng_supply_voltage` - Versorgungsspannung in V
+- `sensor.hb_rf_eth_ng_uptime` - Laufzeit in Sekunden
+- `sensor.hb_rf_eth_ng_uptime_text` - Laufzeit als Text (X d, X h, X m)
+- `sensor.hb_rf_eth_ng_current_version` - Aktuelle Firmware-Version
+- `sensor.hb_rf_eth_ng_latest_version` - Verfügbare Firmware-Version
+- `sensor.hb_rf_eth_ng_board_revision` - Hardware-Revision
+
+**Binary Sensoren:**
+- `binary_sensor.hb_rf_eth_ng_update_available` - Zeigt an, ob ein Update verfügbar ist
+
+**Buttons (Konfiguration):**
+- `button.hb_rf_eth_ng_restart` - Gerät neustarten
+- `button.hb_rf_eth_ng_factory_reset` - Auf Werkseinstellungen zurücksetzen
+
+**Update-Entität:**
+- `update.hb_rf_eth_ng_firmware_update` - Firmware-Update durchführen
+
+#### MQTT-Topic-Struktur
+
+Die Firmware verwendet folgende Topic-Struktur:
+
+```
+hb-rf-eth/                      (Standard Topic Prefix)
+├── status/                     (Status-Metriken)
+│   ├── cpu_usage
+│   ├── memory_usage
+│   ├── temperature
+│   ├── supply_voltage
+│   ├── uptime
+│   ├── uptime_text
+│   ├── version
+│   ├── latest_version
+│   ├── update_available
+│   └── board_revision
+└── command/                    (Commands für HA)
+    ├── restart
+    ├── factory_reset
+    └── update
+
+homeassistant/                  (HA Discovery Prefix)
+├── sensor/
+├── binary_sensor/
+├── button/
+└── update/
+```
+
+#### Beispiel-HA-Dashboard
+
+Ein typisches Home Assistant Dashboard könnte so aussehen:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: entities
+    title: HB-RF-ETH-ng Status
+    entities:
+      - entity: sensor.hb_rf_eth_ng_cpu_usage
+        name: CPU
+      - entity: sensor.hb_rf_eth_ng_memory_usage
+        name: RAM
+      - entity: sensor.hb_rf_eth_ng_temperature
+        name: Temperatur
+      - entity: sensor.hb_rf_eth_ng_supply_voltage
+        name: Spannung
+      - entity: sensor.hb_rf_eth_ng_uptime_text
+        name: Laufzeit
+
+  - type: horizontal-stack
+    cards:
+      - type: entity-button
+        entity: button.hb_rf_eth_ng_restart
+        name: Neustart
+      - type: entity-button
+        entity: button.hb_rf_eth_ng_factory_reset
+        name: Reset
+      - type: entity-button
+        entity: update.hb_rf_eth_ng_firmware_update
+        name: Update
+
+  - type: entities
+    title: Firmware
+    entities:
+      - entity: sensor.hb_rf_eth_ng_current_version
+      - entity: sensor.hb_rf_eth_ng_latest_version
+      - entity: binary_sensor.hb_rf_eth_ng_update_available
+      - entity: update.hb_rf_eth_ng_firmware_update
+```
+
+#### Sicherheitshinweise
+
+- Die HA-Integration ist standardmäßig **DEAKTIVIERT** und muss explizit aktiviert werden
+- Commands (Restart, Factory Reset, Update) sind nur per MQTT möglich, wenn HA Discovery aktiviert ist
+- Alle Commands werden im Systemlog protokolliert
+- Die WebUI-Authentifizierung bleibt weiterhin aktiv
+
+#### Fehlersuche
+
+**Falls Geräte nicht in HA erscheinen:**
+1. Überprüfen Sie die MQTT-Verbindung in der WebUI
+2. Kontrollieren Sie die MQTT-Logs im Home Assistant Dashboard
+3. Stellen Sie sicher, dass "Home Assistant Discovery" aktiviert ist
+4. Prüfen Sie, ob der Discovery-Topic (`homeassistant/`) vom MQTT-Broker erreicht wird
+
+**MQTT-Topic-Manuell überprüfen:**
+```bash
+# Im MQTT-Broker prüfen
+mosquitto_sub -h <broker-ip> -t "homeassistant/#" -v
+```
 
 ### Danksagung
 Ein großer Dank geht an **Alexander Reinert** für die Entwicklung der originalen HB-RF-ETH Firmware und Hardware. Seine Arbeit bildet die Grundlage für diese modernisierte Version.
