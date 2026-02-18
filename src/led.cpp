@@ -31,6 +31,17 @@ static LED *_leds[MAX_LED_COUNT] = {0};
 static TaskHandle_t _switchTaskHandle = NULL;
 static int _highDuty;
 
+// LED Programme Konfiguration (Default-Werte)
+led_state_t LED::_programs[7] = {
+    LED_STATE_ON,                  // IDLE: Dauerhaft an
+    LED_STATE_BLINK_SLOW,          // CCU_DISCONNECTED: Langsames blinken
+    LED_STATE_BLINK_2X,            // CCU_CONNECTED: 2x blinken
+    LED_STATE_BLINK_FAST,          // UPDATE_AVAILABLE: Schnell blinken
+    LED_STATE_STROBE,              // ERROR: Strobe
+    LED_STATE_BLINK_FAST,          // BOOTING: Schnell blinken
+    LED_STATE_BLINK_SLOW           // UPDATE_IN_PROGRESS: Langsames blinken
+};
+
 void ledSwitcherTask(void *parameter)
 {
     for (;;)
@@ -138,5 +149,81 @@ void LED::updatePinState()
     case LED_STATE_BLINK_SLOW:
         _setPinState(_blinkState < 12);
         break;
+    case LED_STATE_BLINK_2X:
+        // 2x blinken, dann Pause (24 Ticks = 3 Sekunden)
+        {
+            int phase = _blinkState % 24;
+            if (phase < 2) _setPinState(true);      // On
+            else if (phase < 4) _setPinState(false); // Off
+            else if (phase < 6) _setPinState(true);  // On
+            else _setPinState(false);                // Pause
+        }
+        break;
+    case LED_STATE_BLINK_3X:
+        // 3x blinken, dann Pause (24 Ticks = 3 Sekunden)
+        {
+            int phase = _blinkState % 24;
+            if (phase < 2) _setPinState(true);      // On
+            else if (phase < 4) _setPinState(false); // Off
+            else if (phase < 6) _setPinState(true);  // On
+            else if (phase < 8) _setPinState(false); // Off
+            else if (phase < 10) _setPinState(true); // On
+            else _setPinState(false);                // Pause
+        }
+        break;
+    case LED_STATE_BREATHING:
+        // Sanftes pulsieren (24 Ticks = 3 Sekunden kompletter Zyklus)
+        {
+            int phase = _blinkState % 24;
+            // Sinus-Wellenform für sanftes Ein/Aus-Blenden
+            int brightness = (sin((phase * 2 * 3.14159) / 24) + 1) * (_highDuty / 2);
+            ledc_set_duty(_channel_conf.speed_mode, _channel_conf.channel, brightness);
+            ledc_update_duty(_channel_conf.speed_mode, _channel_conf.channel);
+        }
+        break;
+    case LED_STATE_HEARTBEAT:
+        // Herzschlag-Muster: beat-beat-pause
+        {
+            int phase = _blinkState % 24;
+            if (phase < 1) _setPinState(true);       // Beat 1
+            else if (phase < 3) _setPinState(false);  // Pause
+            else if (phase < 4) _setPinState(true);   // Beat 2
+            else _setPinState(false);                // Lange Pause
+        }
+        break;
+    case LED_STATE_STROBE:
+        // Strobe-Effekt: sehr schnelles blinken
+        _setPinState((_blinkState % 4) < 2);
+        break;
+    }
+}
+
+// LED Programme Management
+void LED::setProgram(led_program_t program, led_state_t state)
+{
+    if (program >= 0 && program < 7) {
+        _programs[program] = state;
+    }
+}
+
+led_state_t LED::getProgram(led_program_t program)
+{
+    if (program >= 0 && program < 7) {
+        return _programs[program];
+    }
+    return LED_STATE_OFF;
+}
+
+void LED::setProgramState(led_program_t program)
+{
+    if (program >= 0 && program < 7) {
+        // Setze alle LEDs auf das angegebene Programm
+        for (uint8_t i = 0; i < MAX_LED_COUNT; i++)
+        {
+            if (_leds[i] != 0)
+            {
+                _leds[i]->setState(_programs[program]);
+            }
+        }
     }
 }

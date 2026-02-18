@@ -56,6 +56,10 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * **Dashboard** mit Gradient-Icons, Hover-Effekten und kompaktem 3-Spalten-Grid auf Mobile
 * **Sponsor-Button** im Footer mit verschiedenen Optionen (PayPal, Buy Me a Coffee, Tesla referral)
 * **LED-Helligkeitssteuerung** (0-100%) für alle Status-LEDs
+* **Konfigurierbare LED-Programme** für verschiedene Systemzustände
+  * 11 verschiedene LED-Muster (Aus, An, Blinken, Breathing, Herzschlag, Strobe, etc.)
+  * Separate Programme für Idle, CCU-Status, Update, Error, Booting
+  * Alle LEDs können komplett ausgeschaltet werden (Helligkeit 0% oder Pattern "Aus")
 * Detaillierte Systeminformationen und Neustart-Gründe
 * **Neustart-Bestätigungsdialog** beim Speichern von Einstellungen (z.B. CCU IP)
 * Barrierefreiheits-Optimierungen (Accessibility, `aria-hidden` für dekorative Icons)
@@ -77,6 +81,12 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 * Moderne Security Headers (CSP, X-Frame-Options, etc.)
 * HTTP gzip Kompression für schnellere Übertragung
 * **Backup & Restore** der Einstellungen über die WebUI
+
+#### Netzwerk-Optimierung
+* **DNS-Caching** für schnellere Verbindungen und reduzierten Netzwerk-Traffic
+  * Cache für 8 DNS-Einträge mit konfigurierbarer TTL
+  * Automatische Aufräumung abgelaufener Einträge
+  * Deutliche Performance-Verbesserung bei häufigen DNS-Abfragen
 
 #### Monitoring und Überwachung
 * **MQTT-Support mit Home Assistant Integration**

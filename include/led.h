@@ -38,7 +38,24 @@ typedef enum
     LED_STATE_BLINK_INV = 3,
     LED_STATE_BLINK_FAST = 4,
     LED_STATE_BLINK_SLOW = 5,
+    LED_STATE_BLINK_2X = 6,        // 2x blinken, dann Pause
+    LED_STATE_BLINK_3X = 7,        // 3x blinken, dann Pause
+    LED_STATE_BREATHING = 8,       // Sanftes pulsieren
+    LED_STATE_HEARTBEAT = 9,       // Herzschlag-Muster
+    LED_STATE_STROBE = 10,         // Strobe-Effekt
 } led_state_t;
+
+// LED Programme für verschiedene Systemzustände
+typedef enum
+{
+    LED_PROG_IDLE = 0,             // Im Normalbetrieb
+    LED_PROG_CCU_DISCONNECTED = 1, // CCU nicht verbunden
+    LED_PROG_CCU_CONNECTED = 2,    // CCU verbunden
+    LED_PROG_UPDATE_AVAILABLE = 3, // Update verfügbar
+    LED_PROG_ERROR = 4,            // Fehlerzustand
+    LED_PROG_BOOTING = 5,          // System bootet
+    LED_PROG_UPDATE_IN_PROGRESS = 6 // Update wird eingespielt
+} led_program_t;
 
 class LED
 {
@@ -47,9 +64,17 @@ private:
     ledc_channel_config_t _channel_conf;
     void _setPinState(bool enabled);
 
+    // LED Programme Konfiguration
+    static led_state_t _programs[7]; // Programme für verschiedene Zustände
+
 public:
     static void start(Settings *settings);
     static void stop();
+
+    // LED Programme Management
+    static void setProgram(led_program_t program, led_state_t state);
+    static led_state_t getProgram(led_program_t program);
+    static void setProgramState(led_program_t program);
 
     LED(gpio_num_t pin);
     void setState(led_state_t state);

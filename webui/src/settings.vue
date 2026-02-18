@@ -87,6 +87,24 @@
                   </div>
                 </div>
               </div>
+
+              <div class="form-group mt-4">
+                <label class="form-label fw-bold">{{ t('settings.ledPrograms') }}</label>
+                <div class="led-programs-grid">
+                  <div class="led-program-item" v-for="program in ledPrograms" :key="program.id">
+                    <label class="form-label small">{{ program.label }}</label>
+                    <BFormSelect
+                      :modelValue="getLedProgramValue(program.id)"
+                      @update:modelValue="setLedProgramValue(program.id, $event)"
+                      :options="ledPatterns"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+                <div class="form-text mt-2">
+                  <small>{{ t('settings.ledProgramsHelp') }}</small>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -474,6 +492,49 @@ const ntpServer = ref('')
 const ledBrightness = ref(100)
 const updateLedBlink = ref(true)
 
+// LED Programs
+const ledPrograms = ref([
+  { id: 'idle', label: 'Idle' },
+  { id: 'ccu_disconnected', label: 'CCU Disconnected' },
+  { id: 'ccu_connected', label: 'CCU Connected' },
+  { id: 'update_available', label: 'Update Available' },
+  { id: 'error', label: 'Error' },
+  { id: 'booting', label: 'Booting' },
+  { id: 'update_in_progress', label: 'Update Progress' }
+])
+
+const ledPatterns = [
+  { value: 0, text: 'Aus (Off)' },
+  { value: 1, text: 'An (On)' },
+  { value: 2, text: 'Blinken (Blink)' },
+  { value: 3, text: 'Blinken Invertiert (Blink Inv)' },
+  { value: 4, text: 'Schnelles Blinken (Fast Blink)' },
+  { value: 5, text: 'Langsames Blinken (Slow Blink)' },
+  { value: 6, text: '2x Blinken (2x Blink)' },
+  { value: 7, text: '3x Blinken (3x Blink)' },
+  { value: 8, text: 'Breathing (Pulsieren)' },
+  { value: 9, text: 'Herzschlag (Heartbeat)' },
+  { value: 10, text: 'Strobe' }
+]
+
+const ledProgramValues = ref({
+  idle: 1,
+  ccu_disconnected: 5,
+  ccu_connected: 6,
+  update_available: 4,
+  error: 10,
+  booting: 4,
+  update_in_progress: 5
+})
+
+const getLedProgramValue = (programId) => {
+  return ledProgramValues.value[programId] || 1
+}
+
+const setLedProgramValue = (programId, value) => {
+  ledProgramValues.value[programId] = parseInt(value)
+}
+
 const showError = ref(null)  // Can be null or a string with error message
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
@@ -595,6 +656,11 @@ const loadSettings = () => {
   ledBrightness.value = settingsStore.ledBrightness
   updateLedBlink.value = settingsStore.updateLedBlink !== undefined ? settingsStore.updateLedBlink : true
 
+  // Load LED programs if available
+  if (settingsStore.ledPrograms !== undefined) {
+    ledProgramValues.value = settingsStore.ledPrograms
+  }
+
   // Load IPv6 settings if available
   if (settingsStore.enableIPv6 !== undefined) {
     enableIPv6.value = settingsStore.enableIPv6
@@ -643,6 +709,8 @@ const saveSettingsClick = async () => {
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
       updateLedBlink: updateLedBlink.value,
+      // LED Programs
+      ledPrograms: ledProgramValues.value,
       // IPv6 settings
       enableIPv6: enableIPv6.value,
       ipv6Mode: ipv6Mode.value,
@@ -1130,6 +1198,25 @@ hr {
   .brightness-value {
     min-width: 40px;
     text-align: right;
+  }
+
+  .led-programs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+  }
+
+  .led-program-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .led-program-item .form-label.small {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
   }
 
   .floating-footer {

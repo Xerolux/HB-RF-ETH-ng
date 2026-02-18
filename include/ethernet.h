@@ -52,6 +52,17 @@ private:
   eth_speed_t _linkSpeed;
   eth_duplex_t _duplexMode;
 
+  // DNS Cache
+  static const int DNS_CACHE_SIZE = 8;
+  struct dns_cache_entry {
+    char hostname[64];
+    ip4_addr_t ip_addr;
+    uint32_t expiry_time; // TTL in seconds
+    bool valid;
+  };
+  static dns_cache_entry _dns_cache[DNS_CACHE_SIZE];
+  static uint32_t _current_time;
+
 public:
   Ethernet(Settings *settings);
 
@@ -63,6 +74,13 @@ public:
   bool isConnected() { return _isConnected; }
   int getLinkSpeedMbps();
   const char* getDuplexMode();
+
+  // DNS Cache Funktionen
+  static void dnsCacheInit();
+  static bool dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr);
+  static void dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint32_t ttl);
+  static void dnsCacheClear();
+  static void dnsCleanupTask(void* pvParameters);
 
   void _handleETHEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
   void _handleIPEvent(esp_event_base_t event_base, int32_t event_id, void *event_data);
