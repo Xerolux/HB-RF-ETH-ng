@@ -91,7 +91,9 @@ const rules = {
 const v$ = useVuelidate(rules, { password })
 
 onMounted(() => {
-  sysInfoStore.update().catch(() => {})
+  sysInfoStore.update().catch((error) => {
+    console.warn('Failed to load system info on login page:', error)
+  })
 })
 
 const loginClick = async () => {

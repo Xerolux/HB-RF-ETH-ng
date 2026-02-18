@@ -251,6 +251,7 @@ const settingsStore = useSettingsStore()
 
 const showBanner = ref(true)
 const dismissedVersion = ref(localStorage.getItem('dismissedUpdate'))
+let updateCheckTimer = null
 
 // Mobile menu state
 const mobileMenuOpen = ref(false)
@@ -282,9 +283,6 @@ watch(mobileMenuOpen, (isOpen) => {
 })
 
 // Cleanup on unmount
-onUnmounted(() => {
-  document.body.style.overflow = ''
-})
 
 const currentLocale = computed(() => locale.value)
 const currentLocaleFlag = computed(() => {
@@ -336,11 +334,19 @@ onMounted(async () => {
   }
 
   // Re-check every 24 hours
-  setInterval(() => {
+  updateCheckTimer = setInterval(() => {
     if (sysInfoStore.currentVersion) {
       updateStore.checkForUpdate(sysInfoStore.currentVersion)
     }
   }, 24 * 60 * 60 * 1000)
+})
+
+// Cleanup timer on unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer)
+  }
 })
 </script>
 

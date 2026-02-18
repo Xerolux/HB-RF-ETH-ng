@@ -98,7 +98,9 @@ const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
 
 onMounted(() => {
-  sysInfoStore.update().catch(() => {})
+  sysInfoStore.update().catch((error) => {
+    console.warn('Failed to load system info on about page:', error)
+  })
 })
 
 const libs = ref([

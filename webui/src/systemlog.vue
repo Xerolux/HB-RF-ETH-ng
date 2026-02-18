@@ -99,7 +99,7 @@ const fetchLog = async () => {
       }
     }
   } catch (error) {
-    console.warn("Log poll failed", error)
+    console.warn("Log poll failed:", error.response?.status || error.message)
   }
 }
 

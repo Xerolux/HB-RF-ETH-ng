@@ -37,7 +37,9 @@ const showSponsorModal = ref(false)
 // activity tracking (10-minute timeout with cross-tab sync via localStorage).
 
 onMounted(() => {
-  sysInfoStore.update().catch(() => {})
+  sysInfoStore.update().catch((error) => {
+    console.warn('Failed to load system info on app mount:', error)
+  })
 })
 </script>
 
