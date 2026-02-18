@@ -9,6 +9,8 @@
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "updatecheck.h"
+#include "nvs_flash.h"
+#include "reset_info.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "freertos/FreeRTOS.h"
@@ -37,7 +39,29 @@ static void log_error_if_nonzero(const char *message, int error_code)
 
 // Forward declarations for system commands
 extern "C" void esp_restart(void);
-extern "C" esp_err_t settings_factory_reset(void);
+
+static void perform_factory_reset()
+{
+    ESP_LOGI(TAG, "Performing factory reset");
+
+    // Store reset reason before factory reset
+    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
+
+    // Clear NVS namespace for settings
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("settings", NVS_READWRITE, &nvs_handle);
+    if (err == ESP_OK) {
+        nvs_erase_all(nvs_handle);
+        nvs_commit(nvs_handle);
+        nvs_close(nvs_handle);
+        ESP_LOGI(TAG, "Settings NVS erased");
+    } else {
+        ESP_LOGE(TAG, "Failed to open NVS settings namespace: %s", esp_err_to_name(err));
+    }
+
+    // Give some time for operations to complete
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+}
 
 static void handle_mqtt_command(const char* command)
 {
@@ -48,7 +72,7 @@ static void handle_mqtt_command(const char* command)
         esp_restart();
     } else if (strcmp(command, "factory_reset") == 0) {
         ESP_LOGI(TAG, "Factory reset command received via MQTT");
-        settings_factory_reset();
+        perform_factory_reset();
         esp_restart();
     } else if (strcmp(command, "update") == 0) {
         ESP_LOGI(TAG, "Update command received via MQTT");
