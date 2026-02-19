@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Configuración del sistema',
     ledBrightness: 'Brillo del LED',
+    updateLedBlink: 'Parpadear LED en actualizaciones',
     checkUpdates: 'Buscar actualizaciones',
     allowPrerelease: 'Permitir actualizaciones tempranas (Beta/Alpha)',
     language: 'Idioma',

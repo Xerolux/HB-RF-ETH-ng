@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Systeeminstellingen',
     ledBrightness: 'LED Helderheid',
+    updateLedBlink: 'LED knipperen bij updates',
     checkUpdates: 'Controleren op updates',
     allowPrerelease: 'Vroege updates toestaan (Beta/Alpha)',
     language: 'Taal',

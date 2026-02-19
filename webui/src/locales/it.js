@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Impostazioni di Sistema',
     ledBrightness: 'Luminosità LED',
+    updateLedBlink: 'LED lampeggiante per aggiornamenti',
     checkUpdates: 'Controlla aggiornamenti',
     allowPrerelease: 'Consenti aggiornamenti anticipati (Beta/Alpha)',
     language: 'Lingua',
