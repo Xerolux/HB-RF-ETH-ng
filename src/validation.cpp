@@ -637,9 +637,15 @@ bool validateIPv6Address(const char *ipv6)
                 ESP_LOGW(TAG, "Invalid IPv6: segment too long (%d hex digits)", segmentLen);
                 return false;
             }
-            if (segmentLen > 0 || i == 0)  // Allow empty segment only at start after ::
+            if (segmentLen > 0)
             {
                 segmentCount++;
+            }
+            else
+            {
+                // A single colon with no preceding hex digits is invalid (e.g. ":1::1" or ":::")
+                ESP_LOGW(TAG, "Invalid IPv6: empty segment without double colon");
+                return false;
             }
             segmentLen = 0;
         }

@@ -205,6 +205,7 @@ void UpdateCheck::performOnlineUpdate()
     config.url = url;
     config.crt_bundle_attach = esp_crt_bundle_attach;
     config.keep_alive_enable = true;
+    config.timeout_ms = 60000; // 60-second timeout to prevent indefinite stall
 
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &config;

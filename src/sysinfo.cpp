@@ -52,11 +52,7 @@ static const UBaseType_t MAX_TASKS = 32;
 
 void updateCPUUsageTask(void *arg)
 {
-    TaskStatus_t *taskStatus = (TaskStatus_t *)malloc(MAX_TASKS * sizeof(TaskStatus_t));
-    if (!taskStatus) {
-        vTaskDelete(NULL);
-        return;
-    }
+    static TaskStatus_t taskStatus[MAX_TASKS];
 
     TaskHandle_t idle0Task = xTaskGetIdleTaskHandleForCore(0);
     TaskHandle_t idle1Task = xTaskGetIdleTaskHandleForCore(1);
