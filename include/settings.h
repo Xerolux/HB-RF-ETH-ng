@@ -67,7 +67,7 @@ private:
   char _ipv6Dns1[40] = {0};
   char _ipv6Dns2[40] = {0};
 
-  char _ccuIP[16] = {0};
+  char _ccuIP[64] = {0};
 
 public:
   Settings();
