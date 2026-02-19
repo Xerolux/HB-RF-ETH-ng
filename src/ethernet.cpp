@@ -46,8 +46,8 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
 {
     if (!hostname || !ip_addr) return false;
 
-    // Aktualisiere Zeit (simuliert - in echter Implementierung von Systemzeit)
-    _current_time = xTaskGetTickCount() / portTICK_PERIOD_MS / 1000;
+    // Convert FreeRTOS ticks to seconds: ticks * ms_per_tick / 1000
+    _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
 
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (_dns_cache[i].valid &&
@@ -89,6 +89,7 @@ void Ethernet::dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint
 
     if (oldest_idx >= 0) {
         strncpy(_dns_cache[oldest_idx].hostname, hostname, sizeof(_dns_cache[oldest_idx].hostname) - 1);
+        _dns_cache[oldest_idx].hostname[sizeof(_dns_cache[oldest_idx].hostname) - 1] = '\0';
         _dns_cache[oldest_idx].ip_addr = *ip_addr;
         _dns_cache[oldest_idx].expiry_time = _current_time + ttl;
         _dns_cache[oldest_idx].valid = true;
@@ -111,7 +112,7 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
     // Task zum Aufräumen abgelaufener DNS-Einträge (jede Minute)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(60000)); // 1 Minute
-        _current_time = xTaskGetTickCount() / portTICK_PERIOD_MS / 1000;
+        _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
 
         for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
             if (_dns_cache[i].valid && _current_time >= _dns_cache[i].expiry_time) {

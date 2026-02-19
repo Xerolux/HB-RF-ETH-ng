@@ -16,6 +16,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "cJSON.h"
+#include "semver.h"
 
 static const char *TAG = "MQTT";
 
@@ -115,12 +116,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
         // Handle incoming commands
+        // Note: event->topic is NOT null-terminated per ESP-IDF MQTT API.
+        // Use event->topic_len for safe length-bounded operations.
         if (current_mqtt_config.ha_discovery_enabled) {
             char command_topic_prefix[128];
             snprintf(command_topic_prefix, sizeof(command_topic_prefix), "%s/command/", current_mqtt_config.topic_prefix);
+            size_t prefix_len = strlen(command_topic_prefix);
 
-            if (strncmp(event->topic, command_topic_prefix, strlen(command_topic_prefix)) == 0) {
-                const char* command = event->topic + strlen(command_topic_prefix);
+            if ((size_t)event->topic_len > prefix_len &&
+                strncmp(event->topic, command_topic_prefix, prefix_len) == 0) {
+                // Extract the command into a null-terminated buffer
+                char command[64];
+                size_t cmd_len = (size_t)event->topic_len - prefix_len;
+                if (cmd_len >= sizeof(command)) cmd_len = sizeof(command) - 1;
+                memcpy(command, event->topic + prefix_len, cmd_len);
+                command[cmd_len] = '\0';
                 handle_mqtt_command(command);
             }
         }
@@ -196,7 +206,7 @@ void mqtt_handler_publish_status(void)
         const char* latest = updateCheck->getLatestVersion();
         PUBLISH_STR("status/latest_version", latest);
 
-        bool updateAvailable = (strcmp(sysInfo->getCurrentVersion(), latest) != 0 && strcmp(latest, "n/a") != 0);
+        bool updateAvailable = (strcmp(latest, "n/a") != 0 && compareVersions(latest, sysInfo->getCurrentVersion()) > 0);
         PUBLISH_STR("status/update_available", updateAvailable ? "true" : "false");
     }
 
