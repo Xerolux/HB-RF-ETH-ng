@@ -269,6 +269,11 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 void RawUartUdpListener::start()
 {
     _udp_queue = xQueueCreate(64, sizeof(udp_event_t *));
+    if (_udp_queue == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");
+        return;
+    }
     xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
 
     _pcb = udp_new();
@@ -337,16 +342,10 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
 
     e->pb = pb;
 
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wpointer-arith"
-
-    ip_hdr *iphdr = reinterpret_cast<ip_hdr *>(pb->payload - UDP_HLEN - IP_HLEN);
-    e->addr.addr = iphdr->src.addr;
-
-    udp_hdr *udphdr = reinterpret_cast<udp_hdr *>(pb->payload - UDP_HLEN);
-    e->port = ntohs(udphdr->src);
-
-    #pragma GCC diagnostic pop
+    // Use the source address and port provided directly by LwIP in the callback
+    // instead of reading raw pbuf header memory (which is unsafe and fragile).
+    e->addr.addr = addr->u_addr.ip4.addr;
+    e->port = port;
 
     if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
     {
