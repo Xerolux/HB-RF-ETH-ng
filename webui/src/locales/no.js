@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Systeminnstillinger',
     ledBrightness: 'LED-lysstyrke',
+    updateLedBlink: 'Blink LED for oppdateringer',
     checkUpdates: 'Se etter oppdateringer',
     allowPrerelease: 'Tillat tidlige oppdateringer (Beta/Alpha)',
     language: 'Språk',

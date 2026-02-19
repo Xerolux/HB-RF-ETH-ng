@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Paramètres système',
     ledBrightness: 'Luminosité LED',
+    updateLedBlink: 'LED clignotante lors des mises à jour',
     checkUpdates: 'Vérifier les mises à jour',
     allowPrerelease: 'Autoriser les mises à jour anticipées (Beta/Alpha)',
     language: 'Langue',

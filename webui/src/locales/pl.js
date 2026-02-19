@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Ustawienia systemu',
     ledBrightness: 'Jasność LED',
+    updateLedBlink: 'Migaj LED podczas aktualizacji',
     checkUpdates: 'Sprawdź aktualizacje',
     allowPrerelease: 'Zezwalaj na wczesne aktualizacje (Beta/Alpha)',
     language: 'Język',

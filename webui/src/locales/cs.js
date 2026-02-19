@@ -104,6 +104,7 @@ export default {
     // System Settings
     systemSettings: 'Nastavení systému',
     ledBrightness: 'Jas LED',
+    updateLedBlink: 'Blikat LED při aktualizacích',
     checkUpdates: 'Zkontrolovat aktualizace',
     allowPrerelease: 'Povolit dřívější aktualizace (Beta/Alpha)',
     language: 'Jazyk',
