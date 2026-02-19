@@ -85,8 +85,10 @@ bool validateIPAddress(ip4_addr_t addr)
         return true;
     }
 
-    // Extract first octet (most significant byte in network byte order)
-    uint8_t firstOctet = (ip >> 24) & 0xFF;
+    // Extract first octet by reading the first byte of the network-byte-order address.
+    // addr.addr is stored in network byte order, so byte[0] is always the first IP octet
+    // regardless of the CPU endianness (works correctly on little-endian ESP32).
+    uint8_t firstOctet = ((const uint8_t *)&addr.addr)[0];
 
     // Reject class E addresses (240-255) except for limited broadcast (255.255.255.255)
     if (firstOctet >= 240 && ip != IPADDR_BROADCAST)

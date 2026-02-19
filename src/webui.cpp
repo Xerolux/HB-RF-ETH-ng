@@ -411,104 +411,110 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char buffer[1024];
-    int len = httpd_req_recv(req, buffer, sizeof(buffer) - 1);
-
-    if (len > 0)
-    {
-        buffer[len] = 0;
-        cJSON *root = cJSON_Parse(buffer);
-
-        if (!root) {
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
-        }
-
-        char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
-        char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
-        bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
-        ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
-        ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
-        ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
-        ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
-        ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
-
-        cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-        timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
-
-        cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-        int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
-
-        cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-        int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
-
-        char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
-        cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-        int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
-
-        cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
-        if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
-            _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
-        }
-
-        // IPv6
-        bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-        char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-        char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-        cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-        int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
-        char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
-        char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
-        char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-        char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
-
-        if (adminPassword && strlen(adminPassword) > 0)
-            _settings->setAdminPassword(adminPassword);
-
-        if (hostname) {
-            if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
-                cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
-            }
-        }
-        _settings->setTimesource(timesource);
-        _settings->setDcfOffset(dcfOffset);
-        _settings->setGpsBaudrate(gpsBaudrate);
-        if (ntpServer) {
-            _settings->setNtpServer(ntpServer);
-        }
-        _settings->setLEDBrightness(ledBrightness);
-
-        // Handle IPv6 (checking for nulls)
-        if (ipv6Mode) {
-             _settings->setIPv6Settings(
-                enableIPv6,
-                ipv6Mode,
-                ipv6Address ? ipv6Address : "",
-                ipv6PrefixLength,
-                ipv6Gateway ? ipv6Gateway : "",
-                ipv6Dns1 ? ipv6Dns1 : "",
-                ipv6Dns2 ? ipv6Dns2 : ""
-            );
-        }
-
-        if (ccuIP) {
-            _settings->setCCUIP(ccuIP);
-        }
-
-        _settings->save();
-
-        cJSON_Delete(root);
-
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings saved.\"}");
-
-        return ESP_OK;
+    char *buffer = (char *)malloc(4096);
+    if (!buffer) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    return ESP_FAIL;
+    int len = httpd_req_recv(req, buffer, 4095);
+
+    if (len <= 0) {
+        free(buffer);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+    }
+
+    buffer[len] = 0;
+    cJSON *root = cJSON_Parse(buffer);
+    free(buffer);
+    buffer = NULL;
+
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
+    char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
+    bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
+    ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
+    ip4_addr_t netmask = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "netmask"));
+    ip4_addr_t gateway = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "gateway"));
+    ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
+    ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
+
+    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
+    timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
+
+    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
+    int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
+
+    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
+    int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
+
+    char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+
+    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
+    int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
+
+    cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
+    if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
+        _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
+    }
+
+    // IPv6
+    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+    cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
+    int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
+    char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
+    char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
+    char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
+
+    if (hostname) {
+        if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
+        }
+    }
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    if (ntpServer) {
+        _settings->setNtpServer(ntpServer);
+    }
+    _settings->setLEDBrightness(ledBrightness);
+
+    // Handle IPv6 (checking for nulls)
+    if (ipv6Mode) {
+        _settings->setIPv6Settings(
+            enableIPv6,
+            ipv6Mode,
+            ipv6Address ? ipv6Address : "",
+            ipv6PrefixLength,
+            ipv6Gateway ? ipv6Gateway : "",
+            ipv6Dns1 ? ipv6Dns1 : "",
+            ipv6Dns2 ? ipv6Dns2 : ""
+        );
+    }
+
+    if (ccuIP) {
+        _settings->setCCUIP(ccuIP);
+    }
+
+    _settings->save();
+
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Settings saved.\"}");
+
+    return ESP_OK;
 }
 
 httpd_uri_t post_settings_json_handler = {
