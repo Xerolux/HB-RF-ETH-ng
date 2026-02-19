@@ -1,16 +1,22 @@
-# HB-RF-ETH-ng Firmware v2.1.6
+<div align="center">
+
+# HB-RF-ETH-ng
+
+**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 5.x**
 
 [![GitHub Release][releases-shield]][releases]
 [![Downloads][downloads-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE.md)
 
-
 [![Buy Me A Coffee][buymeacoffee-badge]][buymeacoffee]
 [![Tesla](https://img.shields.io/badge/Tesla-Referral-red?style=for-the-badge&logo=tesla)](https://ts.la/sebastian564489)
 
-
 [![Release Management](https://github.com/Xerolux/HB-RF-ETH-ng/actions/workflows/release.yml/badge.svg)](https://github.com/Xerolux/HB-RF-ETH-ng/actions/workflows/release.yml)
+
+![Dashboard](screenshots/Status_1.png)
+
+</div>
 
 ## Modernisierte Fork von Xerolux (2025)
 
@@ -351,4 +357,4 @@ Die Firmware steht unter Creative Commons Attribution-NonCommercial-ShareAlike 4
 [commits]: https://github.com/Xerolux/HB-RF-ETH-ng/commits/main
 [license-shield]: https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng.svg?style=for-the-badge
 [buymeacoffee]: https://www.buymeacoffee.com/xerolux
-[buymeacoffee-badge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
+[buymeacoffee-badge]: https://img.shields.io/badge/-Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black
