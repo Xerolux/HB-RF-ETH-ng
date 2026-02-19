@@ -14,8 +14,6 @@
 
 [![Release Management](https://github.com/Xerolux/HB-RF-ETH-ng/actions/workflows/release.yml/badge.svg)](https://github.com/Xerolux/HB-RF-ETH-ng/actions/workflows/release.yml)
 
-![Dashboard](screenshots/Status_1.png)
-
 </div>
 
 ## Modernisierte Fork von Xerolux (2025)
