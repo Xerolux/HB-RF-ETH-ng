@@ -130,7 +130,7 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
                 time.tm_min = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0');
                 time.tm_hour = ((buffer[fieldStart + 0] - '0') * 10) + (buffer[fieldStart + 1] - '0');
 
-                tv->tv_usec = ((buffer[fieldStart + 4] - '7') * 100000) + ((buffer[fieldStart + 8] - '0') * 10000);
+                tv->tv_usec = ((buffer[fieldStart + 7] - '0') * 100000) + ((buffer[fieldStart + 8] - '0') * 10000);
             }
             else if (fieldIndex == 9)
             {
