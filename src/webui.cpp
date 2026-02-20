@@ -231,6 +231,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";
@@ -358,6 +359,7 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     cJSON *root = cJSON_CreateObject();
 
     add_settings(root);
@@ -468,19 +470,40 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     if (ledPrograms) {
         cJSON *item;
         item = cJSON_GetObjectItem(ledPrograms, "idle");
-        if (item) _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
+            LED::setProgram(LED_PROG_IDLE, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
-        if (item) _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
+            LED::setProgram(LED_PROG_CCU_DISCONNECTED, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
-        if (item) _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
+            LED::setProgram(LED_PROG_CCU_CONNECTED, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "update_available");
-        if (item) _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
+            LED::setProgram(LED_PROG_UPDATE_AVAILABLE, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "error");
-        if (item) _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
+            LED::setProgram(LED_PROG_ERROR, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "booting");
-        if (item) _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
+            LED::setProgram(LED_PROG_BOOTING, (led_state_t)item->valueint);
+        }
         item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
-        if (item) _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
+        if (item) {
+            _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
+            LED::setProgram(LED_PROG_UPDATE_IN_PROGRESS, (led_state_t)item->valueint);
+        }
     }
 
     // IPv6
