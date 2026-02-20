@@ -157,11 +157,7 @@ void UpdateCheck::_taskFunc()
       if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) < 0)
       {
         ESP_LOGW(TAG, "An updated firmware with version %s is available!", _latestVersion);
-        if (_settings->getUpdateLedBlink()) {
-          _statusLED->setState(LED_STATE_BLINK_SLOW);
-        } else {
-          _statusLED->setState(LED_STATE_OFF);
-        }
+        _statusLED->setState(LED::getProgram(LED_PROG_UPDATE_AVAILABLE));
       }
       else if (compareVersions(_sysInfo->getCurrentVersion(), _latestVersion) > 0)
       {
