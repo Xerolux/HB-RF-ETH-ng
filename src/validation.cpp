@@ -387,7 +387,10 @@ bool validateServerAddress(const char *server, size_t maxLength)
     }
 
     // Check if host is a valid IPv6 address (without brackets)
-    if (validateIPv6Address(host))
+    // Only attempt IPv6 validation if host contains a colon; bare IPv6 always
+    // has at least one colon, so this avoids spurious "invalid character" warnings
+    // when the host is a plain hostname (e.g. pool.ntp.org).
+    if (strchr(host, ':') != NULL && validateIPv6Address(host))
     {
         return true;
     }
