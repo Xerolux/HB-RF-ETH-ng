@@ -374,6 +374,16 @@
       </div>
     </Transition>
 
+    <!-- Save Success Overlay -->
+    <Transition name="fade">
+      <div v-if="showSaveSuccess" class="success-overlay" @click="showSaveSuccess = false">
+        <div class="success-card">
+          <div class="success-icon">✓</div>
+          <h3>{{ t('settings.saveSuccess') }}</h3>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Password Change Modal -->
     <PasswordChangeModal v-model="showPasswordModal" :force-redirect="false" />
 
@@ -526,6 +536,7 @@ const setLedProgramValue = (programId, value) => {
 }
 
 const showError = ref(null)  // Can be null or a string with error message
+const showSaveSuccess = ref(false)
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
 
@@ -647,7 +658,7 @@ const loadSettings = () => {
 
   // Load LED programs if available
   if (settingsStore.ledPrograms !== undefined) {
-    ledProgramValues.value = settingsStore.ledPrograms
+    ledProgramValues.value = { ...settingsStore.ledPrograms }
   }
 
   // Load IPv6 settings if available
@@ -680,7 +691,7 @@ const saveSettingsClick = async () => {
   v$.value.$touch()
   if (v$.value.$error) return
 
-  showError.value = false
+  showError.value = null
 
   try {
     const settings = {
@@ -710,10 +721,16 @@ const saveSettingsClick = async () => {
     }
 
     await settingsStore.save(settings)
-    showRestartModal.value = true
+
+    // Show success popup and auto-dismiss after 2.5 seconds
+    showSaveSuccess.value = true
+    setTimeout(() => {
+      showSaveSuccess.value = false
+      showRestartModal.value = true
+    }, 2500)
   } catch (error) {
     // Extract specific error message from backend response
-    const errorMsg = error.response?.data || error.response?.data?.error || t('settings.saveError')
+    const errorMsg = error.response?.data?.error || error.response?.data || t('settings.saveError')
     showError.value = errorMsg
   }
 }
