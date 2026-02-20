@@ -125,7 +125,30 @@ void Settings::load()
     strncpy(_ntpServer, "pool.ntp.org", sizeof(_ntpServer) - 1);
   }
 
-  GET_BOOL(handle, "updateLedBlink", _updateLedBlink, true);
+  // Initialize default LED programs
+  int32_t defaults[7] = {
+      1,  // IDLE: ON
+      5,  // CCU_DISCONNECTED: BLINK_SLOW
+      6,  // CCU_CONNECTED: BLINK_2X
+      4,  // UPDATE_AVAILABLE: BLINK_FAST
+      10, // ERROR: STROBE
+      4,  // BOOTING: BLINK_FAST
+      5   // UPDATE_IN_PROGRESS: BLINK_SLOW
+  };
+
+  // Check for legacy updateLedBlink setting to migrate preference
+  bool updateLedBlink;
+  GET_BOOL(handle, "updateLedBlink", updateLedBlink, true);
+  if (!updateLedBlink) {
+      defaults[3] = 0; // Set UPDATE_AVAILABLE to OFF if legacy setting was false
+  }
+
+  // Load LED programs
+  char key[16];
+  for (int i = 0; i < 7; i++) {
+      snprintf(key, sizeof(key), "ledProg%d", i);
+      GET_INT(handle, key, _ledPrograms[i], defaults[i]);
+  }
 
   GET_INT(handle, "ledBrightness", _ledBrightness, 100);
 
@@ -181,7 +204,12 @@ void Settings::save()
 
   SET_STR(handle, "ntpServer", _ntpServer);
 
-  SET_BOOL(handle, "updateLedBlink", _updateLedBlink);
+  // Save LED programs
+  char key[16];
+  for (int i = 0; i < 7; i++) {
+      snprintf(key, sizeof(key), "ledProg%d", i);
+      SET_INT(handle, key, _ledPrograms[i]);
+  }
 
   SET_INT(handle, "ledBrightness", _ledBrightness);
 
@@ -387,14 +415,20 @@ void Settings::setLEDBrightness(int ledBrightness)
   _ledBrightness = ledBrightness;
 }
 
-bool Settings::getUpdateLedBlink()
+int Settings::getLedProgram(int program)
 {
-  return _updateLedBlink;
+    if (program < 0 || program >= 7) return 0;
+    return _ledPrograms[program];
 }
 
-void Settings::setUpdateLedBlink(bool enabled)
+void Settings::setLedProgram(int program, int state)
 {
-  _updateLedBlink = enabled;
+    if (program >= 0 && program < 7) {
+        // Validate state (0-10)
+        if (state >= 0 && state <= 10) {
+            _ledPrograms[program] = state;
+        }
+    }
 }
 
 // IPv6 Getters

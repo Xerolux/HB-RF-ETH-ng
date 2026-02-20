@@ -74,6 +74,11 @@ void LED::start(Settings *settings)
 
     _highDuty = settings->getLEDBrightness() * (1 << ledc_timer.duty_resolution) / 100;
 
+    // Apply LED programs from settings
+    for (int i = 0; i < 7; i++) {
+        setProgram((led_program_t)i, (led_state_t)settings->getLedProgram(i));
+    }
+
     ledc_timer_config(&ledc_timer);
 
     if (!_switchTaskHandle)

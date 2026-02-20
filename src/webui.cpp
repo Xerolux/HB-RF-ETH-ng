@@ -231,6 +231,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
     // Determine Radio Module Type String
     const char* radioModuleTypeStr = "-";
@@ -324,7 +325,15 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
-    cJSON_AddBoolToObject(settings, "updateLedBlink", _settings->getUpdateLedBlink());
+
+    cJSON *ledPrograms = cJSON_AddObjectToObject(settings, "ledPrograms");
+    cJSON_AddNumberToObject(ledPrograms, "idle", _settings->getLedProgram(LED_PROG_IDLE));
+    cJSON_AddNumberToObject(ledPrograms, "ccu_disconnected", _settings->getLedProgram(LED_PROG_CCU_DISCONNECTED));
+    cJSON_AddNumberToObject(ledPrograms, "ccu_connected", _settings->getLedProgram(LED_PROG_CCU_CONNECTED));
+    cJSON_AddNumberToObject(ledPrograms, "update_available", _settings->getLedProgram(LED_PROG_UPDATE_AVAILABLE));
+    cJSON_AddNumberToObject(ledPrograms, "error", _settings->getLedProgram(LED_PROG_ERROR));
+    cJSON_AddNumberToObject(ledPrograms, "booting", _settings->getLedProgram(LED_PROG_BOOTING));
+    cJSON_AddNumberToObject(ledPrograms, "update_in_progress", _settings->getLedProgram(LED_PROG_UPDATE_IN_PROGRESS));
 
     // IPv6 Settings
     cJSON_AddBoolToObject(settings, "enableIPv6", _settings->getEnableIPv6());
@@ -350,6 +359,7 @@ esp_err_t get_settings_json_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     cJSON *root = cJSON_CreateObject();
 
     add_settings(root);
@@ -456,9 +466,44 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
     int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
 
-    cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
-    if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
-        _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
+    cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
+    if (ledPrograms) {
+        cJSON *item;
+        item = cJSON_GetObjectItem(ledPrograms, "idle");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
+            LED::setProgram(LED_PROG_IDLE, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
+            LED::setProgram(LED_PROG_CCU_DISCONNECTED, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
+            LED::setProgram(LED_PROG_CCU_CONNECTED, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "update_available");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
+            LED::setProgram(LED_PROG_UPDATE_AVAILABLE, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "error");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
+            LED::setProgram(LED_PROG_ERROR, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "booting");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
+            LED::setProgram(LED_PROG_BOOTING, (led_state_t)item->valueint);
+        }
+        item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
+        if (item) {
+            _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
+            LED::setProgram(LED_PROG_UPDATE_IN_PROGRESS, (led_state_t)item->valueint);
+        }
     }
 
     // IPv6
@@ -635,6 +680,25 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
     int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
 
+    cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
+    if (ledPrograms) {
+        cJSON *item;
+        item = cJSON_GetObjectItem(ledPrograms, "idle");
+        if (item) _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
+        if (item) _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
+        if (item) _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "update_available");
+        if (item) _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "error");
+        if (item) _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "booting");
+        if (item) _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
+        item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
+        if (item) _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
+    }
+
     // IPv6
     bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
     char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
@@ -658,11 +722,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         _settings->setNtpServer(ntpServer);
     }
     _settings->setLEDBrightness(ledBrightness);
-
-    cJSON *updateLedBlinkItem = cJSON_GetObjectItem(root, "updateLedBlink");
-    if (updateLedBlinkItem && cJSON_IsBool(updateLedBlinkItem)) {
-        _settings->setUpdateLedBlink(cJSON_IsTrue(updateLedBlinkItem));
-    }
 
     if (ipv6Mode) {
          _settings->setIPv6Settings(
