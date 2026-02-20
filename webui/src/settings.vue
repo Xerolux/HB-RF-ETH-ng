@@ -79,15 +79,6 @@
                 </div>
               </div>
 
-              <div class="form-group mt-3">
-                <div class="switch-row">
-                  <label class="switch-label">{{ t('settings.updateLedBlink') }}</label>
-                  <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" v-model="updateLedBlink">
-                  </div>
-                </div>
-              </div>
-
               <div class="form-group mt-4">
                 <label class="form-label fw-bold">{{ t('settings.ledPrograms') }}</label>
                 <div class="led-programs-grid">
@@ -490,7 +481,6 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
-const updateLedBlink = ref(true)
 
 // LED Programs
 const ledPrograms = ref([
@@ -654,7 +644,6 @@ const loadSettings = () => {
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
   ledBrightness.value = settingsStore.ledBrightness
-  updateLedBlink.value = settingsStore.updateLedBlink !== undefined ? settingsStore.updateLedBlink : true
 
   // Load LED programs if available
   if (settingsStore.ledPrograms !== undefined) {
@@ -708,7 +697,6 @@ const saveSettingsClick = async () => {
       gpsBaudrate: gpsBaudrate.value,
       ntpServer: ntpServer.value,
       ledBrightness: ledBrightness.value,
-      updateLedBlink: updateLedBlink.value,
       // LED Programs
       ledPrograms: ledProgramValues.value,
       // IPv6 settings

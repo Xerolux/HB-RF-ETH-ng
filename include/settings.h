@@ -57,7 +57,7 @@ private:
   char _ntpServer[65] = {0};
 
   int32_t _ledBrightness;
-  bool _updateLedBlink;
+  int32_t _ledPrograms[7];
 
   bool _enableIPv6;
   char _ipv6Mode[10] = {0};
@@ -104,8 +104,8 @@ public:
   int getLEDBrightness();
   void setLEDBrightness(int brightness);
 
-  bool getUpdateLedBlink();
-  void setUpdateLedBlink(bool enabled);
+  int getLedProgram(int program);
+  void setLedProgram(int program, int state);
 
   // IPv6 getters
   bool getEnableIPv6();
