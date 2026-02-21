@@ -10,7 +10,8 @@ export default defineConfig({
       algorithm: 'gzip',
       ext: '.gz',
       threshold: 0,
-      deleteOriginFile: false
+      deleteOriginFile: false,
+      filter: /\.(html|xml|css|json|js|mjs|svg|yaml|yml|toml|ico)$/
     })
   ],
   resolve: {
@@ -23,8 +24,13 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        entryFileNames: 'index-[hash].js',
-        assetFileNames: 'index-[hash].[ext]',
+        entryFileNames: 'main.js',
+        assetFileNames: (assetInfo) => {
+          const name = (assetInfo.names && assetInfo.names[0]) || assetInfo.name || ''
+          if (name.endsWith('.ico')) return 'favicon.ico'
+          if (name.endsWith('.css')) return 'main.css'
+          return '[name].[ext]'
+        },
         // IMPORTANT: Bundle everything into a single JS file. The ESP32 HTTP server
         // only serves specific embedded files (main.js, main.css, index.html, favicon.ico).
         // Any additional chunk files would not be served and break the UI.

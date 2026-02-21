@@ -528,7 +528,7 @@ const ledProgramValues = ref({
 })
 
 const getLedProgramValue = (programId) => {
-  return ledProgramValues.value[programId] || 1
+  return ledProgramValues.value[programId] ?? 1
 }
 
 const setLedProgramValue = (programId, value) => {

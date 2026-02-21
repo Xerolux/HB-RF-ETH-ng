@@ -71,6 +71,23 @@ bool validateHostname(const char *hostname)
     return true;
 }
 
+bool validateNetmask(ip4_addr_t addr)
+{
+    // A valid netmask must be a contiguous block of 1-bits followed by 0-bits.
+    // 0.0.0.0 is allowed (used when DHCP is active).
+    // Convert to host byte order for bit arithmetic.
+    uint32_t mask = lwip_ntohl(addr.addr);
+    uint32_t inv = ~mask;
+    // inv must be of the form 2^n - 1 (all lower bits set, no gaps).
+    // Check: (inv & (inv + 1)) == 0  [also true for inv == 0xFFFFFFFF due to wraparound to 0]
+    if ((inv & (inv + 1)) != 0)
+    {
+        ESP_LOGW(TAG, "Invalid netmask: not a contiguous mask");
+        return false;
+    }
+    return true;
+}
+
 bool validateIPAddress(ip4_addr_t addr)
 {
     // IP address 0.0.0.0 is valid (IPADDR_ANY) for DHCP mode

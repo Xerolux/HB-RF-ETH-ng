@@ -7,29 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.7] - 2026-02-21
+
 ### Added
-- 🔒 **Enhanced Backend Validation** - Comprehensive validation for all critical settings:
-  - CCU address validation with IPv4 and IPv6 support (130+ unit tests)
-  - MQTT server address validation (IPv4, IPv6, hostname, port)
-  - SNMP community string validation with length checks
-  - NTP server validation with DNS compliance checks
-  - IPv6 address validation with proper format verification
-- 🌐 **Frontend CCU IPv6 Support** - WebUI now accepts both IPv4 and IPv6 addresses for CCU settings
-  - Updated validation to support both address formats
-  - Improved placeholder text to show examples of both formats
+- 🏠 **Home Assistant MQTT Auto-Discovery** - Vollständige HA-Integration via MQTT Discovery Protokoll; Gerät erscheint automatisch in Home Assistant
+- 💡 **Vollständig konfigurierbare LED-Programme** - LED-Muster für alle Betriebsmodi (Verbunden, Getrennt, Update verfügbar, etc.) sind jetzt einzeln konfigurierbar; doppeltes Update-Blink-Toggle entfernt
+- 🔒 **Umfangreiche Backend-Validierung** - Vollständige Validierung aller kritischen Einstellungen:
+  - CCU-Adress-Validierung mit IPv4- und IPv6-Unterstützung (130+ Unit-Tests)
+  - MQTT-Server-Adress-Validierung (IPv4, IPv6, Hostname, Port)
+  - SNMP Community-String-Validierung mit Längenbegrenzung
+  - NTP-Server-Validierung mit DNS-Compliance-Prüfung
+  - IPv6-Adress-Validierung mit korrekter Format-Überprüfung
+- 🌐 **Frontend CCU IPv6-Unterstützung** - WebUI akzeptiert jetzt sowohl IPv4- als auch IPv6-Adressen für CCU-Einstellungen
+  - Aktualisierte Validierung für beide Adressformate
+  - Verbesserter Platzhaltertext mit Beispielen für beide Formate
+- 🔔 **Spezifische Fehlermeldungen** - WebUI zeigt jetzt spezifische Fehlermeldungen vom Backend (statt generische Fehler)
+- 🌍 **DNS-Caching** - DNS-Cache-Verbesserungen für stabilere Namensauflösung
+- 🔧 **Automatischer CI-Versions-Bump** - Versionsnummer wird automatisch im Release-Workflow aktualisiert
 
 ### Security
-- 🛡️ **Critical Security Fix** - Fixed string length validation bypass vulnerability
-  - Validates string length BEFORE strncpy to prevent buffer overflow
-  - Prevents attackers from bypassing length checks
-- 🔐 **Input Validation Hardening** - All user inputs now properly validated before processing
+- 🛡️ **Kritischer Security-Fix** - Schwachstelle bei der String-Längen-Validierung behoben
+  - String-Länge wird jetzt VOR strncpy validiert, um Buffer-Overflow zu verhindern
+  - Verhindert das Umgehen der Längenprüfungen durch Angreifer
+- 🔐 **Input-Validierung gehärtet** - Alle Benutzereingaben werden jetzt vollständig validiert, bevor sie verarbeitet werden
+- 🔐 **CCU-Adress-Validierung** - Kritischer Security-Fix: Vollständige Validierung der CCU-Adresse im Backend
+- 🔐 **MQTT/SNMP-Validierung** - MQTT-Server und SNMP-Community werden jetzt serverseitig validiert
 
 ### Changed
-- ✅ **Test Coverage** - Added 130+ comprehensive unit tests for validation functions
-  - IPv6 validation tests with edge cases
-  - CCU validation tests for both IPv4 and IPv6
-  - NTP server validation tests with DNS compliance
-  - MQTT and SNMP validation tests
+- ⚡ **Settings-Caching** - Optimistisches Update im Settings-Store beim Speichern; LED-Zustand wird sofort aktualisiert
+- 🔧 **Settings-Refactoring** - Redundante `checkUpdates`- und `allowPrerelease`-Einstellungen entfernt
+- ✅ **Test-Coverage** - 130+ umfassende Unit-Tests für Validierungsfunktionen hinzugefügt
+  - IPv6-Validierungstests mit Edge Cases
+  - CCU-Validierungstests für IPv4 und IPv6
+  - NTP-Server-Validierungstests mit DNS-Compliance
+  - MQTT- und SNMP-Validierungstests
+- 🌍 **i18n** - Fehlende `updateLedBlink`-Übersetzungsschlüssel in 8 Locale-Dateien ergänzt
+- 📰 **README** - Banner mit zentriertem Header, Hero-Image und verbesserten Badges erneuert
+
+### Fixed
+- 🐛 **LED-Programme** - LED-Programme werden jetzt korrekt gespeichert und geladen
+- 🐛 **IPv6-Warnungen** - Störende IPv6-Warnungen für Hostname-Server-Adressen werden unterdrückt
+- 🐛 **GPS** - Bug in der GPS-Verarbeitung behoben
+- 🐛 **OTA** - Fehlerbehandlung beim OTA-Update verbessert
+- 🐛 **CPU-Task** - Bug im CPU-Task behoben
+- 🐛 **UDP-Listener** - Mehrere Bugs im UDP-Listener behoben
+- 🐛 **MQTT-Handler** - Mehrere Bugs im MQTT-Handler behoben
+- 🐛 **DNS-Cache** - Mehrere Bugs im DNS-Cache behoben
+- 🐛 **Settings-Persistenz** - Mehrere Bugs bei der Einstellungs-Speicherung und Sicherheit behoben
+- 🐛 **MQTT Factory-Reset** - Linker-Fehler im MQTT-Handler beim Factory-Reset behoben
+- 🐛 **LED/DNS Kompilierung** - Kompilierungsfehler in LED- und DNS-Caching-Code behoben
+- 🐛 **Memory Leaks** - Fehlerbehandlung verbessert und Memory Leaks beseitigt
+- 🐛 **WebUI-Bugs** - Mehrere WebUI-Bugs in 10 Dateien behoben
+- 🐛 **Doppelte Benachrichtigung** - Doppelte „Einstellungen gespeichert"-Benachrichtigung behoben
+- 🐛 **HTTP-Warnungen** - Harmlose httpd_txrx-Warnungen werden jetzt unterdrückt
+- 🔧 **CI/CD** - Überschreiben existierender Tags im Release-Workflow ermöglicht
+
+### Dependencies
+- 📦 Bumped `bootstrap-vue-next` von 0.43.0 auf 0.43.1
+- 📦 Bumped `marked` von 17.0.1 auf 17.0.2
+- 📦 Bumped `vue` von 3.5.27 auf 3.5.28
+- 📦 Bumped `crate-ci/typos` von 1.43.3 auf 1.43.4
 
 ## [2.1.6] - 2026-02-12
 
@@ -254,7 +291,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.6...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.7...HEAD
+[2.1.7]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.6...v2.1.7
 [2.1.6]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...v2.1.6
 [2.1.5]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...v2.1.5
 [2.1.4]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...v2.1.4

@@ -309,7 +309,7 @@ bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
       ESP_LOGE(TAG, "Invalid local IP address, keeping current settings");
       return false;
     }
-    if (!validateIPAddress(netmask))
+    if (!validateNetmask(netmask))
     {
       ESP_LOGE(TAG, "Invalid netmask, keeping current settings");
       return false;

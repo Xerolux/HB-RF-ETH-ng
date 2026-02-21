@@ -131,16 +131,20 @@ const char* ResetInfo::getEspResetReason() {
 }
 
 const char* ResetInfo::getResetDetails() {
-    reset_reason_type_t stored_reason = getResetReasonType();
-    const char* esp_reason = getEspResetReason();
+    static bool initialized = false;
 
-    // If we have a stored reason, use it
-    if (stored_reason != RESET_REASON_NORMAL) {
-        snprintf(reset_text_buffer, sizeof(reset_text_buffer), "%s (%s)",
-                 get_reason_text(stored_reason), esp_reason);
-    } else {
-        // For normal power-on, just show the ESP reason
-        snprintf(reset_text_buffer, sizeof(reset_text_buffer), "%s", esp_reason);
+    if (!initialized) {
+        initialized = true;
+        reset_reason_type_t stored_reason = getResetReasonType();
+        const char* esp_reason = getEspResetReason();
+
+        if (stored_reason != RESET_REASON_NORMAL) {
+            snprintf(reset_text_buffer, sizeof(reset_text_buffer), "%s (%s)",
+                     get_reason_text(stored_reason), esp_reason);
+            clearResetReason();
+        } else {
+            snprintf(reset_text_buffer, sizeof(reset_text_buffer), "%s", esp_reason);
+        }
     }
 
     return reset_text_buffer;

@@ -40,6 +40,7 @@
 // Validation functions
 bool validateHostname(const char *hostname);
 bool validateIPAddress(ip4_addr_t addr);
+bool validateNetmask(ip4_addr_t addr);
 bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
