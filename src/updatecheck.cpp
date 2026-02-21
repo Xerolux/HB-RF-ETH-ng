@@ -31,6 +31,7 @@
 #include "reset_info.h"
 #include "system_reset.h"
 #include "semver.h"
+#include "ota_config.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -198,9 +199,7 @@ void UpdateCheck::performOnlineUpdate()
     _statusLED->setState(LED_STATE_BLINK_FAST);
 
     esp_http_client_config_t config = {};
-    config.url = url;
-    config.crt_bundle_attach = esp_crt_bundle_attach;
-    config.keep_alive_enable = true;
+    configure_ota_http_client(config, url);
     config.timeout_ms = 60000; // 60-second timeout to prevent indefinite stall
 
     esp_https_ota_config_t ota_config = {};

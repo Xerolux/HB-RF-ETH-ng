@@ -42,6 +42,7 @@
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
+#include "ota_config.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -1146,12 +1147,9 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         _ota_error[0] = '\0';
 
         esp_http_client_config_t config = {};
-        config.url = a->url;
-        config.crt_bundle_attach = esp_crt_bundle_attach;
-        config.keep_alive_enable = true;
+        configure_ota_http_client(config, a->url);
         config.timeout_ms = 30000;
         config.buffer_size = 4096;
-        config.max_redirection_count = 5;
 
         esp_https_ota_config_t ota_config = {};
         ota_config.http_config = &config;
@@ -1215,7 +1213,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             delete a;
         }
         vTaskDelete(NULL);
-    }, "ota_url_update", 8192, args, 5, NULL);
+    }, "ota_url_update", 16384, args, 5, NULL);
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create OTA update task");
