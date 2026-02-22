@@ -230,10 +230,9 @@ export const useUpdateStore = defineStore('update', {
       this.checkError = null
 
       try {
-        const response = await fetch('https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt?t=' + Date.now())
-        if (!response.ok) throw new Error('Failed to fetch version')
+        const response = await axios.get('/api/check_update?t=' + Date.now(), { responseType: 'text' })
 
-        const latestVersion = await response.text()
+        const latestVersion = response.data
         this.latestVersion = latestVersion.trim()
         this.lastCheck = new Date().toISOString()
 
@@ -241,7 +240,7 @@ export const useUpdateStore = defineStore('update', {
         this.updateAvailable = this.compareVersions(currentVersion, this.latestVersion) < 0
       } catch (error) {
         console.error('Update check failed:', error)
-        this.checkError = error.message
+        this.checkError = error.message || 'Unknown error'
       } finally {
         this.isChecking = false
       }
