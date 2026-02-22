@@ -121,8 +121,6 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 ### Mobile Ansicht
 Die Benutzeroberfläche wurde speziell für mobile Endgeräte optimiert und bietet eine intuitive Bedienung auf Smartphones und Tablets.
 
-![Mobile Tour](docs/mobile_tour.gif)
-
 ### Screenshots
 | Login | Dashboard |
 | :---: | :---: |
