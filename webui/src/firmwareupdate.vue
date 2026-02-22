@@ -41,7 +41,7 @@
           <strong>{{ t('firmware.updateAvailable') }}</strong>
           <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) }}</p>
         </div>
-        <BButton variant="light" size="sm" @click="scrollToOta" class="banner-action">
+        <BButton variant="light" size="sm" @click="showChangelogModal = true" class="banner-action">
           {{ t('firmware.viewUpdate') }}
         </BButton>
       </div>
@@ -398,6 +398,12 @@ const manualCheckForUpdate = async () => {
     await sysInfoStore.update()
   }
   await updateStore.checkForUpdate(sysInfoStore.currentVersion)
+
+  if (updateStore.checkError) {
+    showStatus(t('common.error'), t('firmware.checkFailed') + ': ' + updateStore.checkError, '❌', 'error')
+  } else {
+    showStatus(t('common.success'), t('firmware.checkSuccess'), '✓', 'success')
+  }
 }
 
 const formatLastCheck = (dateStr) => {
