@@ -174,7 +174,7 @@ void UpdateCheck::_taskFunc()
       ESP_LOGE(TAG, "Failed to determine latest version");
     }
 
-    vTaskDelay((8 * 60 * 60000) / portTICK_PERIOD_MS); // 8h
+    vTaskDelay((24 * 60 * 60000) / portTICK_PERIOD_MS); // 24h
   }
 
   vTaskDelete(NULL);

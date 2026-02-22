@@ -230,7 +230,7 @@ export const useUpdateStore = defineStore('update', {
       this.checkError = null
 
       try {
-        const response = await fetch('https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt')
+        const response = await fetch('https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt?t=' + Date.now())
         if (!response.ok) throw new Error('Failed to fetch version')
 
         const latestVersion = await response.text()

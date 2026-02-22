@@ -202,6 +202,8 @@ export default {
     upToDate: 'Firmware ist aktuell',
     checkNow: 'Jetzt prüfen',
     checking: 'Prüfe...',
+    checkSuccess: 'Update-Prüfung erfolgreich',
+    checkFailed: 'Update-Prüfung fehlgeschlagen',
     lastCheck: 'Zuletzt geprüft',
     factoryReset: 'Zurücksetzen',
     factoryResetHint: 'Auf Werkseinstellungen zurücksetzen',

@@ -202,6 +202,8 @@ export default {
     upToDate: 'Firmware is up to date',
     checkNow: 'Check now',
     checking: 'Checking...',
+    checkSuccess: 'Update check successful',
+    checkFailed: 'Update check failed',
     lastCheck: 'Last checked',
     factoryReset: 'Reset',
     factoryResetHint: 'Reset to factory defaults',
