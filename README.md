@@ -123,6 +123,23 @@ Die Benutzeroberfläche wurde speziell für mobile Endgeräte optimiert und biet
 
 ![Mobile Tour](docs/mobile_tour.gif)
 
+### Screenshots
+| Login | Dashboard |
+| :---: | :---: |
+| ![Login](screenshots/01_Login.png) | ![Dashboard](screenshots/02_Dashboard.png) |
+
+| Settings | Monitoring |
+| :---: | :---: |
+| ![Settings](screenshots/04_Settings.png) | ![Monitoring](screenshots/05_Monitoring.png) |
+
+| Firmware Update | System Log |
+| :---: | :---: |
+| ![Firmware Update](screenshots/06_FirmwareUpdate.png) | ![System Log](screenshots/07_SystemLog.png) |
+
+| About | Changelog |
+| :---: | :---: |
+| ![About](screenshots/08_About.png) | ![Changelog](screenshots/09_Changelog.png) |
+
 ### Bekannte Einschränkungen
 * Nach einem Neustart der Platine (z.B. bei Stromausfall) findet kein automatischer Reconnect statt, in diesem Fall muss die CCU Software daher neu gestartet werden.
 * Die Stromversorgung mittels des Funkmoduls RPI-RF-MOD darf nur erfolgen, wenn keine andere Stromversorgung (USB oder PoE) angeschlossen ist.
@@ -175,6 +192,30 @@ Firmware Updates sind fertig kompiliert in den [Releases](https://github.com/Xer
 - Die Standard-Authentifizierung schützt Firmware-Updates ausreichend
 - Die Firmware validiert alle Updates vor der Installation
 - Bei fehlerhaften Updates wird die OTA-Operation korrekt abgebrochen
+
+### Notfall-Wiederherstellung (Rescue Script)
+Sollte die WebUI nicht mehr erreichbar sein, aber die Platine noch im Netzwerk antworten (Ping), kann die Firmware über das mitgelieferte Python-Script `test_ota_function.py` neu installiert werden.
+
+**Voraussetzung:**
+- Python 3 installiert
+- Platine ist im Netzwerk erreichbar
+- Admin-Passwort ist bekannt
+
+**Anwendung:**
+Das Script befindet sich im Root-Verzeichnis des Repositories.
+
+```bash
+# Syntax
+python3 test_ota_function.py <IP-ADRESSE> <PASSWORD> [--url <FIRMWARE_URL>]
+
+# Beispiel (mit Standard-URL zur neuesten Firmware)
+python3 test_ota_function.py 192.168.1.100 meinPasswort
+
+# Beispiel (mit eigener URL)
+python3 test_ota_function.py 192.168.1.100 meinPasswort --url http://192.168.1.50/firmware.bin
+```
+
+Das Script authentifiziert sich, triggert das OTA-Update und überwacht den Fortschritt bis zum erfolgreichen Neustart.
 
 ### Kompatible CCU-Systeme
 
