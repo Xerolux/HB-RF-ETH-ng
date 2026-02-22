@@ -68,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test OTA Update Function on HB-RF-ETH-ng")
     parser.add_argument("ip", help="IP address of the device")
     parser.add_argument("password", help="Admin password of the device")
-    parser.add_argument("--url", default="https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.1.7/firmware_2.1.7.bin", help="OTA URL to use")
+    parser.add_argument("--url", default="https://xerolux.de/firmware/HB-RF-ETH-ng/firmware_2.1.7.bin", help="OTA URL to use")
 
     args = parser.parse_args()
 

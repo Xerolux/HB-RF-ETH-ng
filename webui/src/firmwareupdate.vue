@@ -124,20 +124,27 @@
         </div>
 
         <div class="card-body">
-          <div class="url-input-group">
-            <BFormInput
-              v-model="otaUrl"
-              :placeholder="t('firmware.urlPlaceholder')"
-              :disabled="otaUpdating"
-              class="modern-input"
-            />
+          <div v-if="updateStore.latestVersion && updateStore.latestVersion !== 'n/a' && updateStore.updateAvailable" class="update-info">
+            <div class="update-available">
+              <span class="update-icon">✨</span>
+              <div class="update-text">
+                <strong>{{ t('firmware.updateAvailable') }}</strong>
+                <span class="version-info">v{{ updateStore.latestVersion }}</span>
+              </div>
+            </div>
           </div>
-
-          <div class="quick-actions" v-if="sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a'">
-            <button class="chip-btn" @click="setGithubUrl">
-              <span class="chip-icon">🐙</span>
-              GitHub v{{ sysInfoStore.latestVersion }}
+          <div v-else class="update-info">
+            <div class="no-update">
+              <span class="check-icon">✅</span>
+              <span>{{ t('firmware.upToDate') }}</span>
+            </div>
+            <button class="check-btn" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+              <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm"></span>
+              {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.checkNow') }}
             </button>
+            <div v-if="updateStore.lastCheck" class="last-check">
+              {{ t('firmware.lastCheck') }}: {{ formatLastCheck(updateStore.lastCheck) }}
+            </div>
           </div>
 
           <div v-if="otaProgress > 0" class="progress-container">
@@ -151,7 +158,7 @@
             variant="success"
             size="lg"
             block
-            :disabled="!otaUrl || otaUpdating"
+            :disabled="!updateStore.updateAvailable || otaUpdating"
             @click="startOtaUpdate"
             class="action-btn"
           >
@@ -200,14 +207,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useFirmwareUpdateStore } from './stores.js'
+import { useSysInfoStore, useUpdateStore, useFirmwareUpdateStore } from './stores.js'
 import axios from 'axios'
 import ChangelogModal from './components/ChangelogModal.vue'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
+const updateStore = useUpdateStore()
 const firmwareUpdateStore = useFirmwareUpdateStore()
 
 // State
@@ -216,7 +224,6 @@ const fileInput = ref(null)
 const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
-const otaUrl = ref('')
 const otaUpdating = ref(false)
 const otaProgress = ref(0)
 const otaSection = ref(null)
@@ -289,8 +296,29 @@ const executeUpload = async () => {
 }
 
 const startOtaUpdate = async () => {
-  if (!otaUrl.value) return
-  executeOtaUpdate()
+  const version = updateStore.latestVersion
+  if (!version || version === 'n/a') return
+  
+  const updateUrl = `https://xerolux.de/firmware/HB-RF-ETH-ng/firmware_${version}.bin`
+  
+  otaUpdating.value = true
+  otaProgress.value = 0
+
+  showStatus('Downloading', t('firmware.otaProgress'), '📥', 'info', true)
+
+  try {
+    const response = await axios.post('/api/ota_url', { url: updateUrl })
+
+    if (response.data.success) {
+      await pollOtaStatus()
+      showStatus('Success', t('firmware.otaSuccess'), '✓', 'success', true)
+      setTimeout(startCountdown, 1000)
+    }
+  } catch (error) {
+    showStatus('Error', error.response?.data?.error || error.message || 'OTA update failed', '❌', 'error')
+  } finally {
+    otaUpdating.value = false
+  }
 }
 
 const pollOtaStatus = () => {
@@ -310,38 +338,14 @@ const pollOtaStatus = () => {
         } else if (status === 'failed') {
           reject(new Error(otaError || 'OTA update failed'))
         } else {
-          // idle - OTA might have finished and device is restarting
           resolve()
         }
       } catch (err) {
-        // Network error likely means device is restarting after success
         resolve()
       }
     }
     setTimeout(poll, 1000)
   })
-}
-
-const executeOtaUpdate = async () => {
-  otaUpdating.value = true
-  otaProgress.value = 0
-
-  showStatus('Downloading', t('firmware.otaProgress'), '📥', 'info', true)
-
-  try {
-    const response = await axios.post('/api/ota_url', { url: otaUrl.value })
-
-    if (response.data.success) {
-      // Poll real OTA progress from backend
-      await pollOtaStatus()
-      showStatus('Success', t('firmware.otaSuccess'), '✓', 'success', true)
-      setTimeout(startCountdown, 1000)
-    }
-  } catch (error) {
-    showStatus('Error', error.response?.data?.error || error.message || 'OTA update failed', '❌', 'error')
-  } finally {
-    otaUpdating.value = false
-  }
 }
 
 const showStatus = (title, message, icon, type = 'info', persistent = false) => {
@@ -387,17 +391,37 @@ const factoryResetClick = async () => {
   }
 }
 
-const setGithubUrl = () => {
-  const version = sysInfoStore.latestVersion
-  if (version && version !== 'n/a') {
-    otaUrl.value = `https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v${version}/firmware_${version}.bin`
-  }
-}
-
 const scrollToOta = () => otaSection.value?.scrollIntoView({ behavior: 'smooth' })
 
-onMounted(() => {
-  sysInfoStore.update()
+const manualCheckForUpdate = async () => {
+  if (!sysInfoStore.currentVersion) {
+    await sysInfoStore.update()
+  }
+  await updateStore.checkForUpdate(sysInfoStore.currentVersion)
+}
+
+const formatLastCheck = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleString()
+}
+
+let updateCheckInterval = null
+
+onMounted(async () => {
+  await sysInfoStore.update()
+  await updateStore.checkForUpdate(sysInfoStore.currentVersion)
+  updateCheckInterval = setInterval(() => {
+    if (sysInfoStore.currentVersion) {
+      updateStore.checkForUpdate(sysInfoStore.currentVersion)
+    }
+  }, 24 * 60 * 60 * 1000)
+})
+
+onUnmounted(() => {
+  if (updateCheckInterval) {
+    clearInterval(updateCheckInterval)
+  }
 })
 </script>
 
@@ -636,6 +660,95 @@ onMounted(() => {
 .chip-btn:hover {
   background: var(--color-border-light);
   transform: translateY(-1px);
+}
+
+/* Update Info */
+.update-info {
+  margin-bottom: var(--spacing-md);
+}
+
+.update-available {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.update-icon {
+  font-size: 1.5rem;
+  animation: bounce 2s infinite;
+}
+
+.update-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.update-text strong {
+  color: #059669;
+  font-size: 0.9375rem;
+}
+
+.version-info {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.no-update {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.check-icon {
+  font-size: 1.125rem;
+}
+
+.check-btn {
+  margin-top: var(--spacing-sm);
+  padding: 6px 14px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.check-btn:hover:not(:disabled) {
+  background: var(--color-border-light);
+  color: var(--color-text);
+}
+
+.check-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.last-check {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 /* Progress */

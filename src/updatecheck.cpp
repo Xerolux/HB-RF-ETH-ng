@@ -86,8 +86,7 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 
 void UpdateCheck::_updateLatestVersion()
 {
-    // Fetch version from version.txt on GitHub
-    const char* url = "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/version.txt";
+    const char* url = "https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt";
 
     struct http_response_data resp = {};
 
@@ -189,18 +188,18 @@ void UpdateCheck::performOnlineUpdate()
     }
 
     char url[256];
-    // Construct URL: https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v<version>/firmware_<version>.bin
-    // Note: We assume the tag has 'v' prefix, but version string might not.
-    // If _latestVersion is "2.1.1", tag is "v2.1.1" and file is "firmware_2.1.1.bin"
-    snprintf(url, sizeof(url), "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v%s/firmware_%s.bin",
-            _latestVersion, _latestVersion);
+    snprintf(url, sizeof(url), "https://xerolux.de/firmware/HB-RF-ETH-ng/firmware_%s.bin", _latestVersion);
 
     ESP_LOGI(TAG, "Starting OTA update from %s", url);
     _statusLED->setState(LED_STATE_BLINK_FAST);
 
     esp_http_client_config_t config = {};
-    configure_ota_http_client(config, url);
-    config.timeout_ms = 60000; // 60-second timeout to prevent indefinite stall
+    config.url = url;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.timeout_ms = 60000;
+    config.buffer_size = 4096;
+    config.keep_alive_enable = false;
 
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &config;
