@@ -355,6 +355,32 @@ After a device restart (e.g., power failure), the CCU does not automatically rec
    - Perform factory reset (see below)
    - Re-flash firmware
 
+### Emergency Firmware Update (Rescue Script)
+
+If the WebUI is inaccessible but the device is still reachable on the network (pingable), you can use the `test_ota_function.py` script included in the repository to trigger a firmware update via the API.
+
+**Prerequisites:**
+- Python 3 installed
+- Device is reachable on the network
+- Admin password is known
+
+**Usage:**
+
+The script is located in the root directory of the repository.
+
+```bash
+# Syntax
+python3 test_ota_function.py <DEVICE_IP> <PASSWORD> [--url <FIRMWARE_URL>]
+
+# Example (using default URL for latest firmware)
+python3 test_ota_function.py 192.168.1.100 myPassword
+
+# Example (using custom URL)
+python3 test_ota_function.py 192.168.1.100 myPassword --url http://192.168.1.50/firmware.bin
+```
+
+The script will authenticate, trigger the OTA update, and monitor progress until the device restarts.
+
 ---
 
 ## Time Synchronization
