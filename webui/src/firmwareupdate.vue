@@ -142,6 +142,9 @@
               <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm"></span>
               {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.checkNow') }}
             </button>
+            <div class="form-text mt-2 text-muted" style="font-size: 0.75rem; line-height: 1.2;">
+               {{ t('privacy.updateCheck') }}
+            </div>
             <div v-if="updateStore.lastCheck" class="last-check">
               {{ t('firmware.lastCheck') }}: {{ formatLastCheck(updateStore.lastCheck) }}
             </div>

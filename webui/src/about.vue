@@ -62,6 +62,17 @@
       </div>
     </div>
 
+    <!-- Privacy Info -->
+    <div class="about-section">
+      <div class="section-header">
+        <span class="section-icon">🔒</span>
+        <h3 class="section-title">{{ t('privacy.title') }}</h3>
+      </div>
+      <div class="info-card">
+        <p>{{ t('privacy.updateCheck') }}</p>
+      </div>
+    </div>
+
     <!-- Third Party Software -->
     <div class="about-section">
       <div class="section-header">

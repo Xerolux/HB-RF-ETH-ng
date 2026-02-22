@@ -378,6 +378,12 @@ export default {
     empty: 'No log entries yet.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Privacy',
+    updateCheck: 'Automatic updates and firmware checks connect to the server xerolux.de. Your IP address is transmitted to check for availability of new versions.'
+  },
+
   // Changelog
   changelog: {
     title: 'Changelog',

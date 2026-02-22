@@ -378,6 +378,12 @@ export default {
     empty: 'Noch keine Log-Einträge vorhanden.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Datenschutz',
+    updateCheck: 'Automatische Updates und Firmware-Checks verbinden sich mit dem Server xerolux.de. Dabei wird Ihre IP-Adresse übertragen, um die Verfügbarkeit neuer Versionen zu prüfen.'
+  },
+
   // Changelog
   changelog: {
     title: 'Änderungsprotokoll',
