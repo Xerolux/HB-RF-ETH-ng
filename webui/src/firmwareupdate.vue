@@ -27,7 +27,7 @@
       <div class="version-badge">
         <span class="label">{{ t('firmware.version') }}</span>
         <span class="value">{{ sysInfoStore.currentVersion }}</span>
-        <BButton variant="outline-light" size="sm" @click="showChangelogModal = true" class="changelog-btn">
+        <BButton variant="outline-secondary" size="sm" @click="showChangelogModal = true" class="changelog-btn">
           📋 {{ t('changelog.title') }}
         </BButton>
       </div>
@@ -500,11 +500,25 @@ onUnmounted(() => {
   padding: 4px 12px;
   border: 1px solid var(--color-border);
   transition: all 0.2s;
+  color: #343a40;
+  background: transparent;
 }
 
 .version-badge .changelog-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  border-color: #343a40;
+  background-color: #343a40;
+  color: #fff;
+}
+
+:global([data-bs-theme="dark"]) .version-badge .changelog-btn {
+  color: #e9ecef;
+  border-color: var(--color-border);
+}
+
+:global([data-bs-theme="dark"]) .version-badge .changelog-btn:hover {
+  background-color: #e9ecef;
+  color: #000;
+  border-color: #e9ecef;
 }
 
 /* Banners */
