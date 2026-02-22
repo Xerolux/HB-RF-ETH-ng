@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.8] - 2026-02-22
+
+### Added
+- 🔄 **Backend Update Check Proxy** - Neuer `/api/check_update` Endpoint für Update-Prüfung über Backend (verhindert CORS-Fehler)
+- 🧪 **OTA Test Script** - Python CLI Tool (`test_ota_function.py`) für automatisierte OTA-Update-Tests
+- 🎯 **Manueller Update-Check Button** - Neuer Button für manuelle Update-Prüfung mit Status-Anzeige
+- 🌍 **Update-Status Lokalisierung** - Neue Übersetzungsschlüssel für Update-Check-Status (DE/EN)
+
+### Changed
+- 🌐 **OTA Server Migration** - Update-Server auf xerolux.de umgestellt für zuverlässigere Updates
+- ⏰ **Update-Check Intervall** - Automatische Prüfung von 8 Stunden auf 24 Stunden erhöht
+- 🔧 **OTA Konfiguration** - HTTP-Client Konfiguration in separates Modul (`ota_config.cpp`) ausgelagert
+- 🖥️ **Firmware-Update UI** - Verbesserte Statusanzeige mit Popup für Update-Check-Ergebnis
+- 📖 **Changelog aus Update-Banner** - Klick auf "Anzeigen" im Update-Banner öffnet Changelog-Modal
+
+### Fixed
+- 🐛 **OTA GitHub Redirects (Bug #235)** - OTA-Updates mit GitHub-Redirects funktionieren jetzt zuverlässig
+  - HTTP Keep-Alive für OTA-Verbindungen deaktiviert für Cross-Domain-Redirects
+  - TX-Buffer auf 4096 Bytes erhöht für große HTTPS-Header
+  - Redirect-Handling aktiviert (max. 5 Redirects)
+  - Stack-Größe für OTA-Task auf 16384 Bytes erhöht (Stack-Overflow Prevention)
+- 🐛 **CORS-Fehler bei manuellem Update-Check** - Update-Prüfung erfolgt jetzt über Backend-Proxy
+- 🐛 **Store Reference Error** - `useFirmwareUpdateStore` Referenzfehler bei Datei-Upload behoben
+- 🐛 **Caching bei Update-Check** - Timestamp-Parameter verhindert Caching der Version-Datei
+
+### Security
+- 🔒 **Input-Validierung** - OTA URL wird vollständig über Backend verarbeitet
+
 ## [2.1.7] - 2026-02-21
 
 ### Added
@@ -291,7 +319,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.7...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.8...HEAD
+[2.1.8]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.7...v2.1.8
 [2.1.7]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.6...v2.1.7
 [2.1.6]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...v2.1.6
 [2.1.5]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...v2.1.5
