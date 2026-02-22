@@ -60,3 +60,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+webui/test-results/
+webui/playwright-report/
