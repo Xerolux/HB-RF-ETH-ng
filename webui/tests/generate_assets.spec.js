@@ -26,8 +26,8 @@ test.describe('Generate Assets', () => {
         body: JSON.stringify({
           sysInfo: {
             serial: "MEQ1234567",
-            currentVersion: "2.1.8",
-            latestVersion: "2.1.8",
+            currentVersion: "2.1.9",
+            latestVersion: "2.1.9",
             rawUartRemoteAddress: "192.168.1.10",
             memoryUsage: 45.2,
             cpuUsage: 12.5,
@@ -117,7 +117,7 @@ test.describe('Generate Assets', () => {
     await page.route('**/api/check_update?*', async route => {
         await route.fulfill({
             contentType: 'text/plain',
-            body: "2.1.9" // Newer version to show badge
+            body: "2.1.10" // Newer version to show badge
         });
     });
 
@@ -126,7 +126,7 @@ test.describe('Generate Assets', () => {
         await route.fulfill({
             contentType: 'text/plain',
             headers: { 'X-Log-Total': '500' },
-            body: "I (1000) main: Board: HB-RF-ETH-ng (v2.0)\nI (1010) net: Ethernet Link Up. Speed: 100Mbps, Duplex: Full\nI (1012) net: IPv4 Address: 192.168.1.200\nI (1020) hb-rf: Radio module detected: HM-MOD-RPI-PCB\nI (1025) hb-rf: Radio Serial: MEQ1234567\nI (1030) hb-rf: Radio Firmware: 2.8.6\nI (1040) webui: Web server started on port 80\nI (2000) webui: Client connected: 192.168.1.50\nI (5000) update: Checking for updates...\nI (5005) update: Update available: v2.1.9\n"
+            body: "I (1000) main: Board: HB-RF-ETH-ng (v2.0)\nI (1010) net: Ethernet Link Up. Speed: 100Mbps, Duplex: Full\nI (1012) net: IPv4 Address: 192.168.1.200\nI (1020) hb-rf: Radio module detected: HM-MOD-RPI-PCB\nI (1025) hb-rf: Radio Serial: MEQ1234567\nI (1030) hb-rf: Radio Firmware: 2.8.6\nI (1040) webui: Web server started on port 80\nI (2000) webui: Client connected: 192.168.1.50\nI (5000) update: Checking for updates...\nI (5005) update: Update available: v2.1.10\n"
         });
     });
 
@@ -134,7 +134,7 @@ test.describe('Generate Assets', () => {
     await page.route('**/api/changelog', async route => {
         await route.fulfill({
             contentType: 'text/markdown',
-            body: "# Changelog\n\n## v2.1.9 (Latest)\n- **New Feature**: Added dark mode support for all pages.\n- **Improvement**: Enhanced radio communication stability.\n- **Fix**: Resolved issue with static IP configuration.\n\n## v2.1.8\n- **Feature**: Redesigned dashboard layout.\n- **Fix**: Memory leak in long-running sessions fixed.\n- **Security**: Updated dependency versions."
+            body: "# Changelog\n\n## v2.1.10 (Latest)\n- **New Feature**: Added dark mode support for all pages.\n- **Improvement**: Enhanced radio communication stability.\n- **Fix**: Resolved issue with static IP configuration.\n\n## v2.1.9\n- **Feature**: Redesigned dashboard layout.\n- **Fix**: Memory leak in long-running sessions fixed.\n- **Security**: Updated dependency versions."
         });
     });
 

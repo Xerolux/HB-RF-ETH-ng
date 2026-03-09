@@ -276,7 +276,7 @@ components:
         latestVersion:
           type: string
           description: Latest available firmware version
-          example: 2.1.0
+          example: 2.1.9
         rawUartRemoteAddress:
           type: string
           description: Remote address for raw UART connection
