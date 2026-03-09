@@ -172,7 +172,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
-          name: HB-RF-ETH-ng Firmware ${{ steps.get_version.outputs.VERSION_TAG }}
+          name: HB-RF-ETH-ng ${{ steps.get_version.outputs.VERSION_TAG }}
           body_path: release/RELEASE_NOTES.md
           files: |
             release/firmware_*.bin
