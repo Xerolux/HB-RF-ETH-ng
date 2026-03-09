@@ -13,7 +13,7 @@ def run(playwright):
     page.route("**/sysinfo.json", lambda route: route.fulfill(
         status=200,
         content_type="application/json",
-        body='{"sysInfo": {"ethernetConnected": true, "ethernetSpeed": 1000, "ethernetDuplex": "Full", "cpuUsage": 15, "memoryUsage": 30, "serial": "ABC1234567", "currentVersion": "2.1.2", "latestVersion": "2.1.2", "uptimeSeconds": 3600, "boardRevision": "1.0", "radioModuleType": "RPI-RF-MOD"}}'
+        body='{"sysInfo": {"ethernetConnected": true, "ethernetSpeed": 1000, "ethernetDuplex": "Full", "cpuUsage": 15, "memoryUsage": 30, "serial": "ABC1234567", "currentVersion": "2.1.9", "latestVersion": "2.1.9", "uptimeSeconds": 3600, "boardRevision": "1.0", "radioModuleType": "RPI-RF-MOD"}}'
     ))
 
     page.route("**/login.json", lambda route: route.fulfill(

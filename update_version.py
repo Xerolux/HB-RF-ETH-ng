@@ -28,8 +28,8 @@ def update_readme(version: str):
 
     # Update the main title
     content = re.sub(
-        r"# HB-RF-ETH-ng Firmware v[\d.]+",
-        f"# HB-RF-ETH-ng Firmware v{version}",
+        r"# HB-RF-ETH-ng (?:Firmware )?v[\d.]+",
+        f"# HB-RF-ETH-ng v{version}",
         content
     )
 
