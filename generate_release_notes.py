@@ -91,7 +91,7 @@ def generate_release_notes(version: str) -> str:
     notes = []
 
     # Header with version and badges
-    notes.append(f"# 🚀 HB-RF-ETH-ng Firmware v{version}")
+    notes.append(f"# 🚀 HB-RF-ETH-ng v{version}")
     notes.append("")
     notes.append("[![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)")
     notes.append("[![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)")
