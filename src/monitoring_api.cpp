@@ -121,10 +121,13 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *community = cJSON_GetObjectItem(snmp, "community");
         if (community != NULL && cJSON_IsString(community))
         {
-            if (!validateSnmpCommunity(community->valuestring))
+            if (config.snmp.enabled || strlen(community->valuestring) > 0)
             {
-                cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid SNMP community string");
+                if (!validateSnmpCommunity(community->valuestring))
+                {
+                    cJSON_Delete(root);
+                    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid SNMP community string");
+                }
             }
             strncpy(config.snmp.community, community->valuestring, sizeof(config.snmp.community) - 1);
         }
@@ -209,10 +212,13 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         cJSON *server = cJSON_GetObjectItem(mqtt, "server");
         if (server != NULL && cJSON_IsString(server))
         {
-            if (!validateServerAddress(server->valuestring, sizeof(config.mqtt.server) - 1))
+            if (config.mqtt.enabled || strlen(server->valuestring) > 0)
             {
-                cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid MQTT server address");
+                if (!validateServerAddress(server->valuestring, sizeof(config.mqtt.server) - 1))
+                {
+                    cJSON_Delete(root);
+                    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid MQTT server address");
+                }
             }
             strncpy(config.mqtt.server, server->valuestring, sizeof(config.mqtt.server) - 1);
         }
