@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HB-RF-ETH-ng</title>
+    <meta name="description" content="Next Generation Firmware für die HB-RF-ETH Platine. Modernisiert mit Vue.js WebUI, Home Assistant MQTT Integration und vielen weiteren Verbesserungen.">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2196F3;
+            --primary-light: #64B5F6;
+            --primary-dark: #1976D2;
+            --secondary: #e2e8f0;
+            --text: #1a202c;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .logo-container {
+            margin-bottom: 2rem;
+        }
+
+        .logo-container img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto 2rem;
+        }
+
+        .badges {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badges img {
+            height: 28px;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background-color: white;
+            color: #1e3a8a;
+            border: 2px solid white;
+        }
+
+        .btn-primary:hover {
+            background-color: transparent;
+            color: white;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-outline:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 3rem;
+            color: #1e3a8a;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+
+        .feature-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #1e3a8a;
+        }
+
+        .hacs-install {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            margin-bottom: 4rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .hacs-install img {
+            margin: 1.5rem 0;
+            max-width: 100%;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        code {
+            background: #f1f1f1;
+            padding: 1rem;
+            border-radius: 4px;
+            display: block;
+            text-align: left;
+            margin: 1.5rem auto;
+            max-width: 600px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            border: 1px solid #ddd;
+        }
+
+        footer {
+            background: var(--text);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 2rem;
+        }
+
+        footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>HB-RF-ETH-ng</h1>
+    <p class="subtitle">Next Generation Firmware für die HB-RF-ETH Platine. Modernisiert mit Vue.js WebUI, Home Assistant MQTT Integration und vielen weiteren Verbesserungen.</p>
+
+    <div class="badges">
+        <a href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"><img src="https://img.shields.io/github/release/Xerolux/HB-RF-ETH-ng.svg?style=for-the-badge" alt="GitHub Release"></a>
+        <img src="https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/latest/total.svg?style=for-the-badge" alt="Downloads">
+        <img src="https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng.svg?style=for-the-badge" alt="License">
+    </div>
+
+    <div class="badges">
+        <a href="https://github.com/sponsors/xerolux"><img src="https://img.shields.io/github/sponsors/xerolux?logo=github&style=for-the-badge&color=blue" alt="GitHub Sponsor"></a>
+        <a href="https://ko-fi.com/xerolux"><img src="https://img.shields.io/badge/Ko--fi-xerolux-blue?logo=ko-fi&style=for-the-badge" alt="Ko-Fi"></a>
+        <a href="https://www.buymeacoffee.com/xerolux"><img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-xerolux-yellow?logo=buy-me-a-coffee&style=for-the-badge" alt="Buy Me A Coffee"></a>
+        <a href="https://ts.la/sebastian564489"><img src="https://img.shields.io/badge/Tesla-Referral-red?style=for-the-badge&logo=tesla" alt="Tesla Referral"></a>
+        <a href="https://paypal.me/xerolux"><img src="https://img.shields.io/badge/PayPal-Donate-00457C?style=for-the-badge&logo=paypal" alt="PayPal"></a>
+    </div>
+
+    <div class="cta-buttons">
+        <a href="https://github.com/Xerolux/HB-RF-ETH-ng" class="btn btn-primary">GitHub Repository</a>
+        <a href="https://github.com/Xerolux/HB-RF-ETH-ng/releases" class="btn btn-outline">Releases & Downloads</a>
+    </div>
+</header>
+
+<main>
+    <h2 class="section-title">Features im Überblick</h2>
+
+    <div class="features-grid">
+        <div class="feature-card">
+            <span class="feature-icon">🌐</span>
+            <div class="feature-title">Moderne WebUI</div>
+            <p>Komplett neu geschriebene Weboberfläche basierend auf Vue.js 3, Bootstrap 5 und Vite. Responsiv und benutzerfreundlich mit Dark-Mode Unterstützung.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">🏠</span>
+            <div class="feature-title">Home Assistant MQTT</div>
+            <p>Nahtlose Integration in Home Assistant via MQTT mit Auto-Discovery. Keine manuelle Konfiguration von Sensoren nötig.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">🔄</span>
+            <div class="feature-title">Einfache Updates</div>
+            <p>Firmware-Updates bequem über die WebUI als Datei-Upload oder direkt via URL von GitHub installieren.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">📊</span>
+            <div class="feature-title">Erweitertes Monitoring</div>
+            <p>Umfassende Überwachung von CPU, RAM, Temperatur und mehr. SNMPv2 und MQTT Unterstützung für externe Monitoring-Systeme.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">🔒</span>
+            <div class="feature-title">Verbesserte Sicherheit</div>
+            <p>Rate Limiting, strikte Passwort-Richtlinien und Input-Validierung schützen vor unbefugtem Zugriff.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">🚀</span>
+            <div class="feature-title">ESP-IDF 5.x</div>
+            <p>Basierend auf dem aktuellen ESP-IDF 5.x Framework für verbesserte Stabilität, Leistung und Zukunftssicherheit.</p>
+        </div>
+    </div>
+
+    <div class="hacs-install">
+        <h2 class="section-title" style="margin-bottom: 1rem;">Screenshots</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <img src="https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/screenshots/sysinfo_dark.png" alt="Sysinfo Dark Mode" style="border: 1px solid #ddd; border-radius: 8px;">
+            <img src="https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/screenshots/settings_dark.png" alt="Settings Dark Mode" style="border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+        <div style="margin-top: 1rem;">
+            <img src="https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/screenshots/sysinfo_light.png" alt="Sysinfo Light Mode" style="border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+    </div>
+
+    <div class="hacs-install">
+        <h2 class="section-title" style="margin-bottom: 1rem;">Installation</h2>
+        <p>Fertig kompilierte Firmware-Images findest du auf der Releases-Seite bei GitHub.</p>
+
+        <code>1. Lade die firmware.bin aus dem aktuellen Release herunter
+2. Öffne die WebUI deiner Platine
+3. Navigiere zu "Firmware Update" und wähle die Datei aus
+4. Klicke auf "Update starten" und warte auf den Neustart</code>
+
+        <div style="margin-top: 2rem;">
+            <a href="https://github.com/Xerolux/HB-RF-ETH-ng" class="btn" style="background: #1e3a8a; color: white;">Zur vollständigen Dokumentation</a>
+        </div>
+    </div>
+
+</main>
+
+<footer>
+    <p>HB-RF-ETH-ng von <a href="https://github.com/Xerolux">Xerolux</a></p>
+    <p style="margin-top: 10px; font-size: 0.9em;">
+        Ein großer Dank geht an Alexander Reinert für die Entwicklung der originalen HB-RF-ETH Firmware und Hardware.
+    </p>
+</footer>
+
+</body>
+</html>
