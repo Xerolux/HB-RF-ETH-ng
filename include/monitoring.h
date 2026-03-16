@@ -53,8 +53,11 @@ typedef struct {
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
 
-// Update configuration
+// Update configuration (synchronous - blocks caller)
 esp_err_t monitoring_update_config(const monitoring_config_t *config);
+
+// Schedule configuration update asynchronously (returns immediately, applies in background task)
+esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config);
 
 // Get current configuration
 esp_err_t monitoring_get_config(monitoring_config_t *config);

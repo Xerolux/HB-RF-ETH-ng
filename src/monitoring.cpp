@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <stdlib.h>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -587,6 +588,36 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
         mqtt_handler_start(&current_config.mqtt);
     }
 
+    return ESP_OK;
+}
+
+// Task that applies a pending config update asynchronously
+static void apply_config_task(void *pvParameters)
+{
+    monitoring_config_t *config = (monitoring_config_t *)pvParameters;
+    monitoring_update_config(config);
+    free(config);
+    vTaskDelete(NULL);
+}
+
+// Schedule configuration update asynchronously - returns immediately, update runs in background
+esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
+{
+    monitoring_config_t *config_copy = (monitoring_config_t *)malloc(sizeof(monitoring_config_t));
+    if (!config_copy) {
+        ESP_LOGE(TAG, "Failed to allocate memory for async config update");
+        return ESP_ERR_NO_MEM;
+    }
+    memcpy(config_copy, config, sizeof(monitoring_config_t));
+
+    BaseType_t ret = xTaskCreate(apply_config_task, "mon_update", 4096, config_copy, 5, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create config update task");
+        free(config_copy);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Config update scheduled (async)");
     return ESP_OK;
 }
 
