@@ -246,11 +246,53 @@ esp_err_t snmp_start(const snmp_config_t *config)
         return ESP_OK;
     }
 
-    ESP_LOGW(TAG, "SNMP agent requested on port %d - Feature disabled (requires CONFIG_LWIP_SNMP=y)", config->port);
-    ESP_LOGW(TAG, "SNMP code available but not compiled. Enable via: pio run -t menuconfig -> Component config -> LWIP -> Enable SNMP");
-    return ESP_ERR_NOT_SUPPORTED;
+    ESP_LOGI(TAG, "Starting SNMP agent (community: %s, port: %d)",
+             config->community[0] ? config->community : "public", config->port);
+
+    // lwIP SNMP stores pointers - use static buffers so they persist
+    static char s_community[64];
+    static char s_location[128];
+    static char s_contact[128];
+    static const char s_sysdescr[] = "HB-RF-ETH-ng HomeMatic BidCoS/HmIP Gateway";
+    static u16_t s_sysdescr_len = sizeof(s_sysdescr) - 1;
+    static u16_t s_location_len;
+    static u16_t s_contact_len;
+
+    // Community string
+    strncpy(s_community, config->community[0] ? config->community : "public", sizeof(s_community) - 1);
+    s_community[sizeof(s_community) - 1] = '\0';
+    snmp_set_community(s_community);
+    snmp_set_community_write("private"); // restrict write access
+
+    // System description
+    snmp_mib2_set_sysdescr((const u8_t *)s_sysdescr, &s_sysdescr_len);
+
+    // Location (optional)
+    if (config->location[0]) {
+        strncpy(s_location, config->location, sizeof(s_location) - 1);
+        s_location[sizeof(s_location) - 1] = '\0';
+        s_location_len = (u16_t)strlen(s_location);
+        snmp_mib2_set_syslocation((const u8_t *)s_location, &s_location_len);
+    }
+
+    // Contact (optional)
+    if (config->contact[0]) {
+        strncpy(s_contact, config->contact, sizeof(s_contact) - 1);
+        s_contact[sizeof(s_contact) - 1] = '\0';
+        s_contact_len = (u16_t)strlen(s_contact);
+        snmp_mib2_set_syscontact((const u8_t *)s_contact, &s_contact_len);
+    }
+
+    // Register MIB2 and start agent (listens on UDP port 161)
+    static const struct snmp_mib *mibs[] = {&mib2};
+    snmp_set_mibs(mibs, LWIP_ARRAYSIZE(mibs));
+    snmp_init();
+
+    snmp_running = true;
+    ESP_LOGI(TAG, "SNMP agent started");
+    return ESP_OK;
 #else
-    ESP_LOGW(TAG, "SNMP not enabled in build configuration");
+    ESP_LOGW(TAG, "SNMP not compiled in (CONFIG_LWIP_SNMP not set)");
     return ESP_ERR_NOT_SUPPORTED;
 #endif
 }

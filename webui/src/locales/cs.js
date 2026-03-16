@@ -273,7 +273,8 @@ export default {
       topicPrefixHelp: 'Výchozí: hb-rf-eth - Témata budou jako prefix/status/...',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
-      haDiscoveryPrefixHelp: 'Výchozí: homeassistant'
+      haDiscoveryPrefixHelp: 'Výchozí: homeassistant',
+      serverRequired: 'Please enter an MQTT server address when MQTT is enabled.'
     },
     enable: 'Povolit',
     allowedHosts: 'Povolené hostitelé'

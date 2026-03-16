@@ -206,6 +206,12 @@ onMounted(async () => {
 })
 
 const saveConfig = async () => {
+  // Frontend validation
+  if (mqttConfig.value.enabled && !mqttConfig.value.server) {
+    showError.value = t('monitoring.mqtt.serverRequired')
+    return
+  }
+
   saving.value = true
   showSuccess.value = false
   showError.value = null
@@ -223,8 +229,8 @@ const saveConfig = async () => {
     showSuccess.value = true
     setTimeout(() => { showSuccess.value = false }, 3000)
   } catch (error) {
-    // Extract specific error message from backend response
-    const errorMsg = error.response?.data || error.response?.data?.error || t('monitoring.saveError')
+    // Extract specific error message from backend JSON response
+    const errorMsg = error.response?.data?.error || t('monitoring.saveError')
     showError.value = errorMsg
   } finally {
     saving.value = false

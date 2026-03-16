@@ -18,6 +18,16 @@ static const char *TAG = "MONITORING_API";
 // Helper function to validate authentication (extern from webui.cpp)
 extern esp_err_t validate_auth(httpd_req_t *req);
 
+static esp_err_t send_json_error(httpd_req_t *req, const char *message)
+{
+    char buf[256];
+    snprintf(buf, sizeof(buf), "{\"error\":\"%s\"}", message);
+    httpd_resp_set_status(req, "400 Bad Request");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, buf);
+    return ESP_OK;
+}
+
 // GET /api/monitoring - Get monitoring configuration
 esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 {
@@ -89,18 +99,23 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
-    char content[1024];
+    char content[4096];
     int ret = httpd_req_recv(req, content, sizeof(content) - 1);
     if (ret <= 0)
     {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"Invalid request\"}");
+        return ESP_FAIL;
     }
     content[ret] = '\0';
 
     cJSON *root = cJSON_Parse(content);
     if (root == NULL)
     {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"Invalid JSON\"}");
+        return ESP_OK;
     }
 
     // Load current config first to preserve fields not sent by frontend
@@ -126,7 +141,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 if (!validateSnmpCommunity(community->valuestring))
                 {
                     cJSON_Delete(root);
-                    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid SNMP community string");
+                    return send_json_error(req, "Invalid SNMP community string");
                 }
             }
             strncpy(config.snmp.community, community->valuestring, sizeof(config.snmp.community) - 1);
@@ -138,7 +153,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(location->valuestring, sizeof(config.snmp.location) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP location string too long");
+                return send_json_error(req, "SNMP location string too long");
             }
             strncpy(config.snmp.location, location->valuestring, sizeof(config.snmp.location) - 1);
         }
@@ -149,7 +164,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(contact->valuestring, sizeof(config.snmp.contact) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SNMP contact string too long");
+                return send_json_error(req, "SNMP contact string too long");
             }
             strncpy(config.snmp.contact, contact->valuestring, sizeof(config.snmp.contact) - 1);
         }
@@ -160,7 +175,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validatePort(port->valueint))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid SNMP port");
+                return send_json_error(req, "Invalid SNMP port");
             }
             config.snmp.port = port->valueint;
         }
@@ -182,7 +197,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validatePort(port->valueint))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid CheckMK port");
+                return send_json_error(req, "Invalid CheckMK port");
             }
             config.checkmk.port = port->valueint;
         }
@@ -193,7 +208,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "CheckMK allowed hosts string too long");
+                return send_json_error(req, "CheckMK allowed hosts string too long");
             }
             strncpy(config.checkmk.allowed_hosts, allowedHosts->valuestring, sizeof(config.checkmk.allowed_hosts) - 1);
         }
@@ -217,7 +232,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 if (!validateServerAddress(server->valuestring, sizeof(config.mqtt.server) - 1))
                 {
                     cJSON_Delete(root);
-                    return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid MQTT server address");
+                    return send_json_error(req, "MQTT server address is empty or invalid");
                 }
             }
             strncpy(config.mqtt.server, server->valuestring, sizeof(config.mqtt.server) - 1);
@@ -229,7 +244,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validatePort(port->valueint))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid MQTT port");
+                return send_json_error(req, "Invalid MQTT port");
             }
             config.mqtt.port = port->valueint;
         }
@@ -240,7 +255,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(user->valuestring, sizeof(config.mqtt.user) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT user string too long");
+                return send_json_error(req, "MQTT user string too long");
             }
             strncpy(config.mqtt.user, user->valuestring, sizeof(config.mqtt.user) - 1);
         }
@@ -251,7 +266,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(password->valuestring, sizeof(config.mqtt.password) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT password too long");
+                return send_json_error(req, "MQTT password too long");
             }
             // Only update password if provided
             strncpy(config.mqtt.password, password->valuestring, sizeof(config.mqtt.password) - 1);
@@ -263,7 +278,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT topic prefix too long");
+                return send_json_error(req, "MQTT topic prefix too long");
             }
             strncpy(config.mqtt.topic_prefix, topicPrefix->valuestring, sizeof(config.mqtt.topic_prefix) - 1);
         }
@@ -280,7 +295,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1))
             {
                 cJSON_Delete(root);
-                return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "MQTT HA discovery prefix too long");
+                return send_json_error(req, "MQTT HA discovery prefix too long");
             }
             strncpy(config.mqtt.ha_discovery_prefix, haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1);
         }
@@ -291,7 +306,10 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     // Update configuration
     if (monitoring_update_config(&config) != ESP_OK)
     {
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to update config");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"Failed to update config\"}");
+        return ESP_OK;
     }
 
     httpd_resp_set_type(req, "application/json");

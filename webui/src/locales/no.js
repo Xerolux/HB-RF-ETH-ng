@@ -273,7 +273,8 @@ export default {
       topicPrefixHelp: 'Standard: hb-rf-eth - Emner vil være som prefiks/status/...',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery-prefiks',
-      haDiscoveryPrefixHelp: 'Standard: homeassistant'
+      haDiscoveryPrefixHelp: 'Standard: homeassistant',
+      serverRequired: 'Please enter an MQTT server address when MQTT is enabled.'
     },
     enable: 'Aktiver',
     allowedHosts: 'Tillatte verter'

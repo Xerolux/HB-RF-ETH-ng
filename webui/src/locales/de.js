@@ -281,7 +281,8 @@ export default {
       topicPrefixHelp: 'Standard: hb-rf-eth - Topics lauten präfix/status/...',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Präfix',
-      haDiscoveryPrefixHelp: 'Standard: homeassistant'
+      haDiscoveryPrefixHelp: 'Standard: homeassistant',
+      serverRequired: 'Bitte einen MQTT-Server angeben, wenn MQTT aktiviert ist.'
     },
     enable: 'Aktivieren',
     allowedHosts: 'Erlaubte Hosts'

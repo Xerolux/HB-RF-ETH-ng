@@ -273,7 +273,8 @@ export default {
       topicPrefixHelp: 'Par défaut : hb-rf-eth - Les sujets seront comme prefix/status/...',
       haDiscoveryEnabled: 'Découverte Home Assistant',
       haDiscoveryPrefix: 'Préfixe de découverte',
-      haDiscoveryPrefixHelp: 'Par défaut : homeassistant'
+      haDiscoveryPrefixHelp: 'Par défaut : homeassistant',
+      serverRequired: 'Please enter an MQTT server address when MQTT is enabled.'
     },
     enable: 'Activer',
     allowedHosts: 'Hôtes autorisés'

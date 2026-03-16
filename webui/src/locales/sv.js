@@ -273,7 +273,8 @@ export default {
       topicPrefixHelp: 'Standard: hb-rf-eth - Ämnen kommer att vara som prefix/status/...',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
-      haDiscoveryPrefixHelp: 'Standard: homeassistant'
+      haDiscoveryPrefixHelp: 'Standard: homeassistant',
+      serverRequired: 'Please enter an MQTT server address when MQTT is enabled.'
     },
     enable: 'Aktivera',
     allowedHosts: 'Tillåtna Värdar'

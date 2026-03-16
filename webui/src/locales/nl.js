@@ -273,7 +273,8 @@ export default {
       topicPrefixHelp: 'Standaard: hb-rf-eth - Onderwerpen zullen zijn als prefix/status/...',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
-      haDiscoveryPrefixHelp: 'Standaard: homeassistant'
+      haDiscoveryPrefixHelp: 'Standaard: homeassistant',
+      serverRequired: 'Please enter an MQTT server address when MQTT is enabled.'
     },
     enable: 'Inschakelen',
     allowedHosts: 'Toegestane Hosts'
