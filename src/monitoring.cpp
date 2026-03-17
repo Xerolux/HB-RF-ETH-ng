@@ -329,7 +329,8 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
     memcpy(&current_config.checkmk, config, sizeof(checkmk_config_t));
 
     // Create CheckMK agent task - pass pointer to current_config
-    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 4096,
+    // 8192 bytes: large output buffer (2048) + sockaddr/IP string operations
+    BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 8192,
                                   (void *)&current_config.checkmk, 5, &checkmk_task_handle);
 
     if (ret != pdPASS) {
