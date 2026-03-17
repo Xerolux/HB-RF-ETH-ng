@@ -9,6 +9,7 @@
 #include "monitoring.h"
 #include "validation.h"
 #include "security_headers.h"
+#include "esp_err.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include <string.h>
@@ -305,7 +306,15 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     // Schedule the config update asynchronously so the HTTP handler returns immediately.
     // Stopping/restarting MQTT and CheckMK can take several seconds; doing it synchronously
     // would block the httpd task, stall the HTTP response, and risk a watchdog reset.
-    if (monitoring_schedule_update_config(&config) != ESP_OK)
+    esp_err_t schedule_err = monitoring_schedule_update_config(&config);
+    if (schedule_err == ESP_ERR_INVALID_STATE)
+    {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"Config update already in progress, please wait\"}");
+        return ESP_OK;
+    }
+    if (schedule_err != ESP_OK)
     {
         httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");

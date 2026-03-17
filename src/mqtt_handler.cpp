@@ -485,6 +485,11 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_cfg.broker.address.hostname = current_mqtt_config.server;
     mqtt_cfg.broker.address.port = current_mqtt_config.port;
     mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
+    // Limit TCP connect timeout so stop/restart completes quickly even when
+    // the broker is unreachable, and space out reconnect attempts to avoid
+    // hammering the network stack (which also causes CCU proxy slowdowns).
+    mqtt_cfg.network.timeout_ms = 5000;
+    mqtt_cfg.network.reconnect_timeout_ms = 30000;
 
     if (strlen(current_mqtt_config.user) > 0) {
         mqtt_cfg.credentials.username = current_mqtt_config.user;

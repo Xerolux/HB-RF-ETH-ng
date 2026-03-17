@@ -32,6 +32,7 @@ static const char *TAG = "MONITORING";
 static monitoring_config_t current_config = {};
 static bool snmp_running = false;
 static volatile bool checkmk_running = false;
+static volatile bool update_in_progress = false;
 static TaskHandle_t checkmk_task_handle = NULL;
 static int checkmk_listen_sock = -1;
 
@@ -601,12 +602,18 @@ static void apply_config_task(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(300));
     monitoring_update_config(config);
     free(config);
+    update_in_progress = false;
     vTaskDelete(NULL);
 }
 
 // Schedule configuration update asynchronously - returns immediately, update runs in background
 esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
 {
+    if (update_in_progress) {
+        ESP_LOGW(TAG, "Config update already in progress, ignoring duplicate request");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     monitoring_config_t *config_copy = (monitoring_config_t *)malloc(sizeof(monitoring_config_t));
     if (!config_copy) {
         ESP_LOGE(TAG, "Failed to allocate memory for async config update");
@@ -617,10 +624,12 @@ esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
     // 8192 bytes: NVS write + MQTT client init/stop/start + CheckMK socket
     // operations require significantly more than 4096 bytes of stack.
     // A stack overflow at 4096 corrupts the heap and makes the device unresponsive.
+    update_in_progress = true;
     BaseType_t ret = xTaskCreate(apply_config_task, "mon_update", 8192, config_copy, 5, NULL);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create config update task");
         free(config_copy);
+        update_in_progress = false;
         return ESP_FAIL;
     }
 
