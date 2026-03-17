@@ -1571,6 +1571,9 @@ void WebUI::start()
     config.lru_purge_enable = true;
     config.max_uri_handlers = 24;
     config.uri_match_fn = httpd_uri_match_wildcard;
+    // Increase stack: POST handlers allocate content buffers + config structs
+    // that together exceed the default 4096-byte stack, causing overflow/corruption.
+    config.stack_size = 8192;
 
     _httpd_handle = NULL;
 

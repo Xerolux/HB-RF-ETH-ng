@@ -99,10 +99,16 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
-    char content[4096];
-    int ret = httpd_req_recv(req, content, sizeof(content) - 1);
+    // Heap-allocate to keep stack usage within httpd task limits
+    char *content = (char *)malloc(4096);
+    if (!content)
+    {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    }
+    int ret = httpd_req_recv(req, content, 4095);
     if (ret <= 0)
     {
+        free(content);
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"error\":\"Invalid request\"}");
         return ESP_FAIL;
@@ -110,6 +116,7 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     content[ret] = '\0';
 
     cJSON *root = cJSON_Parse(content);
+    free(content);
     if (root == NULL)
     {
         httpd_resp_set_status(req, "400 Bad Request");
