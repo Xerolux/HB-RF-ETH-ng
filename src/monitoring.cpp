@@ -12,6 +12,7 @@
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "lwip/sockets.h"
 #include "esp_app_format.h"
 #include "esp_ota_ops.h"
@@ -19,6 +20,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <atomic>
 
 // SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
 #if CONFIG_LWIP_SNMP
@@ -31,11 +33,12 @@
 static const char *TAG = "MONITORING";
 
 static monitoring_config_t current_config = {};
+static SemaphoreHandle_t config_mutex = NULL;
 static bool snmp_running = false;
 static volatile bool checkmk_running = false;
-static volatile bool update_in_progress = false;
+static std::atomic<bool> update_in_progress{false};
 static volatile TaskHandle_t checkmk_task_handle = NULL;
-static int checkmk_listen_sock = -1;
+static volatile int checkmk_listen_sock = -1;
 
 // NVS keys
 #define NVS_NAMESPACE "monitoring"
@@ -334,9 +337,6 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
 
     checkmk_running = true;
 
-    // Copy config to current_config to avoid dangling pointer
-    memcpy(&current_config.checkmk, config, sizeof(checkmk_config_t));
-
     // Create CheckMK agent task - pass pointer to current_config
     // 8192 bytes: large output buffer (2048) + sockaddr/IP string operations
     // xTaskCreate requires a non-volatile TaskHandle_t*; assign to volatile global afterwards.
@@ -546,6 +546,12 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 
+    config_mutex = xSemaphoreCreateMutex();
+    if (config_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create config mutex");
+        return ESP_ERR_NO_MEM;
+    }
+
     g_sysInfo = sysInfo;
     g_updateCheck = updateCheck;
 
@@ -581,39 +587,35 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
 // Update configuration
 esp_err_t monitoring_update_config(const monitoring_config_t *config)
 {
-    // Only stop and restart services whose config actually changed.
-    // esp_mqtt_client_stop() can block for seconds; skipping it when MQTT
-    // settings are unchanged avoids unnecessary delays and keeps the device
-    // responsive (e.g. user changed only CheckMK settings while MQTT runs).
+    // Take a snapshot of the current config under mutex to determine what changed.
+    // Release the mutex before any blocking stop/start calls so GET requests
+    // are never blocked for more than a memcpy duration.
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
     bool snmp_changed    = (memcmp(&current_config.snmp,    &config->snmp,    sizeof(snmp_config_t))    != 0);
     bool checkmk_changed = (memcmp(&current_config.checkmk, &config->checkmk, sizeof(checkmk_config_t)) != 0);
     bool mqtt_changed    = (memcmp(&current_config.mqtt,    &config->mqtt,    sizeof(mqtt_config_t))    != 0);
+    bool snmp_was_enabled    = current_config.snmp.enabled;
+    bool checkmk_was_enabled = current_config.checkmk.enabled;
+    bool mqtt_was_enabled    = current_config.mqtt.enabled;
+    xSemaphoreGive(config_mutex);
 
-    // Stop only what needs to change
-    if (snmp_changed && current_config.snmp.enabled) {
-        snmp_stop();
-    }
-    if (checkmk_changed && current_config.checkmk.enabled) {
-        checkmk_stop();
-    }
-    if (mqtt_changed && current_config.mqtt.enabled) {
-        mqtt_handler_stop();
-    }
+    // Stop only what needs to change (these calls can block; no mutex held)
+    if (snmp_changed && snmp_was_enabled)    snmp_stop();
+    if (checkmk_changed && checkmk_was_enabled) checkmk_stop();
+    if (mqtt_changed && mqtt_was_enabled)    mqtt_handler_stop();
 
-    // Update config and persist
+    // Commit the new config under mutex so concurrent GET requests see a
+    // consistent snapshot (no partial memcpy visible)
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
     memcpy(&current_config, config, sizeof(monitoring_config_t));
+    xSemaphoreGive(config_mutex);
+
     save_config_to_nvs(&current_config);
 
     // Restart only what changed and is now enabled
-    if (snmp_changed && current_config.snmp.enabled) {
-        snmp_start(&current_config.snmp);
-    }
-    if (checkmk_changed && current_config.checkmk.enabled) {
-        checkmk_start(&current_config.checkmk);
-    }
-    if (mqtt_changed && current_config.mqtt.enabled) {
-        mqtt_handler_start(&current_config.mqtt);
-    }
+    if (snmp_changed && current_config.snmp.enabled)    snmp_start(&current_config.snmp);
+    if (checkmk_changed && current_config.checkmk.enabled) checkmk_start(&current_config.checkmk);
+    if (mqtt_changed && current_config.mqtt.enabled)    mqtt_handler_start(&current_config.mqtt);
 
     return ESP_OK;
 }
@@ -627,14 +629,18 @@ static void apply_config_task(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(300));
     monitoring_update_config(config);
     free(config);
-    update_in_progress = false;
+    update_in_progress.store(false);
     vTaskDelete(NULL);
 }
 
 // Schedule configuration update asynchronously - returns immediately, update runs in background
 esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
 {
-    if (update_in_progress) {
+    // Atomic compare-and-swap gate: only one update task at a time.
+    // compare_exchange_strong guarantees no race between the check and the set,
+    // even on dual-core ESP32 where volatile alone is insufficient.
+    bool expected = false;
+    if (!update_in_progress.compare_exchange_strong(expected, true)) {
         ESP_LOGW(TAG, "Config update already in progress, ignoring duplicate request");
         return ESP_ERR_INVALID_STATE;
     }
@@ -642,22 +648,20 @@ esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
     monitoring_config_t *config_copy = (monitoring_config_t *)malloc(sizeof(monitoring_config_t));
     if (!config_copy) {
         ESP_LOGE(TAG, "Failed to allocate memory for async config update");
+        update_in_progress.store(false);
         return ESP_ERR_NO_MEM;
     }
     memcpy(config_copy, config, sizeof(monitoring_config_t));
 
     // 8192 bytes: NVS write + MQTT client init/stop/start + CheckMK socket
     // operations require significantly more than 4096 bytes of stack.
-    // A stack overflow at 4096 corrupts the heap and makes the device unresponsive.
     // Priority 3 (below httpd=5): ensures the httpd task can still serve HTTP
-    // requests while the config update is in progress, keeping the UI responsive
-    // even when esp_mqtt_client_stop() blocks for a few seconds.
-    update_in_progress = true;
+    // requests while the config update is in progress.
     BaseType_t ret = xTaskCreate(apply_config_task, "mon_update", 8192, config_copy, 3, NULL);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create config update task");
         free(config_copy);
-        update_in_progress = false;
+        update_in_progress.store(false);
         return ESP_FAIL;
     }
 
@@ -672,6 +676,8 @@ esp_err_t monitoring_get_config(monitoring_config_t *config)
         return ESP_ERR_INVALID_ARG;
     }
 
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
     memcpy(config, &current_config, sizeof(monitoring_config_t));
+    xSemaphoreGive(config_mutex);
     return ESP_OK;
 }

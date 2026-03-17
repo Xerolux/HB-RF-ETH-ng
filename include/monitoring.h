@@ -70,8 +70,4 @@ esp_err_t snmp_stop(void);
 esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);
 
-// MQTT functions
-esp_err_t mqtt_start(const mqtt_config_t *config);
-esp_err_t mqtt_stop(void);
-
 #endif // MONITORING_H
