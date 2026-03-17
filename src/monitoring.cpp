@@ -581,29 +581,37 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
 // Update configuration
 esp_err_t monitoring_update_config(const monitoring_config_t *config)
 {
-    // Stop current services
-    if (current_config.snmp.enabled) {
+    // Only stop and restart services whose config actually changed.
+    // esp_mqtt_client_stop() can block for seconds; skipping it when MQTT
+    // settings are unchanged avoids unnecessary delays and keeps the device
+    // responsive (e.g. user changed only CheckMK settings while MQTT runs).
+    bool snmp_changed    = (memcmp(&current_config.snmp,    &config->snmp,    sizeof(snmp_config_t))    != 0);
+    bool checkmk_changed = (memcmp(&current_config.checkmk, &config->checkmk, sizeof(checkmk_config_t)) != 0);
+    bool mqtt_changed    = (memcmp(&current_config.mqtt,    &config->mqtt,    sizeof(mqtt_config_t))    != 0);
+
+    // Stop only what needs to change
+    if (snmp_changed && current_config.snmp.enabled) {
         snmp_stop();
     }
-    if (current_config.checkmk.enabled) {
+    if (checkmk_changed && current_config.checkmk.enabled) {
         checkmk_stop();
     }
-    if (current_config.mqtt.enabled) {
+    if (mqtt_changed && current_config.mqtt.enabled) {
         mqtt_handler_stop();
     }
 
-    // Update config
+    // Update config and persist
     memcpy(&current_config, config, sizeof(monitoring_config_t));
     save_config_to_nvs(&current_config);
 
-    // Restart services with new config
-    if (current_config.snmp.enabled) {
+    // Restart only what changed and is now enabled
+    if (snmp_changed && current_config.snmp.enabled) {
         snmp_start(&current_config.snmp);
     }
-    if (current_config.checkmk.enabled) {
+    if (checkmk_changed && current_config.checkmk.enabled) {
         checkmk_start(&current_config.checkmk);
     }
-    if (current_config.mqtt.enabled) {
+    if (mqtt_changed && current_config.mqtt.enabled) {
         mqtt_handler_start(&current_config.mqtt);
     }
 
@@ -641,8 +649,11 @@ esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config)
     // 8192 bytes: NVS write + MQTT client init/stop/start + CheckMK socket
     // operations require significantly more than 4096 bytes of stack.
     // A stack overflow at 4096 corrupts the heap and makes the device unresponsive.
+    // Priority 3 (below httpd=5): ensures the httpd task can still serve HTTP
+    // requests while the config update is in progress, keeping the UI responsive
+    // even when esp_mqtt_client_stop() blocks for a few seconds.
     update_in_progress = true;
-    BaseType_t ret = xTaskCreate(apply_config_task, "mon_update", 8192, config_copy, 5, NULL);
+    BaseType_t ret = xTaskCreate(apply_config_task, "mon_update", 8192, config_copy, 3, NULL);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create config update task");
         free(config_copy);

@@ -492,7 +492,7 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     // Limit TCP connect timeout so stop/restart completes quickly even when
     // the broker is unreachable, and space out reconnect attempts to avoid
     // hammering the network stack (which also causes CCU proxy slowdowns).
-    mqtt_cfg.network.timeout_ms = 5000;
+    mqtt_cfg.network.timeout_ms = 2000;
     mqtt_cfg.network.reconnect_timeout_ms = 30000;
 
     if (strlen(current_mqtt_config.user) > 0) {
