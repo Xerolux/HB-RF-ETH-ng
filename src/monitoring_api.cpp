@@ -13,7 +13,6 @@
 #include "cJSON.h"
 #include <string.h>
 
-static const char *TAG = "MONITORING_API";
 
 // Helper function to validate authentication (extern from webui.cpp)
 extern esp_err_t validate_auth(httpd_req_t *req);

@@ -59,7 +59,7 @@ static void i2c_master_init()
         .scl_io_num = HM_SCL_PIN,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
+        .flags = { .enable_internal_pullup = true }
     };
 
     esp_err_t ret = i2c_new_master_bus(&bus_config, &i2c_bus);

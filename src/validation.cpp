@@ -160,7 +160,6 @@ bool validateDcfOffset(int offset)
 // Helper function to check if a string is a valid IPv4 address
 static bool isValidIPv4(const char *str, size_t len)
 {
-    int octets[4];
     int octetIndex = 0;
     int currentNum = -1;
 
@@ -184,7 +183,7 @@ static bool isValidIPv4(const char *str, size_t len)
             {
                 return false;
             }
-            octets[octetIndex++] = currentNum;
+            octetIndex++;
             currentNum = -1;
 
             if (c == '\0') break;
