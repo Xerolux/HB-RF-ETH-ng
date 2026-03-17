@@ -22,7 +22,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         entryFileNames: 'main.js',
         assetFileNames: (assetInfo) => {
@@ -34,7 +34,7 @@ export default defineConfig({
         // IMPORTANT: Bundle everything into a single JS file. The ESP32 HTTP server
         // only serves specific embedded files (main.js, main.css, index.html, favicon.ico).
         // Any additional chunk files would not be served and break the UI.
-        inlineDynamicImports: true
+        codeSplitting: false
       }
     },
     cssCodeSplit: false,
