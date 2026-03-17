@@ -5,7 +5,6 @@
 **Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 5.x**
 
 [![GitHub Release][releases-shield]][releases]
-[![Downloads][downloads-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE.md)
 
