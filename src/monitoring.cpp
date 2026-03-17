@@ -2,7 +2,7 @@
  *  monitoring.cpp is part of the HB-RF-ETH firmware v2.0
  *
  *  Copyright 2025 Xerolux
- *  SNMP and CheckMK monitoring support
+ *  CheckMK and MQTT monitoring support
  */
 
 #include "monitoring.h"
@@ -22,19 +22,10 @@
 #include <errno.h>
 #include <atomic>
 
-// SNMP support (optional, requires CONFIG_LWIP_SNMP=y)
-#if CONFIG_LWIP_SNMP
-#include "lwip/apps/snmp.h"
-#include "lwip/apps/snmp_mib2.h"
-#include "lwip/apps/snmp_snmpv2_framework.h"
-#include "lwip/apps/snmp_snmpv2_usm.h"
-#endif
-
 static const char *TAG = "MONITORING";
 
 static monitoring_config_t current_config = {};
 static SemaphoreHandle_t config_mutex = NULL;
-static bool snmp_running = false;
 static volatile bool checkmk_running = false;
 static std::atomic<bool> update_in_progress{false};
 static volatile TaskHandle_t checkmk_task_handle = NULL;
@@ -42,11 +33,6 @@ static volatile int checkmk_listen_sock = -1;
 
 // NVS keys
 #define NVS_NAMESPACE "monitoring"
-#define NVS_SNMP_ENABLED "snmp_en"
-#define NVS_SNMP_COMMUNITY "snmp_comm"
-#define NVS_SNMP_LOCATION "snmp_loc"
-#define NVS_SNMP_CONTACT "snmp_cont"
-#define NVS_SNMP_PORT "snmp_port"
 #define NVS_CHECKMK_ENABLED "cmk_en"
 #define NVS_CHECKMK_PORT "cmk_port"
 #define NVS_CHECKMK_HOSTS "cmk_hosts"
@@ -246,83 +232,6 @@ static void checkmk_agent_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-// SNMP Functions
-esp_err_t snmp_start(const snmp_config_t *config)
-{
-#if CONFIG_LWIP_SNMP
-    if (snmp_running) {
-        ESP_LOGW(TAG, "SNMP already running");
-        return ESP_OK;
-    }
-
-    if (!config->enabled) {
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "Starting SNMP agent (community: %s, port: %d)",
-             config->community[0] ? config->community : "public", config->port);
-
-    // lwIP SNMP stores pointers - use static buffers so they persist
-    static char s_community[64];
-    static char s_location[128];
-    static char s_contact[128];
-    static const char s_sysdescr[] = "HB-RF-ETH-ng HomeMatic BidCoS/HmIP Gateway";
-    static u16_t s_sysdescr_len = sizeof(s_sysdescr) - 1;
-    static u16_t s_location_len;
-    static u16_t s_contact_len;
-
-    // Community string
-    strncpy(s_community, config->community[0] ? config->community : "public", sizeof(s_community) - 1);
-    s_community[sizeof(s_community) - 1] = '\0';
-    snmp_set_community(s_community);
-    snmp_set_community_write("private"); // restrict write access
-
-    // System description
-    snmp_mib2_set_sysdescr((const u8_t *)s_sysdescr, &s_sysdescr_len);
-
-    // Location (optional)
-    if (config->location[0]) {
-        strncpy(s_location, config->location, sizeof(s_location) - 1);
-        s_location[sizeof(s_location) - 1] = '\0';
-        s_location_len = (u16_t)strlen(s_location);
-        snmp_mib2_set_syslocation((const u8_t *)s_location, &s_location_len);
-    }
-
-    // Contact (optional)
-    if (config->contact[0]) {
-        strncpy(s_contact, config->contact, sizeof(s_contact) - 1);
-        s_contact[sizeof(s_contact) - 1] = '\0';
-        s_contact_len = (u16_t)strlen(s_contact);
-        snmp_mib2_set_syscontact((const u8_t *)s_contact, &s_contact_len);
-    }
-
-    // Register MIB2 and start agent (listens on UDP port 161)
-    static const struct snmp_mib *mibs[] = {&mib2};
-    snmp_set_mibs(mibs, LWIP_ARRAYSIZE(mibs));
-    snmp_init();
-
-    snmp_running = true;
-    ESP_LOGI(TAG, "SNMP agent started");
-    return ESP_OK;
-#else
-    ESP_LOGW(TAG, "SNMP not compiled in (CONFIG_LWIP_SNMP not set)");
-    return ESP_ERR_NOT_SUPPORTED;
-#endif
-}
-
-esp_err_t snmp_stop(void)
-{
-    if (!snmp_running) {
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "Stopping SNMP agent");
-    // Note: lwIP SNMP doesn't have a clean shutdown function
-    snmp_running = false;
-
-    return ESP_OK;
-}
-
 // CheckMK Functions
 esp_err_t checkmk_start(const checkmk_config_t *config)
 {
@@ -400,13 +309,6 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
         return err;
     }
 
-    // Save SNMP config
-    nvs_set_u8(nvs_handle, NVS_SNMP_ENABLED, config->snmp.enabled);
-    nvs_set_str(nvs_handle, NVS_SNMP_COMMUNITY, config->snmp.community);
-    nvs_set_str(nvs_handle, NVS_SNMP_LOCATION, config->snmp.location);
-    nvs_set_str(nvs_handle, NVS_SNMP_CONTACT, config->snmp.contact);
-    nvs_set_u16(nvs_handle, NVS_SNMP_PORT, config->snmp.port);
-
     // Save CheckMK config
     nvs_set_u8(nvs_handle, NVS_CHECKMK_ENABLED, config->checkmk.enabled);
     nvs_set_u16(nvs_handle, NVS_CHECKMK_PORT, config->checkmk.port);
@@ -436,13 +338,6 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
         // Set defaults
-        config->snmp.enabled = false;
-        strncpy(config->snmp.community, "public", sizeof(config->snmp.community) - 1);
-        config->snmp.community[sizeof(config->snmp.community) - 1] = '\0';
-        config->snmp.location[0] = '\0';
-        config->snmp.contact[0] = '\0';
-        config->snmp.port = 161;
-
         config->checkmk.enabled = false;
         config->checkmk.port = 6556;
         strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
@@ -459,29 +354,10 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         return ESP_OK;
     }
 
-    // Load SNMP config
+    // Load CheckMK config
     uint8_t u8_val;
     uint16_t u16_val;
     size_t str_len;
-
-    if (nvs_get_u8(nvs_handle, NVS_SNMP_ENABLED, &u8_val) == ESP_OK) {
-        config->snmp.enabled = u8_val;
-    }
-
-    str_len = sizeof(config->snmp.community);
-    nvs_get_str(nvs_handle, NVS_SNMP_COMMUNITY, config->snmp.community, &str_len);
-
-    str_len = sizeof(config->snmp.location);
-    nvs_get_str(nvs_handle, NVS_SNMP_LOCATION, config->snmp.location, &str_len);
-
-    str_len = sizeof(config->snmp.contact);
-    nvs_get_str(nvs_handle, NVS_SNMP_CONTACT, config->snmp.contact, &str_len);
-
-    if (nvs_get_u16(nvs_handle, NVS_SNMP_PORT, &u16_val) == ESP_OK) {
-        config->snmp.port = u16_val;
-    }
-
-    // Load CheckMK config
     if (nvs_get_u8(nvs_handle, NVS_CHECKMK_ENABLED, &u8_val) == ESP_OK) {
         config->checkmk.enabled = u8_val;
     }
@@ -566,11 +442,6 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         save_config_to_nvs(&current_config);
     }
 
-    // Start SNMP if enabled
-    if (current_config.snmp.enabled) {
-        snmp_start(&current_config.snmp);
-    }
-
     // Start CheckMK if enabled
     if (current_config.checkmk.enabled) {
         checkmk_start(&current_config.checkmk);
@@ -591,16 +462,13 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     // Release the mutex before any blocking stop/start calls so GET requests
     // are never blocked for more than a memcpy duration.
     xSemaphoreTake(config_mutex, portMAX_DELAY);
-    bool snmp_changed    = (memcmp(&current_config.snmp,    &config->snmp,    sizeof(snmp_config_t))    != 0);
     bool checkmk_changed = (memcmp(&current_config.checkmk, &config->checkmk, sizeof(checkmk_config_t)) != 0);
     bool mqtt_changed    = (memcmp(&current_config.mqtt,    &config->mqtt,    sizeof(mqtt_config_t))    != 0);
-    bool snmp_was_enabled    = current_config.snmp.enabled;
     bool checkmk_was_enabled = current_config.checkmk.enabled;
     bool mqtt_was_enabled    = current_config.mqtt.enabled;
     xSemaphoreGive(config_mutex);
 
     // Stop only what needs to change (these calls can block; no mutex held)
-    if (snmp_changed && snmp_was_enabled)    snmp_stop();
     if (checkmk_changed && checkmk_was_enabled) checkmk_stop();
     if (mqtt_changed && mqtt_was_enabled)    mqtt_handler_stop();
 
@@ -613,7 +481,6 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     save_config_to_nvs(&current_config);
 
     // Restart only what changed and is now enabled
-    if (snmp_changed && current_config.snmp.enabled)    snmp_start(&current_config.snmp);
     if (checkmk_changed && current_config.checkmk.enabled) checkmk_start(&current_config.checkmk);
     if (mqtt_changed && current_config.mqtt.enabled)    mqtt_handler_start(&current_config.mqtt);
 

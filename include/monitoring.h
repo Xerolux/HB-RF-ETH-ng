@@ -2,7 +2,7 @@
  *  monitoring.h is part of the HB-RF-ETH firmware v2.0
  *
  *  Copyright 2025 Xerolux
- *  SNMP and CheckMK monitoring support
+ *  CheckMK and MQTT monitoring support
  */
 
 #ifndef MONITORING_H
@@ -14,15 +14,6 @@
 // Forward declarations
 class SysInfo;
 class UpdateCheck;
-
-// SNMP Configuration
-typedef struct {
-    bool enabled;
-    char community[64];
-    char location[128];
-    char contact[128];
-    uint16_t port;  // default 161
-} snmp_config_t;
 
 // CheckMK Agent Configuration
 typedef struct {
@@ -45,7 +36,6 @@ typedef struct {
 
 // Monitoring configuration
 typedef struct {
-    snmp_config_t snmp;
     checkmk_config_t checkmk;
     mqtt_config_t mqtt;
 } monitoring_config_t;
@@ -61,10 +51,6 @@ esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config);
 
 // Get current configuration
 esp_err_t monitoring_get_config(monitoring_config_t *config);
-
-// SNMP functions
-esp_err_t snmp_start(const snmp_config_t *config);
-esp_err_t snmp_stop(void);
 
 // CheckMK Agent functions
 esp_err_t checkmk_start(const checkmk_config_t *config);

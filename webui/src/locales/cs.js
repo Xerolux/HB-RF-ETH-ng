@@ -233,23 +233,11 @@ export default {
   // Monitoring
   monitoring: {
     title: 'Monitorování',
-    description: 'Nakonfigurujte monitorování SNMP a CheckMK pro bránu HB-RF-ETH.',
+    description: 'Nakonfigurujte monitorování CheckMK a MQTT pro bránu HB-RF-ETH.',
     save: 'Uložit',
     saving: 'Ukládání...',
     saveSuccess: 'Konfigurace úspěšně uložena!',
     saveError: 'Chyba při ukládání konfigurace!',
-    snmp: {
-      title: 'SNMP Agent',
-      enabled: 'Povolit SNMP',
-      port: 'Port',
-      portHelp: 'Výchozí: 161',
-      community: 'Community String',
-      communityHelp: 'Výchozí: "public" - Prosím změňte pro produkci!',
-      location: 'Umístění',
-      locationHelp: 'Volitelné: např. "Serverovna, Budova A"',
-      contact: 'Kontakt',
-      contactHelp: 'Volitelné: např. "admin@priklad.cz"'
-    },
     checkmk: {
       title: 'CheckMK Agent',
       enabled: 'Povolit CheckMK',

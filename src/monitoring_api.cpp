@@ -46,15 +46,6 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 
     cJSON *root = cJSON_CreateObject();
 
-    // SNMP config
-    cJSON *snmp = cJSON_CreateObject();
-    cJSON_AddBoolToObject(snmp, "enabled", config.snmp.enabled);
-    cJSON_AddStringToObject(snmp, "community", config.snmp.community);
-    cJSON_AddStringToObject(snmp, "location", config.snmp.location);
-    cJSON_AddStringToObject(snmp, "contact", config.snmp.contact);
-    cJSON_AddNumberToObject(snmp, "port", config.snmp.port);
-    cJSON_AddItemToObject(root, "snmp", snmp);
-
     // MQTT config
     cJSON *mqtt = cJSON_CreateObject();
     cJSON_AddBoolToObject(mqtt, "enabled", config.mqtt.enabled);
@@ -129,64 +120,6 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     // (e.g., MQTT password is never sent back for security reasons)
     monitoring_config_t config = {};
     monitoring_get_config(&config);
-
-    // Parse SNMP config
-    cJSON *snmp = cJSON_GetObjectItem(root, "snmp");
-    if (snmp != NULL)
-    {
-        cJSON *enabled = cJSON_GetObjectItem(snmp, "enabled");
-        if (enabled != NULL && cJSON_IsBool(enabled))
-        {
-            config.snmp.enabled = cJSON_IsTrue(enabled);
-        }
-
-        cJSON *community = cJSON_GetObjectItem(snmp, "community");
-        if (community != NULL && cJSON_IsString(community))
-        {
-            if (config.snmp.enabled || strlen(community->valuestring) > 0)
-            {
-                if (!validateSnmpCommunity(community->valuestring))
-                {
-                    cJSON_Delete(root);
-                    return send_json_error(req, "Invalid SNMP community string");
-                }
-            }
-            strncpy(config.snmp.community, community->valuestring, sizeof(config.snmp.community) - 1);
-        }
-
-        cJSON *location = cJSON_GetObjectItem(snmp, "location");
-        if (location != NULL && cJSON_IsString(location))
-        {
-            if (!validateStringLength(location->valuestring, sizeof(config.snmp.location) - 1))
-            {
-                cJSON_Delete(root);
-                return send_json_error(req, "SNMP location string too long");
-            }
-            strncpy(config.snmp.location, location->valuestring, sizeof(config.snmp.location) - 1);
-        }
-
-        cJSON *contact = cJSON_GetObjectItem(snmp, "contact");
-        if (contact != NULL && cJSON_IsString(contact))
-        {
-            if (!validateStringLength(contact->valuestring, sizeof(config.snmp.contact) - 1))
-            {
-                cJSON_Delete(root);
-                return send_json_error(req, "SNMP contact string too long");
-            }
-            strncpy(config.snmp.contact, contact->valuestring, sizeof(config.snmp.contact) - 1);
-        }
-
-        cJSON *port = cJSON_GetObjectItem(snmp, "port");
-        if (port != NULL && cJSON_IsNumber(port))
-        {
-            if (!validatePort(port->valueint))
-            {
-                cJSON_Delete(root);
-                return send_json_error(req, "Invalid SNMP port");
-            }
-            config.snmp.port = port->valueint;
-        }
-    }
 
     // Parse CheckMK config
     cJSON *checkmk = cJSON_GetObjectItem(root, "checkmk");

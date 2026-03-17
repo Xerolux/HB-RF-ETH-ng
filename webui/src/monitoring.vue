@@ -5,46 +5,6 @@
       <p class="text-secondary">{{ t('monitoring.description') }}</p>
     </div>
 
-    <!-- SNMP Configuration -->
-    <div class="settings-card">
-      <div class="card-header">
-        <div class="header-content">
-          <div class="header-icon bg-info-light text-info">📡</div>
-          <h3>{{ t('monitoring.snmp.title') }}</h3>
-        </div>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" v-model="snmpConfig.enabled">
-        </div>
-      </div>
-
-      <Transition name="expand">
-        <div v-if="snmpConfig.enabled" class="card-body">
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">{{ t('monitoring.snmp.port') }}</label>
-              <BFormInput v-model.number="snmpConfig.port" type="number" min="1" max="65535" />
-              <div class="form-text">{{ t('monitoring.snmp.portHelp') }}</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">{{ t('monitoring.snmp.community') }}</label>
-              <BFormInput v-model="snmpConfig.community" />
-              <div class="form-text">{{ t('monitoring.snmp.communityHelp') }}</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">{{ t('monitoring.snmp.location') }}</label>
-              <BFormInput v-model="snmpConfig.location" />
-              <div class="form-text">{{ t('monitoring.snmp.locationHelp') }}</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">{{ t('monitoring.snmp.contact') }}</label>
-              <BFormInput v-model="snmpConfig.contact" />
-              <div class="form-text">{{ t('monitoring.snmp.contactHelp') }}</div>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </div>
-
     <!-- CheckMK Configuration -->
     <div class="settings-card">
       <div class="card-header">
@@ -191,7 +151,7 @@ const monitoringStore = useMonitoringStore()
 // No, storeToRefs keeps them reactive. We modify store state directly.
 // Ideally we should clone them to local state and only save on button press,
 // but Pinia state is mutable. Let's keep it simple as per original implementation.
-const { snmp: snmpConfig, checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
+const { checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
 
 const showSuccess = ref(false)
 const showError = ref(null)  // Can be null or a string with error message
@@ -221,7 +181,6 @@ const saveConfig = async () => {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     await monitoringStore.save({
-      snmp: snmpConfig.value,
       checkmk: checkmkConfig.value,
       mqtt: mqttConfig.value
     })

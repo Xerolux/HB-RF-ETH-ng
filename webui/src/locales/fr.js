@@ -233,23 +233,11 @@ export default {
   // Monitoring
   monitoring: {
     title: 'Surveillance',
-    description: 'Configurer la surveillance SNMP et CheckMK pour la passerelle HB-RF-ETH.',
+    description: 'Configurer la surveillance CheckMK et MQTT pour la passerelle HB-RF-ETH.',
     save: 'Enregistrer',
     saving: 'Enregistrement...',
     saveSuccess: 'Configuration enregistrée avec succès !',
     saveError: 'Erreur lors de l\'enregistrement de la configuration !',
-    snmp: {
-      title: 'Agent SNMP',
-      enabled: 'Activer SNMP',
-      port: 'Port',
-      portHelp: 'Par défaut : 161',
-      community: 'Chaîne de communauté',
-      communityHelp: 'Par défaut : "public" - Veuillez changer pour la production !',
-      location: 'Emplacement',
-      locationHelp: 'Optionnel : par ex. "Salle serveur, Bâtiment A"',
-      contact: 'Contact',
-      contactHelp: 'Optionnel : par ex. "admin@example.com"'
-    },
     checkmk: {
       title: 'Agent CheckMK',
       enabled: 'Activer CheckMK',

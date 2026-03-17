@@ -233,23 +233,11 @@ export default {
   // Monitoring
   monitoring: {
     title: 'Monitoring',
-    description: 'Skonfiguruj monitoring SNMP i CheckMK dla bramki HB-RF-ETH.',
+    description: 'Skonfiguruj monitoring CheckMK i MQTT dla bramki HB-RF-ETH.',
     save: 'Zapisz',
     saving: 'Zapisywanie...',
     saveSuccess: 'Konfiguracja zapisana pomyślnie!',
     saveError: 'Błąd zapisywania konfiguracji!',
-    snmp: {
-      title: 'Agent SNMP',
-      enabled: 'Włącz SNMP',
-      port: 'Port',
-      portHelp: 'Domyślnie: 161',
-      community: 'Community String',
-      communityHelp: 'Domyślnie: "public" - Proszę zmienić w produkcji!',
-      location: 'Lokalizacja',
-      locationHelp: 'Opcjonalnie: np. "Serwerownia, Budynek A"',
-      contact: 'Kontakt',
-      contactHelp: 'Opcjonalnie: np. "admin@przyklad.com"'
-    },
     checkmk: {
       title: 'Agent CheckMK',
       enabled: 'Włącz CheckMK',

@@ -265,13 +265,6 @@ export const useUpdateStore = defineStore('update', {
 
 export const useMonitoringStore = defineStore('monitoring', {
   state: () => ({
-    snmp: {
-      enabled: false,
-      port: 161,
-      community: 'public',
-      location: '',
-      contact: ''
-    },
     checkmk: {
       enabled: false,
       port: 6556,

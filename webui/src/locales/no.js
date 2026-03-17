@@ -233,23 +233,11 @@ export default {
   // Monitoring
   monitoring: {
     title: 'Overvåking',
-    description: 'Konfigurer SNMP- og CheckMK-overvåking for HB-RF-ETH-gatewayen.',
+    description: 'Konfigurer CheckMK og MQTT-overvåking for HB-RF-ETH-gatewayen.',
     save: 'Lagre',
     saving: 'Lagrer...',
     saveSuccess: 'Konfigurasjon lagret!',
     saveError: 'Feil ved lagring av konfigurasjon!',
-    snmp: {
-      title: 'SNMP-agent',
-      enabled: 'Aktiver SNMP',
-      port: 'Port',
-      portHelp: 'Standard: 161',
-      community: 'Community String',
-      communityHelp: 'Standard: "public" - Vennligst endre for produksjon!',
-      location: 'Plassering',
-      locationHelp: 'Valgfritt: f.eks. "Serverrom, Bygg A"',
-      contact: 'Kontakt',
-      contactHelp: 'Valgfritt: f.eks. "admin@eksempel.no"'
-    },
     checkmk: {
       title: 'CheckMK-agent',
       enabled: 'Aktiver CheckMK',

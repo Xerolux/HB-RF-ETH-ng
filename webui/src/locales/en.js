@@ -241,23 +241,11 @@ export default {
   // Monitoring
   monitoring: {
     title: 'Monitoring',
-    description: 'Configure SNMP and CheckMK monitoring for the HB-RF-ETH gateway.',
+    description: 'Configure CheckMK and MQTT monitoring for the HB-RF-ETH gateway.',
     save: 'Save',
     saving: 'Saving...',
     saveSuccess: 'Configuration saved successfully!',
     saveError: 'Error saving configuration!',
-    snmp: {
-      title: 'SNMP Agent',
-      enabled: 'Enable SNMP',
-      port: 'Port',
-      portHelp: 'Default: 161',
-      community: 'Community String',
-      communityHelp: 'Default: "public" - Please change for production!',
-      location: 'Location',
-      locationHelp: 'Optional: e.g. "Server room, Building A"',
-      contact: 'Contact',
-      contactHelp: 'Optional: e.g. "admin@example.com"'
-    },
     checkmk: {
       title: 'CheckMK Agent',
       enabled: 'Enable CheckMK',

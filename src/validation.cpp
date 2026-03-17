@@ -427,48 +427,6 @@ bool validateNtpServer(const char *ntpServer)
     return validateServerAddress(ntpServer, MAX_NTP_SERVER_LENGTH);
 }
 
-bool validateSnmpCommunity(const char *community)
-{
-    if (community == NULL || community[0] == '\0')
-    {
-        ESP_LOGW(TAG, "SNMP community string is NULL or empty");
-        return false;
-    }
-
-    size_t len = strlen(community);
-    if (len > MAX_SNMP_COMMUNITY_LENGTH)
-    {
-        ESP_LOGW(TAG, "SNMP community string too long: %zu (max %d)", len, MAX_SNMP_COMMUNITY_LENGTH);
-        return false;
-    }
-
-    // SNMP community strings should only contain:
-    // - Alphanumeric characters (a-z, A-Z, 0-9)
-    // - Hyphens (-)
-    // - Underscores (_)
-    // No spaces, special characters, or control characters for security
-    for (size_t i = 0; i < len; i++)
-    {
-        char c = community[i];
-        if (!isalnum(c) && c != '-' && c != '_')
-        {
-            ESP_LOGW(TAG, "Invalid character in SNMP community string: '%c' (only alphanumeric, hyphen, underscore allowed)", c);
-            return false;
-        }
-    }
-
-    // Community string should not start or end with hyphen or underscore
-    // (best practice for readability and consistency)
-    if (community[0] == '-' || community[0] == '_' ||
-        community[len - 1] == '-' || community[len - 1] == '_')
-    {
-        ESP_LOGW(TAG, "SNMP community string should not start or end with hyphen or underscore");
-        return false;
-    }
-
-    return true;
-}
-
 bool validateCcuAddress(const char *address)
 {
     if (address == NULL || address[0] == '\0')
