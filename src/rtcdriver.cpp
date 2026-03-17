@@ -25,8 +25,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include "freertos/FreeRTOS.h"
-#include "driver/i2c.h"
-#include "driver/gpio.h"
+#include "driver/i2c_master.h"
 #include "esp_log.h"
 
 // Forward declare GPIO pins from pins.h to avoid circular includes
@@ -47,27 +46,29 @@ static uint8_t bin2bcd(uint8_t val)
 
 const uint8_t daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-static bool _isDriverInstalled = false;
+static i2c_master_bus_handle_t i2c_bus = NULL;
 
 static void i2c_master_init()
 {
-    if (_isDriverInstalled)
+    if (i2c_bus != NULL)
         return;
 
-    i2c_config_t i2c_config = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = HM_SDA_PIN,
-        .scl_io_num = HM_SCL_PIN,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master = {
-            .clk_speed = 100000
-        },
-        .clk_flags = 0
+    i2c_master_bus_config_t bus_config = {
+        .i2c_scl_io_num = HM_SCL_PIN,
+        .i2c_sda_io_num = HM_SDA_PIN,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_pullup = true,
     };
-    i2c_param_config(I2C_NUM_0, &i2c_config);
-    i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-    _isDriverInstalled = true;
+
+    i2c_master_config_t master_config = {
+        .max_speed_hz = 100000,
+    };
+
+    esp_err_t ret = i2c_new_master_bus(&bus_config, &master_config, &i2c_bus);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize I2C bus: %s", esp_err_to_name(ret));
+    }
 }
 
 Rtc *Rtc::detect()
@@ -109,12 +110,21 @@ Rtc::~Rtc()
 
 bool Rtc::begin()
 {
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (_address << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
+    i2c_master_dev_handle_t device_handle;
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = _address,
+        .scl_speed_hz = 100000,
+    };
+
+    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_config, &device_handle);
+    if (ret != ESP_OK) {
+        return false;
+    }
+
+    // Zero-length write to check device presence
+    ret = i2c_master_transmit(device_handle, NULL, 0, -1);
+    i2c_master_bus_rm_device(device_handle);
 
     return ret == ESP_OK;
 }
@@ -125,17 +135,25 @@ struct timeval Rtc::GetTime()
 
     uint8_t rawData[7] = {0};
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, _address << 1 | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, _reg_start, true);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, _address << 1 | I2C_MASTER_READ, true);
-    i2c_master_read(cmd, rawData, sizeof(rawData) - 1, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, rawData + sizeof(rawData) - 1, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
+    i2c_master_dev_handle_t device_handle;
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = _address,
+        .scl_speed_hz = 100000,
+    };
+
+    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_config, &device_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add I2C device");
+        res.tv_sec = 0;
+        res.tv_usec = 0;
+        return res;
+    }
+
+    // Write register address, then read data
+    uint8_t reg_addr = _reg_start;
+    ret = i2c_master_transmit_receive(device_handle, &reg_addr, 1, rawData, sizeof(rawData), -1);
+    i2c_master_bus_rm_device(device_handle);
 
     if (ret != ESP_OK)
     {
@@ -205,20 +223,29 @@ void Rtc::SetTime(struct timeval now)
     }
     days++;
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, _address << 1 | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, _reg_start, true);
-    i2c_master_write_byte(cmd, bin2bcd(seconds), true);
-    i2c_master_write_byte(cmd, bin2bcd(minutes), true);
-    i2c_master_write_byte(cmd, bin2bcd(hours), true);
-    i2c_master_write_byte(cmd, 0, true);
-    i2c_master_write_byte(cmd, bin2bcd(days), true);
-    i2c_master_write_byte(cmd, bin2bcd(month), true);
-    i2c_master_write_byte(cmd, bin2bcd(year), true);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
+    uint8_t writeData[8] = {
+        _reg_start,
+        bin2bcd(seconds),
+        bin2bcd(minutes),
+        bin2bcd(hours),
+        0,
+        bin2bcd(days),
+        bin2bcd(month),
+        bin2bcd(year)
+    };
+
+    i2c_master_dev_handle_t device_handle;
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = _address,
+        .scl_speed_hz = 100000,
+    };
+
+    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_config, &device_handle);
+    if (ret == ESP_OK) {
+        ret = i2c_master_transmit(device_handle, writeData, sizeof(writeData), -1);
+        i2c_master_bus_rm_device(device_handle);
+    }
 
     if (ret != ESP_OK)
     {
@@ -238,14 +265,20 @@ bool RtcRX8130::begin()
 {
     if (Rtc::begin())
     {
-        i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-        i2c_master_start(cmd);
-        i2c_master_write_byte(cmd, _address << 1 | I2C_MASTER_WRITE, true);
-        i2c_master_write_byte(cmd, 0x1f, true);
-        i2c_master_write_byte(cmd, 0x31, true);
-        i2c_master_stop(cmd);
-        esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 50 / portTICK_PERIOD_MS);
-        i2c_cmd_link_delete(cmd);
+        uint8_t writeData[2] = {0x1f, 0x31};
+
+        i2c_master_dev_handle_t device_handle;
+        i2c_device_config_t dev_config = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = _address,
+            .scl_speed_hz = 100000,
+        };
+
+        esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_config, &device_handle);
+        if (ret == ESP_OK) {
+            ret = i2c_master_transmit(device_handle, writeData, sizeof(writeData), -1);
+            i2c_master_bus_rm_device(device_handle);
+        }
 
         return ret == ESP_OK;
     }
