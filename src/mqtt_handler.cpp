@@ -519,7 +519,10 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_running = true;
 
     // Start publishing task
-    xTaskCreate(mqtt_publish_task, "mqtt_publish", 4096, NULL, 5, &mqtt_publish_task_handle);
+    // xTaskCreate requires a non-volatile TaskHandle_t*; assign to volatile global afterwards.
+    TaskHandle_t pub_handle = NULL;
+    xTaskCreate(mqtt_publish_task, "mqtt_publish", 4096, NULL, 5, &pub_handle);
+    mqtt_publish_task_handle = pub_handle;
 
     return ESP_OK;
 }

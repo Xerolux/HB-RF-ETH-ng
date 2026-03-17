@@ -339,8 +339,11 @@ esp_err_t checkmk_start(const checkmk_config_t *config)
 
     // Create CheckMK agent task - pass pointer to current_config
     // 8192 bytes: large output buffer (2048) + sockaddr/IP string operations
+    // xTaskCreate requires a non-volatile TaskHandle_t*; assign to volatile global afterwards.
+    TaskHandle_t cmk_handle = NULL;
     BaseType_t ret = xTaskCreate(checkmk_agent_task, "checkmk_agent", 8192,
-                                  (void *)&current_config.checkmk, 5, &checkmk_task_handle);
+                                  (void *)&current_config.checkmk, 5, &cmk_handle);
+    checkmk_task_handle = cmk_handle;
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CheckMK agent task");
