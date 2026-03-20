@@ -28,7 +28,7 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 
 ---
 
-📖 **Umfassende Dokumentation zu Funktionen, Installation, Home Assistant Integration und vielem mehr finden Sie im [Wiki](docs/WIKI.md).**
+📖 **Umfassende Dokumentation zu Funktionen, Installation, Home Assistant Integration und vielem mehr finden Sie im [offiziellen Wiki](https://github.com/Xerolux/HB-RF-ETH-ng/wiki).**
 
 ---
 
