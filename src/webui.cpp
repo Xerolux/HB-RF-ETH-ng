@@ -517,6 +517,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
 
+    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+
     if (adminPassword && strlen(adminPassword) > 0)
         _settings->setAdminPassword(adminPassword);
 
@@ -707,6 +709,9 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+
+    if (adminPassword && strlen(adminPassword) > 0)
+        _settings->setAdminPassword(adminPassword);
 
     if (hostname) {
         _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
