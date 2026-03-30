@@ -9,6 +9,7 @@
 #define MONITORING_H
 
 #include <stdint.h>
+#include <stddef.h>
 #include "esp_err.h"
 
 // Forward declarations
@@ -52,6 +53,9 @@ esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config);
 // Get current configuration
 esp_err_t monitoring_get_config(monitoring_config_t *config);
 
+// Run a lightweight connectivity/self-test for a configured monitoring target.
+// Supported targets: "checkmk", "mqtt"
+esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message, size_t message_len);
 // CheckMK Agent functions
 esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);

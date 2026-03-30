@@ -1,197 +1,302 @@
 <template>
-  <div class="dashboard-container">
-    <!-- Header Section -->
-    <div class="dashboard-header animate-entry">
-      <div class="header-text">
-        <h1>{{ t('sysinfo.dashboardTitle') }}</h1>
+  <div class="page-shell dashboard">
+    <section class="page-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">
+          <AppIcon name="dashboard" />
+          {{ t('sysinfo.dashboardTitle') }}
+        </span>
+        <h1 class="hero-title">HB-RF-ETH-ng</h1>
+        <p class="hero-subtitle">{{ t('sysinfo.system') }} · {{ t('sysinfo.network') }} · {{ t('sysinfo.radioModule') }}</p>
       </div>
-      <div class="status-indicator" :class="{ 'online': sysInfoStore.ethernetConnected }">
-        <span class="indicator-dot"></span>
-        <span class="indicator-text">{{ sysInfoStore.ethernetConnected ? t('sysinfo.online') : t('sysinfo.offline') }}</span>
+
+      <div class="hero-meta">
+        <span class="status-chip" :class="sysInfoStore.ethernetConnected ? 'success' : 'danger'">
+          <AppIcon :name="sysInfoStore.ethernetConnected ? 'ethernet' : 'alert'" />
+          {{ sysInfoStore.ethernetConnected ? t('sysinfo.online') : t('sysinfo.offline') }}
+        </span>
+        <span class="meta-chip">
+          <AppIcon name="time" />
+          {{ uptimeFormatted }}
+        </span>
       </div>
+    </section>
+
+    <div v-if="isLoading" class="stats-grid compact">
+      <div v-for="index in 6" :key="index" class="card-glass skeleton-block skeleton"></div>
     </div>
 
-    <!-- Status Widgets Row -->
-    <div class="widgets-row">
-      <!-- CPU Widget -->
-      <div class="widget animate-entry" style="animation-delay: 0.1s">
-        <div class="widget-top">
-          <div class="widget-icon-bg primary">
-            <span class="widget-icon">⚡</span>
+    <template v-else>
+      <section class="quick-actions">
+        <router-link class="quick-action card-glass card-hover" to="/firmware">
+          <span class="icon-badge warning"><AppIcon name="firmware" /></span>
+          <div>
+            <strong>{{ t('nav.firmware') }}</strong>
+            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== sysInfoStore.currentVersion ? `Update ${sysInfoStore.latestVersion}` : 'Updates and recovery' }}</p>
           </div>
-          <span class="widget-trend">{{ sysInfoStore.cpuUsage.toFixed(0) }}%</span>
-        </div>
-        <div class="widget-bottom">
-          <span class="widget-label">{{ t('sysinfo.cpuUsage') }}</span>
-          <div class="widget-progress">
-            <div class="progress-fill primary" :style="{ width: sysInfoStore.cpuUsage + '%' }"></div>
-          </div>
-        </div>
-      </div>
+        </router-link>
 
-      <!-- Memory Widget -->
-      <div class="widget animate-entry" style="animation-delay: 0.2s">
-        <div class="widget-top">
-          <div class="widget-icon-bg success">
-            <span class="widget-icon">💾</span>
+        <router-link class="quick-action card-glass card-hover" to="/systemlog">
+          <span class="icon-badge soft"><AppIcon name="logs" /></span>
+          <div>
+            <strong>{{ t('nav.systemlog') }}</strong>
+            <p>Live stream and export</p>
           </div>
-          <span class="widget-trend">{{ sysInfoStore.memoryUsage.toFixed(0) }}%</span>
-        </div>
-        <div class="widget-bottom">
-          <span class="widget-label">{{ t('sysinfo.memoryUsage') }}</span>
-          <div class="widget-progress">
-            <div class="progress-fill success" :style="{ width: sysInfoStore.memoryUsage + '%' }"></div>
-          </div>
-        </div>
-      </div>
+        </router-link>
 
-      <!-- Ethernet Widget -->
-      <div class="widget animate-entry" style="animation-delay: 0.3s">
-        <div class="widget-top">
-          <div class="widget-icon-bg" :class="sysInfoStore.ethernetConnected ? 'info' : 'danger'">
-            <span class="widget-icon">{{ sysInfoStore.ethernetConnected ? '🌐' : '❌' }}</span>
+        <router-link class="quick-action card-glass card-hover" to="/monitoring">
+          <span class="icon-badge info"><AppIcon name="monitoring" /></span>
+          <div>
+            <strong>{{ t('nav.monitoring') }}</strong>
+            <p>MQTT, SNMP and CheckMK</p>
           </div>
-          <span class="widget-trend small">{{ ethernetStatusShort }}</span>
-        </div>
-        <div class="widget-bottom">
-          <span class="widget-label">{{ t('sysinfo.ethernet') }}</span>
-          <div class="widget-status-text" :class="sysInfoStore.ethernetConnected ? 'text-success' : 'text-danger'">
-            {{ sysInfoStore.ethernetConnected ? t('sysinfo.connected') : t('sysinfo.disconnected') }}
-          </div>
-        </div>
-      </div>
-    </div>
+        </router-link>
 
-    <!-- Main Info Grid -->
-    <div class="info-masonry">
-      <!-- System Information -->
-      <div class="info-card animate-entry" style="animation-delay: 0.4s">
-        <div class="card-header-clean">
-          <h3>{{ t('sysinfo.system') }}</h3>
-          <div class="header-line"></div>
-        </div>
-        <div class="card-content">
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.serial') }}</span>
-            <span class="value">{{ sysInfoStore.serial }}</span>
+        <router-link class="quick-action card-glass card-hover" to="/settings">
+          <span class="icon-badge success"><AppIcon name="settings" /></span>
+          <div>
+            <strong>{{ t('nav.settings') }}</strong>
+            <p>Network and time setup</p>
           </div>
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.boardRevision') }}</span>
-            <span class="value">{{ sysInfoStore.boardRevision }}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.uptime') }}</span>
-            <span class="value highlight">{{ uptimeFormatted }}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.resetReason') }}</span>
-            <span class="value muted">{{ sysInfoStore.resetReason }}</span>
-          </div>
-        </div>
-      </div>
+        </router-link>
+      </section>
 
-      <!-- Network Information -->
-      <div class="info-card animate-entry" style="animation-delay: 0.5s">
-        <div class="card-header-clean">
-          <h3>{{ t('sysinfo.network') }}</h3>
-          <div class="header-line"></div>
-        </div>
-        <div class="card-content">
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.ethernetStatus') }}</span>
-            <span class="value" :class="sysInfoStore.ethernetConnected ? 'text-success' : 'text-danger'">
-              {{ ethernetStatus }}
+      <section class="stats-grid">
+        <article class="card-glass metric-card card-hover">
+          <div class="metric-top">
+            <div>
+              <div class="metric-label">{{ t('sysinfo.cpuUsage') }}</div>
+              <div class="metric-value">{{ safePercent(sysInfoStore.cpuUsage) }}%</div>
+            </div>
+            <span class="icon-badge soft"><AppIcon name="cpu" /></span>
+          </div>
+          <div class="metric-subtext">{{ t('sysinfo.system') }}</div>
+          <div class="metric-progress info">
+            <span :style="{ width: safePercent(sysInfoStore.cpuUsage) + '%' }"></span>
+          </div>
+        </article>
+
+        <article class="card-glass metric-card card-hover">
+          <div class="metric-top">
+            <div>
+              <div class="metric-label">{{ t('sysinfo.memoryUsage') }}</div>
+              <div class="metric-value">{{ safePercent(sysInfoStore.memoryUsage) }}%</div>
+            </div>
+            <span class="icon-badge success"><AppIcon name="memory" /></span>
+          </div>
+          <div class="metric-subtext">{{ t('sysinfo.system') }}</div>
+          <div class="metric-progress success">
+            <span :style="{ width: safePercent(sysInfoStore.memoryUsage) + '%' }"></span>
+          </div>
+        </article>
+
+        <article class="card-glass metric-card card-hover">
+          <div class="metric-top">
+            <div>
+              <div class="metric-label">{{ t('sysinfo.ethernetStatus') }}</div>
+              <div class="metric-value">{{ ethernetSummary }}</div>
+            </div>
+            <span class="icon-badge" :class="sysInfoStore.ethernetConnected ? 'info' : 'danger'">
+              <AppIcon :name="sysInfoStore.ethernetConnected ? 'ethernet' : 'alert'" />
             </span>
           </div>
-          <div class="info-row">
-            <span class="label">{{ t('sysinfo.rawUartRemoteAddress') }}</span>
-            <span class="value">{{ sysInfoStore.rawUartRemoteAddress || '-' }}</span>
+          <div class="metric-subtext">{{ ethernetStatus }}</div>
+          <div class="status-chip" :class="sysInfoStore.ethernetConnected ? 'success' : 'danger'">
+            <AppIcon :name="sysInfoStore.ethernetConnected ? 'check' : 'close'" />
+            {{ sysInfoStore.ethernetConnected ? t('sysinfo.connected') : t('sysinfo.disconnected') }}
           </div>
-        </div>
-      </div>
+        </article>
 
-      <!-- Radio Module Information -->
-      <div class="info-card wide animate-entry" style="animation-delay: 0.6s">
-        <div class="card-header-clean">
-          <h3>{{ t('sysinfo.radioModule') }}</h3>
-          <div class="header-line"></div>
-        </div>
-        <div class="card-content grid-3">
-          <div class="info-block box">
-            <span class="label">{{ t('sysinfo.radioModuleType') }}</span>
-            <span class="value large">{{ sysInfoStore.radioModuleType || '-' }}</span>
+        <article class="card-glass metric-card card-hover">
+          <div class="metric-top">
+            <div>
+              <div class="metric-label">{{ t('sysinfo.radioModule') }}</div>
+              <div class="metric-value smaller">{{ sysInfoStore.radioModuleType || '-' }}</div>
+            </div>
+            <span class="icon-badge warning"><AppIcon name="board" /></span>
           </div>
-          <div class="info-block box">
-            <span class="label">{{ t('sysinfo.radioModuleSerial') }}</span>
-            <span class="value large">{{ sysInfoStore.radioModuleSerial || '-' }}</span>
+          <div class="metric-subtext">{{ sysInfoStore.radioModuleFirmwareVersion || '-' }}</div>
+          <span class="pill-chip">{{ sysInfoStore.radioModuleSerial || '-' }}</span>
+        </article>
+      </section>
+
+      <section class="info-grid">
+        <article class="card-glass card-hover">
+          <div class="card-section-title">
+            <span class="icon-badge soft"><AppIcon name="board" /></span>
+            <div>
+              <h3>{{ t('sysinfo.system') }}</h3>
+              <p>{{ t('sysinfo.serial') }} · {{ t('sysinfo.resetReason') }}</p>
+            </div>
           </div>
-          <div class="info-block box">
-            <span class="label">{{ t('sysinfo.radioModuleFirmware') }}</span>
-            <span class="value large">{{ sysInfoStore.radioModuleFirmwareVersion || '-' }}</span>
+          <div class="kv-list">
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.serial') }}</span>
+              <button class="copy-value" @click="copyValue(sysInfoStore.serial, t('sysinfo.serial'))">
+                <span class="kv-value mono">{{ sysInfoStore.serial || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.boardRevision') }}</span>
+              <span class="kv-value">{{ sysInfoStore.boardRevision || '-' }}</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.uptime') }}</span>
+              <span class="kv-value">{{ uptimeFormatted }}</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.resetReason') }}</span>
+              <span class="kv-value">{{ sysInfoStore.resetReason || '-' }}</span>
+            </div>
           </div>
-           <div class="info-block">
-            <span class="label">{{ t('sysinfo.radioModuleSGTIN') }}</span>
-            <span class="value monospace">{{ sysInfoStore.radioModuleSGTIN || '-' }}</span>
+        </article>
+
+        <article class="card-glass card-hover">
+          <div class="card-section-title">
+            <span class="icon-badge info"><AppIcon name="network" /></span>
+            <div>
+              <h3>{{ t('sysinfo.network') }}</h3>
+              <p>{{ t('sysinfo.ethernet') }} · {{ t('sysinfo.rawUartRemoteAddress') }}</p>
+            </div>
           </div>
-          <div class="info-block">
-            <span class="label">{{ t('sysinfo.radioModuleBidCosRadioMAC') }}</span>
-            <span class="value monospace">{{ sysInfoStore.radioModuleBidCosRadioMAC || '-' }}</span>
+          <div class="kv-list">
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.ethernetStatus') }}</span>
+              <span class="status-chip" :class="sysInfoStore.ethernetConnected ? 'success' : 'danger'">
+                <AppIcon :name="sysInfoStore.ethernetConnected ? 'ethernet' : 'close'" />
+                {{ ethernetStatus }}
+              </span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">{{ t('sysinfo.rawUartRemoteAddress') }}</span>
+              <button class="copy-value" :disabled="!sysInfoStore.rawUartRemoteAddress" @click="copyValue(sysInfoStore.rawUartRemoteAddress, t('sysinfo.rawUartRemoteAddress'))">
+                <span class="kv-value mono">{{ sysInfoStore.rawUartRemoteAddress || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
           </div>
-          <div class="info-block">
-            <span class="label">{{ t('sysinfo.radioModuleHmIPRadioMAC') }}</span>
-            <span class="value monospace">{{ sysInfoStore.radioModuleHmIPRadioMAC || '-' }}</span>
+        </article>
+
+        <article class="card-glass card-hover radio-card">
+          <div class="card-section-title">
+            <span class="icon-badge warning"><AppIcon name="firmware" /></span>
+            <div>
+              <h3>{{ t('sysinfo.radioModule') }}</h3>
+              <p>{{ t('sysinfo.radioModuleFirmware') }} · {{ t('sysinfo.radioModuleSGTIN') }}</p>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+
+          <div class="radio-grid">
+            <div class="radio-stat">
+              <span class="kv-label">{{ t('sysinfo.radioModuleType') }}</span>
+              <strong>{{ sysInfoStore.radioModuleType || '-' }}</strong>
+            </div>
+            <div class="radio-stat">
+              <span class="kv-label">{{ t('sysinfo.radioModuleFirmware') }}</span>
+              <strong>{{ sysInfoStore.radioModuleFirmwareVersion || '-' }}</strong>
+            </div>
+            <div class="radio-stat wide">
+              <span class="kv-label">{{ t('sysinfo.radioModuleSerial') }}</span>
+              <button class="copy-value" :disabled="!sysInfoStore.radioModuleSerial" @click="copyValue(sysInfoStore.radioModuleSerial, t('sysinfo.radioModuleSerial'))">
+                <span class="kv-value mono">{{ sysInfoStore.radioModuleSerial || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
+            <div class="radio-stat wide">
+              <span class="kv-label">{{ t('sysinfo.radioModuleSGTIN') }}</span>
+              <button class="copy-value" :disabled="!sysInfoStore.radioModuleSGTIN" @click="copyValue(sysInfoStore.radioModuleSGTIN, t('sysinfo.radioModuleSGTIN'))">
+                <span class="kv-value mono">{{ sysInfoStore.radioModuleSGTIN || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
+            <div class="radio-stat wide">
+              <span class="kv-label">{{ t('sysinfo.radioModuleBidCosRadioMAC') }}</span>
+              <button class="copy-value" :disabled="!sysInfoStore.radioModuleBidCosRadioMAC" @click="copyValue(sysInfoStore.radioModuleBidCosRadioMAC, t('sysinfo.radioModuleBidCosRadioMAC'))">
+                <span class="kv-value mono">{{ sysInfoStore.radioModuleBidCosRadioMAC || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
+            <div class="radio-stat wide">
+              <span class="kv-label">{{ t('sysinfo.radioModuleHmIPRadioMAC') }}</span>
+              <button class="copy-value" :disabled="!sysInfoStore.radioModuleHmIPRadioMAC" @click="copyValue(sysInfoStore.radioModuleHmIPRadioMAC, t('sysinfo.radioModuleHmIPRadioMAC'))">
+                <span class="kv-value mono">{{ sysInfoStore.radioModuleHmIPRadioMAC || '-' }}</span>
+                <AppIcon name="copy" />
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore } from './stores.js'
+import { useSysInfoStore, useUiStore } from './stores.js'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
+const uiStore = useUiStore()
+const isLoading = ref(true)
 
-// Ethernet status
 const ethernetStatus = computed(() => {
   if (!sysInfoStore.ethernetConnected) return t('sysinfo.disconnected')
-  return `${sysInfoStore.ethernetSpeed} ${t('sysinfo.mbits')} (${sysInfoStore.ethernetDuplex})`
+  return `${sysInfoStore.ethernetSpeed} ${t('sysinfo.mbits')} · ${sysInfoStore.ethernetDuplex}`
 })
 
-const ethernetStatusShort = computed(() => {
+const ethernetSummary = computed(() => {
   if (!sysInfoStore.ethernetConnected) return t('sysinfo.down')
   return `${sysInfoStore.ethernetSpeed}M`
 })
 
-// Uptime formatting
 const uptimeFormatted = computed(() => {
-  const seconds = sysInfoStore.uptimeSeconds
+  const seconds = sysInfoStore.uptimeSeconds || 0
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = seconds % 60
 
-  if (days > 0) {
-    return `${days}d ${hours}h ${minutes}m`
-  } else if (hours > 0) {
-    return `${hours}h ${minutes}m ${secs}s`
-  } else {
-    return `${minutes}m ${secs}s`
-  }
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
+  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`
+  return `${minutes}m ${secs}s`
 })
+
+const safePercent = (value) => Math.max(0, Math.min(100, Number(value || 0).toFixed(0)))
+
+const copyValue = async (value, label) => {
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(value)
+    uiStore.pushToast({
+      type: 'success',
+      title: t('common.success'),
+      message: `${label} copied`,
+      duration: 2200
+    })
+  } catch (error) {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('common.error'),
+      message: `Could not copy ${label}`,
+      duration: 2800
+    })
+  }
+}
 
 let updateTimer = null
 
-const startPolling = () => {
-  if (!updateTimer) {
-    sysInfoStore.update()
-    updateTimer = setInterval(() => {
-      sysInfoStore.update()
-    }, 1000)
+const startPolling = async () => {
+  if (updateTimer) return
+  try {
+    await sysInfoStore.update()
+  } finally {
+    isLoading.value = false
   }
+  updateTimer = setInterval(() => {
+    sysInfoStore.update()
+  }, 2000)
 }
 
 const stopPolling = () => {
@@ -201,7 +306,6 @@ const stopPolling = () => {
   }
 }
 
-// Optimize performance by pausing polling when tab is hidden
 const handleVisibilityChange = () => {
   if (document.hidden) {
     stopPolling()
@@ -222,448 +326,98 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.dashboard-container {
-  display: flex;
-  flex-direction: column;
+.dashboard {
   gap: var(--spacing-xl);
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
 }
 
-.animate-entry {
-  opacity: 0;
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Header */
-.dashboard-header {
+.quick-action {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 var(--spacing-sm);
+  gap: 14px;
+  text-decoration: none;
+  color: inherit;
+  padding: 16px 18px;
 }
 
-.header-text h1 {
-  font-size: 2rem;
-  font-weight: 800;
-  margin: 0;
-  background: linear-gradient(135deg, var(--color-text) 0%, var(--color-text-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.quick-action strong {
+  display: block;
+  font-size: 0.95rem;
 }
 
-.header-text p {
-  margin: 0;
+.quick-action p {
+  margin: 4px 0 0;
   color: var(--color-text-secondary);
-  font-weight: 500;
+  font-size: 0.82rem;
 }
 
-.status-indicator {
-  display: flex;
+.metric-value.smaller {
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
+.copy-value {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: var(--color-surface);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-.status-indicator.online {
-  color: var(--color-success);
-}
-
-.indicator-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: currentColor;
-}
-
-.status-indicator.online .indicator-dot {
-  box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.2);
-}
-
-/* Widgets Row */
-.widgets-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.widget {
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 160px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  cursor: default;
-}
-
-.widget:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: var(--shadow-lg);
-}
-
-.widget-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.widget-icon-bg {
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  box-shadow: var(--shadow-sm);
-}
-
-.widget-icon-bg.primary { background: linear-gradient(135deg, var(--color-primary-light), var(--color-surface)); color: var(--color-primary); }
-.widget-icon-bg.success { background: linear-gradient(135deg, var(--color-success-light), var(--color-surface)); color: var(--color-success); }
-.widget-icon-bg.info { background: linear-gradient(135deg, var(--color-info-light), var(--color-surface)); color: var(--color-info); }
-.widget-icon-bg.danger { background: linear-gradient(135deg, var(--color-danger-light), var(--color-surface)); color: var(--color-danger); }
-
-.widget-trend {
-  font-size: 1.5rem;
-  font-weight: 700;
+  border: none;
+  background: transparent;
   color: var(--color-text);
+  padding: 0;
 }
 
-.widget-trend.small {
-  font-size: 1.25rem;
+.copy-value:disabled {
+  opacity: 0.6;
 }
 
-.widget-bottom {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.widget-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.widget-progress {
-  height: 6px;
-  background-color: var(--color-bg);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  border-radius: var(--radius-full);
-  transition: width 0.5s ease;
-}
-
-.progress-fill.primary { background-image: linear-gradient(90deg, var(--color-primary), #ff8a5c); }
-.progress-fill.success { background-image: linear-gradient(90deg, var(--color-success), #66d985); }
-
-.widget-status-text {
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-
-/* Info Masonry */
-.info-masonry {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.info-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.info-card.wide {
+.radio-card {
   grid-column: 1 / -1;
 }
 
-.card-header-clean {
-  padding: 24px 24px 16px;
+.radio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
-.card-header-clean h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: var(--color-text);
-}
-
-.header-line {
-  width: 40px;
-  height: 4px;
-  background-color: var(--color-primary);
-  border-radius: 2px;
-}
-
-.card-content {
-  padding: 0 24px 24px;
+.radio-stat {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.44);
+  border: 1px solid rgba(125, 139, 167, 0.12);
 }
 
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-border-light);
+[data-bs-theme="dark"] .radio-stat {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.info-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.radio-stat.wide {
+  grid-column: span 2;
 }
 
-.label {
-  font-size: 0.9375rem;
-  color: var(--color-text-secondary);
-}
-
-.value {
-  font-weight: 600;
-  color: var(--color-text);
+.radio-stat strong {
   font-size: 1rem;
 }
 
-.value.highlight {
-  color: var(--color-primary);
-}
-
-.value.muted {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
-
-/* Grid for Radio Module */
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-}
-
-.info-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.info-block.box {
-  background-color: var(--color-bg);
-  padding: 16px;
-  border-radius: var(--radius-lg);
-}
-
-.value.large {
-  font-size: 1.25rem;
-}
-
-.value.monospace {
-  font-family: 'SF Mono', 'Roboto Mono', monospace;
-  font-size: 0.9375rem;
-  background-color: var(--color-bg);
-  padding: 4px 8px;
-  border-radius: 6px;
-  width: fit-content;
-}
-
-/* Responsive */
 @media (max-width: 768px) {
-  .dashboard-container {
-    gap: var(--spacing-lg);
-  }
-
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 0;
-  }
-
-  .header-text h1 {
-    font-size: 1.5rem;
-  }
-
-  .status-indicator {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .widgets-row {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-md);
-  }
-
-  .widget {
-    padding: 16px;
-    height: 130px;
-  }
-
-  .widget-icon-bg {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    font-size: 1.125rem;
-  }
-
-  .widget-trend {
-    font-size: 1.25rem;
-  }
-
-  .widget-trend.small {
-    font-size: 1rem;
-  }
-
-  .widget-label {
-    font-size: 0.75rem;
-  }
-
-  .info-masonry {
+  .quick-actions {
     grid-template-columns: 1fr;
-    gap: var(--spacing-md);
   }
 
-  .card-header-clean {
-    padding: 16px 16px 12px;
-  }
-
-  .card-header-clean h3 {
-    font-size: 1.125rem;
-  }
-
-  .card-content {
-    padding: 0 16px 16px;
-    gap: 12px;
-  }
-
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-    padding-bottom: 10px;
-  }
-
-  .grid-3 {
+  .radio-grid {
     grid-template-columns: 1fr;
-    gap: 10px;
   }
 
-  .info-block.box {
-    padding: 12px;
-  }
-
-  .value.large {
-    font-size: 1.125rem;
-  }
-
-  .value.monospace {
-    font-size: 0.8125rem;
-    word-break: break-all;
-  }
-}
-
-@media (max-width: 600px) {
-  .widgets-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    overflow-x: visible;
-    scroll-snap-type: none;
-    padding: 0;
-    margin: 0;
-    gap: 8px;
-  }
-
-  .widget {
-    min-width: 0;
-    width: 100%;
-    height: auto;
-    min-height: 100px;
-    padding: 12px 8px;
-    scroll-snap-align: none;
-    margin-bottom: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .widget-top {
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-
-  .widget-icon-bg {
-    width: 32px;
-    height: 32px;
-    font-size: 1rem;
-    margin-bottom: 0;
-  }
-
-  .widget-trend {
-    font-size: 1rem;
-    width: 100%;
-    text-align: center;
-  }
-
-  .widget-bottom {
-    width: 100%;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .widget-label {
-    font-size: 0.65rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  .widget-progress {
-    height: 4px;
-    width: 100%;
-    margin-top: 4px;
-  }
-
-  .widget-status-text {
-    display: none;
+  .radio-stat.wide {
+    grid-column: auto;
   }
 }
 </style>

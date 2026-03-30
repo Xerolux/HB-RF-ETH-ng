@@ -443,8 +443,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
 
-    char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
-
     char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
     bool useDHCP = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "useDHCP"));
     ip4_addr_t localIP = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "localIP"));
@@ -709,9 +707,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
-
-    if (adminPassword && strlen(adminPassword) > 0)
-        _settings->setAdminPassword(adminPassword);
 
     if (hostname) {
         _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
@@ -1569,7 +1564,7 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 24;
+    config.max_uri_handlers = 25;
     config.uri_match_fn = httpd_uri_match_wildcard;
     // Increase stack: POST handlers allocate content buffers + config structs
     // that together exceed the default 4096-byte stack, causing overflow/corruption.
@@ -1591,6 +1586,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_monitoring_test_handler);
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);

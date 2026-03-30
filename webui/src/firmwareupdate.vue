@@ -18,25 +18,44 @@
       </div>
     </Transition>
 
-    <div class="page-header">
-      <div class="icon-wrapper">📦</div>
-      <div class="text-wrapper">
-        <h1>{{ t('firmware.title') }}</h1>
-        <p>{{ t('firmware.subtitle') }}</p>
+    <div class="page-header page-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">
+          <AppIcon name="firmware" />
+          {{ t('firmware.title') }}
+        </span>
+        <h1 class="hero-title">{{ t('firmware.title') }}</h1>
+        <p class="hero-subtitle">{{ t('firmware.subtitle') }}</p>
       </div>
-      <div class="version-badge">
+      <div class="hero-meta version-badge">
         <span class="label">{{ t('firmware.version') }}</span>
         <span class="value">{{ sysInfoStore.currentVersion }}</span>
         <BButton variant="outline-secondary" size="sm" @click="showChangelogModal = true" class="changelog-btn">
-          📋 {{ t('changelog.title') }}
+          <AppIcon name="logs" />
+          {{ t('changelog.title') }}
         </BButton>
       </div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="chip-btn" type="button" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+        <AppIcon name="refresh" />
+        {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.checkNow') }}
+      </button>
+      <button class="chip-btn" type="button" @click="scrollToOta">
+        <AppIcon name="download" />
+        Jump to OTA
+      </button>
+      <span class="chip-btn static">
+        <AppIcon name="clock" />
+        {{ updateStore.lastCheck ? `Last check: ${formatLastCheck(updateStore.lastCheck)}` : 'No recent check' }}
+      </span>
     </div>
 
     <!-- Update Available Banner -->
     <Transition name="slide-down">
       <div v-if="showUpdateBanner" class="alert-banner info">
-        <div class="banner-icon">🎉</div>
+        <div class="banner-icon"><AppIcon name="download" /></div>
         <div class="banner-content">
           <strong>{{ t('firmware.updateAvailable') }}</strong>
           <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) }}</p>
@@ -51,7 +70,7 @@
       <!-- File Upload Card -->
       <div class="update-card">
         <div class="card-header">
-          <div class="header-icon bg-primary-light text-primary">📤</div>
+          <div class="header-icon bg-primary-light text-primary"><AppIcon name="upload" /></div>
           <div class="header-text">
             <h3>{{ t('firmware.fileUpload') }}</h3>
             <p>{{ t('firmware.fileUploadHint') }}</p>
@@ -76,18 +95,18 @@
             />
 
             <template v-if="!file">
-              <div class="upload-icon">☁️</div>
+              <div class="upload-icon"><AppIcon name="upload" /></div>
               <span class="upload-text">{{ t('firmware.selectFile') }}</span>
             </template>
 
             <template v-else>
               <div class="file-preview">
-                <div class="file-icon">📄</div>
+                <div class="file-icon"><AppIcon name="file" /></div>
                 <div class="file-details">
                   <span class="file-name">{{ file.name }}</span>
                   <span class="file-size">{{ formatSize(file.size) }}</span>
                 </div>
-                <button @click.stop="clearFile" class="remove-file-btn">✕</button>
+                <button @click.stop="clearFile" class="remove-file-btn"><AppIcon name="close" /></button>
               </div>
             </template>
           </div>
@@ -116,7 +135,7 @@
       <!-- Network Update Card -->
       <div class="update-card" ref="otaSection">
         <div class="card-header">
-          <div class="header-icon bg-success-light text-success">🌐</div>
+          <div class="header-icon bg-success-light text-success"><AppIcon name="globe" /></div>
           <div class="header-text">
             <h3>{{ t('firmware.networkUpdate') }}</h3>
             <p>{{ t('firmware.networkUpdateHint') }}</p>
@@ -126,7 +145,7 @@
         <div class="card-body">
           <div v-if="updateStore.latestVersion && updateStore.latestVersion !== 'n/a' && updateStore.updateAvailable" class="update-info">
             <div class="update-available">
-              <span class="update-icon">✨</span>
+              <span class="update-icon"><AppIcon name="download" /></span>
               <div class="update-text">
                 <strong>{{ t('firmware.updateAvailable') }}</strong>
                 <span class="version-info">v{{ updateStore.latestVersion }}</span>
@@ -135,7 +154,7 @@
           </div>
           <div v-else class="update-info">
             <div class="no-update">
-              <span class="check-icon">✅</span>
+              <span class="check-icon"><AppIcon name="check" /></span>
               <span>{{ t('firmware.upToDate') }}</span>
             </div>
             <button class="check-btn" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
@@ -175,7 +194,7 @@
     <!-- System Actions -->
     <div class="system-actions">
       <div class="action-tile warning" @click="restartClick">
-        <div class="tile-icon">🔄</div>
+        <div class="tile-icon"><AppIcon name="refresh" /></div>
         <div class="tile-text">
           <h4>{{ t('firmware.restart') }}</h4>
           <p>{{ t('firmware.restartHint') }}</p>
@@ -183,25 +202,13 @@
       </div>
 
       <div class="action-tile danger" @click="factoryResetClick">
-        <div class="tile-icon">🔧</div>
+        <div class="tile-icon"><AppIcon name="restore" /></div>
         <div class="tile-text">
           <h4>{{ t('firmware.factoryReset') }}</h4>
           <p>{{ t('firmware.factoryResetHint') }}</p>
         </div>
       </div>
     </div>
-
-    <!-- Status Modal -->
-    <BModal v-model="showStatusModal" centered hide-footer hide-header no-close-on-backdrop no-close-on-esc content-class="status-modal-content">
-      <div class="status-modal-body" :class="statusType">
-        <div class="status-icon-large">{{ statusIcon }}</div>
-        <h3>{{ statusTitle }}</h3>
-        <p>{{ statusMessage }}</p>
-        <BButton v-if="!statusPersistent" @click="showStatusModal = false" variant="secondary" class="mt-3">
-          {{ t('common.close') }}
-        </BButton>
-      </div>
-    </BModal>
 
     <!-- Changelog Modal -->
     <ChangelogModal v-model="showChangelogModal" />
@@ -212,7 +219,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useUpdateStore, useFirmwareUpdateStore } from './stores.js'
+import { useSysInfoStore, useUpdateStore, useFirmwareUpdateStore, useUiStore } from './stores.js'
 import axios from 'axios'
 import ChangelogModal from './components/ChangelogModal.vue'
 
@@ -220,6 +227,7 @@ const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
 const updateStore = useUpdateStore()
 const firmwareUpdateStore = useFirmwareUpdateStore()
+const uiStore = useUiStore()
 
 // State
 const file = ref(null)
@@ -232,12 +240,6 @@ const otaProgress = ref(0)
 const otaSection = ref(null)
 const showCountdown = ref(false)
 const countdown = ref(30)
-const showStatusModal = ref(false)
-const statusTitle = ref('')
-const statusMessage = ref('')
-const statusIcon = ref('')
-const statusType = ref('info') // info, success, error, warning
-const statusPersistent = ref(false)
 const showChangelogModal = ref(false)
 
 const showUpdateBanner = computed(() => {
@@ -291,7 +293,7 @@ const executeUpload = async () => {
     })
     startCountdown()
   } catch (error) {
-    showStatus('Error', error.response?.data?.error || error.message, '❌', 'error')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message })
   } finally {
     uploading.value = false
     uploadProgress.value = 0
@@ -307,18 +309,18 @@ const startOtaUpdate = async () => {
   otaUpdating.value = true
   otaProgress.value = 0
 
-  showStatus('Downloading', t('firmware.otaProgress'), '📥', 'info', true)
+  uiStore.pushToast({ type: 'info', title: t('firmware.title'), message: t('firmware.otaProgress'), duration: 2200 })
 
   try {
     const response = await axios.post('/api/ota_url', { url: updateUrl })
 
     if (response.data.success) {
       await pollOtaStatus()
-      showStatus('Success', t('firmware.otaSuccess'), '✓', 'success', true)
+      uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.otaSuccess'), duration: 2400 })
       setTimeout(startCountdown, 1000)
     }
   } catch (error) {
-    showStatus('Error', error.response?.data?.error || error.message || 'OTA update failed', '❌', 'error')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message || 'OTA update failed' })
   } finally {
     otaUpdating.value = false
   }
@@ -351,17 +353,7 @@ const pollOtaStatus = () => {
   })
 }
 
-const showStatus = (title, message, icon, type = 'info', persistent = false) => {
-  statusTitle.value = title
-  statusMessage.value = message
-  statusIcon.value = icon
-  statusType.value = type
-  statusPersistent.value = persistent
-  showStatusModal.value = true
-}
-
 const startCountdown = () => {
-  showStatusModal.value = false
   showCountdown.value = true
   countdown.value = 30
   const timer = setInterval(() => {
@@ -377,6 +369,7 @@ const restartClick = async () => {
   if (!confirm(t('firmware.restartConfirm'))) return
   try {
     await axios.post('/api/restart')
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
     startCountdown()
   } catch (e) {
     startCountdown() // Assume success if network drops
@@ -387,6 +380,7 @@ const factoryResetClick = async () => {
   if (confirm(t('firmware.factoryResetConfirm'))) {
     try {
       await axios.post('/api/factory-reset')
+      uiStore.pushToast({ type: 'warning', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
       startCountdown()
     } catch (e) {
       startCountdown()
@@ -403,9 +397,9 @@ const manualCheckForUpdate = async () => {
   await updateStore.checkForUpdate(sysInfoStore.currentVersion)
 
   if (updateStore.checkError) {
-    showStatus(t('common.error'), t('firmware.checkFailed') + ': ' + updateStore.checkError, '❌', 'error')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: `${t('firmware.checkFailed')}: ${updateStore.checkError}` })
   } else {
-    showStatus(t('common.success'), t('firmware.checkSuccess'), '✓', 'success')
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.checkSuccess'), duration: 2200 })
   }
 }
 
@@ -447,37 +441,11 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-xl);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-}
-
-.icon-wrapper {
-  font-size: 2.5rem;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg);
-  border-radius: var(--radius-lg);
-}
-
-.text-wrapper h1 {
-  font-size: 1.5rem;
-  margin: 0;
-}
-
-.text-wrapper p {
-  margin: 0;
-  color: var(--color-text-secondary);
 }
 
 .version-badge {
   margin-left: auto;
   text-align: right;
-  background: var(--color-bg);
   padding: 8px 16px;
   border-radius: var(--radius-lg);
   display: flex;
@@ -544,7 +512,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
 }
 
-.banner-icon { font-size: 1.5rem; }
+.banner-icon { font-size: 1.5rem; display: flex; }
 .banner-content { flex: 1; }
 .banner-content p { margin: 0; opacity: 0.9; font-size: 0.9375rem; }
 
@@ -629,7 +597,7 @@ onUnmounted(() => {
   background: var(--color-success-light);
 }
 
-.upload-icon { font-size: 2.5rem; margin-bottom: var(--spacing-sm); opacity: 0.5; }
+.upload-icon { font-size: 2.5rem; margin-bottom: var(--spacing-sm); opacity: 0.5; display: flex; }
 .upload-text { color: var(--color-text-secondary); font-weight: 500; }
 
 .file-preview {
@@ -639,7 +607,7 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.file-icon { font-size: 2rem; }
+.file-icon { font-size: 2rem; display: flex; }
 .file-details { flex: 1; text-align: left; overflow: hidden; }
 .file-name { display: block; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
 .file-size { color: var(--color-text-secondary); font-size: 0.8125rem; }
@@ -703,6 +671,11 @@ onUnmounted(() => {
 .update-icon {
   font-size: 1.5rem;
   animation: bounce 2s infinite;
+  display: flex;
+}
+
+.chip-btn.static {
+  cursor: default;
 }
 
 .update-text {
@@ -734,6 +707,7 @@ onUnmounted(() => {
 
 .check-icon {
   font-size: 1.125rem;
+  display: flex;
 }
 
 .check-btn {
@@ -835,7 +809,7 @@ onUnmounted(() => {
 .action-tile.warning:hover { background: var(--color-warning-light); }
 .action-tile.danger:hover { background: var(--color-danger-light); }
 
-.tile-icon { font-size: 2rem; }
+.tile-icon { font-size: 2rem; display: flex; }
 .tile-text h4 { margin: 0; font-size: 1rem; }
 .tile-text p { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); }
 
@@ -900,24 +874,6 @@ onUnmounted(() => {
   background: white;
   transition: width 1s linear;
 }
-
-/* Modals */
-:deep(.status-modal-content) {
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  border: none;
-}
-
-.status-modal-body {
-  padding: var(--spacing-xl);
-  text-align: center;
-}
-
-.status-modal-body.error { border-top: 6px solid var(--color-danger); }
-.status-modal-body.success { border-top: 6px solid var(--color-success); }
-.status-modal-body.info { border-top: 6px solid var(--color-info); }
-
-.status-icon-large { font-size: 4rem; margin-bottom: var(--spacing-md); }
 
 @media (max-width: 768px) {
   .firmware-page {
@@ -997,6 +953,12 @@ onUnmounted(() => {
     text-align: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-md);
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   /* Countdown */

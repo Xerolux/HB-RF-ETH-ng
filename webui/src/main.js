@@ -19,6 +19,7 @@ import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import SystemLog from './systemlog.vue'
+import AppIcon from './components/AppIcon.vue'
 
 
 // Router
@@ -109,7 +110,18 @@ const i18n = createI18n({
 
 // Create Bootstrap Vue Next
 import { createBootstrap } from 'bootstrap-vue-next'
-import * as BootstrapVueNext from 'bootstrap-vue-next'
+import {
+  BAlert,
+  BButton,
+  BCard,
+  BForm,
+  BFormGroup,
+  BFormInput,
+  BFormInvalidFeedback,
+  BFormSelect,
+  BFormSelectOption,
+  BModal
+} from 'bootstrap-vue-next'
 
 // Create and mount app
 const app = createApp(App)
@@ -119,16 +131,21 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 app.use(createBootstrap({
-    components: true,
+    components: false,
     directives: true,
 }))
 
-// Register all BootstrapVueNext components globally
-for (const key in BootstrapVueNext) {
-  if (key.startsWith('B')) {
-    app.component(key, BootstrapVueNext[key])
-  }
-}
+app.component('BAlert', BAlert)
+app.component('BButton', BButton)
+app.component('BCard', BCard)
+app.component('BForm', BForm)
+app.component('BFormGroup', BFormGroup)
+app.component('BFormInput', BFormInput)
+app.component('BFormInvalidFeedback', BFormInvalidFeedback)
+app.component('BFormSelect', BFormSelect)
+app.component('BFormSelectOption', BFormSelectOption)
+app.component('BModal', BModal)
+app.component('AppIcon', AppIcon)
 
 // Initialize theme
 const themeStore = useThemeStore()

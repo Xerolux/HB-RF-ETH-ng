@@ -1,5 +1,25 @@
 <template>
-  <div class="settings-page">
+  <div class="settings-page page-shell">
+    <section class="page-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">
+          <AppIcon name="settings" />
+          {{ t('nav.settings') }}
+        </span>
+        <h1 class="hero-title">{{ t('nav.settings') }}</h1>
+        <p class="hero-subtitle">{{ t('settings.networkSettings') }} · {{ t('settings.timeSettings') }} · {{ t('settings.backupRestore') }}</p>
+      </div>
+      <div class="hero-meta">
+        <span class="meta-chip"><AppIcon name="shield" /> {{ t('settings.security') }}</span>
+        <span class="meta-chip"><AppIcon name="network" /> IPv4 / IPv6</span>
+        <span class="meta-chip"><AppIcon name="backup" /> Backup</span>
+        <span class="meta-chip" :class="hasUnsavedChanges ? 'warning-chip' : ''">
+          <AppIcon :name="hasUnsavedChanges ? 'alert' : 'check'" />
+          {{ hasUnsavedChanges ? 'Unsaved changes' : 'Saved' }}
+        </span>
+      </div>
+    </section>
+
     <!-- Tabs Navigation (iOS Style Segmented Control) -->
     <div class="tabs-container">
       <div class="segmented-control">
@@ -9,6 +29,7 @@
           :class="['segment-btn', { active: activeTab === tab.id }]"
           @click="activeTab = tab.id"
         >
+          <AppIcon :name="tab.icon" />
           <span class="segment-label">{{ tab.label }}</span>
         </button>
       </div>
@@ -350,7 +371,7 @@
 
     <!-- Floating Action Bar for Save -->
     <Transition name="slide-up">
-      <div class="floating-footer">
+      <div v-if="hasUnsavedChanges || showError" class="floating-footer">
         <div class="footer-container">
           <BAlert
             variant="danger"
@@ -362,24 +383,24 @@
           >{{ showError || t("settings.saveError") }}</BAlert>
 
           <BButton
+            variant="outline-secondary"
+            size="lg"
+            @click="resetToLoadedState"
+            :disabled="!hasUnsavedChanges"
+            class="discard-btn"
+          >
+            Discard
+          </BButton>
+
+          <BButton
             variant="primary"
             size="lg"
             @click="saveSettingsClick"
-            :disabled="v$.$error"
+            :disabled="v$.$error || !hasUnsavedChanges"
             class="save-btn"
           >
             {{ t('common.save') }}
           </BButton>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- Save Success Overlay -->
-    <Transition name="fade">
-      <div v-if="showSaveSuccess" class="success-overlay" @click="showSaveSuccess = false">
-        <div class="success-card">
-          <div class="success-icon">✓</div>
-          <h3>{{ t('settings.saveSuccess') }}</h3>
         </div>
       </div>
     </Transition>
@@ -410,7 +431,7 @@
 
 <script setup>
 import axios from 'axios'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVuelidate } from '@vuelidate/core'
 import {
@@ -423,14 +444,15 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore, useLoginStore } from './stores.js'
+import { useSettingsStore, useLoginStore, useUiStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const loginStore = useLoginStore()
+const uiStore = useUiStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -453,10 +475,10 @@ watch(() => route.query.tab, (newTab) => {
 })
 
 const tabs = computed(() => [
-  { id: 'general', label: t('settings.tabGeneral') },
-  { id: 'network', label: t('settings.tabNetwork') },
-  { id: 'time', label: t('settings.tabTime') },
-  { id: 'backup', label: t('settings.tabBackup') }
+  { id: 'general', label: t('settings.tabGeneral'), icon: 'shield' },
+  { id: 'network', label: t('settings.tabNetwork'), icon: 'network' },
+  { id: 'time', label: t('settings.tabTime'), icon: 'clock' },
+  { id: 'backup', label: t('settings.tabBackup'), icon: 'backup' }
 ])
 
 const timeSources = computed(() => [
@@ -536,9 +558,9 @@ const setLedProgramValue = (programId, value) => {
 }
 
 const showError = ref(null)  // Can be null or a string with error message
-const showSaveSuccess = ref(false)
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
+const loadedSnapshot = ref('')
 
 // Computed flags
 const isNtpActivated = computed(() => timesource.value === 0)
@@ -640,6 +662,34 @@ const v$ = useVuelidate(rules, {
   dcfOffset
 })
 
+const buildSettingsPayload = () => ({
+  hostname: hostname.value,
+  useDHCP: useDHCP.value,
+  localIP: localIP.value,
+  netmask: netmask.value,
+  gateway: gateway.value,
+  dns1: dns1.value,
+  dns2: dns2.value,
+  ccuIP: ccuIP.value,
+  timesource: timesource.value,
+  dcfOffset: dcfOffset.value,
+  gpsBaudrate: gpsBaudrate.value,
+  ntpServer: ntpServer.value,
+  ledBrightness: ledBrightness.value,
+  ledPrograms: { ...ledProgramValues.value },
+  enableIPv6: enableIPv6.value,
+  ipv6Mode: ipv6Mode.value,
+  ipv6Address: ipv6Address.value,
+  ipv6PrefixLength: ipv6PrefixLength.value,
+  ipv6Gateway: ipv6Gateway.value,
+  ipv6Dns1: ipv6Dns1.value,
+  ipv6Dns2: ipv6Dns2.value
+})
+
+const serializeSettings = () => JSON.stringify(buildSettingsPayload())
+
+const hasUnsavedChanges = computed(() => loadedSnapshot.value !== '' && serializeSettings() !== loadedSnapshot.value)
+
 // Load settings from store
 const loadSettings = () => {
   hostname.value = settingsStore.hostname
@@ -671,6 +721,10 @@ const loadSettings = () => {
     ipv6Dns1.value = settingsStore.ipv6Dns1 || ''
     ipv6Dns2.value = settingsStore.ipv6Dns2 || ''
   }
+
+  loadedSnapshot.value = serializeSettings()
+  showError.value = null
+  v$.value.$reset()
 }
 
 // Watch store changes
@@ -681,7 +735,23 @@ watch(() => settingsStore.$state, () => {
 onMounted(async () => {
   await settingsStore.load()
   loadSettings()
+  window.addEventListener('beforeunload', handleBeforeUnload)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
+
+onBeforeRouteLeave(() => {
+  if (!hasUnsavedChanges.value) return true
+  return window.confirm('You have unsaved changes. Leave this page anyway?')
+})
+
+const handleBeforeUnload = (event) => {
+  if (!hasUnsavedChanges.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
 
 const handleFileSelect = (event) => {
   restoreFile.value = event.target.files[0]
@@ -694,45 +764,36 @@ const saveSettingsClick = async () => {
   showError.value = null
 
   try {
-    const settings = {
-      hostname: hostname.value,
-      useDHCP: useDHCP.value,
-      localIP: localIP.value,
-      netmask: netmask.value,
-      gateway: gateway.value,
-      dns1: dns1.value,
-      dns2: dns2.value,
-      ccuIP: ccuIP.value,
-      timesource: timesource.value,
-      dcfOffset: dcfOffset.value,
-      gpsBaudrate: gpsBaudrate.value,
-      ntpServer: ntpServer.value,
-      ledBrightness: ledBrightness.value,
-      // LED Programs
-      ledPrograms: ledProgramValues.value,
-      // IPv6 settings
-      enableIPv6: enableIPv6.value,
-      ipv6Mode: ipv6Mode.value,
-      ipv6Address: ipv6Address.value,
-      ipv6PrefixLength: ipv6PrefixLength.value,
-      ipv6Gateway: ipv6Gateway.value,
-      ipv6Dns1: ipv6Dns1.value,
-      ipv6Dns2: ipv6Dns2.value
-    }
+    const settings = buildSettingsPayload()
 
     await settingsStore.save(settings)
+    loadedSnapshot.value = serializeSettings()
 
-    // Show success popup and auto-dismiss after 2.5 seconds
-    showSaveSuccess.value = true
+    uiStore.pushToast({
+      type: 'success',
+      title: t('common.success'),
+      message: t('settings.saveSuccess'),
+      duration: 2200
+    })
     setTimeout(() => {
-      showSaveSuccess.value = false
       showRestartModal.value = true
-    }, 2500)
+    }, 700)
   } catch (error) {
     // Extract specific error message from backend response
     const errorMsg = error.response?.data?.error || error.response?.data || t('settings.saveError')
     showError.value = errorMsg
+    uiStore.pushToast({
+      type: 'error',
+      title: t('common.error'),
+      message: String(errorMsg)
+    })
   }
+}
+
+const resetToLoadedState = () => {
+  if (!hasUnsavedChanges.value) return
+  if (!window.confirm('Discard your unsaved changes and restore the last loaded values?')) return
+  loadSettings()
 }
 
 const performRestart = async () => {
@@ -740,11 +801,11 @@ const performRestart = async () => {
   try {
     await axios.post('/api/restart')
     showRestartModal.value = false
-    alert(t('firmware.restartingText'))
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1800 })
     window.location.reload()
   } catch (e) {
     console.error("Restart request failed", e)
-    alert("Error restarting device")
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: 'Error restarting device' })
     isRestarting.value = false
   }
 }
@@ -762,7 +823,7 @@ const downloadBackup = async () => {
     window.URL.revokeObjectURL(url)
   } catch (error) {
     console.error('Backup download failed:', error)
-    alert(t('settings.backupError'))
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.backupError') })
   }
 }
 
@@ -777,15 +838,15 @@ const restoreSettings = async () => {
       try {
         const json = JSON.parse(e.target.result)
         await axios.post('/api/restore', json)
-        alert(t('settings.restoreSuccess'))
+        uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('settings.restoreSuccess'), duration: 1500 })
         window.location.reload()
       } catch (err) {
-        alert(t('settings.restoreError') + ': ' + err.message)
+        uiStore.pushToast({ type: 'error', title: t('common.error'), message: `${t('settings.restoreError')}: ${err.message}` })
       }
     }
     reader.readAsText(restoreFile.value)
   } catch (e) {
-    alert(t('settings.restoreError'))
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restoreError') })
   }
 }
 </script>
@@ -806,10 +867,11 @@ const restoreSettings = async () => {
   display: inline-flex;
   background-color: var(--color-border-light);
   padding: 4px;
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   position: relative;
   width: 100%;
   max-width: 600px;
+  gap: 4px;
 }
 
 .segment-btn {
@@ -826,6 +888,10 @@ const restoreSettings = async () => {
   position: relative;
   z-index: 1;
   text-align: center;
+  gap: 8px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .segment-btn.active {
@@ -1066,40 +1132,19 @@ hr {
   box-shadow: var(--shadow-lg);
 }
 
+.discard-btn {
+  min-width: 132px;
+  box-shadow: var(--shadow-lg);
+}
+
 .footer-alert {
   flex: 1;
   margin: 0;
   box-shadow: var(--shadow-lg);
 }
 
-/* Success Overlay */
-.success-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.2);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.success-card {
-  background: var(--color-surface);
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-xl);
-  text-align: center;
-  box-shadow: var(--shadow-xl);
-  min-width: 300px;
-}
-
-.success-icon {
-  font-size: 3rem;
-  color: var(--color-success);
-  margin-bottom: var(--spacing-md);
+.warning-chip {
+  color: var(--color-warning);
 }
 
 /* Transitions */
@@ -1230,12 +1275,6 @@ hr {
 
   .footer-container {
     flex-direction: column;
-  }
-
-  .success-card {
-    min-width: 0;
-    width: 90%;
-    max-width: 300px;
   }
 }
 

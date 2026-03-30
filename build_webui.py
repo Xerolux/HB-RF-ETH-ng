@@ -33,18 +33,31 @@ def build_web():
         print("Building web UI...")
 
         npm_cmd = "npm.cmd" if platform.system() == "Windows" else "npm"
+        package_lock = Path("package-lock.json")
+        node_modules = Path("node_modules")
+        lock_stamp = node_modules / ".package-lock.json"
 
-        # Always install/update dependencies to ensure we have the latest packages
-        # Use 'npm ci' if package-lock.json exists for faster, reproducible builds
-        print("Installing npm dependencies...")
-        if Path("package-lock.json").exists():
-            result = run([npm_cmd, "ci"], capture_output=True, text=True, encoding="utf-8")
+        should_install = (
+            not node_modules.exists() or
+            not lock_stamp.exists() or
+            (
+                package_lock.exists() and
+                package_lock.stat().st_mtime > lock_stamp.stat().st_mtime
+            )
+        )
+
+        if should_install:
+            print("Installing npm dependencies...")
+            if package_lock.exists():
+                result = run([npm_cmd, "ci"], capture_output=True, text=True, encoding="utf-8")
+            else:
+                result = run([npm_cmd, "install"], capture_output=True, text=True, encoding="utf-8")
+
+            if result.returncode != 0:
+                print(f"ERROR: npm install failed:\n{result.stderr}")
+                return
         else:
-            result = run([npm_cmd, "install"], capture_output=True, text=True, encoding="utf-8")
-
-        if result.returncode != 0:
-            print(f"ERROR: npm install failed:\n{result.stderr}")
-            return
+            print("npm dependencies are up to date, skipping install.")
 
         # Build the web UI
         result = run([npm_cmd, "run", "build"], capture_output=True, text=True, encoding="utf-8")

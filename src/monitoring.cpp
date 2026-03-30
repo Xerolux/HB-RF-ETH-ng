@@ -14,9 +14,12 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "lwip/sockets.h"
+#include "lwip/netdb.h"
 #include "esp_app_format.h"
 #include "esp_ota_ops.h"
 #include "esp_timer.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -547,4 +550,116 @@ esp_err_t monitoring_get_config(monitoring_config_t *config)
     memcpy(config, &current_config, sizeof(monitoring_config_t));
     xSemaphoreGive(config_mutex);
     return ESP_OK;
+}
+
+static esp_err_t tcp_probe_endpoint(const char *host, uint16_t port, int timeout_ms, char *message, size_t message_len)
+{
+    if (host == NULL || host[0] == '\0') {
+        snprintf(message, message_len, "No server configured");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    char port_str[8];
+    snprintf(port_str, sizeof(port_str), "%u", port);
+
+    struct addrinfo hints = {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    struct addrinfo *results = NULL;
+    int gai_err = getaddrinfo(host, port_str, &hints, &results);
+    if (gai_err != 0 || results == NULL) {
+        snprintf(message, message_len, "DNS resolution failed for %s:%u", host, port);
+        return ESP_FAIL;
+    }
+
+    esp_err_t probe_result = ESP_FAIL;
+
+    for (struct addrinfo *addr = results; addr != NULL; addr = addr->ai_next) {
+        int sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+        if (sock < 0) {
+            continue;
+        }
+
+        int flags = fcntl(sock, F_GETFL, 0);
+        if (flags >= 0) {
+            fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+        }
+
+        int ret = connect(sock, addr->ai_addr, addr->ai_addrlen);
+        if (ret == 0) {
+            probe_result = ESP_OK;
+        } else if (errno == EINPROGRESS || errno == EWOULDBLOCK) {
+            fd_set writefds;
+            FD_ZERO(&writefds);
+            FD_SET(sock, &writefds);
+
+            struct timeval timeout = {
+                .tv_sec = timeout_ms / 1000,
+                .tv_usec = (timeout_ms % 1000) * 1000
+            };
+
+            ret = select(sock + 1, NULL, &writefds, NULL, &timeout);
+            if (ret > 0) {
+                int so_error = 0;
+                socklen_t optlen = sizeof(so_error);
+                if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_error, &optlen) == 0 && so_error == 0) {
+                    probe_result = ESP_OK;
+                }
+            }
+        }
+
+        close(sock);
+
+        if (probe_result == ESP_OK) {
+            snprintf(message, message_len, "TCP connection to %s:%u succeeded", host, port);
+            break;
+        }
+    }
+
+    freeaddrinfo(results);
+
+    if (probe_result != ESP_OK) {
+        snprintf(message, message_len, "TCP connection to %s:%u failed", host, port);
+    }
+
+    return probe_result;
+}
+
+esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message, size_t message_len)
+{
+    if (target == NULL || ok == NULL || message == NULL || message_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *ok = false;
+    message[0] = '\0';
+
+    if (strcmp(target, "checkmk") == 0) {
+        if (!current_config.checkmk.enabled) {
+            snprintf(message, message_len, "CheckMK is disabled");
+            return ESP_OK;
+        }
+
+        *ok = checkmk_running && checkmk_listen_sock >= 0;
+        snprintf(message, message_len, *ok
+            ? "CheckMK agent listening on TCP port %u"
+            : "CheckMK is enabled but listener is not ready",
+            current_config.checkmk.port);
+        return ESP_OK;
+    }
+
+    if (strcmp(target, "mqtt") == 0) {
+        if (!current_config.mqtt.enabled) {
+            snprintf(message, message_len, "MQTT is disabled");
+            return ESP_OK;
+        }
+
+        esp_err_t probe = tcp_probe_endpoint(current_config.mqtt.server, current_config.mqtt.port, 3000, message, message_len);
+        *ok = (probe == ESP_OK);
+        return ESP_OK;
+    }
+
+    snprintf(message, message_len, "Unknown diagnostic target");
+    return ESP_ERR_NOT_SUPPORTED;
 }

@@ -3,6 +3,7 @@ Script to rename Vite/Parcel output files with content hashes to fixed names
 """
 from pathlib import Path
 import shutil
+import gzip
 
 try:
     Import("env")
@@ -33,7 +34,6 @@ def rename_webui_files():
         matches = list(dist_dir.glob(pattern))
 
         if not matches:
-            print(f"WARNING: No files matching {pattern}")
             continue
 
         source = matches[0]
@@ -56,19 +56,8 @@ def rename_webui_files():
     index_html = dist_dir / "index.html"
     index_html_gz = dist_dir / "index.html.gz"
 
-    # First, ensure index.html.gz exists
-    if index_html.exists() and not index_html_gz.exists():
-        import gzip
-        with open(index_html, 'rb') as f_in:
-            with gzip.open(index_html_gz, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
-        print("Created index.html.gz")
-
-    if index_html_gz.exists():
-        import gzip
-
-        # Decompress
-        with gzip.open(index_html_gz, 'rt', encoding='utf-8') as f:
+    if index_html.exists():
+        with open(index_html, 'r', encoding='utf-8') as f:
             html_content = f.read()
 
         # Replace old filenames with new ones
@@ -84,15 +73,13 @@ def rename_webui_files():
             html_content = html_content.replace(old_favicon, "favicon.ico")
             print(f"Replaced {old_favicon} -> favicon.ico in index.html")
 
-        # Recompress
-        with gzip.open(index_html_gz, 'wt', encoding='utf-8') as f:
-            f.write(html_content)
-        print("Updated index.html.gz with new filenames")
-
-        # Also update uncompressed index.html
         with open(index_html, 'w', encoding='utf-8') as f:
             f.write(html_content)
         print("Updated index.html with new filenames")
+
+        with gzip.open(index_html_gz, 'wt', encoding='utf-8') as f:
+            f.write(html_content)
+        print("Created index.html.gz")
 
     # Handle favicon - copy from webui root and compress
     webui_favicon = Path("webui/favicon.ico")
@@ -113,12 +100,22 @@ def rename_webui_files():
 
         # Compress favicon
         if dist_favicon.exists():
-            import gzip
             with open(dist_favicon, 'rb') as f_in:
                 with gzip.open(favicon_gz, 'wb') as f_out:
                     shutil.copyfileobj(f_in, f_out)
             print("Created favicon.ico.gz")
     else:
         print("WARNING: webui/favicon.ico not found")
+
+    for filename in ["main.js", "main.css"]:
+        source = dist_dir / filename
+        target = dist_dir / f"{filename}.gz"
+        if source.exists():
+            with open(source, 'rb') as f_in:
+                with gzip.open(target, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            print(f"Created {target.name}")
+        else:
+            print(f"WARNING: {filename} not found in dist")
 
 rename_webui_files()

@@ -1,18 +1,10 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import viteCompression from 'vite-plugin-compression'
 import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [
-    vue(),
-    viteCompression({
-      algorithm: 'gzip',
-      ext: '.gz',
-      threshold: 0,
-      deleteOriginFile: false,
-      filter: /\.(html|xml|css|json|js|mjs|svg|yaml|yml|toml|ico)$/
-    })
+    vue()
   ],
   resolve: {
     alias: {
@@ -39,7 +31,8 @@ export default defineConfig({
     },
     cssCodeSplit: false,
     minify: 'esbuild',
-    target: 'es2015'
+    target: 'es2020',
+    chunkSizeWarningLimit: 1000
   },
   server: {
     port: 1234,

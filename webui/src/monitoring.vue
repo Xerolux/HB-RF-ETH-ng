@@ -1,15 +1,41 @@
 <template>
-  <div class="monitoring-page">
-    <div class="page-header">
-      <h3>{{ t('monitoring.title') }}</h3>
-      <p class="text-secondary">{{ t('monitoring.description') }}</p>
-    </div>
+  <div class="page-shell monitoring-page">
+    <section class="page-hero">
+      <div class="hero-copy">
+        <span class="hero-eyebrow">
+          <AppIcon name="monitoring" />
+          {{ t('monitoring.title') }}
+        </span>
+        <h1 class="hero-title">{{ t('monitoring.title') }}</h1>
+        <p class="hero-subtitle">{{ t('monitoring.description') }}</p>
+      </div>
+      <div class="hero-meta">
+        <span class="meta-chip"><AppIcon name="activity" /> MQTT</span>
+        <span class="meta-chip"><AppIcon name="logs" /> CheckMK</span>
+      </div>
+    </section>
 
-    <!-- CheckMK Configuration -->
-    <div class="settings-card">
+    <section class="diagnostics-grid">
+      <article v-for="item in diagnosticCards" :key="item.key" class="diagnostic-card card-glass">
+        <div class="diagnostic-copy">
+          <span class="icon-badge" :class="item.tone"><AppIcon :name="item.icon" /></span>
+          <div>
+            <h3>{{ item.title }}</h3>
+            <p>{{ diagnosticState(item.key).message }}</p>
+          </div>
+        </div>
+        <button class="tool-btn" type="button" :disabled="diagnosticBusy[item.key]" @click="runDiagnostic(item.key)">
+          <span v-if="diagnosticBusy[item.key]" class="spinner-border spinner-border-sm me-2"></span>
+          <AppIcon v-else name="refresh" />
+          Test
+        </button>
+      </article>
+    </section>
+
+    <div class="settings-card card-glass">
       <div class="card-header">
         <div class="header-content">
-          <div class="header-icon bg-danger-light text-danger">🔍</div>
+          <div class="header-icon bg-danger-light text-danger"><AppIcon name="search" /></div>
           <h3>{{ t('monitoring.checkmk.title') }}</h3>
         </div>
         <div class="form-check form-switch">
@@ -35,11 +61,10 @@
       </Transition>
     </div>
 
-    <!-- MQTT Configuration -->
-    <div class="settings-card">
+    <div class="settings-card card-glass">
       <div class="card-header">
         <div class="header-content">
-          <div class="header-icon bg-success-light text-success">🔄</div>
+          <div class="header-icon bg-success-light text-success"><AppIcon name="activity" /></div>
           <h3>{{ t('monitoring.mqtt.title') }}</h3>
         </div>
         <div class="form-check form-switch">
@@ -97,7 +122,6 @@
       </Transition>
     </div>
 
-    <!-- Floating Action Bar for Save -->
     <Transition name="slide-up">
       <div class="floating-footer">
         <div class="footer-container">
@@ -114,48 +138,36 @@
         </div>
       </div>
     </Transition>
-
-    <!-- Success/Error Toasts -->
-    <Transition name="fade">
-      <div v-if="showSuccess" class="toast-overlay success">
-        <div class="toast-card">
-          <span class="toast-icon">✓</span>
-          <span class="toast-message">{{ t('monitoring.saveSuccess') }}</span>
-        </div>
-      </div>
-    </Transition>
-
-    <Transition name="fade">
-      <div v-if="showError" class="toast-overlay error">
-        <div class="toast-card">
-          <span class="toast-icon">⚠️</span>
-          <span class="toast-message">{{ showError || t('monitoring.saveError') }}</span>
-          <button @click="showError = null" class="toast-close">✕</button>
-        </div>
-      </div>
-    </Transition>
-
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useMonitoringStore } from './stores.js'
+import { useMonitoringStore, useUiStore } from './stores.js'
 import { storeToRefs } from 'pinia'
 
 const { t } = useI18n()
 
 const monitoringStore = useMonitoringStore()
-// Use refs to make them reactive but disconnected from store state until save?
-// No, storeToRefs keeps them reactive. We modify store state directly.
-// Ideally we should clone them to local state and only save on button press,
-// but Pinia state is mutable. Let's keep it simple as per original implementation.
+const uiStore = useUiStore()
 const { checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
 
-const showSuccess = ref(false)
-const showError = ref(null)  // Can be null or a string with error message
 const saving = ref(false)
+const diagnosticBusy = ref({ checkmk: false, mqtt: false })
+
+const diagnosticCards = computed(() => [
+  { key: 'checkmk', title: 'CheckMK', icon: 'logs', tone: 'warning' },
+  { key: 'mqtt', title: 'MQTT', icon: 'activity', tone: 'success' }
+])
+
+const diagnosticState = (target) => {
+  const result = monitoringStore.diagnostics[target]
+  if (!result) {
+    return { ok: null, message: 'Run a quick self-test to verify the current configuration.' }
+  }
+  return result
+}
 
 onMounted(async () => {
   try {
@@ -166,33 +178,53 @@ onMounted(async () => {
 })
 
 const saveConfig = async () => {
-  // Frontend validation
   if (mqttConfig.value.enabled && !mqttConfig.value.server) {
-    showError.value = t('monitoring.mqtt.serverRequired')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('monitoring.mqtt.serverRequired') })
     return
   }
 
   saving.value = true
-  showSuccess.value = false
-  showError.value = null
 
   try {
-    // Force a small delay to show loading state
-    await new Promise(resolve => setTimeout(resolve, 500))
-
     await monitoringStore.save({
       checkmk: checkmkConfig.value,
       mqtt: mqttConfig.value
     })
 
-    showSuccess.value = true
-    setTimeout(() => { showSuccess.value = false }, 3000)
+    uiStore.pushToast({
+      type: 'success',
+      title: t('common.success'),
+      message: t('monitoring.saveSuccess')
+    })
   } catch (error) {
-    // Extract specific error message from backend JSON response
-    const errorMsg = error.response?.data?.error || t('monitoring.saveError')
-    showError.value = errorMsg
+    uiStore.pushToast({
+      type: 'error',
+      title: t('common.error'),
+      message: error.response?.data?.error || t('monitoring.saveError')
+    })
   } finally {
     saving.value = false
+  }
+}
+
+const runDiagnostic = async (target) => {
+  diagnosticBusy.value[target] = true
+  try {
+    const result = await monitoringStore.test(target)
+    uiStore.pushToast({
+      type: result.ok ? 'success' : 'warning',
+      title: result.ok ? t('common.success') : 'Check finished',
+      message: result.message,
+      duration: 2800
+    })
+  } catch (error) {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('common.error'),
+      message: error.response?.data?.error || 'Diagnostic request failed'
+    })
+  } finally {
+    diagnosticBusy.value[target] = false
   }
 }
 </script>
@@ -204,20 +236,51 @@ const saveConfig = async () => {
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: var(--spacing-xl);
-  text-align: center;
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
 }
 
-.page-header h3 {
-  font-size: 1.5rem;
-  margin-bottom: var(--spacing-xs);
+.diagnostic-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+}
+
+.diagnostic-copy {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.diagnostic-copy h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.diagnostic-copy p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-border-light);
+  background: rgba(255, 255, 255, 0.68);
+  border-radius: var(--radius-full);
+  padding: 10px 14px;
+  color: var(--color-text);
 }
 
 .settings-card {
-  background: var(--color-surface);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
   margin-bottom: var(--spacing-lg);
   overflow: hidden;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -261,7 +324,6 @@ const saveConfig = async () => {
   padding-top: var(--spacing-lg);
 }
 
-/* Floating Footer */
 .floating-footer {
   position: fixed;
   bottom: 0;
@@ -289,59 +351,6 @@ const saveConfig = async () => {
   font-size: 1.1rem;
 }
 
-/* Toast Messages */
-.toast-overlay {
-  position: fixed;
-  top: var(--spacing-xl);
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  z-index: 2000;
-  pointer-events: none;
-}
-
-.toast-card {
-  background: var(--color-surface);
-  padding: var(--spacing-md) var(--spacing-xl);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-xl);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  pointer-events: auto;
-  min-width: 300px;
-}
-
-.success .toast-card {
-  border-left: 4px solid var(--color-success);
-}
-
-.error .toast-card {
-  border-left: 4px solid var(--color-danger);
-}
-
-.toast-icon {
-  font-size: 1.25rem;
-}
-
-.success .toast-icon { color: var(--color-success); }
-.error .toast-icon { color: var(--color-danger); }
-
-.toast-message {
-  font-weight: 600;
-  flex: 1;
-}
-
-.toast-close {
-  background: transparent;
-  border: none;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-/* Transitions */
 .expand-enter-active,
 .expand-leave-active {
   transition: all 0.3s ease;
@@ -369,49 +378,34 @@ const saveConfig = async () => {
   transform: translateY(100%);
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-20px);
-}
-
-/* Utility Colors */
-.bg-info-light { background-color: var(--color-info-light); }
 .bg-danger-light { background-color: var(--color-danger-light); }
 .bg-success-light { background-color: var(--color-success-light); }
-.text-info { color: var(--color-info); }
 .text-danger { color: var(--color-danger); }
 .text-success { color: var(--color-success); }
 
-/* Form Text */
 .form-text {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   margin-top: 4px;
 }
 
-/* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
   .monitoring-page {
     padding-bottom: 100px;
   }
 
-  .page-header {
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .page-header h3 {
-    font-size: 1.25rem;
-  }
-
   .settings-card {
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-md);
+  }
+
+  .diagnostics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostic-card {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .card-header {
@@ -441,13 +435,6 @@ const saveConfig = async () => {
   .save-btn {
     font-size: 1rem;
     padding: 0.875rem;
-  }
-
-  .toast-card {
-    min-width: 0;
-    width: 90%;
-    max-width: 300px;
-    margin: 0 auto;
   }
 }
 </style>

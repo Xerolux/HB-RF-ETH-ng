@@ -28,6 +28,22 @@ static esp_err_t send_json_error(httpd_req_t *req, const char *message)
     return ESP_OK;
 }
 
+static esp_err_t send_monitoring_test_response(httpd_req_t *req, const char *target, bool ok, const char *message)
+{
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "target", target);
+    cJSON_AddBoolToObject(root, "ok", ok);
+    cJSON_AddStringToObject(root, "message", message);
+
+    char *json_string = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, json_string);
+    free(json_string);
+    return ESP_OK;
+}
+
 // GET /api/monitoring - Get monitoring configuration
 esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 {
@@ -280,5 +296,42 @@ httpd_uri_t post_monitoring_handler = {
     .uri = "/api/monitoring",
     .method = HTTP_POST,
     .handler = post_monitoring_handler_func,
+    .user_ctx = NULL
+};
+
+esp_err_t get_monitoring_test_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    char query[64];
+    char target[16];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK ||
+        httpd_query_key_value(query, "target", target, sizeof(target)) != ESP_OK)
+    {
+        return send_json_error(req, "Missing diagnostic target");
+    }
+
+    bool ok = false;
+    char message[160];
+    esp_err_t result = monitoring_run_diagnostic(target, &ok, message, sizeof(message));
+    if (result == ESP_ERR_NOT_SUPPORTED) {
+        return send_json_error(req, "Unsupported diagnostic target");
+    }
+    if (result != ESP_OK && message[0] == '\0') {
+        return send_json_error(req, "Diagnostic failed");
+    }
+
+    return send_monitoring_test_response(req, target, ok, message);
+}
+
+httpd_uri_t get_monitoring_test_handler = {
+    .uri = "/api/monitoring/test",
+    .method = HTTP_GET,
+    .handler = get_monitoring_test_handler_func,
     .user_ctx = NULL
 };

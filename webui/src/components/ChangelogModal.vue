@@ -74,13 +74,20 @@ const loading = ref(true)
 const error = ref(null)
 const changelog = ref('')
 
+const escapeHtml = (value) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+
 const renderedChangelog = computed(() => {
   if (!changelog.value) return ''
   try {
-    return marked(changelog.value)
+    return marked.parse(escapeHtml(changelog.value))
   } catch (e) {
     console.error('Error parsing markdown:', e)
-    return `<pre>${changelog.value}</pre>`
+    return `<pre>${escapeHtml(changelog.value)}</pre>`
   }
 })
 

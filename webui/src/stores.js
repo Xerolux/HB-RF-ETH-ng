@@ -21,6 +21,37 @@ export const useThemeStore = defineStore('theme', {
   }
 })
 
+export const useUiStore = defineStore('ui', {
+  state: () => ({
+    toasts: [],
+    nextToastId: 1
+  }),
+  actions: {
+    pushToast(payload) {
+      const toast = {
+        id: this.nextToastId++,
+        type: payload.type || 'info',
+        title: payload.title || '',
+        message: payload.message || '',
+        duration: payload.duration ?? 3000
+      }
+
+      this.toasts.push(toast)
+
+      if (toast.duration > 0) {
+        window.setTimeout(() => {
+          this.removeToast(toast.id)
+        }, toast.duration)
+      }
+
+      return toast.id
+    },
+    removeToast(id) {
+      this.toasts = this.toasts.filter((toast) => toast.id !== id)
+    }
+  }
+})
+
 export const useLoginStore = defineStore('login', {
   state: () => ({
     isLoggedIn: localStorage.getItem("hb-rf-eth-ng-pw") != null,
@@ -279,6 +310,10 @@ export const useMonitoringStore = defineStore('monitoring', {
       topicPrefix: 'hb-rf-eth',
       haDiscoveryEnabled: false,
       haDiscoveryPrefix: 'homeassistant'
+    },
+    diagnostics: {
+      checkmk: null,
+      mqtt: null
     }
   }),
   actions: {
@@ -297,6 +332,16 @@ export const useMonitoringStore = defineStore('monitoring', {
         Object.assign(this.$state, config)
       } catch (error) {
         console.error('Failed to save monitoring config:', error.response?.status || error.message)
+        throw error
+      }
+    },
+    async test(target) {
+      try {
+        const response = await axios.get('/api/monitoring/test', { params: { target } })
+        this.diagnostics[target] = response.data
+        return response.data
+      } catch (error) {
+        console.error('Failed to test monitoring target:', error.response?.status || error.message)
         throw error
       }
     }

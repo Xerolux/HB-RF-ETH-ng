@@ -13,12 +13,13 @@
         <div class="footer-content">
           <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025-2026 Xerolux</small>
           <button class="sponsor-btn" @click="showSponsorModal = true">
-            <span aria-hidden="true">❤️</span> Sponsor
+            <AppIcon name="support" /> Sponsor
           </button>
         </div>
       </footer>
     </div>
 
+    <AppToastContainer />
     <SponsorModal v-model="showSponsorModal" />
   </div>
 </template>
@@ -28,6 +29,7 @@ import { onMounted, ref } from 'vue'
 import { useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
 import SponsorModal from './components/SponsorModal.vue'
+import AppToastContainer from './components/AppToastContainer.vue'
 
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
