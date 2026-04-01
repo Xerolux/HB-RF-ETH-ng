@@ -17,7 +17,7 @@ NEW_HEADER_TEMPLATE = """/*
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.1 and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
