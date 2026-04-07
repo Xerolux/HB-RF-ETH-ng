@@ -1,3 +1,5 @@
 dependencies:
   espressif/mdns:
     version: "^1.4.3"
+  espressif/lan87xx:
+    version: "^1.0.0"
