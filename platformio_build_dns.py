@@ -1,5 +1,5 @@
 import urllib.request
-url = "https://docs.espressif.com/projects/esp-idf/en/v6.0/esp32/migration-guides/release-6.x/6.0/build-system.html"
+url = "https://docs.espressif.com/projects/esp-idf/en/v6.0/esp32/migration-guides/release-6.x/6.0/networking.html"
 try:
     response = urllib.request.urlopen(url)
     print(response.read().decode('utf-8'))
