@@ -48,7 +48,7 @@ jobs:
       - name: Setup Python for version update
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Update all version numbers and changelog
         run: |
@@ -89,7 +89,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: webui/package-lock.json
 
@@ -172,7 +172,7 @@ jobs:
           echo "IS_DRAFT=$IS_DRAFT" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION_TAG }}
           name: HB-RF-ETH-ng ${{ steps.get_version.outputs.VERSION_TAG }}
