@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -47,7 +47,7 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
             {
                 return;
             }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         powerLED->setState(LED_STATE_OFF);
@@ -58,7 +58,7 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
         // wait for release of button
         while (gpio_get_level(HM_BTN_PIN) == 0)
         {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         // wait to be pressed again or timeout
@@ -68,7 +68,7 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
             {
                 break;
             }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         // reset request start if button is pressed at least for 4sec
@@ -77,24 +77,24 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
             if (gpio_get_level(HM_BTN_PIN) == 1)
             {
                 statusLED->setState(LED_STATE_ON);
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                vTaskDelay(pdMS_TO_TICKS(1000));
                 powerLED->setState(LED_STATE_ON);
                 statusLED->setState(LED_STATE_OFF);
                 ESP_LOGI(TAG, "Factory Reset mode timeout.");
                 return;
             }
-            vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         statusLED->setState(LED_STATE_OFF);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(100));
 
         settings->clear();
         ESP_LOGI(TAG, "Factory Reset done.");
 
         powerLED->setState(LED_STATE_ON);
         statusLED->setState(LED_STATE_ON);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         powerLED->setState(LED_STATE_BLINK);
         statusLED->setState(LED_STATE_BLINK_INV);
     }

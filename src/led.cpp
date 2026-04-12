@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -57,14 +57,14 @@ void ledSwitcherTask(void *parameter)
             }
             _leds[i]->updatePinState();
         }
-        vTaskDelay(125 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(125));
     }
 }
 
 void LED::start(Settings *settings)
 {
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_11_BIT,
         .timer_num = LEDC_TIMER_0,
         .freq_hz = 5000,
@@ -99,7 +99,7 @@ void LED::stop()
 LED::LED(gpio_num_t pin) : _state(LED_STATE_OFF), _channel_conf({})
 {
     _channel_conf.gpio_num = pin;
-    _channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+    _channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
     _channel_conf.channel = LEDC_CHANNEL_MAX;
     _channel_conf.intr_type = LEDC_INTR_DISABLE;
     _channel_conf.timer_sel = LEDC_TIMER_0;

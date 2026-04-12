@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -305,7 +305,7 @@ void RawUartUdpListener::_udpQueueHandler()
 
     for (;;)
     {
-        if (xQueueReceive(_udp_queue, &event, (TickType_t)(10 / portTICK_PERIOD_MS)) == pdTRUE)
+        if (xQueueReceive(_udp_queue, &event, pdMS_TO_TICKS(10)) == pdTRUE)
         {
             handlePacket(event->pb, event->addr, event->port);
             pbuf_free(event->pb);

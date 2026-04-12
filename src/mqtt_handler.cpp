@@ -61,7 +61,7 @@ static void perform_factory_reset()
     }
 
     // Give some time for operations to complete
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
 static void handle_mqtt_command(const char* command)

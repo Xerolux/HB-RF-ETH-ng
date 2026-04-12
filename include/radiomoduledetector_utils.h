@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -23,7 +23,7 @@
 
 #include "esp_log.h"
 
-#define sem_take(__sem, __timeout) (xSemaphoreTake(__sem, __timeout * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+#define sem_take(__sem, __timeout) (xSemaphoreTake(__sem, pdMS_TO_TICKS(__timeout * 1000)) == pdTRUE)
 #define sem_give(__sem) xSemaphoreGive(__sem)
 #define sem_init(__sem) __sem = xSemaphoreCreateBinary();
 

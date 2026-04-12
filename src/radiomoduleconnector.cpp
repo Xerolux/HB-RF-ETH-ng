@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -98,9 +98,9 @@ void RadioModuleConnector::setLED(bool red, bool green, bool blue)
 void RadioModuleConnector::resetModule()
 {
     gpio_set_level(HM_RST_PIN, 1);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(50));
     gpio_set_level(HM_RST_PIN, 0);
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 void RadioModuleConnector::sendFrame(unsigned char *buffer, uint16_t len)

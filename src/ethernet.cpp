@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 5.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -25,6 +25,8 @@
 #include "pins.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_eth_mac.h"
+#include "esp_eth_phy.h"
 
 static const char *TAG = "Ethernet";
 
@@ -47,7 +49,7 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
     if (!hostname || !ip_addr) return false;
 
     // Convert FreeRTOS ticks to seconds: ticks * ms_per_tick / 1000
-    _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
+    _current_time = pdTICKS_TO_MS(xTaskGetTickCount()) / 1000;
 
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (_dns_cache[i].valid &&
@@ -112,7 +114,7 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
     // Task zum Aufräumen abgelaufener DNS-Einträge (jede Minute)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(60000)); // 1 Minute
-        _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
+        _current_time = pdTICKS_TO_MS(xTaskGetTickCount()) / 1000;
 
         for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
             if (_dns_cache[i].valid && _current_time >= _dns_cache[i].expiry_time) {

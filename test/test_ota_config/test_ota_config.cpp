@@ -32,7 +32,7 @@ void test_ota_config_defaults(void) {
 
 void setup() {
     // Wait for board to stabilize
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(2000));
     UNITY_BEGIN();
     RUN_TEST(test_ota_config_defaults);
     UNITY_END();
