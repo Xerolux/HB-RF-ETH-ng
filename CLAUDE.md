@@ -49,9 +49,9 @@ HB-RF-ETH-ng/
 | Tool | Version |
 |------|---------|
 | PlatformIO | Latest |
-| ESP-IDF framework | 6.0.0 (via `framework-espidf@~3.60000.0`) |
+| ESP-IDF framework | 5.5.3 (via `framework-espidf@~3.50503.0`) |
 | Xtensa GCC toolchain | 14.2.0+20251107 |
-| Platform package | `espressif32@^7.0.0` |
+| Platform package | `espressif32@^6.13.0` |
 
 ### Building the Firmware
 

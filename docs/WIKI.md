@@ -83,7 +83,7 @@ Willkommen im Wiki der modernisierten HB-RF-ETH-ng Firmware. Hier finden Sie all
 * **Hardware-Überwachung** - Echtzeit-Temperatur, Spannung, CPU- und Speicheranzeige
 
 ### Technische Basis
-* **ESP-IDF 6.0.x** auf Espressif32 Platform ^7.0.0
+* **ESP-IDF 5.5.x** auf Espressif32 Platform ^6.13.0
 * **GCC 14.2.0** Toolchain (xtensa-esp-elf)
 * **Vue.js 3.5.30** mit Composition API, Vue Router 5, Pinia 3, Vue i18n 11
 * **Bootstrap Vue Next 0.44.0** UI-Komponentenbibliothek
