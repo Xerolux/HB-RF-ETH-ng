@@ -25,6 +25,8 @@
 #include "pins.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_eth_mac.h"
+#include "esp_eth_phy.h"
 
 static const char *TAG = "Ethernet";
 

@@ -1,7 +1,11 @@
 # HB-RF-ETH Default Configuration
+# Compatible with ESP-IDF 6.0
 
 # MQTT 3.1.1 Protocol
 CONFIG_MQTT_PROTOCOL_311=y
 
 # HTTP Server
 CONFIG_HTTPD_MAX_URI_HANDLERS=15
+
+# FreeRTOS: disable backward-compat (portTICK_PERIOD_MS etc.)
+CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
