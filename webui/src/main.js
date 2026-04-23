@@ -44,6 +44,10 @@ axios.interceptors.request.use(
     if (loginStore.isLoggedIn) {
       request.headers['Authorization'] = 'Token ' + loginStore.token
     }
+    // Set default timeout if not already set
+    if (!request.timeout) {
+      request.timeout = 10000
+    }
     return request
   },
   error => Promise.reject(error)
@@ -52,11 +56,40 @@ axios.interceptors.request.use(
 axios.interceptors.response.use(
   response => response,
   error => {
-    if (error.response && error.response.status === 401) {
-      const loginStore = useLoginStore()
-      loginStore.logout()
-      router.push('/login')
+    const uiStore = useUiStore()
+    const loginStore = useLoginStore()
+
+    if (error.response) {
+      // Handle 401 Unauthorized
+      if (error.response.status === 401) {
+        loginStore.logout()
+        router.push('/login')
+      }
+      // Handle network/server errors
+      else if (error.response.status >= 500) {
+        uiStore.pushToast({
+          type: 'danger',
+          title: 'Server Error',
+          message: `Server error: ${error.response.status}`,
+          duration: 5000
+        })
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      uiStore.pushToast({
+        type: 'warning',
+        title: 'Request Timeout',
+        message: 'The request took too long. Please try again.',
+        duration: 4000
+      })
+    } else if (!error.response) {
+      uiStore.pushToast({
+        type: 'danger',
+        title: 'Connection Error',
+        message: 'Unable to connect to the device. Check your network.',
+        duration: 5000
+      })
     }
+
     return Promise.reject(error)
   }
 )

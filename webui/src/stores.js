@@ -94,15 +94,17 @@ export const useLoginStore = defineStore('login', {
     },
     async tryLogin(password) {
       try {
-        const response = await axios.post("/login.json", { password })
-        if (response.data.isAuthenticated) {
+        const response = await axios.post("/login.json", { password }, { timeout: 8000 })
+        if (response.data?.isAuthenticated && response.data?.token) {
           this.login(response.data.token)
           this.setPasswordChanged(response.data.passwordChanged !== false)
           return true
         }
         return false
       } catch (error) {
-        console.error('Login failed:', error.response?.status || error.message)
+        const status = error.response?.status || error.message
+        console.error('Login failed:', status)
+        // Don't throw - let caller handle the error via response
         return false
       }
     }
@@ -135,8 +137,12 @@ export const useSysInfoStore = defineStore('sysInfo', {
   actions: {
     async update() {
       try {
-        const response = await axios.get("/sysinfo.json")
-        Object.assign(this.$state, response.data.sysInfo)
+        const response = await axios.get("/sysinfo.json", { timeout: 5000 })
+        if (response.data?.sysInfo) {
+          Object.assign(this.$state, response.data.sysInfo)
+        } else {
+          throw new Error('Invalid response format: missing sysInfo')
+        }
       } catch (error) {
         console.error('Failed to load system info:', error.response?.status || error.message)
         throw error
@@ -181,8 +187,12 @@ export const useSettingsStore = defineStore('settings', {
   actions: {
     async load() {
       try {
-        const response = await axios.get("/settings.json")
-        Object.assign(this.$state, response.data.settings)
+        const response = await axios.get("/settings.json", { timeout: 5000 })
+        if (response.data?.settings) {
+          Object.assign(this.$state, response.data.settings)
+        } else {
+          throw new Error('Invalid response format: missing settings')
+        }
       } catch (error) {
         console.error('Failed to load settings:', error.response?.status || error.message)
         throw error
@@ -190,8 +200,12 @@ export const useSettingsStore = defineStore('settings', {
     },
     async save(settings) {
       try {
-        await axios.post("/settings.json", settings)
-        Object.assign(this.$state, settings)
+        const response = await axios.post("/settings.json", settings, { timeout: 10000 })
+        if (response.data?.success !== false) {
+          Object.assign(this.$state, settings)
+        } else {
+          throw new Error('Server rejected settings save')
+        }
       } catch (error) {
         console.error('Failed to save settings:', error.response?.status || error.message)
         throw error
