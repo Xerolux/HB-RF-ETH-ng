@@ -180,14 +180,18 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.phy_addr = ETH_PHY_ADDR;
     phy_config.reset_gpio_num = ETH_POWER_PIN;
+    phy_config.reset_timeout_ms = 100;
     _phy = esp_eth_phy_new_lan87xx(&phy_config);
 
     // Configure MAC
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
+    mac_config.flags = ETH_MAC_FLAG_WORK_WITH_CACHE_DISABLE | ETH_MAC_FLAG_DMA_CAPABLE;
 
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;
     esp32_emac_config.smi_gpio.mdc_num = ETH_MDC_PIN;
+    esp32_emac_config.interface = EMAC_DATA_INTERFACE_RMII;
+    esp32_emac_config.dma_burst_len = ETH_DMA_BURST_LEN_32;
     _mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
 
     _eth_config = ETH_DEFAULT_CONFIG(_mac, _phy);

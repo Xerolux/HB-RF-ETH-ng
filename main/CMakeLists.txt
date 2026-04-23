@@ -24,9 +24,9 @@ idf_component_register(SRCS ${app_sources}
                            lwip
                            mbedtls
                            app_update
-                            esp_adc
-                            spi_flash
-                            )
+                           esp_adc
+                           spi_flash
+                           )
 
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.css.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.js.gz" BINARY)

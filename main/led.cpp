@@ -64,7 +64,7 @@ void ledSwitcherTask(void *parameter)
 void LED::start(Settings *settings)
 {
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_11_BIT,
         .timer_num = LEDC_TIMER_0,
         .freq_hz = 5000,
@@ -99,8 +99,8 @@ void LED::stop()
 LED::LED(gpio_num_t pin) : _state(LED_STATE_OFF), _channel_conf({})
 {
     _channel_conf.gpio_num = pin;
-    _channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-    _channel_conf.channel = LEDC_CHANNEL_MAX;
+    _channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
+    _channel_conf.channel = LEDC_CHANNEL_0;
     _channel_conf.intr_type = LEDC_INTR_DISABLE;
     _channel_conf.timer_sel = LEDC_TIMER_0;
     _channel_conf.duty = 0;
@@ -110,7 +110,7 @@ LED::LED(gpio_num_t pin) : _state(LED_STATE_OFF), _channel_conf({})
 
     for (uint8_t i = 0; i < MAX_LED_COUNT; i++)
     {
-        if (_leds[i] == 0)
+        if (_leds[i] == NULL)
         {
             _channel_conf.channel = (ledc_channel_t)i;
             break;
