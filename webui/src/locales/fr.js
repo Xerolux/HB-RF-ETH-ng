@@ -205,7 +205,7 @@ export default {
     otaSuccess: 'Téléchargement réussi. Installation...',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
-    versionInfo: 'Fork modernisé v2.1.11 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
+    versionInfo: 'Fork modernisé v2.2.0 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
     newVersionAvailable: 'Nouvelle version {version} disponible !',
     viewUpdate: 'Voir',
@@ -272,9 +272,9 @@ export default {
   // About Page
   about: {
     title: 'À propos',
-    version: 'Version 2.1.11',
+    version: 'Version 2.2.0',
     fork: 'Fork Modernisé',
-    forkDescription: 'Cette version est un fork modernisé par Xerolux (2025), basé sur le firmware original HB-RF-ETH. Mis à jour vers ESP-IDF 5.x, chaînes d\'outils modernes et technologies WebUI actuelles (Vue 3, Vite, Pinia).',
+    forkDescription: 'Cette version est un fork modernisé par Xerolux (2025), basé sur le firmware original HB-RF-ETH. Mis à jour vers ESP-IDF 6.0, chaînes d\'outils modernes et technologies WebUI actuelles (Vue 3, Vite, Pinia).',
     original: 'Auteur Original',
     firmwareLicense: 'Le',
     hardwareLicense: 'Le',

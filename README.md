@@ -2,7 +2,7 @@
 
 # HB-RF-ETH-ng
 
-**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 5.x**
+**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 6.0**
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -17,7 +17,7 @@
 
 ## Modernisierte Fork von Xerolux (2025)
 
-Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware wurde auf ESP-IDF 5.x portiert und für moderne Toolchains optimiert.
+Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware basiert auf ESP-IDF 6.0 und ist für moderne Toolchains optimiert.
 
 > Alle detaillierten Änderungen pro Version finden Sie im [CHANGELOG.md](CHANGELOG.md).
 
@@ -37,7 +37,21 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 - Moderne WebUI auf Basis von Vue 3, Vite und Bootstrap 5
 - Monitoring via MQTT und CheckMK
 - OTA-Updates per Datei-Upload oder über den integrierten Online-Update-Dienst
-- ESP-IDF 5.5.x Toolchain über PlatformIO
+- ESP-IDF 6.0 Toolchain (native `idf.py` Builds)
+
+### Entwickler-Build (ESP-IDF 6.0)
+```bash
+./scripts/setup_esp_idf.sh
+. ~/esp-idf/export.sh
+
+cd webui
+npm ci
+npm run build
+cd ..
+python3 rename_webui_files.py
+
+./idf.py build
+```
 
 ### Update- und Release-Hinweise
 - Die WebUI prüft neue Versionen standardmäßig über den gehosteten Update-Dienst unter `https://xerolux.de/firmware/HB-RF-ETH-ng/`.

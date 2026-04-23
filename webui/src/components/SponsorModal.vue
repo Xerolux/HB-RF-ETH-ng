@@ -24,17 +24,17 @@
       </div>
 
       <div class="options-grid">
-        <a href="https://paypal.me/Xerolux" target="_blank" class="sponsor-option paypal">
+        <a href="https://paypal.me/Xerolux" target="_blank" rel="noopener noreferrer" class="sponsor-option paypal">
           <span class="icon">☕</span>
           <span class="label">PayPal</span>
         </a>
 
-        <a href="https://www.buymeacoffee.com/xerolux" target="_blank" class="sponsor-option bmc">
+        <a href="https://www.buymeacoffee.com/xerolux" target="_blank" rel="noopener noreferrer" class="sponsor-option bmc">
           <span class="icon">🥤</span>
           <span class="label">Buy Me a Coffee</span>
         </a>
 
-        <a href="https://ts.la/sebastian564489" target="_blank" class="sponsor-option tesla">
+        <a href="https://ts.la/sebastian564489" target="_blank" rel="noopener noreferrer" class="sponsor-option tesla">
           <span class="icon">🚗</span>
           <span class="label">Tesla Referral</span>
         </a>

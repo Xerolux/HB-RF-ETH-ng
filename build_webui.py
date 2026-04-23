@@ -1,10 +1,15 @@
-from subprocess import run, CalledProcessError, PIPE
+from subprocess import run
 import sys
 import os
 import platform
 from pathlib import Path
 
-Import("env")
+# Optional PlatformIO/SCons integration.
+# This script also runs standalone for native ESP-IDF workflows.
+try:
+    Import("env")  # type: ignore[name-defined]
+except Exception:
+    env = None
 
 def is_tool(name):
     """Check if a tool is available in PATH."""

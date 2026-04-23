@@ -128,7 +128,7 @@ curl -X GET http://192.168.1.100/sysinfo.json \
 {
   "sysInfo": {
     "serial": "A1B2C3D4E5F6",
-    "currentVersion": "2.1.11",
+    "currentVersion": "2.2.0",
     "latestVersion": "2.1.12",
     "boardRevision": "REV 1.10 (PUB)",
     "uptimeSeconds": 345678,
