@@ -175,7 +175,7 @@ void app_main()
     // Add a short delay before starting UDP listener to ensure network is fully stable
     // This helps improve CCU 3 reconnection after firmware updates
     ESP_LOGI(TAG, "Waiting 2 seconds for network stabilization before starting UDP listener...");
-    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();

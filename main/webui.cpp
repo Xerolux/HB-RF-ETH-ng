@@ -406,7 +406,7 @@ bool cJSON_GetBoolValue(const cJSON *item)
 }
 
 void delayed_restart_task(void *pvParameter) {
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(3000));
     full_system_restart();
     vTaskDelete(NULL);
 }
@@ -749,7 +749,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     httpd_resp_sendstr(req, "{\"success\":true}");
 
     // Restart
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     full_system_restart();
 
     return ESP_OK;
@@ -964,7 +964,7 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
 
     // Restart after a short delay to allow response to be sent
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     full_system_restart();
 
     return ESP_OK;
@@ -996,7 +996,7 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     _settings->clear();
 
     // Restart after a short delay to allow response to be sent
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(1000));
     full_system_restart();
 
     return ESP_OK;
@@ -1184,7 +1184,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
                 int downloaded = esp_https_ota_get_image_len_read(ota_handle);
                 _ota_progress = (int)((int64_t)downloaded * 100 / image_size);
             }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         if (ret == ESP_OK) {
@@ -1201,7 +1201,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             a->statusLED->setState(LED_STATE_OFF);
             free(a->url);
             delete a;
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(1000));
             full_system_restart();
         } else {
             ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));

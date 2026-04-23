@@ -23,7 +23,7 @@
 
 #include "esp_log.h"
 
-#define sem_take(__sem, __timeout) (xSemaphoreTake(__sem, __timeout * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+#define sem_take(__sem, __timeout) (xSemaphoreTake(__sem, pdMS_TO_TICKS(__timeout)) == pdTRUE)
 #define sem_give(__sem) xSemaphoreGive(__sem)
 #define sem_init(__sem) __sem = xSemaphoreCreateBinary();
 

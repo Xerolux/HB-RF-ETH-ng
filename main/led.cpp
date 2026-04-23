@@ -57,7 +57,7 @@ void ledSwitcherTask(void *parameter)
             }
             _leds[i]->updatePinState();
         }
-        vTaskDelay(125 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(125));
     }
 }
 

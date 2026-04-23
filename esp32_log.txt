@@ -1,0 +1,15 @@
+[20:06:34] 43637...[0m
+[20:06:34] [0;32mI (489) app_init: ESP-IDF:          v6.0[0m
+[20:06:34] [0;32mI (494) efuse_init: Min chip rev:     v0.0[0m
+[20:06:34] [0;32mI (498) efuse_init: Max chip rev:     v3.99 [0m
+[20:06:34] [0;32mI (503) efuse_init: Chip rev:         v1.0[0m
+[20:06:34] [0;32mI (508) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[20:06:34] [0;32mI (515) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM[0m
+[20:06:34] [0;32mI (521) heap_init: At 3FFB6768 len 00029898 (166 KiB): DRAM[0m
+[20:06:34] [0;32mI (528) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM[0m
+[20:06:34] [0;32mI (534) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM[0m
+[20:06:34] [0;32mI (540) heap_init: At 400911AC len 0000EE54 (59 KiB): IRAM[0m
+[20:06:34] [0;32mI (548) spi_flash: detected chip: generic[0m
+[20:06:34] [0;32mI (551) spi_flash: flash io: dio[0m
+[20:06:35] [0;32mI (556) ma[0;32mI (696) SysInfo: ESP32 classic has no internal temperature sensor - external sensor required[0m
+[20:06:35] [0;32mI (696) uart: queue free spaces: 20[0m

@@ -47,8 +47,8 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
 {
     if (!hostname || !ip_addr) return false;
 
-    // Convert FreeRTOS ticks to seconds: ticks * ms_per_tick / 1000
-    _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
+    // Convert FreeRTOS ticks to seconds: ticks * 1000 / tick_rate_hz
+    _current_time = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (_dns_cache[i].valid &&
@@ -113,7 +113,7 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
     // Task zum Aufräumen abgelaufener DNS-Einträge (jede Minute)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(60000)); // 1 Minute
-        _current_time = xTaskGetTickCount() * portTICK_PERIOD_MS / 1000;
+        _current_time = xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 
         for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
             if (_dns_cache[i].valid && _current_time >= _dns_cache[i].expiry_time) {

@@ -61,7 +61,7 @@ void updateCPUUsageTask(void *arg)
 
     for (;;)
     {
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(1000));
 
         UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, MAX_TASKS, &totalRunTime);
 

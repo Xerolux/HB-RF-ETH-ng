@@ -141,7 +141,7 @@ void UpdateCheck::_updateLatestVersion()
 void UpdateCheck::_taskFunc()
 {
   // some time for initial network connection
-  vTaskDelay(30000 / portTICK_PERIOD_MS);
+  vTaskDelay(pdMS_TO_TICKS(30000));
 
   for (;;)
   {
@@ -174,7 +174,7 @@ void UpdateCheck::_taskFunc()
       ESP_LOGE(TAG, "Failed to determine latest version");
     }
 
-    vTaskDelay((24 * 60 * 60000) / portTICK_PERIOD_MS); // 24h
+    vTaskDelay(pdMS_TO_TICKS(24 * 60 * 60000)); // 24h
   }
 
   vTaskDelete(NULL);

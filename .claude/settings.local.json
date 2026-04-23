@@ -58,7 +58,10 @@
       "mcp__zread__get_repo_structure",
       "Bash(git rm:*)",
       "Bash(idf.py:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Read(//tmp/**)",
+      "WebFetch(domain:docs.espressif.com)",
+      "WebFetch(domain:developer.espressif.com)"
     ],
     "deny": [],
     "ask": []
