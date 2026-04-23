@@ -51,7 +51,7 @@ jobs:
       - name: Check file sizes
         run: |
           # Check for large files that shouldn't be committed
-          find . -type f -size +1M -not -path "./.git/*" -not -path "./.pio/*" -not -path "./webui/node_modules/*" | while read file; do
+          find . -type f -size +1M -not -path "./.git/*" -not -path "./build/*" -not -path "./webui/node_modules/*" | while read file; do
             echo "⚠️ Large file detected: $file ($(du -h "$file" | cut -f1))"
           done
 
@@ -90,7 +90,7 @@ jobs:
 
       - name: Validate JSON files
         run: |
-          for file in $(find . -name "*.json" -not -path "./node_modules/*" -not -path "./.pio/*" -not -path "./webui/node_modules/*"); do
+          for file in $(find . -name "*.json" -not -path "./node_modules/*" -not -path "./build/*" -not -path "./webui/node_modules/*"); do
             echo "Validating $file"
             python3 -m json.tool "$file" > /dev/null || exit 1
           done
@@ -117,37 +117,35 @@ jobs:
           npm run build
 
       - name: Rename WebUI files
-        run: python rename_webui_files.py
-
-      - name: Cache PlatformIO
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.platformio
-            .pio
-          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
-          restore-keys: |
-            ${{ runner.os }}-pio-
+        run: python3 rename_webui_files.py
 
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
-      - name: Install PlatformIO
+      - name: Setup ESP-IDF v6.0
         run: |
           python -m pip install --upgrade pip
-          pip install platformio
+          git clone --depth 1 --branch v6.0 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
+          git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
+          python -m pip install -r "$HOME/esp-idf/requirements.txt"
 
       - name: Build and check firmware size
         run: |
-          pio run
+          . "$HOME/esp-idf/export.sh"
+          export IDF_TARGET=esp32
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
+          idf.py build
 
       - name: Report firmware size
         run: |
+          . "$HOME/esp-idf/export.sh"
+          export IDF_TARGET=esp32
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
           echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          pio run -t size >> $GITHUB_STEP_SUMMARY 2>&1 || true
+          idf.py size >> $GITHUB_STEP_SUMMARY 2>&1 || true
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Check WebUI size

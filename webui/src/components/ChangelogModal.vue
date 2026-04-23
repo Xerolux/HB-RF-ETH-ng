@@ -37,6 +37,7 @@
         <a
           href="https://github.com/Xerolux/HB-RF-ETH-ng/blob/main/CHANGELOG.md"
           target="_blank"
+          rel="noopener noreferrer"
           class="text-decoration-none text-primary small fw-bold"
         >
           {{ t('changelog.viewOnGithub') }}

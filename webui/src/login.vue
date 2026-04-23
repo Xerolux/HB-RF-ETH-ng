@@ -58,7 +58,7 @@
         <div class="links">
           <span>&copy; Xerolux 2026</span>
           <span class="separator">•</span>
-          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank">GitHub</a>
+          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </div>
     </div>

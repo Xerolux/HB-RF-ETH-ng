@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.0 and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -61,7 +61,7 @@ void updateCPUUsageTask(void *arg)
 
     for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
 
         UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, MAX_TASKS, &totalRunTime);
 
@@ -95,7 +95,7 @@ void updateCPUUsageTask(void *arg)
 
 uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t adc_atten)
 {
-    // ESP-IDF ADC oneshot API
+    // ESP-IDF 5.1 ADC oneshot API
     adc_oneshot_unit_handle_t adc_handle;
     adc_oneshot_unit_init_cfg_t init_config = {
         .unit_id = adc_unit,

@@ -1,6 +1,6 @@
 # HB-RF-ETH-ng Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.1.11
+This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.2.0
 
 ## Table of Contents
 
@@ -346,7 +346,7 @@ With current firmware versions, reconnect handling after restarts has been impro
 
 3. **Manual Flash**
    - Flash firmware via USB/serial
-   - Use esptool.py or PlatformIO
+   - Use esptool.py or ESP-IDF (`idf.py`)
    ```bash
    esptool.py --chip esp32 --port /dev/ttyUSB0 \
      write_flash 0x10000 firmware_2_1_0.bin

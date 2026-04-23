@@ -5,7 +5,7 @@
  *  https://github.com/alexreinert/HB-RF-ETH
  *
  *  Modified work Copyright 2025 Xerolux
- *  Modernized fork - Updated to ESP-IDF 6.x and modern toolchains
+ *  Modernized fork - Updated to ESP-IDF 6.0 and modern toolchains
  *
  *  The HB-RF-ETH firmware is licensed under a
  *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
@@ -175,7 +175,7 @@ void app_main()
     // Add a short delay before starting UDP listener to ensure network is fully stable
     // This helps improve CCU 3 reconnection after firmware updates
     ESP_LOGI(TAG, "Waiting 2 seconds for network stabilization before starting UDP listener...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
