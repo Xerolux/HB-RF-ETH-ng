@@ -188,9 +188,6 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;
     esp32_emac_config.smi_gpio.mdc_num = ETH_MDC_PIN;
-    esp32_emac_config.interface = EMAC_DATA_INTERFACE_RMII;
-    esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_EXT_IN;
-    esp32_emac_config.clock_config.rmii.clock_gpio = GPIO_NUM_0;
     _mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
 
     _eth_config = ETH_DEFAULT_CONFIG(_mac, _phy);
