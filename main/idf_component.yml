@@ -5,3 +5,5 @@ dependencies:
     version: "*"
   espressif/cjson:
     version: "^1.7.19"
+  espressif/esp_eth_phy_lan87xx:
+    version: "^1.0.0"

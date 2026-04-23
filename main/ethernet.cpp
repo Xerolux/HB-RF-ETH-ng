@@ -23,6 +23,7 @@
 
 #include "ethernet.h"
 #include "pins.h"
+#include "esp_eth_phy_lan87xx.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -179,7 +180,7 @@ Ethernet::Ethernet(Settings *settings) : _settings(settings), _isConnected(false
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.phy_addr = ETH_PHY_ADDR;
     phy_config.reset_gpio_num = ETH_POWER_PIN;
-    _phy = esp_eth_phy_new_generic(&phy_config);
+    _phy = esp_eth_phy_new_lan87xx(&phy_config);
 
     // Configure MAC
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
