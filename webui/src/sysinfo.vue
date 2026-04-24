@@ -32,7 +32,7 @@
           <span class="icon-badge warning"><AppIcon name="firmware" /></span>
           <div>
             <strong>{{ t('nav.firmware') }}</strong>
-            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== sysInfoStore.currentVersion ? `Update ${sysInfoStore.latestVersion}` : 'Updates and recovery' }}</p>
+            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? `Update ${sysInfoStore.latestVersion}` : 'Updates and recovery' }}</p>
           </div>
         </router-link>
 
@@ -234,10 +234,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useUiStore } from './stores.js'
+import { useSysInfoStore, useUpdateStore, useUiStore } from './stores.js'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
+const updateStore = useUpdateStore()
 const uiStore = useUiStore()
 const isLoading = ref(true)
 

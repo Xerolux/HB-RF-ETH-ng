@@ -57,7 +57,7 @@
       <div v-if="showUpdateBanner" class="alert-banner info">
         <div class="banner-icon"><AppIcon name="download" /></div>
         <div class="banner-content">
-          <strong>{{ t('firmware.updateAvailable') }}</strong>
+          <strong>{{ t('firmware.updateAvailable', { latestVersion: sysInfoStore.latestVersion }) }}</strong>
           <p>{{ t('firmware.newVersionAvailable', { version: sysInfoStore.latestVersion }) }}</p>
         </div>
         <BButton variant="light" size="sm" @click="showChangelogModal = true" class="banner-action">
@@ -245,7 +245,8 @@ const showChangelogModal = ref(false)
 const showUpdateBanner = computed(() => {
   const current = sysInfoStore.currentVersion
   const latest = sysInfoStore.latestVersion
-  return current && latest && latest !== 'n/a' && latest !== current
+  if (!current || !latest || latest === 'n/a') return false
+  return updateStore.compareVersions(current, latest) < 0
 })
 
 const formatSize = (bytes) => {
