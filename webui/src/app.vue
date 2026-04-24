@@ -53,7 +53,7 @@ onMounted(() => {
 }
 
 .app-container {
-  max-width: 900px;
+  max-width: min(1080px, 94vw);
   width: 100%;
   margin: 0 auto;
   padding: var(--spacing-md);

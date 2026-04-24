@@ -299,4 +299,26 @@ const loginClick = async () => {
 [data-bs-theme="dark"] .modern-input:focus {
   background: rgba(0, 0, 0, 0.5);
 }
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: var(--spacing-sm);
+  }
+  .glass-panel {
+    padding: 24px 18px;
+    border-radius: 20px;
+  }
+  .brand-section {
+    margin-bottom: 18px;
+  }
+  .brand-logo {
+    font-size: 2.5rem;
+  }
+  .brand-name {
+    font-size: 1.2rem;
+  }
+  .welcome-text {
+    font-size: 1rem;
+  }
+}
 </style>

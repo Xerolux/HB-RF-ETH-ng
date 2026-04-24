@@ -313,8 +313,6 @@ onUnmounted(() => {
 
 <style scoped>
 .log-page {
-  max-width: 1100px;
-  margin: 0 auto;
 }
 
 .settings-card {
@@ -431,7 +429,7 @@ onUnmounted(() => {
 }
 
 .log-container {
-  height: 500px;
+  height: clamp(300px, 55vh, 500px);
   overflow-y: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -524,7 +522,16 @@ onUnmounted(() => {
   }
 
   .log-container {
-    height: 400px;
+    height: clamp(250px, 50vh, 400px);
+  }
+
+  .log-actions {
+    gap: 6px;
+  }
+
+  .tool-btn {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
   }
 
   .log-line code {

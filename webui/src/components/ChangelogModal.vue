@@ -274,4 +274,16 @@ watch(() => props.modelValue, (newValue) => {
 .btn-close-modal {
   color: var(--color-text) !important;
 }
+
+@media (max-width: 576px) {
+  .changelog-body {
+    padding: 1rem;
+  }
+  .changelog-content :deep(h1) {
+    font-size: 1.5rem;
+  }
+  .changelog-content :deep(h2) {
+    font-size: 1.25rem;
+  }
+}
 </style>

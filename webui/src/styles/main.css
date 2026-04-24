@@ -58,6 +58,7 @@
   --spacing-2xl: 3rem;
 
   --touch-target: 44px;
+  --touch-target-lg: 52px;
   --backdrop-blur: 20px;
   --transition-fast: 0.18s ease;
   --transition-normal: 0.28s cubic-bezier(0.16, 1, 0.3, 1);
@@ -755,5 +756,12 @@ button {
   form .btn[type="submit"],
   form button[type="submit"] {
     width: 100%;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --spacing-xl: 2.5rem;
+    --spacing-2xl: 3.5rem;
   }
 }

@@ -192,4 +192,20 @@ const closeModal = () => {
   color: var(--color-text-secondary);
   font-weight: 500;
 }
+
+@media (max-width: 576px) {
+  .sponsor-modal-body {
+    padding: 24px 16px;
+  }
+  .heart-icon {
+    font-size: 3rem;
+  }
+  .title {
+    font-size: 1.375rem;
+  }
+  .sponsor-option {
+    padding: 12px;
+    font-size: 1rem;
+  }
+}
 </style>

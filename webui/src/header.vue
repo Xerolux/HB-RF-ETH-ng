@@ -301,6 +301,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   flex: 1;
+  flex-wrap: wrap;
 }
 
 .nav-item {
@@ -575,9 +576,11 @@ onUnmounted(() => {
   }
 
   .update-banner {
+    position: relative;
+    top: auto;
     flex-direction: column;
     align-items: flex-start;
-    top: 52px;
+    margin-bottom: var(--spacing-md);
   }
 
   .update-banner-actions {
