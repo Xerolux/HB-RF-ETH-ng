@@ -9,6 +9,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0-Beta.1] - 2026-04-24
 
+### Changes
+- chore: prepare v2.2.0-Beta.1 release
+- fix: also update static definition type to uint64_t
+- fix: prevent integer overflow in DNS cache time calculation after ~12h
+- fix: correct sem_take timeout units - was ms instead of seconds
+- fix: WebUI responsive design improvements across all viewports
+- fix: WebUI stability, layout, performance and design improvements
+- fix: migrate FreeRTOS tick conversion to IDF 6.0 compatible API
+- fix: add debug logging to Ethernet init for diagnostics
+- fix: use local netif_cfg to avoid C++ brace-enclosed initializer issue
+- fix: ESP-IDF 6.0 compatibility - EMAC clock config, build errors, safety fixes
+- feat: improve WebUI error handling, timeouts, and API response validation
+- fix: comprehensive IDF 6.0 compatibility corrections for Ethernet and LED
+- fix: revert EMAC clock to CLK_OUTPUT GPIO17 (correct for HB-RF-ETH board)
+- fix: configure EMAC for external RMII clock input from LAN8720A PHY
+- fix: correct LAN87xx component name in registry (espressif/lan87xx)
+- fix: use LAN87xx PHY driver from esp-eth-drivers for ESP-IDF 6.0
+- chore: bump version to 2.2.0
+- fix: add missing esp_timer.h include in rawuartudplistener.cpp
+- fix: correct SNTP callback function name for ESP-IDF 6.0
+- fix: add spi_flash dep and esp_timer.h include for ESP-IDF 6.0
+- fix: add missing esp_timer.h include in dcf.cpp
+- fix: add split driver component deps for ESP-IDF 6.0
+- fix: move mqtt and json to managed components for ESP-IDF 6.0
+- fix: rename src/ to main/ and update APIs for ESP-IDF 6.0 build
+- docs-webui-consistency
+- fix(ci): use esp-idf install.sh for v6 setup
+- chore: fold pending dependabot updates into branch
+- docs-webui-consistency
+- merge: resolve conflicts with origin/main
+- feat: migrate to esp-idf 6.0 and refresh webui stack
+- fix-i2c-initializers-espidf
+- Fix I2C struct initializer warnings
+- Merge pull request #300 from Xerolux/claude/migrate-esp-idf-6-GxMtB
+- Merge pull request #298 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-94be095972
+- fix: revert platformio.ini to espressif32@^6.13.0 (ESP-IDF 5.5.3)
+- Merge pull request #299 from Xerolux/claude/migrate-esp-idf-6-GxMtB
+- chore: complete ESP-IDF 6.0 migration - LEDC, Ethernet, CMake, sdkconfig
+- chore: migrate project to ESP-IDF 6.0
+- chore(deps)(deps): bump axios
+- Merge pull request #297 from Xerolux/claude/upgrade-dev-tools-5TauD
+- chore: upgrade dev tools and dependencies to latest versions
+- Merge pull request #294 from Xerolux/dependabot/npm_and_yarn/webui/esbuild-0.28.0
+- chore(deps)(deps-dev): bump esbuild from 0.27.4 to 0.28.0 in /webui
+- Merge pull request #291 from Xerolux/dependabot/npm_and_yarn/webui/vue-3.5.32
+- Merge pull request #293 from Xerolux/dependabot/npm_and_yarn/webui/axios-1.14.0
+- Merge pull request #289 from Xerolux/dependabot/github_actions/actions/deploy-pages-5
+- Merge pull request #295 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-bd829dc841
+- Merge pull request #292 from Xerolux/dependabot/npm_and_yarn/webui/marked-17.0.6
+- Merge pull request #288 from Xerolux/dependabot/github_actions/crate-ci/typos-1.45.0
+- Merge pull request #287 from Xerolux/dependabot/github_actions/actions/configure-pages-6
+- chore(deps)(deps): bump the npm_and_yarn group across 1 directory with 2 updates
+- chore(deps)(deps): bump axios from 1.13.6 to 1.14.0 in /webui
+- chore(deps)(deps): bump marked from 17.0.4 to 17.0.6 in /webui
+- chore(deps)(deps): bump vue from 3.5.30 to 3.5.32 in /webui
+- chore(ci)(deps): bump actions/deploy-pages from 4 to 5
+- chore(ci)(deps): bump crate-ci/typos from 1.44.0 to 1.45.0
+- chore(ci)(deps): bump actions/configure-pages from 5 to 6
+- docs-webui-consistency
+- normalize firmware header metadata and helper script defaults
+- align docs and webui with current monitoring and update behavior
+- /fix-firmware-build
+- fix: resolve build errors in webui.cpp
+- Merge pull request #280 from Xerolux/dependabot/npm_and_yarn/webui/bootstrap-vue-next-0.44.0
+- Merge pull request #283 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-3f9ee708be
+- Merge pull request #278 from Xerolux/dependabot/github_actions/actions/configure-pages-5
+- add-community-standards
+- chore(deps)(deps): bump picomatch
+- refresh webui and add monitoring diagnostics
+- Add community standards files
+- Merge pull request #281 from Xerolux/dependabot/npm_and_yarn/webui/vue-router-5.0.4
+- Merge pull request #277 from Xerolux/dependabot/github_actions/actions/upload-pages-artifact-4
+- Merge pull request #276 from Xerolux/dependabot/npm_and_yarn/webui/vite-8.0.1
+- Merge pull request #275 from Xerolux/dependabot/github_actions/actions/checkout-6
+- Merge pull request #282 from Xerolux/claude/add-claude-documentation-vv3z0
+- docs: add CLAUDE.md for AI assistant codebase guidance
+- chore(deps)(deps): bump vue-router from 5.0.3 to 5.0.4 in /webui
+- chore(deps)(deps): bump bootstrap-vue-next in /webui
+- chore(ci)(deps): bump actions/configure-pages from 4 to 5
+- chore(ci)(deps): bump actions/upload-pages-artifact from 3 to 4
+- chore(deps)(deps-dev): bump vite from 8.0.0 to 8.0.1 in /webui
+- chore(ci)(deps): bump actions/checkout from 4 to 6
+- docs-and-changelog
+- Merge branch 'main' into docs-and-changelog-7592836451194571511
+- docs: shrink README and automate changelog
+- Merge pull request #273 from Xerolux/docs-and-changelog-7592836451194571511
+- docs: shrink README and automate changelog
+
+## [2.2.0-Beta.1] - 2026-04-24
+
 ### ⚠️ Beta Release
 
 This is a beta release for testing purposes. The firmware has been migrated from ESP-IDF 5.5.3 to ESP-IDF 6.0.
