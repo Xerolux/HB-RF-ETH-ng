@@ -171,7 +171,7 @@ jobs:
             IS_DRAFT="true"
           fi
 
-          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+          if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then
             IS_PRERELEASE="true"
           fi
 

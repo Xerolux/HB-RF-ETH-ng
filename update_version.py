@@ -18,13 +18,13 @@ from pathlib import Path
 def update_version_txt(version: str):
     """Update version.txt file"""
     version_file = Path("version.txt")
-    version_file.write_text(f"{version}\n")
+    version_file.write_text(f"{version}\n", encoding='utf-8')
     print(f"✓ Updated version.txt to {version}")
 
 def update_readme(version: str):
     """Update README.md with new version"""
     readme_file = Path("README.md")
-    content = readme_file.read_text()
+    content = readme_file.read_text(encoding='utf-8')
 
     # Update the main title
     content = re.sub(
@@ -40,9 +40,7 @@ def update_readme(version: str):
         content
     )
 
-    readme_file.write_text(content)
-    print(f"✓ Updated README.md to version {version}")
-
+    readme_file.write_text(content, encoding='utf-8')
 def update_locales(version: str):
     """Update version in locale files"""
     # Use full version for display (e.g. "Version 2.1.0")
@@ -52,26 +50,25 @@ def update_locales(version: str):
     for locale in locales:
         file_path = Path(f"webui/src/locales/{locale}")
         if file_path.exists():
-            content = file_path.read_text()
+            content = file_path.read_text(encoding='utf-8')
             # Update version: 'Word X.X' (preserves localized "Version" word)
             content = re.sub(
-                r"(version: '.*? )([\d.]+)(',)",
+                r"(version: '.*? )([\d.]+(?:-[A-Za-z]+\.\d+)?)(\",|',)",
                 f"\\g<1>{version}\\g<3>",
                 content
             )
-            # Update versionInfo: '... v2.1.5 ...'
             content = re.sub(
-                r"(versionInfo:.*v)(\d+\.\d+\.\d+)",
+                r"(versionInfo:.*v)(\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?)",
                 f"\\g<1>{version}",
                 content
             )
-            file_path.write_text(content)
-            print(f"✓ Updated {locale} to version {version}")
+            file_path.write_text(content, encoding='utf-8')
+            print(f"Updated {locale} to version {version}")
 
 def update_about_vue(version: str):
     """Update about.vue with new version"""
     about_file = Path("webui/src/about.vue")
-    content = about_file.read_text()
+    content = about_file.read_text(encoding='utf-8')
 
     # Extract major.minor version (e.g., "2.1" from "2.1.0")
     major_minor = '.'.join(version.split('.')[:2])
@@ -83,8 +80,8 @@ def update_about_vue(version: str):
         content
     )
 
-    about_file.write_text(content)
-    print(f"✓ Updated about.vue link to fork version {major_minor}")
+    about_file.write_text(content, encoding='utf-8')
+    print(f"Updated about.vue link to fork version {major_minor}")
 
 def update_package_json(version: str):
     """Update webui/package.json with new version"""
@@ -129,17 +126,16 @@ def update_openapi_yaml(version: str):
         print("⚠ docs/openapi.yaml not found, skipping")
         return
 
-    content = openapi_file.read_text()
+    content = openapi_file.read_text(encoding='utf-8')
 
-    # Update version in openapi spec
     content = re.sub(
-        r"version: '[\d.]+'",
+        r"version: '[\d.]+(?:-[A-Za-z]+\.\d+)?'",
         f"version: '{version}'",
         content
     )
 
-    openapi_file.write_text(content)
-    print(f"✓ Updated openapi.yaml to version {version}")
+    openapi_file.write_text(content, encoding='utf-8')
+    print(f"Updated openapi.yaml to version {version}")
 
 def update_troubleshooting(version: str):
     """Update TROUBLESHOOTING.md with new version"""
@@ -149,7 +145,7 @@ def update_troubleshooting(version: str):
         print("⚠ docs/TROUBLESHOOTING.md not found, skipping")
         return
 
-    content = troubleshooting_file.read_text()
+    content = troubleshooting_file.read_text(encoding='utf-8')
 
     # Update version in header
     content = re.sub(
@@ -158,8 +154,8 @@ def update_troubleshooting(version: str):
         content
     )
 
-    troubleshooting_file.write_text(content)
-    print(f"✓ Updated TROUBLESHOOTING.md to version {version}")
+    troubleshooting_file.write_text(content, encoding='utf-8')
+    print(f"Updated TROUBLESHOOTING.md to version {version}")
 
 def main():
     if len(sys.argv) != 2:
@@ -170,7 +166,7 @@ def main():
     version = sys.argv[1].lstrip('v')  # Remove leading 'v' if present
 
     # Validate version format (semantic versioning)
-    if not re.match(r'^\d+\.\d+\.\d+$', version):
+    if not re.match(r'^\d+\.\d+\.\d+(-[A-Za-z]+\.\d+)?$', version):
         print(f"Error: Invalid version format '{version}'. Expected format: X.Y.Z")
         sys.exit(1)
 
