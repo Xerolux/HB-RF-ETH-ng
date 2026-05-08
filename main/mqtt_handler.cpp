@@ -13,6 +13,7 @@
 #include "reset_info.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
+#include "esp_crt_bundle.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "cJSON.h"
@@ -489,6 +490,26 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_cfg.broker.address.hostname = current_mqtt_config.server;
     mqtt_cfg.broker.address.port = current_mqtt_config.port;
     mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_TCP;
+
+    if (current_mqtt_config.tls_enable) {
+        mqtt_cfg.broker.address.transport = MQTT_TRANSPORT_OVER_SSL;
+
+        if (current_mqtt_config.tls_skip_verify) {
+            mqtt_cfg.broker.verification.skip_cert_common_name_check = true;
+        } else {
+            if (strlen(current_mqtt_config.tls_ca_certs) > 0) {
+                mqtt_cfg.broker.verification.certificate = current_mqtt_config.tls_ca_certs;
+            } else {
+                mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
+            }
+        }
+
+        if (strlen(current_mqtt_config.tls_certfile) > 0 && strlen(current_mqtt_config.tls_keyfile) > 0) {
+            mqtt_cfg.credentials.authentication.certificate = current_mqtt_config.tls_certfile;
+            mqtt_cfg.credentials.authentication.key         = current_mqtt_config.tls_keyfile;
+        }
+    }
+
     // Limit TCP connect timeout so stop/restart completes quickly even when
     // the broker is unreachable, and space out reconnect attempts to avoid
     // hammering the network stack (which also causes CCU proxy slowdowns).

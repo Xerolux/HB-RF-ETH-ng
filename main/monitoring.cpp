@@ -47,6 +47,11 @@ static volatile int checkmk_listen_sock = -1;
 #define NVS_MQTT_PREFIX "mqtt_pfx"
 #define NVS_MQTT_HA_ENABLED "mqtt_ha_en"
 #define NVS_MQTT_HA_PREFIX "mqtt_ha_pfx"
+#define NVS_MQTT_TLS_EN     "mqtt_tls_en"
+#define NVS_MQTT_TLS_SKIP   "mqtt_tls_skip"
+#define NVS_MQTT_TLS_CA     "mqtt_tls_ca"
+#define NVS_MQTT_TLS_CRT    "mqtt_tls_crt"
+#define NVS_MQTT_TLS_KEY    "mqtt_tls_key"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
@@ -327,6 +332,12 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled);
     nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix);
 
+    nvs_set_u8(nvs_handle, NVS_MQTT_TLS_EN, config->mqtt.tls_enable);
+    nvs_set_u8(nvs_handle, NVS_MQTT_TLS_SKIP, config->mqtt.tls_skip_verify);
+    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CA,  config->mqtt.tls_ca_certs,  strlen(config->mqtt.tls_ca_certs) + 1);
+    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CRT, config->mqtt.tls_certfile,  strlen(config->mqtt.tls_certfile) + 1);
+    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile,   strlen(config->mqtt.tls_keyfile) + 1);
+
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
@@ -353,6 +364,12 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.ha_discovery_enabled = false;
         strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
         config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
+
+        config->mqtt.tls_enable = false;
+        config->mqtt.tls_skip_verify = false;
+        config->mqtt.tls_ca_certs[0] = '\0';
+        config->mqtt.tls_certfile[0] = '\0';
+        config->mqtt.tls_keyfile[0] = '\0';
 
         return ESP_OK;
     }
@@ -414,6 +431,29 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     if (nvs_get_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix, &str_len) != ESP_OK) {
         strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
         config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
+    }
+
+    if (nvs_get_u8(nvs_handle, NVS_MQTT_TLS_EN, &u8_val) == ESP_OK) {
+        config->mqtt.tls_enable = u8_val;
+    } else {
+        config->mqtt.tls_enable = false;
+    }
+    if (nvs_get_u8(nvs_handle, NVS_MQTT_TLS_SKIP, &u8_val) == ESP_OK) {
+        config->mqtt.tls_skip_verify = u8_val;
+    } else {
+        config->mqtt.tls_skip_verify = false;
+    }
+    size_t blob_len = sizeof(config->mqtt.tls_ca_certs);
+    if (nvs_get_blob(nvs_handle, NVS_MQTT_TLS_CA, config->mqtt.tls_ca_certs, &blob_len) != ESP_OK) {
+        config->mqtt.tls_ca_certs[0] = '\0';
+    }
+    blob_len = sizeof(config->mqtt.tls_certfile);
+    if (nvs_get_blob(nvs_handle, NVS_MQTT_TLS_CRT, config->mqtt.tls_certfile, &blob_len) != ESP_OK) {
+        config->mqtt.tls_certfile[0] = '\0';
+    }
+    blob_len = sizeof(config->mqtt.tls_keyfile);
+    if (nvs_get_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile, &blob_len) != ESP_OK) {
+        config->mqtt.tls_keyfile[0] = '\0';
     }
 
     nvs_close(nvs_handle);
@@ -657,6 +697,11 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message,
 
         esp_err_t probe = tcp_probe_endpoint(current_config.mqtt.server, current_config.mqtt.port, 3000, message, message_len);
         *ok = (probe == ESP_OK);
+        if (current_config.mqtt.tls_enable) {
+            // Append TLS note — TCP probe only; TLS handshake not tested here
+            size_t used = strlen(message);
+            snprintf(message + used, message_len - used, " (TLS enabled — cert validation not tested)");
+        }
         return ESP_OK;
     }
 

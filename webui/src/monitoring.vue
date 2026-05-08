@@ -102,6 +102,123 @@
             </div>
 
             <div class="col-12 mt-4">
+              <div class="tls-section">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <h4>{{ t('monitoring.mqtt.tls.title') }}</h4>
+                    <div class="form-text mb-0">{{ t('monitoring.mqtt.tls.enableHelp') }}</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" v-model="mqttConfig.tlsEnable">
+                  </div>
+                </div>
+
+                <Transition name="expand">
+                  <div v-if="mqttConfig.tlsEnable">
+                    <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                      <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.skipVerify') }}</label>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" v-model="mqttConfig.tlsSkipVerify">
+                      </div>
+                    </div>
+
+                    <div v-if="mqttConfig.tlsSkipVerify" class="alert-warning-soft">
+                      <div>{{ t('monitoring.mqtt.tls.skipVerifyAlert') }}</div>
+                    </div>
+
+                    <div v-if="!mqttConfig.tlsSkipVerify" class="mt-3">
+                      <div class="pem-label-row">
+                        <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.caCerts') }}</label>
+                        <button type="button" class="btn-load-file" @click="$refs.caFileInput.click()">
+                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                        </button>
+                      </div>
+                      <input ref="caFileInput" type="file" accept=".pem,.crt,.cer,.txt" hidden
+                             @change="loadPemFile($event, 'tlsCaCerts', 'ca')">
+                      <textarea class="form-control pem-textarea" v-model="mqttConfig.tlsCaCerts"
+                        :placeholder="'-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'"
+                        @blur="validatePemField('tlsCaCerts', 'ca')"></textarea>
+                      <div v-if="pemFeedback.tlsCaCerts" class="pem-feedback"
+                           :class="pemFeedback.tlsCaCerts.kind === 'ok' ? 'is-ok' : 'is-error'">
+                        {{ pemFeedback.tlsCaCerts.msg }}
+                      </div>
+                      <div class="cert-status-row">
+                        <div class="form-text mb-0">{{ t('monitoring.mqtt.tls.caCertsHelp') }}</div>
+                        <div v-if="mqttConfig.tlsCaCertsSet && !mqttConfig.tlsCaCerts" class="d-flex gap-3 align-items-center">
+                          <span class="cert-present-hint">{{ t('monitoring.mqtt.tls.certPresent') }}</span>
+                          <button type="button" class="btn-link-danger"
+                                  @click="clearCert('tlsCaCerts', 'tlsCaCertsClear', 'tlsCaCertsSet')">
+                            {{ t('monitoring.mqtt.tls.clear') }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <div class="pem-label-row">
+                        <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.certfile') }}</label>
+                        <button type="button" class="btn-load-file" @click="$refs.certFileInput.click()">
+                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                        </button>
+                      </div>
+                      <input ref="certFileInput" type="file" accept=".pem,.crt,.cer,.txt" hidden
+                             @change="loadPemFile($event, 'tlsCertfile', 'cert')">
+                      <textarea class="form-control pem-textarea" v-model="mqttConfig.tlsCertfile"
+                        :placeholder="'-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----'"
+                        @blur="validatePemField('tlsCertfile', 'cert')"></textarea>
+                      <div v-if="pemFeedback.tlsCertfile" class="pem-feedback"
+                           :class="pemFeedback.tlsCertfile.kind === 'ok' ? 'is-ok' : 'is-error'">
+                        {{ pemFeedback.tlsCertfile.msg }}
+                      </div>
+                      <div class="cert-status-row">
+                        <div class="form-text mb-0">{{ t('monitoring.mqtt.tls.certfileHelp') }}</div>
+                        <div v-if="mqttConfig.tlsCertfileSet && !mqttConfig.tlsCertfile" class="d-flex gap-3 align-items-center">
+                          <span class="cert-present-hint">{{ t('monitoring.mqtt.tls.certPresent') }}</span>
+                          <button type="button" class="btn-link-danger"
+                                  @click="clearCert('tlsCertfile', 'tlsCertfileClear', 'tlsCertfileSet')">
+                            {{ t('monitoring.mqtt.tls.clear') }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="mt-3">
+                      <div class="pem-label-row">
+                        <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.keyfile') }}</label>
+                        <button type="button" class="btn-load-file" @click="$refs.keyFileInput.click()">
+                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                        </button>
+                      </div>
+                      <input ref="keyFileInput" type="file" accept=".pem,.key,.txt" hidden
+                             @change="loadPemFile($event, 'tlsKeyfile', 'key')">
+                      <textarea class="form-control pem-textarea" v-model="mqttConfig.tlsKeyfile"
+                        :placeholder="'-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'"
+                        @blur="validatePemField('tlsKeyfile', 'key')"></textarea>
+                      <div v-if="pemFeedback.tlsKeyfile" class="pem-feedback"
+                           :class="pemFeedback.tlsKeyfile.kind === 'ok' ? 'is-ok' : 'is-error'">
+                        {{ pemFeedback.tlsKeyfile.msg }}
+                      </div>
+                      <div class="cert-status-row">
+                        <div class="form-text mb-0">{{ t('monitoring.mqtt.tls.keyfileHelp') }}</div>
+                        <div v-if="mqttConfig.tlsKeyfileSet && !mqttConfig.tlsKeyfile" class="d-flex gap-3 align-items-center">
+                          <span class="cert-present-hint">{{ t('monitoring.mqtt.tls.certPresent') }}</span>
+                          <button type="button" class="btn-link-danger"
+                                  @click="clearCert('tlsKeyfile', 'tlsKeyfileClear', 'tlsKeyfileSet')">
+                            {{ t('monitoring.mqtt.tls.clear') }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="mtlsInconsistent" class="alert-warning-soft mt-3">
+                      <div>{{ t('monitoring.mqtt.tls.mtlsRequiresBoth') }}</div>
+                    </div>
+                  </div>
+                </Transition>
+              </div>
+            </div>
+
+            <div class="col-12 mt-4">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <label class="form-label mb-0">{{ t('monitoring.mqtt.haDiscoveryEnabled') }}</label>
                 <div class="form-check form-switch">
@@ -158,9 +275,91 @@ const diagnosticBusy = ref({ checkmk: false, mqtt: false })
 const hasChanges = ref(false)
 const originalConfig = ref('')
 
-const markDirty = () => {
-  hasChanges.value = true
+const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false })
+const pemFeedback = ref({ tlsCaCerts: null, tlsCertfile: null, tlsKeyfile: null })
+
+const MAX_PEM_BYTES = 8 * 1024
+const MAX_FILE_BYTES = 16 * 1024
+const ALLOWED_LABELS = {
+  ca:   ['CERTIFICATE'],
+  cert: ['CERTIFICATE'],
+  key:  ['PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY']
 }
+
+function normalizePem(raw) {
+  let s = String(raw)
+  s = s.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  s = s.split('\n').map(l => l.replace(/[\t ]+$/g, '')).join('\n').trim()
+  return s.length > 0 ? s + '\n' : s
+}
+
+function validatePem(raw, kind) {
+  if (!raw || !raw.trim()) return null
+  if (!/-----BEGIN /.test(raw)) {
+    return /[\x00-\x08\x0E-\x1F]/.test(raw)
+      ? { kind: 'error', msg: t('monitoring.mqtt.tls.binaryFormatError') }
+      : { kind: 'error', msg: t('monitoring.mqtt.tls.invalidPemFormat') }
+  }
+  const re = /-----BEGIN ([A-Z0-9 ]+)-----\s*([\s\S]*?)\s*-----END \1-----/g
+  const blocks = []
+  let m
+  while ((m = re.exec(raw)) !== null) blocks.push({ label: m[1].trim(), body: m[2] })
+  if (!blocks.length) return { kind: 'error', msg: t('monitoring.mqtt.tls.invalidPemFormat') }
+  if (blocks.some(b => b.label === 'ENCRYPTED PRIVATE KEY'))
+    return { kind: 'error', msg: t('monitoring.mqtt.tls.encryptedKeyError') }
+  if (kind === 'key' && blocks.length !== 1)
+    return { kind: 'error', msg: t('monitoring.mqtt.tls.keySingleBlock') }
+  const allowed = ALLOWED_LABELS[kind] || []
+  for (const b of blocks) {
+    if (!allowed.includes(b.label)) return { kind: 'error', msg: t('monitoring.mqtt.tls.unexpectedPemLabel') }
+    if (!/^[A-Za-z0-9+/=\s]+$/.test(b.body)) return { kind: 'error', msg: t('monitoring.mqtt.tls.invalidBase64') }
+  }
+  if (raw.length > MAX_PEM_BYTES) return { kind: 'error', msg: t('monitoring.mqtt.tls.pemTooLarge') }
+  return { kind: 'ok', msg: t('monitoring.mqtt.tls.pemValid', { count: blocks.length }) }
+}
+
+function validatePemField(field, kind) {
+  const val = mqttConfig.value[field]
+  if (!val || !val.trim()) { pemFeedback.value[field] = null; return true }
+  const result = validatePem(val, kind)
+  pemFeedback.value[field] = result
+  return result === null || result.kind !== 'error'
+}
+
+function loadPemFile(event, field, kind) {
+  const file = event.target.files[0]
+  if (!file) return
+  if (/\.(p12|pfx)$/i.test(file.name)) {
+    pemFeedback.value[field] = { kind: 'error', msg: t('monitoring.mqtt.tls.pkcs12Error') }
+    event.target.value = ''; return
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    pemFeedback.value[field] = { kind: 'error', msg: t('monitoring.mqtt.tls.fileTooLarge') }
+    event.target.value = ''; return
+  }
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const normalized = normalizePem(e.target.result)
+    mqttConfig.value[field] = normalized
+    pemFeedback.value[field] = validatePem(normalized, kind)
+  }
+  reader.onerror = () => { pemFeedback.value[field] = { kind: 'error', msg: t('monitoring.mqtt.tls.fileReadError') } }
+  reader.readAsText(file)
+  event.target.value = ''
+}
+
+function clearCert(field, clearFlag, setFlag) {
+  mqttConfig.value[field] = ''
+  mqttConfig.value[setFlag] = false
+  tlsClearFlags.value[clearFlag] = true
+  pemFeedback.value[field] = null
+}
+
+const mtlsInconsistent = computed(() => {
+  const hasCert = !!(mqttConfig.value.tlsCertfile || mqttConfig.value.tlsCertfileSet)
+  const hasKey  = !!(mqttConfig.value.tlsKeyfile  || mqttConfig.value.tlsKeyfileSet)
+  return (hasCert || hasKey) && !(hasCert && hasKey)
+})
 
 const diagnosticCards = computed(() => [
   { key: 'checkmk', title: 'CheckMK', icon: 'logs', tone: 'warning' },
@@ -169,9 +368,7 @@ const diagnosticCards = computed(() => [
 
 const diagnosticState = (target) => {
   const result = monitoringStore.diagnostics[target]
-  if (!result) {
-    return { ok: null, message: 'Run a quick self-test to verify the current configuration.' }
-  }
+  if (!result) return { ok: null, message: 'Run a quick self-test to verify the current configuration.' }
   return result
 }
 
@@ -179,8 +376,7 @@ onMounted(async () => {
   try {
     await monitoringStore.load()
     originalConfig.value = JSON.stringify({ checkmk: { ...checkmkConfig.value }, mqtt: { ...mqttConfig.value } })
-  } catch (error) {
-  }
+  } catch (error) {}
 })
 
 watch([checkmkConfig, mqttConfig], () => {
@@ -195,27 +391,36 @@ const saveConfig = async () => {
     return
   }
 
+  if (mqttConfig.value.tlsEnable && mtlsInconsistent.value) {
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('monitoring.mqtt.tls.mtlsRequiresBoth') })
+    return
+  }
+
+  if (mqttConfig.value.tlsEnable) {
+    for (const [field, kind] of [['tlsCaCerts', 'ca'], ['tlsCertfile', 'cert'], ['tlsKeyfile', 'key']]) {
+      if (!validatePemField(field, kind)) {
+        uiStore.pushToast({ type: 'error', title: t('common.error'), message: pemFeedback.value[field]?.msg })
+        return
+      }
+    }
+  }
+
   saving.value = true
-
   try {
-    await monitoringStore.save({
-      checkmk: checkmkConfig.value,
-      mqtt: mqttConfig.value
-    })
+    const { tlsCaCertsSet, tlsCertfileSet, tlsKeyfileSet, ...mqttPayload } = mqttConfig.value
+    mqttPayload.tlsCaCertsClear  = tlsClearFlags.value.tlsCaCertsClear
+    mqttPayload.tlsCertfileClear = tlsClearFlags.value.tlsCertfileClear
+    mqttPayload.tlsKeyfileClear  = tlsClearFlags.value.tlsKeyfileClear
 
-    uiStore.pushToast({
-      type: 'success',
-      title: t('common.success'),
-      message: t('monitoring.saveSuccess')
-    })
+    await monitoringStore.save({ checkmk: checkmkConfig.value, mqtt: mqttPayload })
+    await monitoringStore.load()
+    tlsClearFlags.value = { tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false }
+
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('monitoring.saveSuccess') })
     hasChanges.value = false
     originalConfig.value = JSON.stringify({ checkmk: { ...checkmkConfig.value }, mqtt: { ...mqttConfig.value } })
   } catch (error) {
-    uiStore.pushToast({
-      type: 'error',
-      title: t('common.error'),
-      message: error.response?.data?.error || t('monitoring.saveError')
-    })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || t('monitoring.saveError') })
   } finally {
     saving.value = false
   }
@@ -232,11 +437,7 @@ const runDiagnostic = async (target) => {
       duration: 2800
     })
   } catch (error) {
-    uiStore.pushToast({
-      type: 'error',
-      title: t('common.error'),
-      message: error.response?.data?.error || 'Diagnostic request failed'
-    })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || 'Diagnostic request failed' })
   } finally {
     diagnosticBusy.value[target] = false
   }
@@ -403,6 +604,89 @@ const runDiagnostic = async (target) => {
   margin-top: 4px;
 }
 
+.tls-section {
+  margin-top: 16px;
+}
+
+.tls-section h4 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.alert-warning-soft {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  font-size: 0.88rem;
+}
+
+.pem-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.btn-load-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-light);
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.btn-link-danger {
+  color: var(--color-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.pem-textarea {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  min-height: 110px;
+}
+
+.pem-feedback {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pem-feedback.is-error {
+  color: var(--color-danger);
+}
+
+.pem-feedback.is-ok {
+  color: var(--color-success);
+}
+
+.cert-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.cert-present-hint {
+  color: var(--color-success);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .monitoring-page {
     padding-bottom: 100px;
@@ -449,6 +733,16 @@ const runDiagnostic = async (target) => {
   .save-btn {
     font-size: 1rem;
     padding: 0.875rem;
+  }
+
+  .cert-status-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pem-label-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>
