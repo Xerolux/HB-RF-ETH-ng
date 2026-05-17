@@ -76,6 +76,11 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(mqtt, "topicPrefix", config.mqtt.topic_prefix);
     cJSON_AddBoolToObject(mqtt, "haDiscoveryEnabled", config.mqtt.ha_discovery_enabled);
     cJSON_AddStringToObject(mqtt, "haDiscoveryPrefix", config.mqtt.ha_discovery_prefix);
+    cJSON_AddBoolToObject(mqtt, "tlsEnable", config.mqtt.tls_enable);
+    cJSON_AddBoolToObject(mqtt, "tlsSkipVerify", config.mqtt.tls_skip_verify);
+    cJSON_AddBoolToObject(mqtt, "tlsCaCertsSet",   strlen(config.mqtt.tls_ca_certs)  > 0);
+    cJSON_AddBoolToObject(mqtt, "tlsCertfileSet",  strlen(config.mqtt.tls_certfile)  > 0);
+    cJSON_AddBoolToObject(mqtt, "tlsKeyfileSet",   strlen(config.mqtt.tls_keyfile)   > 0);
     cJSON_AddItemToObject(root, "mqtt", mqtt);
 
     // CheckMK config
@@ -107,12 +112,12 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     }
 
     // Heap-allocate to keep stack usage within httpd task limits
-    char *content = (char *)malloc(4096);
+    char *content = (char *)malloc(16384);
     if (!content)
     {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
-    int ret = httpd_req_recv(req, content, 4095);
+    int ret = httpd_req_recv(req, content, 16383);
     if (ret <= 0)
     {
         free(content);
@@ -254,6 +259,69 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 return send_json_error(req, "MQTT HA discovery prefix too long");
             }
             strncpy(config.mqtt.ha_discovery_prefix, haDiscoveryPrefix->valuestring, sizeof(config.mqtt.ha_discovery_prefix) - 1);
+        }
+
+        cJSON *tlsEnable = cJSON_GetObjectItem(mqtt, "tlsEnable");
+        if (tlsEnable != NULL && cJSON_IsBool(tlsEnable))
+        {
+            config.mqtt.tls_enable = cJSON_IsTrue(tlsEnable);
+        }
+
+        cJSON *tlsSkipVerify = cJSON_GetObjectItem(mqtt, "tlsSkipVerify");
+        if (tlsSkipVerify != NULL && cJSON_IsBool(tlsSkipVerify))
+        {
+            config.mqtt.tls_skip_verify = cJSON_IsTrue(tlsSkipVerify);
+        }
+
+        cJSON *tlsCaCertsClear = cJSON_GetObjectItem(mqtt, "tlsCaCertsClear");
+        if (tlsCaCertsClear != NULL && cJSON_IsTrue(tlsCaCertsClear))
+        {
+            config.mqtt.tls_ca_certs[0] = '\0';
+        }
+        cJSON *tlsCaCerts = cJSON_GetObjectItem(mqtt, "tlsCaCerts");
+        if (tlsCaCerts != NULL && cJSON_IsString(tlsCaCerts) && strlen(tlsCaCerts->valuestring) > 0)
+        {
+            if (!validateStringLength(tlsCaCerts->valuestring, sizeof(config.mqtt.tls_ca_certs) - 1))
+            {
+                cJSON_Delete(root);
+                return send_json_error(req, "MQTT TLS CA certs too long");
+            }
+            strncpy(config.mqtt.tls_ca_certs, tlsCaCerts->valuestring, sizeof(config.mqtt.tls_ca_certs) - 1);
+            config.mqtt.tls_ca_certs[sizeof(config.mqtt.tls_ca_certs) - 1] = '\0';
+        }
+
+        cJSON *tlsCertfileClear = cJSON_GetObjectItem(mqtt, "tlsCertfileClear");
+        if (tlsCertfileClear != NULL && cJSON_IsTrue(tlsCertfileClear))
+        {
+            config.mqtt.tls_certfile[0] = '\0';
+        }
+        cJSON *tlsCertfile = cJSON_GetObjectItem(mqtt, "tlsCertfile");
+        if (tlsCertfile != NULL && cJSON_IsString(tlsCertfile) && strlen(tlsCertfile->valuestring) > 0)
+        {
+            if (!validateStringLength(tlsCertfile->valuestring, sizeof(config.mqtt.tls_certfile) - 1))
+            {
+                cJSON_Delete(root);
+                return send_json_error(req, "MQTT TLS client cert too long");
+            }
+            strncpy(config.mqtt.tls_certfile, tlsCertfile->valuestring, sizeof(config.mqtt.tls_certfile) - 1);
+            config.mqtt.tls_certfile[sizeof(config.mqtt.tls_certfile) - 1] = '\0';
+        }
+
+        cJSON *tlsKeyfileClear = cJSON_GetObjectItem(mqtt, "tlsKeyfileClear");
+        if (tlsKeyfileClear != NULL && cJSON_IsTrue(tlsKeyfileClear))
+        {
+            config.mqtt.tls_keyfile[0] = '\0';
+        }
+        cJSON *tlsKeyfile = cJSON_GetObjectItem(mqtt, "tlsKeyfile");
+        if (tlsKeyfile != NULL && cJSON_IsString(tlsKeyfile) && strlen(tlsKeyfile->valuestring) > 0)
+        {
+            if (!validateStringLength(tlsKeyfile->valuestring, sizeof(config.mqtt.tls_keyfile) - 1))
+            {
+                cJSON_Delete(root);
+                return send_json_error(req, "MQTT TLS client key too long");
+            }
+            strncpy(config.mqtt.tls_keyfile, tlsKeyfile->valuestring, sizeof(config.mqtt.tls_keyfile) - 1);
+            config.mqtt.tls_keyfile[sizeof(config.mqtt.tls_keyfile) - 1] = '\0';
         }
     }
 

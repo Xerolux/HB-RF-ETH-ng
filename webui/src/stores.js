@@ -330,7 +330,15 @@ export const useMonitoringStore = defineStore('monitoring', {
       password: '',
       topicPrefix: 'hb-rf-eth',
       haDiscoveryEnabled: false,
-      haDiscoveryPrefix: 'homeassistant'
+      haDiscoveryPrefix: 'homeassistant',
+      tlsEnable: false,
+      tlsSkipVerify: false,
+      tlsCaCerts: '',
+      tlsCertfile: '',
+      tlsKeyfile: '',
+      tlsCaCertsSet: false,
+      tlsCertfileSet: false,
+      tlsKeyfileSet: false
     },
     diagnostics: {
       checkmk: null,

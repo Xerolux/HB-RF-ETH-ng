@@ -33,6 +33,11 @@ typedef struct {
     char topic_prefix[65];
     bool ha_discovery_enabled;
     char ha_discovery_prefix[65];
+    bool tls_enable;            // True = connect via TLS (MQTT over TLS) (default: false)
+    bool tls_skip_verify;       // Disables TLS cert + hostname verification (INSECURE; self-signed / lab only; default: false)
+    char tls_ca_certs[2048];    // MQTT TLS CA bundle (PEM); empty = use built-in ESP-IDF CA bundle
+    char tls_certfile[2048];    // MQTT TLS client cert (mTLS), PEM; empty = no client cert
+    char tls_keyfile[2048];     // MQTT TLS client key (mTLS), PEM; empty = no client key
 } mqtt_config_t;
 
 // Monitoring configuration
