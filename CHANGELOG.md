@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0-Beta.2] - 2026-05-27
 
+### Changes
+- chore: bump version to 2.2.0-Beta.2 - IDF 6.0.1 compat & deps upgrade
+- Merge pull request #316 from EarlSneedSinclair/mqtt-tls
+- feat(mqtt): add TLS/SSL support for MQTT configuration
+- Merge pull request #310 from Xerolux/dependabot/npm_and_yarn/webui/vue-i18n-11.4.0
+- chore(deps)(deps): bump vue-i18n from 11.3.2 to 11.4.0 in /webui
+- fix: correct update banner showing when running version is newer than available
+- fix: semver pre-release comparison and log polling stability
+- feat: live LED brightness update without restart
+
+## [2.2.0-Beta.2] - 2026-05-27
+
 ### Added
 - feat(mqtt): TLS/SSL support for MQTT connections (CA certs, mTLS, skip verify)
 - feat: ESP-IDF 6.0.1 build compatibility (I2C struct fields, time.h includes)
