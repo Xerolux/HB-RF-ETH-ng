@@ -1,6 +1,6 @@
 {
   "name": "webui",
-  "version": "2.2.0-Beta.1",
+  "version": "2.2.0-Beta.2",
   "description": "WebUI of HB-RF-ETH firmware",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,7 @@
     "@vuelidate/validators": "^2.0.4",
     "axios": "^1.15.2",
     "bootstrap": "^5.3.8",
-    "bootstrap-vue-next": "^0.44.7",
+    "bootstrap-vue-next": "^0.45.4",
     "marked": "^18.0.2",
     "pinia": "^3.0.4",
     "vue": "^3.5.33",

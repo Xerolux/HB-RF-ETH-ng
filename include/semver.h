@@ -10,8 +10,8 @@ static inline int compareVersions(const char* v1, const char* v2) {
     const char* v2_pre = NULL;
 
     // Parse major.minor.patch and optional pre-release tag
-    int v1_len = sscanf(v1, "%d.%d.%d", &v1_parts[0], &v1_parts[1], &v1_parts[2]);
-    int v2_len = sscanf(v2, "%d.%d.%d", &v2_parts[0], &v2_parts[1], &v2_parts[2]);
+    (void)sscanf(v1, "%d.%d.%d", &v1_parts[0], &v1_parts[1], &v1_parts[2]);
+    (void)sscanf(v2, "%d.%d.%d", &v2_parts[0], &v2_parts[1], &v2_parts[2]);
 
     // Find pre-release suffix (e.g. "-Beta.1")
     const char* dash = strchr(v1, '-');

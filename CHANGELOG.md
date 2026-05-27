@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-Beta.2] - 2026-05-27
+
+### Added
+- feat(mqtt): TLS/SSL support for MQTT connections (CA certs, mTLS, skip verify)
+- feat: ESP-IDF 6.0.1 build compatibility (I2C struct fields, time.h includes)
+
+### Changed
+- chore(deps): upgrade all WebUI npm dependencies to latest
+- chore(deps): update espressif/mdns to ^1.9.1
+- chore: add sdkconfig.defaults entries for partition table, flash size, FreeRTOS trace
+
+### Fixed
+- fix: missing `#include <time.h>` in systemclock.cpp for IDF 6.0.1
+- fix: I2C struct initializer field order for IDF 6.0.1 (rtcdriver.cpp)
+- fix: suppress unused variable warnings in semver.h
+- fix: correct double version suffix in TROUBLESHOOTING.md
+
 ## [2.2.0-Beta.1] - 2026-04-24
 
 ### Changes
@@ -470,7 +487,8 @@ This version builds on his excellent work and modernizes it for current developm
 
 For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
 
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.2.0-Beta.1...HEAD
+[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.2.0-Beta.2...HEAD
+[2.2.0-Beta.2]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.2.0-Beta.1...v2.2.0-Beta.2
 [2.2.0-Beta.1]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.10...v2.2.0-Beta.1
 [2.1.10]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.9...v2.1.10
 [2.1.9]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.8...v2.1.9

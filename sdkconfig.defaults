@@ -1,5 +1,12 @@
 # HB-RF-ETH Default Configuration
-# Compatible with ESP-IDF 6.0
+# Compatible with ESP-IDF 6.0.1
+
+# Partition Table
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Flash size (4 MB WROOM-32)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 
 # MQTT 3.1.1 Protocol
 CONFIG_MQTT_PROTOCOL_311=y
@@ -9,3 +16,7 @@ CONFIG_HTTPD_MAX_URI_HANDLERS=15
 
 # FreeRTOS: disable backward-compat (portTICK_PERIOD_MS etc.)
 CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
+
+# FreeRTOS: needed for CPU usage monitoring (uxTaskGetSystemState)
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y

@@ -23,6 +23,7 @@
 
 #include "systemclock.h"
 #include <sys/time.h>
+#include <time.h>
 #include "esp_log.h"
 
 static const char *TAG = "SystemClock";
