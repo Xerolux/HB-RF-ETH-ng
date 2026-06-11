@@ -26,6 +26,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <sys/param.h>
+#include <atomic>
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -1353,25 +1354,40 @@ httpd_uri_t post_change_password_handler = {
     .user_ctx = NULL};
 
 
-struct UpdateCheckContext {
-    httpd_req_t *req;
+// ---- Async proxy for external HTTPS fetches --------------------------------
+// /api/check_update and /api/changelog relay content from external servers.
+// The fetch (DNS + TLS handshake + download, up to 10 s) must not run inside
+// the httpd task: esp_http_server is single-threaded, so every other request
+// (login, sysinfo polling, OTA status) would stall for the duration. The
+// handler detaches the request with the async handler API and a short-lived
+// worker task streams the upstream body to the client.
+
+struct AsyncProxyJob {
+    httpd_req_t *req;          // async copy of the request
+    const char *url;
+    const char *content_type;
+    const char *error_message; // sent to the client if the upstream fetch fails
     bool failed;
     bool header_sent;
 };
 
-static esp_err_t _update_check_http_event_handler(esp_http_client_event_t *evt)
+// Only one upstream fetch at a time - each worker needs ~9 KB task stack for
+// the TLS handshake and these requests are rare (manual checks, 24 h timer).
+static std::atomic<bool> _proxy_busy{false};
+
+static esp_err_t _proxy_http_event_handler(esp_http_client_event_t *evt)
 {
-    UpdateCheckContext *ctx = (UpdateCheckContext *)evt->user_data;
+    AsyncProxyJob *job = (AsyncProxyJob *)evt->user_data;
 
     switch(evt->event_id) {
         case HTTP_EVENT_ON_DATA:
-            if (!ctx->failed && esp_http_client_get_status_code(evt->client) == 200) {
-                esp_err_t err = httpd_resp_send_chunk(ctx->req, (const char *)evt->data, evt->data_len);
+            if (!job->failed && esp_http_client_get_status_code(evt->client) == 200) {
+                esp_err_t err = httpd_resp_send_chunk(job->req, (const char *)evt->data, evt->data_len);
                 if (err != ESP_OK) {
-                    ctx->failed = true;
+                    job->failed = true;
                     return ESP_FAIL;
                 }
-                ctx->header_sent = true;
+                job->header_sent = true;
             }
             break;
         default:
@@ -1380,7 +1396,46 @@ static esp_err_t _update_check_http_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-esp_err_t get_check_update_handler_func(httpd_req_t *req)
+static void _async_proxy_task(void *arg)
+{
+    AsyncProxyJob *job = (AsyncProxyJob *)arg;
+
+    esp_http_client_config_t config = {};
+    configure_ota_http_client(config, job->url);
+    config.event_handler = _proxy_http_event_handler;
+    config.user_data = job;
+    config.timeout_ms = 10000;
+    config.buffer_size = 4096;
+
+    httpd_resp_set_type(job->req, job->content_type);
+    httpd_resp_set_hdr(job->req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_err_t err = client ? esp_http_client_perform(client) : ESP_ERR_NO_MEM;
+    int status_code = client ? esp_http_client_get_status_code(client) : 0;
+
+    if ((err == ESP_OK && status_code == 200) || job->header_sent) {
+        // Complete (or at least terminate) the chunked response
+        httpd_resp_send_chunk(job->req, NULL, 0);
+        if (err != ESP_OK || status_code != 200) {
+            ESP_LOGE(TAG, "%s (%s, HTTP %d)", job->error_message, esp_err_to_name(err), status_code);
+        }
+    } else {
+        ESP_LOGE(TAG, "%s (%s, HTTP %d)", job->error_message, esp_err_to_name(err), status_code);
+        httpd_resp_send_err(job->req, HTTPD_500_INTERNAL_SERVER_ERROR, job->error_message);
+    }
+
+    if (client) {
+        esp_http_client_cleanup(client);
+    }
+
+    httpd_req_async_handler_complete(job->req);
+    free(job);
+    _proxy_busy.store(false);
+    vTaskDelete(NULL);
+}
+
+static esp_err_t start_async_proxy(httpd_req_t *req, const char *url, const char *content_type, const char *error_message)
 {
     add_security_headers(req);
 
@@ -1390,45 +1445,47 @@ esp_err_t get_check_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    UpdateCheckContext ctx = { req, false, false };
+    bool expected = false;
+    if (!_proxy_busy.compare_exchange_strong(expected, true)) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "text/plain");
+        httpd_resp_sendstr(req, "Another external fetch is in progress, try again shortly");
+        return ESP_OK;
+    }
 
-    esp_http_client_config_t config = {};
-    configure_ota_http_client(config, "https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt");
-    config.event_handler = _update_check_http_event_handler;
-    config.user_data = &ctx;
-    config.timeout_ms = 10000;
-    config.buffer_size = 4096;
-
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        ESP_LOGE(TAG, "Failed to init HTTP client (out of memory)");
+    AsyncProxyJob *job = (AsyncProxyJob *)calloc(1, sizeof(AsyncProxyJob));
+    if (!job) {
+        _proxy_busy.store(false);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
-    esp_err_t err = esp_http_client_perform(client);
+    job->url = url;
+    job->content_type = content_type;
+    job->error_message = error_message;
 
-    int status_code = esp_http_client_get_status_code(client);
-
-    if (err == ESP_OK && status_code == 200) {
-        httpd_resp_send_chunk(req, NULL, 0);
-    } else {
-        if (!ctx.header_sent) {
-            if (err != ESP_OK) {
-                 ESP_LOGE(TAG, "Failed to check for updates: %s", esp_err_to_name(err));
-                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to check for updates");
-            } else {
-                 ESP_LOGE(TAG, "Failed to check for updates: HTTP %d", status_code);
-                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Update server returned error");
-            }
-        } else {
-            httpd_resp_send_chunk(req, NULL, 0);
-        }
+    // The async copy carries the already-set security headers (the response
+    // header block is duplicated by httpd_req_async_handler_begin).
+    if (httpd_req_async_handler_begin(req, &job->req) != ESP_OK) {
+        free(job);
+        _proxy_busy.store(false);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
 
-    esp_http_client_cleanup(client);
+    if (xTaskCreate(_async_proxy_task, "ext_proxy", 9216, job, 5, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create proxy task");
+        httpd_resp_send_err(job->req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        httpd_req_async_handler_complete(job->req);
+        free(job);
+        _proxy_busy.store(false);
+    }
     return ESP_OK;
+}
+
+esp_err_t get_check_update_handler_func(httpd_req_t *req)
+{
+    return start_async_proxy(req,
+                             "https://xerolux.de/firmware/HB-RF-ETH-ng/version.txt",
+                             "text/plain",
+                             "Failed to check for updates");
 }
 
 httpd_uri_t get_check_update_handler = {
@@ -1437,82 +1494,12 @@ httpd_uri_t get_check_update_handler = {
     .handler = get_check_update_handler_func,
     .user_ctx = NULL};
 
-struct ChangelogContext {
-    httpd_req_t *req;
-    bool failed;
-    bool header_sent;
-};
-
-static esp_err_t _changelog_http_event_handler(esp_http_client_event_t *evt)
-{
-    ChangelogContext *ctx = (ChangelogContext *)evt->user_data;
-
-    switch(evt->event_id) {
-        case HTTP_EVENT_ON_DATA:
-            if (!ctx->failed && esp_http_client_get_status_code(evt->client) == 200) {
-                esp_err_t err = httpd_resp_send_chunk(ctx->req, (const char *)evt->data, evt->data_len);
-                if (err != ESP_OK) {
-                    ctx->failed = true;
-                    return ESP_FAIL;
-                }
-                ctx->header_sent = true;
-            }
-            break;
-        default:
-            break;
-    }
-    return ESP_OK;
-}
-
 esp_err_t get_changelog_handler_func(httpd_req_t *req)
 {
-    add_security_headers(req);
-
-    if (validate_auth(req) != ESP_OK) {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-
-    ChangelogContext ctx = { req, false, false };
-
-    esp_http_client_config_t config = {};
-    config.url = "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md";
-    config.crt_bundle_attach = esp_crt_bundle_attach;
-    config.event_handler = _changelog_http_event_handler;
-    config.user_data = &ctx;
-    config.timeout_ms = 10000;
-    config.buffer_size = 4096;
-
-    httpd_resp_set_type(req, "text/markdown");
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        ESP_LOGE(TAG, "Failed to init HTTP client (out of memory)");
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-    }
-    esp_err_t err = esp_http_client_perform(client);
-
-    int status_code = esp_http_client_get_status_code(client);
-
-    if (err == ESP_OK && status_code == 200) {
-        httpd_resp_send_chunk(req, NULL, 0);
-    } else {
-        if (!ctx.header_sent) {
-            if (err != ESP_OK) {
-                 ESP_LOGE(TAG, "Failed to fetch changelog: %s", esp_err_to_name(err));
-                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to fetch changelog from GitHub");
-            } else {
-                 ESP_LOGE(TAG, "Failed to fetch changelog: HTTP %d", status_code);
-                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "GitHub returned error");
-            }
-        } else {
-            httpd_resp_send_chunk(req, NULL, 0);
-        }
-    }
-
-    esp_http_client_cleanup(client);
-    return ESP_OK;
+    return start_async_proxy(req,
+                             "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md",
+                             "text/markdown",
+                             "Failed to fetch changelog from GitHub");
 }
 
 httpd_uri_t get_changelog_handler = {
