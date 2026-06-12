@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Wyłączona',
+    ledPatternOn: 'Włączona',
+    ledPatternBlink: 'Miganie',
+    ledPatternBlinkInv: 'Miganie odwrócone',
+    ledPatternFastBlink: 'Szybkie miganie',
+    ledPatternSlowBlink: 'Wolne miganie',
+    ledPatternBlink2x: 'Miganie 2x',
+    ledPatternBlink3x: 'Miganie 3x',
+    ledPatternBreathing: 'Oddychanie',
+    ledPatternHeartbeat: 'Bicie serca',
+    ledPatternStrobe: 'Stroboskop',
+    ledProgramIdle: 'Bezczynność',
+    ledProgramCcuDisconnected: 'CCU rozłączone',
+    ledProgramCcuConnected: 'CCU połączone',
+    ledProgramUpdateAvailable: 'Dostępna aktualizacja',
+    ledProgramError: 'Błąd',
+    ledProgramBooting: 'Uruchamianie',
+    ledProgramUpdateInProgress: 'Aktualizacja w toku',
+    unsavedLeave: 'Masz niezapisane zmiany. Mimo to opuścić stronę?',
+    discardConfirm: 'Odrzucić niezapisane zmiany i przywrócić ostatnio wczytane wartości?',
+    discard: 'Odrzuć',
+    restartError: 'Błąd podczas restartu urządzenia',
     title: 'Ustawienia',
     ccuSettings: 'Połączenie CCU',
     ccuIpAddress: 'Adres IP CCU',
@@ -135,6 +157,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Aktualizacje i odzyskiwanie',
+    liveStreamExport: 'Strumień na żywo i eksport',
+    networkTimeSetup: 'Ustawienia sieci i czasu',
+    copied: 'Skopiowano {label}',
     title: 'Informacje o systemie',
     goodMorning: 'Dzień dobry',
     goodAfternoon: 'Dzień dobry',
@@ -187,6 +213,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Przejdź do OTA',
+    lastCheckAt: 'Ostatnie sprawdzenie: {time}',
+    noRecentCheck: 'Brak ostatniego sprawdzenia',
     title: 'Firmware',
     subtitle: 'Zaktualizuj firmware urządzenia',
     restarting: 'Restartowanie...',
@@ -233,6 +262,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Uruchom szybki autotest, aby zweryfikować bieżącą konfigurację.',
+    checkFinished: 'Sprawdzanie zakończone',
+    diagnosticFailed: 'Żądanie diagnostyczne nie powiodło się',
     title: 'Monitoring',
     description: 'Skonfiguruj monitoring CheckMK i MQTT dla bramki HB-RF-ETH.',
     save: 'Zapisz',
@@ -376,6 +408,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filtruj, wstrzymuj i eksportuj log urządzenia na żywo.',
+    paused: 'Wstrzymano',
+    live: 'Na żywo',
+    lines: 'wierszy',
+    newEntries: 'nowych',
+    pause: 'Wstrzymaj',
+    resume: 'Wznów',
+    manualScroll: 'Przewijanie ręczne',
+    copy: 'Kopiuj',
+    searchPlaceholder: 'Szukaj w logu',
+    allLevels: 'Wszystkie poziomy',
+    levelError: 'Błąd',
+    levelWarning: 'Ostrzeżenie',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Brak pasujących wierszy',
+    copiedVisible: 'Skopiowano widoczny log',
+    copiedLine: 'Skopiowano wiersz logu',
+    copyVisibleFailed: 'Nie udało się skopiować logu',
+    copyLineFailed: 'Nie udało się skopiować wiersza',
     title: 'Dziennik Systemowy',
     description: 'Widok na żywo wyjścia dziennika systemowego z możliwością pobrania.',
     liveLog: 'Log na Żywo',

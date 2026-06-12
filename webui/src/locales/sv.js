@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Av',
+    ledPatternOn: 'På',
+    ledPatternBlink: 'Blinkning',
+    ledPatternBlinkInv: 'Inverterad blinkning',
+    ledPatternFastBlink: 'Snabb blinkning',
+    ledPatternSlowBlink: 'Långsam blinkning',
+    ledPatternBlink2x: '2x blinkning',
+    ledPatternBlink3x: '3x blinkning',
+    ledPatternBreathing: 'Andning',
+    ledPatternHeartbeat: 'Hjärtslag',
+    ledPatternStrobe: 'Strobe',
+    ledProgramIdle: 'Vila',
+    ledProgramCcuDisconnected: 'CCU frånkopplad',
+    ledProgramCcuConnected: 'CCU ansluten',
+    ledProgramUpdateAvailable: 'Uppdatering tillgänglig',
+    ledProgramError: 'Fel',
+    ledProgramBooting: 'Startar',
+    ledProgramUpdateInProgress: 'Uppdatering pågår',
+    unsavedLeave: 'Du har osparade ändringar. Lämna sidan ändå?',
+    discardConfirm: 'Kasta osparade ändringar och återställ senast inlästa värden?',
+    discard: 'Kasta',
+    restartError: 'Fel vid omstart av enheten',
     title: 'Inställningar',
     ccuSettings: 'CCU Anslutning',
     ccuIpAddress: 'CCU IP-adress',
@@ -135,6 +157,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Uppdateringar och återställning',
+    liveStreamExport: 'Liveström och export',
+    networkTimeSetup: 'Nätverks- och tidsinställningar',
+    copied: '{label} kopierad',
     title: 'Systeminformation',
     goodMorning: 'God morgon',
     goodAfternoon: 'God eftermiddag',
@@ -187,6 +213,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Gå till OTA',
+    lastCheckAt: 'Senaste kontroll: {time}',
+    noRecentCheck: 'Ingen ny kontroll',
     title: 'Firmware',
     subtitle: 'Uppdatera din enhets firmware',
     restarting: 'Startar om...',
@@ -233,6 +262,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Kör ett snabbt självtest för att verifiera den aktuella konfigurationen.',
+    checkFinished: 'Kontroll klar',
+    diagnosticFailed: 'Diagnostikbegäran misslyckades',
     title: 'Övervakning',
     description: 'Konfigurera CheckMK och MQTT-övervakning för HB-RF-ETH-gatewayen.',
     save: 'Spara',
@@ -376,6 +408,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filtrera, pausa och exportera enhetens livelogg.',
+    paused: 'Pausad',
+    live: 'Live',
+    lines: 'rader',
+    newEntries: 'nya',
+    pause: 'Pausa',
+    resume: 'Återuppta',
+    manualScroll: 'Manuell rullning',
+    copy: 'Kopiera',
+    searchPlaceholder: 'Sök i loggen',
+    allLevels: 'Alla nivåer',
+    levelError: 'Fel',
+    levelWarning: 'Varning',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Inga matchande rader',
+    copiedVisible: 'Synlig logg kopierad',
+    copiedLine: 'Logglinje kopierad',
+    copyVisibleFailed: 'Kunde inte kopiera loggen',
+    copyLineFailed: 'Kunde inte kopiera raden',
     title: 'Systemlogg',
     description: 'Live-visning av systemloggutdata med nedladdningsmöjlighet.',
     liveLog: 'Live Logg',

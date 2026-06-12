@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Off',
+    ledPatternOn: 'On',
+    ledPatternBlink: 'Blink',
+    ledPatternBlinkInv: 'Blink inverted',
+    ledPatternFastBlink: 'Fast blink',
+    ledPatternSlowBlink: 'Slow blink',
+    ledPatternBlink2x: '2x blink',
+    ledPatternBlink3x: '3x blink',
+    ledPatternBreathing: 'Breathing',
+    ledPatternHeartbeat: 'Heartbeat',
+    ledPatternStrobe: 'Strobe',
+    ledProgramIdle: 'Idle',
+    ledProgramCcuDisconnected: 'CCU disconnected',
+    ledProgramCcuConnected: 'CCU connected',
+    ledProgramUpdateAvailable: 'Update available',
+    ledProgramError: 'Error',
+    ledProgramBooting: 'Booting',
+    ledProgramUpdateInProgress: 'Update in progress',
+    unsavedLeave: 'You have unsaved changes. Leave this page anyway?',
+    discardConfirm: 'Discard your unsaved changes and restore the last loaded values?',
+    discard: 'Discard',
+    restartError: 'Error restarting device',
     title: 'Settings',
     ccuSettings: 'CCU Connection',
     ccuIpAddress: 'CCU IP Address',
@@ -136,6 +158,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Updates and recovery',
+    liveStreamExport: 'Live stream and export',
+    networkTimeSetup: 'Network and time setup',
+    copied: '{label} copied',
     title: 'System information',
     goodMorning: 'Good Morning',
     goodAfternoon: 'Good Afternoon',
@@ -188,6 +214,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Jump to OTA',
+    lastCheckAt: 'Last check: {time}',
+    noRecentCheck: 'No recent check',
     title: 'Firmware',
     subtitle: 'Update your device firmware',
     restarting: 'Restarting...',
@@ -241,6 +270,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Run a quick self-test to verify the current configuration.',
+    checkFinished: 'Check finished',
+    diagnosticFailed: 'Diagnostic request failed',
     title: 'Monitoring',
     description: 'Configure CheckMK and MQTT monitoring for the HB-RF-ETH gateway.',
     save: 'Save',
@@ -384,6 +416,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filter, pause and export the live device log.',
+    paused: 'Paused',
+    live: 'Live',
+    lines: 'lines',
+    newEntries: 'new',
+    pause: 'Pause',
+    resume: 'Resume',
+    manualScroll: 'Manual scroll',
+    copy: 'Copy',
+    searchPlaceholder: 'Search log output',
+    allLevels: 'All levels',
+    levelError: 'Error',
+    levelWarning: 'Warning',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'No matching log lines',
+    copiedVisible: 'Visible log copied',
+    copiedLine: 'Log line copied',
+    copyVisibleFailed: 'Could not copy log output',
+    copyLineFailed: 'Could not copy log line',
     title: 'System Log',
     description: 'Live view of system log output with download capability.',
     liveLog: 'Live Log',

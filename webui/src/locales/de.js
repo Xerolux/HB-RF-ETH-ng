@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Aus',
+    ledPatternOn: 'An',
+    ledPatternBlink: 'Blinken',
+    ledPatternBlinkInv: 'Blinken invertiert',
+    ledPatternFastBlink: 'Schnelles Blinken',
+    ledPatternSlowBlink: 'Langsames Blinken',
+    ledPatternBlink2x: '2x Blinken',
+    ledPatternBlink3x: '3x Blinken',
+    ledPatternBreathing: 'Pulsieren',
+    ledPatternHeartbeat: 'Herzschlag',
+    ledPatternStrobe: 'Stroboskop',
+    ledProgramIdle: 'Leerlauf',
+    ledProgramCcuDisconnected: 'CCU getrennt',
+    ledProgramCcuConnected: 'CCU verbunden',
+    ledProgramUpdateAvailable: 'Update verfügbar',
+    ledProgramError: 'Fehler',
+    ledProgramBooting: 'Startvorgang',
+    ledProgramUpdateInProgress: 'Update läuft',
+    unsavedLeave: 'Du hast ungespeicherte Änderungen. Seite trotzdem verlassen?',
+    discardConfirm: 'Ungespeicherte Änderungen verwerfen und zuletzt geladene Werte wiederherstellen?',
+    discard: 'Verwerfen',
+    restartError: 'Fehler beim Neustart des Geräts',
     title: 'Einstellungen',
     ccuSettings: 'CCU Verbindung',
     ccuIpAddress: 'CCU IP-Adresse',
@@ -142,6 +164,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Updates und Wiederherstellung',
+    liveStreamExport: 'Live-Stream und Export',
+    networkTimeSetup: 'Netzwerk- und Zeiteinstellungen',
+    copied: '{label} kopiert',
     title: 'Systeminformationen',
     goodMorning: 'Guten Morgen',
     goodAfternoon: 'Guten Tag',
@@ -188,6 +214,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Zum OTA-Bereich',
+    lastCheckAt: 'Letzte Prüfung: {time}',
+    noRecentCheck: 'Keine aktuelle Prüfung',
     title: 'Firmware',
     subtitle: 'Firmware aktualisieren',
     restarting: 'Startet neu...',
@@ -241,6 +270,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Führe einen kurzen Selbsttest aus, um die aktuelle Konfiguration zu prüfen.',
+    checkFinished: 'Prüfung abgeschlossen',
+    diagnosticFailed: 'Diagnoseanfrage fehlgeschlagen',
     title: 'Monitoring',
     description: 'CheckMK und MQTT Monitoring für das HB-RF-ETH Gateway konfigurieren.',
     save: 'Speichern',
@@ -384,6 +416,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Live-Gerätelog filtern, pausieren und exportieren.',
+    paused: 'Pausiert',
+    live: 'Live',
+    lines: 'Zeilen',
+    newEntries: 'neu',
+    pause: 'Pause',
+    resume: 'Fortsetzen',
+    manualScroll: 'Manuelles Scrollen',
+    copy: 'Kopieren',
+    searchPlaceholder: 'Logausgabe durchsuchen',
+    allLevels: 'Alle Level',
+    levelError: 'Fehler',
+    levelWarning: 'Warnung',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Keine passenden Logzeilen',
+    copiedVisible: 'Sichtbares Log kopiert',
+    copiedLine: 'Logzeile kopiert',
+    copyVisibleFailed: 'Logausgabe konnte nicht kopiert werden',
+    copyLineFailed: 'Logzeile konnte nicht kopiert werden',
     title: 'System-Log',
     description: 'Live-Ansicht der Systemprotokollierung mit Download-Funktion.',
     liveLog: 'Live-Protokoll',

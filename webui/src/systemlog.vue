@@ -10,9 +10,9 @@
         <p class="hero-subtitle">{{ t('systemlog.description') }}</p>
       </div>
       <div class="hero-meta">
-        <span class="meta-chip"><AppIcon name="activity" /> {{ paused ? 'Paused' : 'Live' }}</span>
-        <span class="meta-chip"><AppIcon name="search" /> {{ filteredEntries.length }} lines</span>
-        <span v-if="newEntriesCount > 0" class="meta-chip">{{ newEntriesCount }} new</span>
+        <span class="meta-chip"><AppIcon name="activity" /> {{ paused ? t('systemlog.paused') : t('systemlog.live') }}</span>
+        <span class="meta-chip"><AppIcon name="search" /> {{ filteredEntries.length }} {{ t('systemlog.lines') }}</span>
+        <span v-if="newEntriesCount > 0" class="meta-chip">{{ newEntriesCount }} {{ t('systemlog.newEntries') }}</span>
       </div>
     </section>
 
@@ -22,7 +22,7 @@
           <div class="header-icon bg-info-light text-info"><AppIcon name="logs" /></div>
           <div>
             <h3>{{ t('systemlog.liveLog') }}</h3>
-            <p class="section-subtitle">Filter, pause and export the live device log.</p>
+            <p class="section-subtitle">{{ t('systemlog.subtitle') }}</p>
           </div>
         </div>
         <div class="log-actions">
@@ -32,23 +32,23 @@
           </label>
           <button class="tool-btn" type="button" :disabled="!logEnabled" @click="refreshLog">
             <AppIcon name="refresh" />
-            Refresh
+            {{ t('systemlog.refresh') }}
           </button>
           <button class="tool-btn" type="button" :disabled="!logEnabled" @click="togglePaused">
             <AppIcon name="activity" />
-            {{ paused ? 'Resume' : 'Pause' }}
+            {{ paused ? t('systemlog.resume') : t('systemlog.pause') }}
           </button>
           <button class="tool-btn" type="button" :disabled="!logEnabled" @click="toggleAutoScroll">
             <AppIcon name="download" />
-            {{ autoScroll ? 'Auto scroll' : 'Manual scroll' }}
+            {{ autoScroll ? t('systemlog.autoScroll') : t('systemlog.manualScroll') }}
           </button>
           <button class="tool-btn" type="button" :disabled="!filteredEntries.length" @click="copyVisibleLog">
             <AppIcon name="copy" />
-            Copy
+            {{ t('systemlog.copy') }}
           </button>
           <button class="tool-btn" type="button" @click="clearLog">
             <AppIcon name="close" />
-            Clear
+            {{ t('systemlog.clear') }}
           </button>
           <button class="btn btn-primary btn-sm" type="button" @click="downloadLog">
             <AppIcon name="download" />
@@ -60,14 +60,14 @@
       <div class="toolbar">
         <div class="search-field">
           <AppIcon name="search" />
-          <input v-model.trim="searchQuery" type="search" placeholder="Search log output">
+          <input v-model.trim="searchQuery" type="search" :placeholder="t('systemlog.searchPlaceholder')">
         </div>
         <select v-model="levelFilter" class="level-filter">
-          <option value="all">All levels</option>
-          <option value="E">Error</option>
-          <option value="W">Warning</option>
-          <option value="I">Info</option>
-          <option value="D">Debug</option>
+          <option value="all">{{ t('systemlog.allLevels') }}</option>
+          <option value="E">{{ t('systemlog.levelError') }}</option>
+          <option value="W">{{ t('systemlog.levelWarning') }}</option>
+          <option value="I">{{ t('systemlog.levelInfo') }}</option>
+          <option value="D">{{ t('systemlog.levelDebug') }}</option>
         </select>
       </div>
 
@@ -87,7 +87,7 @@
             </div>
           </div>
           <div v-else class="log-empty">
-            {{ searchQuery || levelFilter !== 'all' ? 'No matching log lines' : t('systemlog.empty') }}
+            {{ searchQuery || levelFilter !== 'all' ? t('systemlog.noMatches') : t('systemlog.empty') }}
           </div>
         </div>
         <div v-else class="log-disabled">
@@ -252,18 +252,18 @@ const copyVisibleLog = async () => {
   if (!content) return
   try {
     await navigator.clipboard.writeText(content)
-    uiStore.pushToast({ type: 'success', title: t('common.success'), message: 'Visible log copied', duration: 1800 })
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('systemlog.copiedVisible'), duration: 1800 })
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: 'Could not copy log output' })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.copyVisibleFailed') })
   }
 }
 
 const copyLine = async (line) => {
   try {
     await navigator.clipboard.writeText(line)
-    uiStore.pushToast({ type: 'success', title: t('common.success'), message: 'Log line copied', duration: 1400 })
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('systemlog.copiedLine'), duration: 1400 })
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: 'Could not copy log line' })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.copyLineFailed') })
   }
 }
 

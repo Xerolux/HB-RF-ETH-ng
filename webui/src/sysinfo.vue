@@ -32,7 +32,7 @@
           <span class="icon-badge warning"><AppIcon name="firmware" /></span>
           <div>
             <strong>{{ t('nav.firmware') }}</strong>
-            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? `Update ${sysInfoStore.latestVersion}` : 'Updates and recovery' }}</p>
+            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? `Update ${sysInfoStore.latestVersion}` : t('sysinfo.updatesRecovery') }}</p>
           </div>
         </router-link>
 
@@ -40,7 +40,7 @@
           <span class="icon-badge soft"><AppIcon name="logs" /></span>
           <div>
             <strong>{{ t('nav.systemlog') }}</strong>
-            <p>Live stream and export</p>
+            <p>{{ t('sysinfo.liveStreamExport') }}</p>
           </div>
         </router-link>
 
@@ -56,7 +56,7 @@
           <span class="icon-badge success"><AppIcon name="settings" /></span>
           <div>
             <strong>{{ t('nav.settings') }}</strong>
-            <p>Network and time setup</p>
+            <p>{{ t('sysinfo.networkTimeSetup') }}</p>
           </div>
         </router-link>
       </section>
@@ -273,7 +273,7 @@ const copyValue = async (value, label) => {
     uiStore.pushToast({
       type: 'success',
       title: t('common.success'),
-      message: `${label} copied`,
+      message: t('sysinfo.copied', { label }),
       duration: 2200
     })
   } catch (error) {

@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Éteint',
+    ledPatternOn: 'Allumé',
+    ledPatternBlink: 'Clignotement',
+    ledPatternBlinkInv: 'Clignotement inversé',
+    ledPatternFastBlink: 'Clignotement rapide',
+    ledPatternSlowBlink: 'Clignotement lent',
+    ledPatternBlink2x: 'Clignotement 2x',
+    ledPatternBlink3x: 'Clignotement 3x',
+    ledPatternBreathing: 'Respiration',
+    ledPatternHeartbeat: 'Battement de cœur',
+    ledPatternStrobe: 'Stroboscope',
+    ledProgramIdle: 'Inactif',
+    ledProgramCcuDisconnected: 'CCU déconnectée',
+    ledProgramCcuConnected: 'CCU connectée',
+    ledProgramUpdateAvailable: 'Mise à jour disponible',
+    ledProgramError: 'Erreur',
+    ledProgramBooting: 'Démarrage',
+    ledProgramUpdateInProgress: 'Mise à jour en cours',
+    unsavedLeave: 'Des modifications ne sont pas enregistrées. Quitter quand même ?',
+    discardConfirm: 'Abandonner les modifications et restaurer les dernières valeurs chargées ?',
+    discard: 'Abandonner',
+    restartError: 'Erreur lors du redémarrage de l’appareil',
     title: 'Paramètres',
     ccuSettings: 'Connexion CCU',
     ccuIpAddress: 'Adresse IP CCU',
@@ -135,6 +157,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Mises à jour et récupération',
+    liveStreamExport: 'Flux en direct et export',
+    networkTimeSetup: 'Configuration réseau et heure',
+    copied: '{label} copié',
     title: 'Informations système',
     goodMorning: 'Bonjour',
     goodAfternoon: 'Bon après-midi',
@@ -187,6 +213,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Aller à l’OTA',
+    lastCheckAt: 'Dernière vérification : {time}',
+    noRecentCheck: 'Aucune vérification récente',
     title: 'Micrologiciel',
     subtitle: 'Mettre à jour le micrologiciel de votre appareil',
     restarting: 'Redémarrage...',
@@ -233,6 +262,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Lancez un autotest rapide pour vérifier la configuration actuelle.',
+    checkFinished: 'Vérification terminée',
+    diagnosticFailed: 'Échec de la demande de diagnostic',
     title: 'Surveillance',
     description: 'Configurer la surveillance CheckMK et MQTT pour la passerelle HB-RF-ETH.',
     save: 'Enregistrer',
@@ -376,6 +408,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filtrer, suspendre et exporter le journal en direct de l’appareil.',
+    paused: 'En pause',
+    live: 'En direct',
+    lines: 'lignes',
+    newEntries: 'nouvelles',
+    pause: 'Pause',
+    resume: 'Reprendre',
+    manualScroll: 'Défilement manuel',
+    copy: 'Copier',
+    searchPlaceholder: 'Rechercher dans le journal',
+    allLevels: 'Tous les niveaux',
+    levelError: 'Erreur',
+    levelWarning: 'Avertissement',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Aucune ligne correspondante',
+    copiedVisible: 'Journal visible copié',
+    copiedLine: 'Ligne copiée',
+    copyVisibleFailed: 'Impossible de copier le journal',
+    copyLineFailed: 'Impossible de copier la ligne',
     title: 'Journal système',
     description: 'Vue en direct de la sortie du journal système avec capacité de téléchargement.',
     liveLog: 'Journal en direct',

@@ -44,11 +44,11 @@
       </button>
       <button class="chip-btn" type="button" @click="scrollToOta">
         <AppIcon name="download" />
-        Jump to OTA
+        {{ t('firmware.jumpToOta') }}
       </button>
       <span class="chip-btn static">
         <AppIcon name="clock" />
-        {{ updateStore.lastCheck ? `Last check: ${formatLastCheck(updateStore.lastCheck)}` : 'No recent check' }}
+        {{ updateStore.lastCheck ? t('firmware.lastCheckAt', { time: formatLastCheck(updateStore.lastCheck) }) : t('firmware.noRecentCheck') }}
       </span>
     </div>
 

@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Uit',
+    ledPatternOn: 'Aan',
+    ledPatternBlink: 'Knipperen',
+    ledPatternBlinkInv: 'Omgekeerd knipperen',
+    ledPatternFastBlink: 'Snel knipperen',
+    ledPatternSlowBlink: 'Langzaam knipperen',
+    ledPatternBlink2x: '2x knipperen',
+    ledPatternBlink3x: '3x knipperen',
+    ledPatternBreathing: 'Ademend',
+    ledPatternHeartbeat: 'Hartslag',
+    ledPatternStrobe: 'Stroboscoop',
+    ledProgramIdle: 'Inactief',
+    ledProgramCcuDisconnected: 'CCU losgekoppeld',
+    ledProgramCcuConnected: 'CCU verbonden',
+    ledProgramUpdateAvailable: 'Update beschikbaar',
+    ledProgramError: 'Fout',
+    ledProgramBooting: 'Opstarten',
+    ledProgramUpdateInProgress: 'Update bezig',
+    unsavedLeave: 'Je hebt niet-opgeslagen wijzigingen. Pagina toch verlaten?',
+    discardConfirm: 'Niet-opgeslagen wijzigingen verwerpen en de laatst geladen waarden herstellen?',
+    discard: 'Verwerpen',
+    restartError: 'Fout bij herstarten van het apparaat',
     title: 'Instellingen',
     ccuSettings: 'CCU Verbinding',
     ccuIpAddress: 'CCU IP-adres',
@@ -135,6 +157,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Updates en herstel',
+    liveStreamExport: 'Livestream en export',
+    networkTimeSetup: 'Netwerk- en tijdinstellingen',
+    copied: '{label} gekopieerd',
     title: 'Systeeminformatie',
     goodMorning: 'Goedemorgen',
     goodAfternoon: 'Goedemiddag',
@@ -187,6 +213,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Naar OTA',
+    lastCheckAt: 'Laatste controle: {time}',
+    noRecentCheck: 'Geen recente controle',
     title: 'Firmware',
     subtitle: 'Update uw apparaatfirmware',
     restarting: 'Opnieuw opstarten...',
@@ -233,6 +262,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Voer een snelle zelftest uit om de huidige configuratie te controleren.',
+    checkFinished: 'Controle voltooid',
+    diagnosticFailed: 'Diagnoseverzoek mislukt',
     title: 'Monitoring',
     description: 'Configureer CheckMK en MQTT monitoring voor de HB-RF-ETH gateway.',
     save: 'Opslaan',
@@ -376,6 +408,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filter, pauzeer en exporteer het live apparaatlog.',
+    paused: 'Gepauzeerd',
+    live: 'Live',
+    lines: 'regels',
+    newEntries: 'nieuw',
+    pause: 'Pauzeren',
+    resume: 'Hervatten',
+    manualScroll: 'Handmatig scrollen',
+    copy: 'Kopiëren',
+    searchPlaceholder: 'Zoeken in loguitvoer',
+    allLevels: 'Alle niveaus',
+    levelError: 'Fout',
+    levelWarning: 'Waarschuwing',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Geen overeenkomende regels',
+    copiedVisible: 'Zichtbaar log gekopieerd',
+    copiedLine: 'Logregel gekopieerd',
+    copyVisibleFailed: 'Kan loguitvoer niet kopiëren',
+    copyLineFailed: 'Kan logregel niet kopiëren',
     title: 'Systeemlog',
     description: 'Live weergave van systeemloguitvoer met downloadmogelijkheid.',
     liveLog: 'Live Log',

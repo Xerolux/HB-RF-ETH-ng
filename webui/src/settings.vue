@@ -389,7 +389,7 @@
             :disabled="!hasUnsavedChanges"
             class="discard-btn"
           >
-            Discard
+            {{ t('settings.discard') }}
           </BButton>
 
           <BButton
@@ -515,29 +515,29 @@ const ntpServer = ref('')
 const ledBrightness = ref(100)
 
 // LED Programs
-const ledPrograms = ref([
-  { id: 'idle', label: 'Idle' },
-  { id: 'ccu_disconnected', label: 'CCU Disconnected' },
-  { id: 'ccu_connected', label: 'CCU Connected' },
-  { id: 'update_available', label: 'Update Available' },
-  { id: 'error', label: 'Error' },
-  { id: 'booting', label: 'Booting' },
-  { id: 'update_in_progress', label: 'Update Progress' }
+const ledPrograms = computed(() => [
+  { id: 'idle', label: t('settings.ledProgramIdle') },
+  { id: 'ccu_disconnected', label: t('settings.ledProgramCcuDisconnected') },
+  { id: 'ccu_connected', label: t('settings.ledProgramCcuConnected') },
+  { id: 'update_available', label: t('settings.ledProgramUpdateAvailable') },
+  { id: 'error', label: t('settings.ledProgramError') },
+  { id: 'booting', label: t('settings.ledProgramBooting') },
+  { id: 'update_in_progress', label: t('settings.ledProgramUpdateInProgress') }
 ])
 
-const ledPatterns = [
-  { value: 0, text: 'Aus (Off)' },
-  { value: 1, text: 'An (On)' },
-  { value: 2, text: 'Blinken (Blink)' },
-  { value: 3, text: 'Blinken Invertiert (Blink Inv)' },
-  { value: 4, text: 'Schnelles Blinken (Fast Blink)' },
-  { value: 5, text: 'Langsames Blinken (Slow Blink)' },
-  { value: 6, text: '2x Blinken (2x Blink)' },
-  { value: 7, text: '3x Blinken (3x Blink)' },
-  { value: 8, text: 'Breathing (Pulsieren)' },
-  { value: 9, text: 'Herzschlag (Heartbeat)' },
-  { value: 10, text: 'Strobe' }
-]
+const ledPatterns = computed(() => [
+  { value: 0, text: t('settings.ledPatternOff') },
+  { value: 1, text: t('settings.ledPatternOn') },
+  { value: 2, text: t('settings.ledPatternBlink') },
+  { value: 3, text: t('settings.ledPatternBlinkInv') },
+  { value: 4, text: t('settings.ledPatternFastBlink') },
+  { value: 5, text: t('settings.ledPatternSlowBlink') },
+  { value: 6, text: t('settings.ledPatternBlink2x') },
+  { value: 7, text: t('settings.ledPatternBlink3x') },
+  { value: 8, text: t('settings.ledPatternBreathing') },
+  { value: 9, text: t('settings.ledPatternHeartbeat') },
+  { value: 10, text: t('settings.ledPatternStrobe') }
+])
 
 const ledProgramValues = ref({
   idle: 1,
@@ -756,7 +756,7 @@ onBeforeUnmount(() => {
 
 onBeforeRouteLeave(() => {
   if (!hasUnsavedChanges.value) return true
-  return window.confirm('You have unsaved changes. Leave this page anyway?')
+  return window.confirm(t('settings.unsavedLeave'))
 })
 
 const handleBeforeUnload = (event) => {
@@ -804,7 +804,7 @@ const saveSettingsClick = async () => {
 
 const resetToLoadedState = () => {
   if (!hasUnsavedChanges.value) return
-  if (!window.confirm('Discard your unsaved changes and restore the last loaded values?')) return
+  if (!window.confirm(t('settings.discardConfirm'))) return
   loadSettings()
 }
 
@@ -819,7 +819,7 @@ const performRestart = async () => {
     setTimeout(() => window.location.reload(), 20000)
   } catch (e) {
     console.error("Restart request failed", e)
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: 'Error restarting device' })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })
     isRestarting.value = false
   }
 }

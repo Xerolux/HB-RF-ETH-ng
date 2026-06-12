@@ -45,6 +45,28 @@ export default {
 
   // Settings Page
   settings: {
+    ledPatternOff: 'Vypnuto',
+    ledPatternOn: 'Zapnuto',
+    ledPatternBlink: 'Blikání',
+    ledPatternBlinkInv: 'Blikání invertované',
+    ledPatternFastBlink: 'Rychlé blikání',
+    ledPatternSlowBlink: 'Pomalé blikání',
+    ledPatternBlink2x: '2× bliknutí',
+    ledPatternBlink3x: '3× bliknutí',
+    ledPatternBreathing: 'Dýchání',
+    ledPatternHeartbeat: 'Tlukot srdce',
+    ledPatternStrobe: 'Stroboskop',
+    ledProgramIdle: 'Nečinnost',
+    ledProgramCcuDisconnected: 'CCU odpojeno',
+    ledProgramCcuConnected: 'CCU připojeno',
+    ledProgramUpdateAvailable: 'Aktualizace k dispozici',
+    ledProgramError: 'Chyba',
+    ledProgramBooting: 'Spouštění',
+    ledProgramUpdateInProgress: 'Probíhá aktualizace',
+    unsavedLeave: 'Máte neuložené změny. Přesto opustit stránku?',
+    discardConfirm: 'Zahodit neuložené změny a obnovit naposledy načtené hodnoty?',
+    discard: 'Zahodit',
+    restartError: 'Chyba při restartu zařízení',
     title: 'Nastavení',
     ccuSettings: 'Připojení CCU',
     ccuIpAddress: 'IP adresa CCU',
@@ -135,6 +157,10 @@ export default {
 
   // System Info
   sysinfo: {
+    updatesRecovery: 'Aktualizace a obnovení',
+    liveStreamExport: 'Živý přenos a export',
+    networkTimeSetup: 'Nastavení sítě a času',
+    copied: '{label} zkopírováno',
     title: 'Informace o systému',
     goodMorning: 'Dobré ráno',
     goodAfternoon: 'Dobré odpoledne',
@@ -187,6 +213,9 @@ export default {
 
   // Firmware Update
   firmware: {
+    jumpToOta: 'Přejít na OTA',
+    lastCheckAt: 'Poslední kontrola: {time}',
+    noRecentCheck: 'Žádná nedávná kontrola',
     title: 'Firmware',
     subtitle: 'Aktualizovat firmware zařízení',
     restarting: 'Restartování...',
@@ -233,6 +262,9 @@ export default {
 
   // Monitoring
   monitoring: {
+    selfTestHint: 'Spusťte rychlý autotest pro ověření aktuální konfigurace.',
+    checkFinished: 'Kontrola dokončena',
+    diagnosticFailed: 'Diagnostický požadavek selhal',
     title: 'Monitorování',
     description: 'Nakonfigurujte monitorování CheckMK a MQTT pro bránu HB-RF-ETH.',
     save: 'Uložit',
@@ -376,6 +408,26 @@ export default {
 
   // System Log
   systemlog: {
+    subtitle: 'Filtrujte, pozastavte a exportujte živý log zařízení.',
+    paused: 'Pozastaveno',
+    live: 'Živě',
+    lines: 'řádků',
+    newEntries: 'nových',
+    pause: 'Pozastavit',
+    resume: 'Pokračovat',
+    manualScroll: 'Ruční posun',
+    copy: 'Kopírovat',
+    searchPlaceholder: 'Hledat ve výpisu logu',
+    allLevels: 'Všechny úrovně',
+    levelError: 'Chyba',
+    levelWarning: 'Varování',
+    levelInfo: 'Info',
+    levelDebug: 'Debug',
+    noMatches: 'Žádné odpovídající řádky',
+    copiedVisible: 'Viditelný log zkopírován',
+    copiedLine: 'Řádek logu zkopírován',
+    copyVisibleFailed: 'Výpis logu se nepodařilo zkopírovat',
+    copyLineFailed: 'Řádek se nepodařilo zkopírovat',
     title: 'Systémový protokol',
     description: 'Živý pohled na výstup systémového protokolu s možností stažení.',
     liveLog: 'Živý protokol',

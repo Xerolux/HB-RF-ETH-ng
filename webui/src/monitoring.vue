@@ -368,7 +368,7 @@ const diagnosticCards = computed(() => [
 
 const diagnosticState = (target) => {
   const result = monitoringStore.diagnostics[target]
-  if (!result) return { ok: null, message: 'Run a quick self-test to verify the current configuration.' }
+  if (!result) return { ok: null, message: t('monitoring.selfTestHint') }
   return result
 }
 
@@ -432,12 +432,12 @@ const runDiagnostic = async (target) => {
     const result = await monitoringStore.test(target)
     uiStore.pushToast({
       type: result.ok ? 'success' : 'warning',
-      title: result.ok ? t('common.success') : 'Check finished',
+      title: result.ok ? t('common.success') : t('monitoring.checkFinished'),
       message: result.message,
       duration: 2800
     })
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || 'Diagnostic request failed' })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || t('monitoring.diagnosticFailed') })
   } finally {
     diagnosticBusy.value[target] = false
   }
