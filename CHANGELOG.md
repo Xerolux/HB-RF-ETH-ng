@@ -13,9 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Token persists across reboots**: the authentication token is now saved to NVS. "Remember me" / persistent login survives firmware updates and device restarts — no more spurious 401 / redirect-to-login after a reboot. Token is regenerated on password change and cleared on factory reset.
 
 ### Fixed
-- **30-second reboot loop**: the UpdateCheck task copied the 5 KB `ReleaseInfo` struct (with its 4 KB `body` field) onto a 8 KB stack — tight enough that TLS` stack frames could overflow it, triggering a watchdog reset exactly 30 s after boot (the wait-before-first-check delay). UpdateCheck task stack raised to 12 KB; MQTT publish task (also copies the struct) raised from 6→10 KB.
+- **30-second reboot loop**: the UpdateCheck task copied the 5 KB `ReleaseInfo` struct (with its 4 KB `body` field) onto a 8 KB stack — tight enough that TLS stack frames could overflow it, triggering a watchdog reset exactly 30 s after boot (the wait-before-first-check delay). UpdateCheck task stack raised to 12 KB; MQTT publish task (also copies the struct) raised from 6→10 KB.
 - **Immediate logout on page load**: the idle-timer `lastActivity` was loaded from `localStorage`, so a stale timestamp from hours before caused an instant logout on the first 30 s cycle. `lastActivity` now always starts fresh on page load.
 - **Log noise**: `httpd_parse: parse_block: incomplete` and `esp-x509-crt-bundle: Certificate validated` (3–4× per boot) are suppressed at the log level.
+
+### Optimized
+- **Lightweight version snapshot**: `UpdateCheck::getVersionSnapshot()` returns a 160-byte struct instead of the full 5 KB `ReleaseInfo` — the MQTT publish task (every 5 s) and the background checker no longer copy the 4 KB body on their stack. The WebUI still uses the full `getReleaseInfo()` for the release-notes preview.
+- **Smaller heap footprint**: GitHub response buffer reduced from 24→12 KB (a single-release fetch fits in ~8 KB after the `?per_page=1` change).
+- **Serialized external HTTPS requests**: a shared mutex (`g_net_fetch_mutex`) ensures the UpdateCheck fetch and the changelog proxy never open two TLS handshakes at once on the ESP32's limited heap.
+- **Stack high-water-mark logging**: the UpdateCheck task and MQTT publish task log their remaining stack at each (first) cycle for early detection of future tightness.
 
 ## [2.2.0-Beta.6] - 2026-06-28
 
