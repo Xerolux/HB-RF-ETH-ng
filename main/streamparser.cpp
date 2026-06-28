@@ -24,7 +24,7 @@
 #include "streamparser.h"
 #include <stdint.h>
 
-StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _bufferPos(0), _framePos(0), _frameLength(0), _state(NO_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
+StreamParser::StreamParser(bool decodeEscaped, std::function<void(unsigned char *buffer, uint16_t len)> processor) : _buffer{0}, _bufferPos(0), _framePos(0), _frameLength(0), _state(WAIT_FOR_DATA), _isEscaped(false), _decodeEscaped(decodeEscaped), _processor(processor)
 {
 }
 
@@ -50,7 +50,7 @@ void StreamParser::append(unsigned char chr)
 
         switch (_state)
         {
-        case NO_DATA:
+        case WAIT_FOR_DATA:
         case FRAME_COMPLETE:
             return; // Do nothing until the first frame prefix occurs
 
@@ -84,14 +84,14 @@ void StreamParser::append(unsigned char chr)
         // Do NOT process the truncated buffer (its CRC would be invalid and
         // invoking the processor here can desync the stream, e.g. when the
         // overflow byte was a fresh 0xfd start marker).
-        _state = NO_DATA;
+        _state = WAIT_FOR_DATA;
         _bufferPos = 0;
     }
 
     if (_state == FRAME_COMPLETE)
     {
         _processor(_buffer, _bufferPos);
-        _state = NO_DATA;
+        _state = WAIT_FOR_DATA;
         _bufferPos = 0;
     }
 }
@@ -107,7 +107,7 @@ void StreamParser::append(unsigned char *buffer, uint16_t len)
 
 void StreamParser::flush()
 {
-    _state = NO_DATA;
+    _state = WAIT_FOR_DATA;
     _bufferPos = 0;
     _isEscaped = false;
 }

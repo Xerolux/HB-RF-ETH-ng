@@ -125,7 +125,7 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
     if (!command_token_ok(payload, payload_len)) {
         ESP_LOGW(TAG, "Command %s rejected: missing/invalid token", command);
         char msg[96];
-        snprintf(msg, sizeof(msg), "rejected cmd=%s reason=invalid_token", command);
+        snprintf(msg, sizeof(msg), "rejected cmd=%.48s reason=invalid_token", command);
         mqtt_handler_publish_event("event/command_rejected", msg);
         return;
     }
