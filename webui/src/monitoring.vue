@@ -130,7 +130,7 @@
                       <div class="pem-label-row">
                         <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.caCerts') }}</label>
                         <button type="button" class="btn-load-file" @click="$refs.caFileInput.click()">
-                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                          <AppIcon name="file" /> {{ t('monitoring.mqtt.tls.loadFromFile') }}
                         </button>
                       </div>
                       <input ref="caFileInput" type="file" accept=".pem,.crt,.cer,.txt" hidden
@@ -158,7 +158,7 @@
                       <div class="pem-label-row">
                         <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.certfile') }}</label>
                         <button type="button" class="btn-load-file" @click="$refs.certFileInput.click()">
-                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                          <AppIcon name="file" /> {{ t('monitoring.mqtt.tls.loadFromFile') }}
                         </button>
                       </div>
                       <input ref="certFileInput" type="file" accept=".pem,.crt,.cer,.txt" hidden
@@ -186,7 +186,7 @@
                       <div class="pem-label-row">
                         <label class="form-label mb-0">{{ t('monitoring.mqtt.tls.keyfile') }}</label>
                         <button type="button" class="btn-load-file" @click="$refs.keyFileInput.click()">
-                          📂 {{ t('monitoring.mqtt.tls.loadFromFile') }}
+                          <AppIcon name="file" /> {{ t('monitoring.mqtt.tls.loadFromFile') }}
                         </button>
                       </div>
                       <input ref="keyFileInput" type="file" accept=".pem,.key,.txt" hidden

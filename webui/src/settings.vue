@@ -15,7 +15,7 @@
         <span class="meta-chip"><AppIcon name="backup" /> Backup</span>
         <span class="meta-chip" :class="hasUnsavedChanges ? 'warning-chip' : ''">
           <AppIcon :name="hasUnsavedChanges ? 'alert' : 'check'" />
-          {{ hasUnsavedChanges ? 'Unsaved changes' : 'Saved' }}
+          {{ hasUnsavedChanges ? t('settings.unsavedChanges') : t('settings.allSaved') }}
         </span>
       </div>
     </section>
@@ -86,7 +86,7 @@
               <div class="form-group">
                 <label class="form-label">{{ t('settings.ledBrightness') }}</label>
                 <div class="brightness-control">
-                  <span class="brightness-icon">🔅</span>
+                  <AppIcon name="sun" class="brightness-icon dim" />
                   <input
                     type="range"
                     v-model.number="ledBrightness"
@@ -95,7 +95,7 @@
                     step="5"
                     class="ios-slider"
                   />
-                  <span class="brightness-icon">🔆</span>
+                  <AppIcon name="sun" class="brightness-icon" />
                   <span class="brightness-value">{{ ledBrightness }}%</span>
                 </div>
               </div>
@@ -282,9 +282,9 @@
                   :class="['source-card', { active: timesource === source.value }]"
                   @click="timesource = source.value"
                 >
-                  <span class="source-icon">{{ source.icon }}</span>
+                  <span class="source-icon"><AppIcon :name="source.icon" /></span>
                   <span class="source-label">{{ source.label }}</span>
-                  <span v-if="timesource === source.value" class="check-icon">✓</span>
+                  <span v-if="timesource === source.value" class="check-icon"><AppIcon name="check" /></span>
                 </button>
               </div>
 
@@ -332,21 +332,21 @@
             <div class="card-body">
               <div class="backup-grid">
                 <div class="action-tile" @click="downloadBackup">
-                  <div class="tile-icon">⬇️</div>
+                  <span class="tile-icon"><AppIcon name="download" /></span>
                   <div class="tile-content">
                     <h4>{{ t('settings.downloadBackup') }}</h4>
                     <p>{{ t('settings.backupInfo') }}</p>
                   </div>
-                  <span class="tile-arrow">➜</span>
+                  <span class="tile-arrow"><AppIcon name="arrowRight" /></span>
                 </div>
 
                 <div class="action-tile" @click="$refs.fileInput.click()">
-                  <div class="tile-icon">⬆️</div>
+                  <span class="tile-icon"><AppIcon name="upload" /></span>
                   <div class="tile-content">
                     <h4>{{ t('settings.restore') }}</h4>
                     <p>{{ t('settings.restoreInfo') }}</p>
                   </div>
-                  <span class="tile-arrow">➜</span>
+                  <span class="tile-arrow"><AppIcon name="arrowRight" /></span>
                   <input
                     type="file"
                     ref="fileInput"
@@ -357,7 +357,7 @@
                 </div>
 
                 <div v-if="restoreFile" class="restore-confirm mt-3 p-3 bg-light rounded">
-                  <p class="mb-2">Selected: <strong>{{ restoreFile.name }}</strong></p>
+                  <p class="mb-2">{{ t('settings.selected', { name: restoreFile.name }) }}</p>
                   <BButton variant="warning" class="w-100" @click="restoreSettings">
                     {{ t('settings.restoreBtn') }}
                   </BButton>
@@ -482,9 +482,9 @@ const tabs = computed(() => [
 ])
 
 const timeSources = computed(() => [
-  { value: 0, icon: '🌍', label: t('settings.ntp') },
-  { value: 1, icon: '📻', label: t('settings.dcf') },
-  { value: 2, icon: '🛰️', label: t('settings.gps') }
+  { value: 0, icon: 'globe', label: t('settings.ntp') },
+  { value: 1, icon: 'radio', label: t('settings.dcf') },
+  { value: 2, icon: 'satellite', label: t('settings.gps') }
 ])
 
 // Local form state
@@ -987,6 +987,16 @@ hr {
   border-radius: var(--radius-lg);
 }
 
+.brightness-icon {
+  font-size: 1.4rem;
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.brightness-icon.dim {
+  opacity: 0.4;
+}
+
 .ios-slider {
   flex: 1;
   height: 6px;
@@ -1058,7 +1068,9 @@ hr {
 
 .source-icon {
   font-size: 2rem;
+  color: var(--color-primary);
   margin-bottom: var(--spacing-xs);
+  display: inline-flex;
 }
 
 .check-icon {
@@ -1066,7 +1078,8 @@ hr {
   top: 8px;
   right: 8px;
   color: var(--color-primary);
-  font-weight: bold;
+  font-size: 1.1rem;
+  display: inline-flex;
 }
 
 /* Action Tiles */
@@ -1090,8 +1103,10 @@ hr {
 }
 
 .tile-icon {
-  font-size: 2rem;
+  font-size: 1.8rem;
+  color: var(--color-primary);
   margin-right: var(--spacing-md);
+  display: inline-flex;
 }
 
 .tile-content {
@@ -1111,11 +1126,32 @@ hr {
 
 .tile-arrow {
   color: var(--color-text-secondary);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  display: inline-flex;
 }
 
 .file-input {
   display: none;
+}
+
+/* LED Programs grid - base definition (was only in mobile MQ, missing on desktop) */
+.led-programs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.led-program-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.led-program-item .form-label.small {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
 }
 
 /* Floating Footer */
@@ -1262,25 +1298,6 @@ hr {
   .brightness-value {
     min-width: 40px;
     text-align: right;
-  }
-
-  .led-programs-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-md);
-  }
-
-  .led-program-item {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-
-  .led-program-item .form-label.small {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
   }
 
   .floating-footer {

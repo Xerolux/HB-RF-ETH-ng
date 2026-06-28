@@ -22,7 +22,7 @@
     </div>
 
     <div v-else-if="error" class="text-center py-5">
-      <div class="error-icon">⚠️</div>
+      <div class="error-icon"><AppIcon name="alert" /></div>
       <h5 class="mt-3">{{ t('changelog.error') }}</h5>
       <p class="text-danger">{{ error }}</p>
       <BButton variant="outline-secondary" class="btn-retry" @click="fetchChangelog">
@@ -41,7 +41,7 @@
           class="text-decoration-none text-primary small fw-bold"
         >
           {{ t('changelog.viewOnGithub') }}
-          <span class="ms-1">↗</span>
+          <AppIcon name="externalLink" class="external-link-icon" />
         </a>
         <BButton variant="secondary" class="btn-close-modal" @click="close">
           {{ t('changelog.close') }}
@@ -127,7 +127,7 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
   border: none;
   color: white;
   padding: 1.5rem;
@@ -248,8 +248,16 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .error-icon {
-  font-size: 4rem;
+  font-size: 3.5rem;
+  color: var(--color-danger);
   margin-bottom: 1rem;
+  display: inline-flex;
+}
+
+.external-link-icon {
+  font-size: 0.95rem;
+  vertical-align: -0.15em;
+  margin-left: 0.25rem;
 }
 
 .changelog-footer {

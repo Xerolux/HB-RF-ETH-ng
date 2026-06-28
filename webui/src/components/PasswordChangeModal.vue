@@ -11,7 +11,7 @@
     @hide="handleHide"
   >
     <div class="password-change-modal">
-      <div class="modal-icon">🔐</div>
+      <div class="modal-icon"><AppIcon name="lock" /></div>
       <p class="modal-description">
         {{ t('changePassword.warningMessage') }}
       </p>
@@ -55,7 +55,7 @@
           @update:model-value="error = null"
           class="mt-3"
         >
-          <span class="alert-icon">⚠️</span>
+          <span class="alert-icon"><AppIcon name="alert" /></span>
           {{ error }}
         </BAlert>
       </BForm>
@@ -236,8 +236,10 @@ const handleSubmit = async () => {
 }
 
 .modal-icon {
-  font-size: 3rem;
+  font-size: 2.5rem;
+  color: var(--color-primary);
   margin-bottom: var(--spacing-md);
+  display: inline-flex;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.15));
 }
 
@@ -258,12 +260,15 @@ const handleSubmit = async () => {
 }
 
 .password-change-modal :deep(.form-control:focus) {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+  border-color: rgba(242, 106, 61, 0.38);
+  box-shadow: 0 0 0 4px rgba(242, 106, 61, 0.12);
 }
 
 .alert-icon {
   margin-right: var(--spacing-sm);
+  font-size: 1.1rem;
+  display: inline-flex;
+  vertical-align: -0.15em;
 }
 
 .modal-footer-content {

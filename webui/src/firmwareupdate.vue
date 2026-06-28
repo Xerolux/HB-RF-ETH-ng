@@ -6,7 +6,7 @@
         <div class="countdown-card">
           <div class="spinner-container">
             <div class="spinner-ring"></div>
-            <div class="spinner-icon">🔄</div>
+            <div class="spinner-icon"><AppIcon name="refresh" /></div>
           </div>
           <h2 class="countdown-title">{{ t('firmware.restarting') }}</h2>
           <div class="countdown-value">{{ countdown }}</div>
@@ -66,7 +66,7 @@
             <summary>{{ t('firmware.releaseNotesPreview') }}</summary>
             <div class="release-notes-body" v-html="releaseNotesExcerpt"></div>
             <a v-if="updateStore.releaseUrl" :href="updateStore.releaseUrl" target="_blank" rel="noopener noreferrer" class="release-link">
-              {{ t('firmware.viewOnGithub') }} <span>↗</span>
+              {{ t('firmware.viewOnGithub') }} <AppIcon name="externalLink" class="external-link-icon" />
             </a>
           </details>
         </div>
@@ -970,6 +970,12 @@ onUnmounted(() => {
   text-decoration: underline;
 }
 
+.external-link-icon {
+  font-size: 0.95rem;
+  vertical-align: -0.15em;
+  margin-left: 0.2rem;
+}
+
 /* Inside the update banner the preview sits on a tinted background */
 .alert-banner .release-notes-preview {
   background: rgba(255, 255, 255, 0.18);
@@ -1138,6 +1144,8 @@ onUnmounted(() => {
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   font-size: 2rem;
+  color: white;
+  display: inline-flex;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -58,6 +58,13 @@ const icons = {
       { type: 'circle', cx: 12, cy: 17, r: 0.8 }
     ]
   },
+  arrowRight: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M5 12h14' },
+      { type: 'path', d: 'm13 6 6 6-6 6' }
+    ]
+  },
   backup: {
     viewBox: '0 0 24 24',
     nodes: [
@@ -145,6 +152,14 @@ const icons = {
       { type: 'path', d: 'M5 19h14' }
     ]
   },
+  externalLink: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6' },
+      { type: 'path', d: 'M15 3h6v6' },
+      { type: 'path', d: 'M10 14 21 3' }
+    ]
+  },
   ethernet: {
     viewBox: '0 0 24 24',
     nodes: [
@@ -166,6 +181,16 @@ const icons = {
       { type: 'path', d: 'M12 3v4' },
       { type: 'path', d: 'M9 6h6' },
       { type: 'path', d: 'M6 10h12l-1.5 8.5a2 2 0 0 1-2 1.5h-5a2 2 0 0 1-2-1.5L6 10Z' }
+    ]
+  },
+  gitFork: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'circle', cx: 6, cy: 5, r: 2 },
+      { type: 'circle', cx: 18, cy: 5, r: 2 },
+      { type: 'circle', cx: 12, cy: 19, r: 2 },
+      { type: 'path', d: 'M6 7v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7' },
+      { type: 'path', d: 'M12 12v5' }
     ]
   },
   globe: {
@@ -193,6 +218,32 @@ const icons = {
       { type: 'path', d: 'M6 10c1 1.2 2.2 2.1 3.5 2.8' },
       { type: 'path', d: 'M14 18h6' },
       { type: 'path', d: 'm15.5 15 2-6 2 6' }
+    ]
+  },
+  lock: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'rect', x: 5, y: 11, width: 14, height: 9, rx: 2.5 },
+      { type: 'path', d: 'M8 11V8a4 4 0 0 1 8 0v3' },
+      { type: 'circle', cx: 12, cy: 15.5, r: 1.2 }
+    ]
+  },
+  link: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1' },
+      { type: 'path', d: 'M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1' }
+    ]
+  },
+  list: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M4 6h.01' },
+      { type: 'path', d: 'M4 12h.01' },
+      { type: 'path', d: 'M4 18h.01' },
+      { type: 'path', d: 'M9 6h11' },
+      { type: 'path', d: 'M9 12h11' },
+      { type: 'path', d: 'M9 18h11' }
     ]
   },
   logs: {
@@ -230,6 +281,14 @@ const icons = {
       { type: 'path', d: 'M17 16v-4' }
     ]
   },
+  package: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M3 7.5 12 3l9 4.5v9L12 21 3 16.5v-9Z' },
+      { type: 'path', d: 'M3 7.5 12 12l9-4.5' },
+      { type: 'path', d: 'M12 12v9' }
+    ]
+  },
   moon: {
     viewBox: '0 0 24 24',
     nodes: [
@@ -252,6 +311,17 @@ const icons = {
     nodes: [
       { type: 'path', d: 'M12 3v8' },
       { type: 'path', d: 'M7 5.5a7 7 0 1 0 10 0' }
+    ]
+  },
+  radio: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'rect', x: 4, y: 13, width: 16, height: 7, rx: 2 },
+      { type: 'circle', cx: 8, cy: 16.5, r: 1 },
+      { type: 'circle', cx: 12, cy: 16.5, r: 1 },
+      { type: 'path', d: 'M9.5 13 17 5.5' },
+      { type: 'path', d: 'M7.5 13 15 5.5' },
+      { type: 'line', x1: 15, y1: 5.5, x2: 18.5, y2: 6.5 }
     ]
   },
   refresh: {
@@ -285,6 +355,17 @@ const icons = {
     nodes: [
       { type: 'circle', cx: 11, cy: 11, r: 6 },
       { type: 'path', d: 'm16 16 4.5 4.5' }
+    ]
+  },
+  satellite: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'm5 5 3 3' },
+      { type: 'path', d: 'm9 3 1.5 4.5' },
+      { type: 'path', d: 'M3 9l4.5 1.5' },
+      { type: 'path', d: 'M7 13c0 4 3 8 8 8' },
+      { type: 'rect', x: 11.5, y: 9.5, width: 6, height: 6, rx: 1.5, transform: 'rotate(45 14.5 12.5)' },
+      { type: 'path', d: 'M15 15l3 3' }
     ]
   },
   settings: {

@@ -131,9 +131,9 @@ onMounted(() => {
 }
 
 .sponsor-btn:hover {
-  background: #fff0f0;
-  color: #ff3b30;
-  border-color: #ff3b30; /* Keep border color change for feedback */
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }

@@ -3,7 +3,7 @@
     <BCard class="change-password-card">
       <template #header>
         <div class="card-header-content">
-          <span class="lock-icon">🔐</span>
+          <span class="lock-icon"><AppIcon name="lock" /></span>
           <div>
             <h2 class="card-title">{{ t('changePassword.title') }}</h2>
             <p class="card-subtitle">{{ t('changePassword.subtitle') }}</p>
@@ -13,7 +13,7 @@
 
       <div class="card-body-content">
         <BAlert show variant="warning" class="warning-alert">
-          <span class="alert-icon">⚠️</span>
+          <span class="alert-icon"><AppIcon name="alert" /></span>
           <div class="alert-content">
             <strong>{{ t('changePassword.warningTitle') }}</strong>
             {{ t('changePassword.warningMessage') }}
@@ -21,7 +21,7 @@
         </BAlert>
 
         <div class="password-requirements">
-          <span class="req-icon">📋</span>
+          <span class="req-icon"><AppIcon name="list" /></span>
           <div class="req-content">
             <strong>{{ t('changePassword.requirementsTitle') }}</strong>
             <ul>
@@ -70,7 +70,7 @@
             @update:model-value="error = null"
             class="mt-3"
           >
-            <span class="alert-icon">❌</span>
+            <span class="alert-icon"><AppIcon name="close" /></span>
             {{ error }}
           </BAlert>
 
@@ -168,7 +168,7 @@ const handleSubmit = async () => {
 }
 
 .change-password-card :deep(.card-header) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
   border-bottom: none;
   padding: var(--spacing-xl) var(--spacing-lg);
 }
@@ -181,7 +181,9 @@ const handleSubmit = async () => {
 }
 
 .lock-icon {
-  font-size: 3rem;
+  font-size: 2rem;
+  color: white;
+  display: inline-flex;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.2));
 }
 
@@ -211,8 +213,9 @@ const handleSubmit = async () => {
 }
 
 .alert-icon {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   flex-shrink: 0;
+  display: inline-flex;
 }
 
 .alert-content {
@@ -235,7 +238,10 @@ const handleSubmit = async () => {
 }
 
 .req-icon {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .req-content {

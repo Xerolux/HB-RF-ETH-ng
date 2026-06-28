@@ -3,7 +3,7 @@
     <!-- Project Info -->
     <div class="about-section">
       <div class="section-header">
-        <span class="section-icon">📡</span>
+        <span class="section-icon"><AppIcon name="router" /></span>
         <h3 class="section-title">HB-RF-ETH-ng</h3>
       </div>
       <div class="project-info">
@@ -18,13 +18,13 @@
     <!-- Fork Info -->
     <div class="about-section">
       <div class="section-header">
-        <span class="section-icon">🔀</span>
+        <span class="section-icon"><AppIcon name="gitFork" /></span>
         <h3 class="section-title">{{ t('about.fork') }}</h3>
       </div>
       <div class="info-card">
         <p>{{ t('about.forkDescription') }}</p>
         <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank" rel="noopener noreferrer" class="github-link">
-          <span class="link-icon">🔗</span>
+          <AppIcon name="link" class="link-icon" />
           GitHub Repository
         </a>
         <div class="license-info">
@@ -41,7 +41,7 @@
     <!-- Original Author -->
     <div class="about-section">
       <div class="section-header">
-        <span class="section-icon">👤</span>
+        <span class="section-icon"><AppIcon name="user" /></span>
         <h3 class="section-title">{{ t('about.original') }}</h3>
       </div>
       <div class="info-card">
@@ -66,7 +66,7 @@
     <!-- Third Party Software -->
     <div class="about-section">
       <div class="section-header">
-        <span class="section-icon">📦</span>
+        <span class="section-icon"><AppIcon name="package" /></span>
         <h3 class="section-title">{{ t('thirdParty.title') }}</h3>
       </div>
       <div class="info-card">
@@ -145,7 +145,9 @@ const libs = ref([
 
 .section-icon {
   font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  color: var(--color-primary);
+  display: inline-flex;
+  flex-shrink: 0;
 }
 
 .section-title {
@@ -232,6 +234,7 @@ const libs = ref([
 
 .link-icon {
   font-size: 1.125rem;
+  display: inline-flex;
 }
 
 .license-info {

@@ -3,7 +3,7 @@
     <div class="login-container">
       <div class="login-card glass-panel">
         <div class="brand-section">
-          <div class="brand-logo">📡</div>
+          <span class="brand-logo"><AppIcon name="router" /></span>
           <h1 class="brand-name">HB-RF-ETH-ng</h1>
         </div>
 
@@ -13,7 +13,7 @@
 
           <BForm @submit.stop.prevent class="login-form">
             <div class="input-group-modern">
-              <div class="input-icon">🔒</div>
+              <span class="input-icon"><AppIcon name="lock" /></span>
               <input
                 type="password"
                 v-model="password"
@@ -122,7 +122,6 @@ const loginClick = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: var(--spacing-md);
 }
 
@@ -134,14 +133,9 @@ const loginClick = async () => {
   gap: var(--spacing-xl);
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+.login-card {
+  border-radius: var(--radius-xl);
   padding: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .brand-section {
@@ -150,9 +144,17 @@ const loginClick = async () => {
 }
 
 .brand-logo {
-  font-size: 3rem;
-  margin-bottom: 10px;
-  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 10px;
+  border-radius: var(--radius-lg);
+  color: white;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
+  box-shadow: var(--shadow-md);
+  font-size: 1.8rem;
 }
 
 .brand-name {
@@ -191,26 +193,28 @@ const loginClick = async () => {
 .input-icon {
   position: absolute;
   left: 16px;
-  font-size: 1.25rem;
   z-index: 2;
   pointer-events: none;
+  color: var(--color-text-muted);
+  font-size: 1.25rem;
+  display: inline-flex;
 }
 
 .modern-input {
   width: 100%;
   padding: 14px 16px 14px 48px;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background: var(--color-bg);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
   color: var(--color-text);
 }
 
 .modern-input:focus {
-  background: white;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+  background: var(--color-surface);
+  border-color: rgba(242, 106, 61, 0.38);
+  box-shadow: 0 0 0 4px rgba(242, 106, 61, 0.12);
   outline: none;
 }
 
@@ -227,27 +231,27 @@ const loginClick = async () => {
 }
 
 .login-alert {
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
 }
 
 .login-btn {
   padding: 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   font-size: 1.0625rem;
   margin-top: 8px;
-  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-  transition: all 0.2s;
+  box-shadow: 0 14px 28px rgba(242, 106, 61, 0.22);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
-.login-btn:hover {
+.login-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 18px 32px rgba(242, 106, 61, 0.28);
 }
 
-.login-btn:active {
-  transform: translateY(0);
+.login-btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .login-footer {
@@ -269,7 +273,7 @@ const loginClick = async () => {
   color: var(--color-text-secondary);
   text-decoration: none;
   font-weight: 500;
-  transition: color 0.2s;
+  transition: color var(--transition-fast);
 }
 
 .links a:hover {
@@ -281,38 +285,21 @@ const loginClick = async () => {
   opacity: 0.5;
 }
 
-/* Dark Mode Overrides */
-[data-bs-theme="dark"] .login-page {
-  background: linear-gradient(135deg, #1a202c 0%, #2d3748 100%);
-}
-
-[data-bs-theme="dark"] .glass-panel {
-  background: rgba(30, 30, 30, 0.8);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-bs-theme="dark"] .modern-input {
-  background: rgba(0, 0, 0, 0.3);
-  color: white;
-}
-
-[data-bs-theme="dark"] .modern-input:focus {
-  background: rgba(0, 0, 0, 0.5);
-}
-
 @media (max-width: 480px) {
   .login-page {
     padding: var(--spacing-sm);
   }
-  .glass-panel {
+  .login-card {
     padding: 24px 18px;
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
   }
   .brand-section {
     margin-bottom: 18px;
   }
   .brand-logo {
-    font-size: 2.5rem;
+    width: 56px;
+    height: 56px;
+    font-size: 1.5rem;
   }
   .brand-name {
     font-size: 1.2rem;
