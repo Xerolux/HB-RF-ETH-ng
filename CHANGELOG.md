@@ -1,525 +1,251 @@
 # Changelog - HB-RF-ETH-ng Firmware
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.2.0-Beta.4] - 2026-06-28
+
+### Added
+- **MQTT Last Will & Testament + Birth message**: the device publishes `status/online`, and the broker flips it to `offline` on unclean disconnects, so Home Assistant reliably detects the device going offline.
+- **MQTT command-topic security**: optional shared-secret command token (`mqtt.command_token`, 8–63 chars, charset `A–Z a–z 0–9 - _ .`). When set, every command payload (`restart` / `update` / `check_update`) must match the token exactly. The token is write-only (never returned by `GET`) and published verbatim as HA `payload_press` / `payload_install` so HA buttons keep working. Broker ACL requirement documented in TROUBLESHOOTING.md and WIKI.md.
+- **Command topics without HA discovery**: new `mqtt.command_enabled` flag (default on) lets plain-MQTT users trigger commands even without HA discovery.
+- **OTA state machine with live progress**: OTA now reports `idle / checking / starting / downloading / flashing / success / failed` with real 0–100 % download progress. New MQTT topics `status/ota_state`, `status/ota_progress`, `status/ota_error` plus transient `event/*` events (`update_started`, `update_downloading`, `update_finished`, `command_rejected`, …).
+- **Richer status topics**: Ethernet (link / speed / duplex / IP / gateway), radio module (type / serial / firmware), reset reason, detailed heap breakdown and NTP sync state.
+- **`check_update` command** to refresh release info without flashing.
+- **Optional Beta update channel** (`betaChannel`, default off): stable users stay on stable releases, beta testers opt into pre-releases. The update check now uses the public GitHub Releases API as the single source of truth, replacing the xerolux.de-hosted `version.txt` + firmware mirror.
+- Release-notes preview, beta badge and collapsible changelog on the firmware-update page.
+- New AppIcon SVG set (lock, radio, satellite, arrowRight, gitFork, link, package, list, externalLink).
+- New i18n keys (beta, betaChannel, betaChannelHint, releaseNotesPreview, viewOnGithub, noDownloadUrl, …) across all 11 locales.
+
+### Changed
+- **OTA**: replaced the blocking `esp_https_ota()` with the advanced `esp_https_ota_begin/perform/finish/abort` API; the publish task now reacts to OTA state changes within ~1 s instead of the 60 s cycle and emits progress events every ~5 %. Publish-task stack raised 4 KB → 6 KB.
+- **Update check is non-blocking and cached**: the 24 h background refresh and a manual "Check now" coalesce via a fetch lock to respect GitHub's unauthenticated rate limit (60 req/h/IP). Manual refresh runs via `httpd_req_async_handler` so the single-threaded server stays responsive.
+- **WebUI**: replaced emoji icons with a unified AppIcon SVG system, replaced hardcoded colors with design tokens, and replaced hardcoded English strings with i18n keys.
+- **API**: `GET/POST /api/monitoring` expose `commandEnabled` / `commandTokenSet` / `commandTokenClear`; documented `GET/POST /api/check_update`, `/api/changelog`, `/api/ota_url`, `/api/ota_status` and the `betaChannel` setting in `API.md` and `openapi.yaml`.
+
+### Fixed
+- **Heap overflow** in UART RX buffers (radio-module + GPS): buffers now match the driver RX-buffer size, so `event.size > 128 B` no longer corrupts the heap.
+- CRC16 read/write now use `memcpy` (unaligned / strict-aliasing safe).
+- `Settings::save()` / `clear()` now bail out on `nvs_open` failure instead of using an uninitialized handle.
+- `StreamParser` discards oversized frames instead of processing a stale buffer (prevents stream desync).
+- Replaced the VLA in `RadioModuleDetector::sendFrame` with a fixed buffer + bounds check.
+- Guarded the `cJSON_Print` result in the OTA-status handler against OOM NULL-deref.
+- Hardened monitoring and log handling.
+- **WebUI**: LED-program edits now mark the form dirty (`deep:true`) — previously lost on navigation; the forced-change gate in `PasswordChangeModal` can no longer be bypassed via ESC/backdrop; TLS clear-flags reset when loading a fresh PEM; the OTA countdown interval is cleared; `/api/ota_url` errors are surfaced instead of swallowed; pre-release segments are compared numerically (`Beta.10 > Beta.3`); a `401` on public pages (`/about`) no longer bounces unauthenticated visitors to `/login`.
+- Removed obsolete SNMP tests referencing a non-existent function.
+
+### Internal
+- npm: vue 3.5.39, vue-router 5.1.0, vite 8.1.0, axios 1.18.1, marked 18.0.5, bootstrap-vue-next 0.45.7, @playwright/test 1.61.1, @vitejs/plugin-vue 6.0.7, esbuild 0.28.1; transitive form-data 4.0.6 fixes a CRLF-injection issue (0 vulnerabilities).
+- ESP-IDF CI pinned to the stable tag v6.0.1; managed components mdns ^1.11.2, mqtt ^1.0.0.
+- GitHub Actions: checkout v6 → v7, crate-ci/typos 1.45.1 → 1.47.2.
+
 ## [2.2.0-Beta.3] - 2026-06-12
 
-### Changes
-- performance-stability-upgrade
-- feat: async monitoring diagnostic, i18n for hardcoded UI strings
-- perf(webui): move update-check/changelog proxies off the httpd task
-- fix(webui): OTA upload timeout, 401 redirect for visitors, polling robustness
-- fix: boot hang hardening, httpd/MQTT/NTP stability fixes
-- fix: RTC detection broken on IDF 6.0 and perf-oriented build config
+### Added
+- Async monitoring diagnostic; i18n for previously hardcoded UI strings.
 
-## [2.2.0-Beta.2] - 2026-05-27
+### Changed
+- Performance & stability upgrade; moved the update-check / changelog proxies off the httpd task.
 
-### Changes
-- chore: bump version to 2.2.0-Beta.2 - IDF 6.0.1 compat & deps upgrade
-- Merge pull request #316 from EarlSneedSinclair/mqtt-tls
-- feat(mqtt): add TLS/SSL support for MQTT configuration
-- Merge pull request #310 from Xerolux/dependabot/npm_and_yarn/webui/vue-i18n-11.4.0
-- chore(deps)(deps): bump vue-i18n from 11.3.2 to 11.4.0 in /webui
-- fix: correct update banner showing when running version is newer than available
-- fix: semver pre-release comparison and log polling stability
-- feat: live LED brightness update without restart
+### Fixed
+- OTA upload timeout, 401 redirect for visitors and log-polling robustness.
+- Boot-hang hardening; httpd / MQTT / NTP stability fixes.
+- RTC detection broken on IDF 6.0 and in the perf-oriented build config.
 
 ## [2.2.0-Beta.2] - 2026-05-27
 
 ### Added
-- feat(mqtt): TLS/SSL support for MQTT connections (CA certs, mTLS, skip verify)
-- feat: ESP-IDF 6.0.1 build compatibility (I2C struct fields, time.h includes)
+- **MQTT TLS/SSL support** (CA certs, mTLS, skip-verify) — thanks @EarlSneedSinclair (PR #316).
+- Live LED-brightness update without restart.
+- ESP-IDF 6.0.1 build compatibility (I2C struct fields, `time.h` includes).
 
 ### Changed
-- chore(deps): upgrade all WebUI npm dependencies to latest
-- chore(deps): update espressif/mdns to ^1.9.1
-- chore: add sdkconfig.defaults entries for partition table, flash size, FreeRTOS trace
+- Upgraded WebUI npm dependencies; espressif/mdns ^1.9.1; added sdkconfig.defaults entries for partition table, flash size and FreeRTOS trace.
 
 ### Fixed
-- fix: missing `#include <time.h>` in systemclock.cpp for IDF 6.0.1
-- fix: I2C struct initializer field order for IDF 6.0.1 (rtcdriver.cpp)
-- fix: suppress unused variable warnings in semver.h
-- fix: correct double version suffix in TROUBLESHOOTING.md
+- Update banner showing when the running version is newer than the available one.
+- Semver pre-release comparison and log-polling stability.
+- Missing `#include <time.h>` in `systemclock.cpp`; I2C struct-initializer field order in `rtcdriver.cpp`; suppressed unused-variable warnings in `semver.h`; double version suffix in `TROUBLESHOOTING.md`.
 
 ## [2.2.0-Beta.1] - 2026-04-24
-
-### Changes
-- chore: prepare v2.2.0-Beta.1 release
-- fix: also update static definition type to uint64_t
-- fix: prevent integer overflow in DNS cache time calculation after ~12h
-- fix: correct sem_take timeout units - was ms instead of seconds
-- fix: WebUI responsive design improvements across all viewports
-- fix: WebUI stability, layout, performance and design improvements
-- fix: migrate FreeRTOS tick conversion to IDF 6.0 compatible API
-- fix: add debug logging to Ethernet init for diagnostics
-- fix: use local netif_cfg to avoid C++ brace-enclosed initializer issue
-- fix: ESP-IDF 6.0 compatibility - EMAC clock config, build errors, safety fixes
-- feat: improve WebUI error handling, timeouts, and API response validation
-- fix: comprehensive IDF 6.0 compatibility corrections for Ethernet and LED
-- fix: revert EMAC clock to CLK_OUTPUT GPIO17 (correct for HB-RF-ETH board)
-- fix: configure EMAC for external RMII clock input from LAN8720A PHY
-- fix: correct LAN87xx component name in registry (espressif/lan87xx)
-- fix: use LAN87xx PHY driver from esp-eth-drivers for ESP-IDF 6.0
-- chore: bump version to 2.2.0
-- fix: add missing esp_timer.h include in rawuartudplistener.cpp
-- fix: correct SNTP callback function name for ESP-IDF 6.0
-- fix: add spi_flash dep and esp_timer.h include for ESP-IDF 6.0
-- fix: add missing esp_timer.h include in dcf.cpp
-- fix: add split driver component deps for ESP-IDF 6.0
-- fix: move mqtt and json to managed components for ESP-IDF 6.0
-- fix: rename src/ to main/ and update APIs for ESP-IDF 6.0 build
-- docs-webui-consistency
-- fix(ci): use esp-idf install.sh for v6 setup
-- chore: fold pending dependabot updates into branch
-- docs-webui-consistency
-- merge: resolve conflicts with origin/main
-- feat: migrate to esp-idf 6.0 and refresh webui stack
-- fix-i2c-initializers-espidf
-- Fix I2C struct initializer warnings
-- Merge pull request #300 from Xerolux/claude/migrate-esp-idf-6-GxMtB
-- Merge pull request #298 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-94be095972
-- fix: revert platformio.ini to espressif32@^6.13.0 (ESP-IDF 5.5.3)
-- Merge pull request #299 from Xerolux/claude/migrate-esp-idf-6-GxMtB
-- chore: complete ESP-IDF 6.0 migration - LEDC, Ethernet, CMake, sdkconfig
-- chore: migrate project to ESP-IDF 6.0
-- chore(deps)(deps): bump axios
-- Merge pull request #297 from Xerolux/claude/upgrade-dev-tools-5TauD
-- chore: upgrade dev tools and dependencies to latest versions
-- Merge pull request #294 from Xerolux/dependabot/npm_and_yarn/webui/esbuild-0.28.0
-- chore(deps)(deps-dev): bump esbuild from 0.27.4 to 0.28.0 in /webui
-- Merge pull request #291 from Xerolux/dependabot/npm_and_yarn/webui/vue-3.5.32
-- Merge pull request #293 from Xerolux/dependabot/npm_and_yarn/webui/axios-1.14.0
-- Merge pull request #289 from Xerolux/dependabot/github_actions/actions/deploy-pages-5
-- Merge pull request #295 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-bd829dc841
-- Merge pull request #292 from Xerolux/dependabot/npm_and_yarn/webui/marked-17.0.6
-- Merge pull request #288 from Xerolux/dependabot/github_actions/crate-ci/typos-1.45.0
-- Merge pull request #287 from Xerolux/dependabot/github_actions/actions/configure-pages-6
-- chore(deps)(deps): bump the npm_and_yarn group across 1 directory with 2 updates
-- chore(deps)(deps): bump axios from 1.13.6 to 1.14.0 in /webui
-- chore(deps)(deps): bump marked from 17.0.4 to 17.0.6 in /webui
-- chore(deps)(deps): bump vue from 3.5.30 to 3.5.32 in /webui
-- chore(ci)(deps): bump actions/deploy-pages from 4 to 5
-- chore(ci)(deps): bump crate-ci/typos from 1.44.0 to 1.45.0
-- chore(ci)(deps): bump actions/configure-pages from 5 to 6
-- docs-webui-consistency
-- normalize firmware header metadata and helper script defaults
-- align docs and webui with current monitoring and update behavior
-- /fix-firmware-build
-- fix: resolve build errors in webui.cpp
-- Merge pull request #280 from Xerolux/dependabot/npm_and_yarn/webui/bootstrap-vue-next-0.44.0
-- Merge pull request #283 from Xerolux/dependabot/npm_and_yarn/webui/npm_and_yarn-3f9ee708be
-- Merge pull request #278 from Xerolux/dependabot/github_actions/actions/configure-pages-5
-- add-community-standards
-- chore(deps)(deps): bump picomatch
-- refresh webui and add monitoring diagnostics
-- Add community standards files
-- Merge pull request #281 from Xerolux/dependabot/npm_and_yarn/webui/vue-router-5.0.4
-- Merge pull request #277 from Xerolux/dependabot/github_actions/actions/upload-pages-artifact-4
-- Merge pull request #276 from Xerolux/dependabot/npm_and_yarn/webui/vite-8.0.1
-- Merge pull request #275 from Xerolux/dependabot/github_actions/actions/checkout-6
-- Merge pull request #282 from Xerolux/claude/add-claude-documentation-vv3z0
-- docs: add CLAUDE.md for AI assistant codebase guidance
-- chore(deps)(deps): bump vue-router from 5.0.3 to 5.0.4 in /webui
-- chore(deps)(deps): bump bootstrap-vue-next in /webui
-- chore(ci)(deps): bump actions/configure-pages from 4 to 5
-- chore(ci)(deps): bump actions/upload-pages-artifact from 3 to 4
-- chore(deps)(deps-dev): bump vite from 8.0.0 to 8.0.1 in /webui
-- chore(ci)(deps): bump actions/checkout from 4 to 6
-- docs-and-changelog
-- Merge branch 'main' into docs-and-changelog-7592836451194571511
-- docs: shrink README and automate changelog
-- Merge pull request #273 from Xerolux/docs-and-changelog-7592836451194571511
-- docs: shrink README and automate changelog
-
-## [2.2.0-Beta.1] - 2026-04-24
-
-### ⚠️ Beta Release
-
-This is a beta release for testing purposes. The firmware has been migrated from ESP-IDF 5.5.3 to ESP-IDF 6.0.
-Please report any issues at [GitHub Issues](https://github.com/Xerolux/HB-RF-ETH-ng/issues).
 
 ### Added
-- ESP-IDF 6.0 migration (from ESP-IDF 5.5.3)
-- WebUI responsive design improvements across all viewports
-- Debug logging for Ethernet init diagnostics
-- WebUI error handling, timeouts, and API response validation improvements
-- CI/CD: CodeQL analysis, NPM security audit, ESP-IDF v6.0 build pipeline
-- Claude AI assistant documentation (CLAUDE.md)
+- **ESP-IDF 6.0 migration**: LAN87xx PHY driver from esp-eth-drivers, external RMII clock config for the LAN8720A, LEDC driver, CMake/sdkconfig updates; renamed `src/` to `main/`; moved mqtt/json to managed components.
+- Improved WebUI error handling, timeouts and API-response validation.
 
 ### Changed
-- Migrated build system from PlatformIO to ESP-IDF CMake
-- Updated all FreeRTOS timing APIs to IDF 6.0 compatible forms
-- WebUI stability, layout, performance and design improvements
-- Dependencies: Vue 3.5.x, Bootstrap Vue Next 0.44.x, Vite 8.x, Axios 1.14.x
-- CI/CD: Upgraded all GitHub Actions to latest versions (checkout v6, node v24)
+- Migrated FreeRTOS tick conversion to the IDF 6.0 API.
+- WebUI responsive-design improvements across all viewports; stability, layout, performance and design polish.
 
 ### Fixed
-- **Critical**: `sem_take` macro timeout unit error - timeouts were 1000x too short (ms instead of seconds), breaking radio module detection
-- **Critical**: Integer overflow in DNS cache time calculation after ~12 hours uptime
-- ESP-IDF 6.0 EMAC clock configuration - explicit `EMAC_CLK_OUT` with `GPIO_NUM_17`
-- ESP-IDF 6.0 `httpd_resp_send_500()` replaced with `httpd_resp_send_err()`
-- ESP-IDF 6.0 `ETH_MAC_FLAG_DMA_CAPABLE` / `dma_burst_len` removed
-- Missing `#pragma once` in `dcf.h`
-- HMFrame `encode()` buffer overflow on escape loop
-- C++ brace-enclosed initializer for `esp_netif_config_t` (local variable workaround)
-- PHY reset timeout increased from 100ms to 1000ms
-- Duplicate `settingsStore.load()` in header.vue
-- WebUI login dark mode selector, nav hover colors, debounced dirty-check
-- Systemlog light-mode colors, firmwareupdate timer leak, monitoring dirty-tracking
-- UTF-8 encoding support in `update_version.py` for locale files
-- Beta version format support in `update_version.py` and `release.yml`
+- Ethernet-init debug logging; EMAC clock reverted to CLK_OUTPUT GPIO17 (correct for the HB-RF-ETH board).
+- Integer overflow in DNS-cache time calculation after ~12 h; `sem_take` timeout units (was ms instead of seconds); static definition type widened to `uint64_t`.
+- CI now uses the esp-idf `install.sh` for v6 setup.
 
-### Known Issues
-- No PlatformIO support (ESP-IDF CMake only)
-- `esp_sntp_*` API deprecated in IDF 6.0 (still functional, will need migration)
-- Potential thread safety issues in `_token`, OTA status, `_cpuUsage` data races
+## [2.1.10] - 2026-03-20
 
-## [2.1.11] - 2026-03-20
-
-### Changes
-- No new commits since last release
-
-## [2.1.10] - 2025-03-10
-
-### Removed
-- 🗑️ **SNMP Support Removed** - SNMP functionality has been completely removed from the firmware and WebUI. This change was necessary because ESP-IDF 5.5.3 no longer supports `CONFIG_LWIP_SNMP`.
+### Added
+- **Working SNMP, MQTT and CheckMK monitoring** (previously non-functional); GitHub Pages landing page and deployment workflow.
 
 ### Changed
-- Bumped version to 2.1.10
+- Upgraded Vite to 8; dependency refresh.
+
+### Fixed
+- **Monitoring thread-safety**: complete refactor to eliminate hangs and crashes; monitoring-config save is now non-blocking (async task); services only stop/restart when config actually changed.
+- Stack overflows in the monitoring POST response, the CheckMK agent and `apply_config_task` (stacks raised to 8192 bytes); `checkmk_stop()` crash when disabling CheckMK after it was running; mqtt/checkmk stop crashes and race conditions.
+- I2C-master API and missing `i2c_port` field for ESP-IDF 5.5.3; UART warnings; C++ designated-initializer compilation errors.
+- CCU reconnect with a stale endpoint identifier after device reboot (now accepted); watchdog reconnect logic restored.
+- Monitoring-settings save redirecting to login without saving; saving monitoring config with empty strings; skipping validation of empty strings when the service is disabled.
+- SNMP removed again (not supported in ESP-IDF 5.5.3 / `CONFIG_LWIP_SNMP` unavailable).
 
 ## [2.1.9] - 2026-03-09
 
+### Added
+- Privacy disclaimer for external update checks.
+
 ### Changed
-- Bumped version to 2.1.9
+- Simplified release/artifact naming (dropped "Firmware" from the release name); updated platform/framework versions.
+
+### Fixed
+- Dependency / security updates (axios, vue, vue-i18n, bootstrap-vue-next, marked, vue-router, rollup, typos, upload-artifact).
+- Refreshed documentation and screenshots; changelog-button visibility on the firmware page.
 
 ## [2.1.8] - 2026-02-22
 
-### Added
-- 🔄 **Backend Update Check Proxy** - Neuer `/api/check_update` Endpoint für Update-Prüfung über Backend (verhindert CORS-Fehler)
-- 🧪 **OTA Test Script** - Python CLI Tool (`test_ota_function.py`) für automatisierte OTA-Update-Tests
-- 🎯 **Manueller Update-Check Button** - Neuer Button für manuelle Update-Prüfung mit Status-Anzeige
-- 🌍 **Update-Status Lokalisierung** - Neue Übersetzungsschlüssel für Update-Check-Status (DE/EN)
-
-### Changed
-- 🌐 **OTA Server Migration** - Update-Server auf xerolux.de umgestellt für zuverlässigere Updates
-- ⏰ **Update-Check Intervall** - Automatische Prüfung von 8 Stunden auf 24 Stunden erhöht
-- 🔧 **OTA Konfiguration** - HTTP-Client Konfiguration in separates Modul (`ota_config.cpp`) ausgelagert
-- 🖥️ **Firmware-Update UI** - Verbesserte Statusanzeige mit Popup für Update-Check-Ergebnis
-- 📖 **Changelog aus Update-Banner** - Klick auf "Anzeigen" im Update-Banner öffnet Changelog-Modal
-
 ### Fixed
-- 🐛 **OTA GitHub Redirects (Bug #235)** - OTA-Updates mit GitHub-Redirects funktionieren jetzt zuverlässig
-  - HTTP Keep-Alive für OTA-Verbindungen deaktiviert für Cross-Domain-Redirects
-  - TX-Buffer auf 4096 Bytes erhöht für große HTTPS-Header
-  - Redirect-Handling aktiviert (max. 5 Redirects)
-  - Stack-Größe für OTA-Task auf 16384 Bytes erhöht (Stack-Overflow Prevention)
-- 🐛 **CORS-Fehler bei manuellem Update-Check** - Update-Prüfung erfolgt jetzt über Backend-Proxy
-- 🐛 **Store Reference Error** - `useFirmwareUpdateStore` Referenzfehler bei Datei-Upload behoben
-- 🐛 **Caching bei Update-Check** - Timestamp-Parameter verhindert Caching der Version-Datei
+- OTA updates failing with GitHub redirects (Bug #235).
+- CORS error in the manual update check.
+- OTA check interval and upload error; switched the OTA update server to xerolux.de.
 
-### Security
-- 🔒 **Input-Validierung** - OTA URL wird vollständig über Backend verarbeitet
+### Added
+- OTA functional test script.
 
 ## [2.1.7] - 2026-02-21
 
 ### Added
-- 🏠 **Home Assistant MQTT Auto-Discovery** - Vollständige HA-Integration via MQTT Discovery Protokoll; Gerät erscheint automatisch in Home Assistant
-- 💡 **Vollständig konfigurierbare LED-Programme** - LED-Muster für alle Betriebsmodi (Verbunden, Getrennt, Update verfügbar, etc.) sind jetzt einzeln konfigurierbar; doppeltes Update-Blink-Toggle entfernt
-- 🔒 **Umfangreiche Backend-Validierung** - Vollständige Validierung aller kritischen Einstellungen:
-  - CCU-Adress-Validierung mit IPv4- und IPv6-Unterstützung (130+ Unit-Tests)
-  - MQTT-Server-Adress-Validierung (IPv4, IPv6, Hostname, Port)
-  - SNMP Community-String-Validierung mit Längenbegrenzung
-  - NTP-Server-Validierung mit DNS-Compliance-Prüfung
-  - IPv6-Adress-Validierung mit korrekter Format-Überprüfung
-- 🌐 **Frontend CCU IPv6-Unterstützung** - WebUI akzeptiert jetzt sowohl IPv4- als auch IPv6-Adressen für CCU-Einstellungen
-  - Aktualisierte Validierung für beide Adressformate
-  - Verbesserter Platzhaltertext mit Beispielen für beide Formate
-- 🔔 **Spezifische Fehlermeldungen** - WebUI zeigt jetzt spezifische Fehlermeldungen vom Backend (statt generische Fehler)
-- 🌍 **DNS-Caching** - DNS-Cache-Verbesserungen für stabilere Namensauflösung
-- 🔧 **Automatischer CI-Versions-Bump** - Versionsnummer wird automatisch im Release-Workflow aktualisiert
-
-### Security
-- 🛡️ **Kritischer Security-Fix** - Schwachstelle bei der String-Längen-Validierung behoben
-  - String-Länge wird jetzt VOR strncpy validiert, um Buffer-Overflow zu verhindern
-  - Verhindert das Umgehen der Längenprüfungen durch Angreifer
-- 🔐 **Input-Validierung gehärtet** - Alle Benutzereingaben werden jetzt vollständig validiert, bevor sie verarbeitet werden
-- 🔐 **CCU-Adress-Validierung** - Kritischer Security-Fix: Vollständige Validierung der CCU-Adresse im Backend
-- 🔐 **MQTT/SNMP-Validierung** - MQTT-Server und SNMP-Community werden jetzt serverseitig validiert
+- **Fully configurable LED programs** (replaces the fixed update-blink toggle).
+- Home Assistant MQTT Auto-Discovery integration.
 
 ### Changed
-- ⚡ **Settings-Caching** - Optimistisches Update im Settings-Store beim Speichern; LED-Zustand wird sofort aktualisiert
-- 🔧 **Settings-Refactoring** - Redundante `checkUpdates`- und `allowPrerelease`-Einstellungen entfernt
-- ✅ **Test-Coverage** - 130+ umfassende Unit-Tests für Validierungsfunktionen hinzugefügt
-  - IPv6-Validierungstests mit Edge Cases
-  - CCU-Validierungstests für IPv4 und IPv6
-  - NTP-Server-Validierungstests mit DNS-Compliance
-  - MQTT- und SNMP-Validierungstests
-- 🌍 **i18n** - Fehlende `updateLedBlink`-Übersetzungsschlüssel in 8 Locale-Dateien ergänzt
-- 📰 **README** - Banner mit zentriertem Header, Hero-Image und verbesserten Badges erneuert
+- Refactored LED programs; automated version bump in the release workflow.
 
 ### Fixed
-- 🐛 **LED-Programme** - LED-Programme werden jetzt korrekt gespeichert und geladen
-- 🐛 **IPv6-Warnungen** - Störende IPv6-Warnungen für Hostname-Server-Adressen werden unterdrückt
-- 🐛 **GPS** - Bug in der GPS-Verarbeitung behoben
-- 🐛 **OTA** - Fehlerbehandlung beim OTA-Update verbessert
-- 🐛 **CPU-Task** - Bug im CPU-Task behoben
-- 🐛 **UDP-Listener** - Mehrere Bugs im UDP-Listener behoben
-- 🐛 **MQTT-Handler** - Mehrere Bugs im MQTT-Handler behoben
-- 🐛 **DNS-Cache** - Mehrere Bugs im DNS-Cache behoben
-- 🐛 **Settings-Persistenz** - Mehrere Bugs bei der Einstellungs-Speicherung und Sicherheit behoben
-- 🐛 **MQTT Factory-Reset** - Linker-Fehler im MQTT-Handler beim Factory-Reset behoben
-- 🐛 **LED/DNS Kompilierung** - Kompilierungsfehler in LED- und DNS-Caching-Code behoben
-- 🐛 **Memory Leaks** - Fehlerbehandlung verbessert und Memory Leaks beseitigt
-- 🐛 **WebUI-Bugs** - Mehrere WebUI-Bugs in 10 Dateien behoben
-- 🐛 **Doppelte Benachrichtigung** - Doppelte „Einstellungen gespeichert"-Benachrichtigung behoben
-- 🐛 **HTTP-Warnungen** - Harmlose httpd_txrx-Warnungen werden jetzt unterdrückt
-- 🔧 **CI/CD** - Überschreiben existierender Tags im Release-Workflow ermöglicht
+- LED programs not saved/loaded correctly; immediate LED-state update and settings caching.
+- IPv6 validation: suppressed spurious warnings for hostname server addresses; IPv6 support in CCU frontend validation.
+- Bugs in GPS, IPv6 validation, OTA and the CPU task; UDP listener, MQTT handler and DNS cache; settings persistence and security; factory-reset linker error in the MQTT handler; compilation errors in LED and DNS caching.
 
-### Dependencies
-- 📦 Bumped `bootstrap-vue-next` von 0.43.0 auf 0.43.1
-- 📦 Bumped `marked` von 17.0.1 auf 17.0.2
-- 📦 Bumped `vue` von 3.5.27 auf 3.5.28
-- 📦 Bumped `crate-ci/typos` von 1.43.3 auf 1.43.4
+### Security
+- String-length validation before `strncpy` to prevent bypass; CCU address validation; MQTT-server, SNMP-community and NTP-server validation.
 
 ## [2.1.6] - 2026-02-12
 
 ### Added
-- 🌟 **Update LED Control** - New setting to enable/disable the status LED blinking when a firmware update is available (default: enabled).
-- 🔒 **Enhanced Password Security** - Enforced stronger password policy (min 8 chars, uppercase, lowercase, digit).
+- Real OTA progress tracking with a status-polling endpoint.
+- Switchable LED blink on firmware update.
+- Backend proxy for the changelog.
 
 ### Changed
-- 📄 **Changelog Fetching** - Now fetched via backend proxy (`/api/changelog`) to avoid CORS issues and improve reliability.
-- ⚡ **Performance** - Optimized idle timer events in WebUI to reduce CPU usage.
-- 🔧 **Network Validation** - Stricter validation prevents saving invalid network settings.
-- 🛑 **MQTT Stability** - Improved MQTT task termination sequence to prevent system restart delays.
-- 🔒 **API Security** - Removed wildcard CORS headers from monitoring API.
+- Optimized WebUI idle timer, accessibility and JSON serialization; refreshed translations and the mobile language menu.
+- Upgraded ESP-IDF from v5.5.0 to v5.5.2.
 
 ### Fixed
-- 🐛 **Settings Error Handling** - Proper error propagation when saving invalid network settings.
-- ♿ **Accessibility** - Added `aria-hidden` attributes to decorative icons.
+- **Bugfix release**: backup/restore missing settings; CORS removed from the monitoring API; log-offset sync on ring-buffer overflow; OTA task double response.
+- MQTT password loss, `ccuIP` validation, OTA double response, hostname mismatch, MQTT race condition.
+- `PasswordChangeModal` validation; firmware-update URL format; password-change failure and settings persistence.
 
-## 2.1.5 Final
+## [2.1.5] - 2026-02-10
 
 ### Added
-- 🔄 **Restart Confirmation Modal** - Settings page now shows a confirmation dialog before restarting the device after saving settings.
-- 🌐 **CCU IP Settings** - CCU IP address is now properly saved and reactive in the settings store.
-- 🔃 **System Log Refresh Button** - Manual refresh button to recover if log polling stalls.
+- Mobile-optimized WebUI + bug fixes.
+- Log Manager WebUI with enable/disable toggle; high-contrast system-log viewer.
+- 10-minute idle auto-logout and persistent session.
+- Maintenance-action modals; loading states on backup/restore and async buttons.
+- Full-system restart that resets peripherals on reboot.
 
 ### Changed
-- 📱 **Mobile Widget Layout** - Dashboard widgets now use a compact 3-column grid layout on mobile devices instead of horizontal scroll container.
-- 📖 **Changelog Readability** - Darker text color (`#343a40`) in changelog modal for improved readability.
+- Migrated the WebUI bundler from Parcel to Vite; modernized UI/UX.
+- Replaced hardcoded fallbacks with translation keys; completed localization.
 
 ### Fixed
-- 🐛 **System Log Download** - Fixed 401 Unauthorized error by using authenticated axios request instead of direct link.
-- 🐛 **System Log Polling** - Added timeout to polling to prevent silent failures.
-- 🐛 **Changelog Display** - Removed unnecessary headers from GitHub Raw request to fix CORS issues.
-- 🐛 **Password Validation** - Fixed `PasswordChangeModal` validation blocking settings save by using `$stopPropagation` in `useVuelidate`.
-
-## [2.1.5] - 2026-02-09
-
-### Added
-- 📋 **System Log Viewer** - New dedicated page (`systemlog.vue`) for viewing system logs with live polling every 3 seconds and log file download.
-- 🔛 **Log Toggle** - Enable/disable switch for system log polling to reduce unnecessary network traffic when not needed.
-- 📡 **Log Manager API** - New `/api/log` and `/api/log/download` backend endpoints for system log access.
-- 🕐 **10-Minute Idle Logout** - Automatic logout after 10 minutes of inactivity, with cross-tab synchronization via `localStorage`.
-- 💾 **Persistent Sessions** - Session tokens stored in `localStorage` instead of `sessionStorage`, surviving tab closures and page reloads.
-- 🧭 **System Log Navigation** - Navigation links for System Log added to both desktop and mobile menus.
-- 💖 **Sponsor Button** - Added a "Sponsor" button in the footer with options for PayPal, Buy Me a Coffee, and Tesla referral.
-- 🌍 **System Log Translations** - Translations for the log viewer added to all 10 supported languages.
+- Race conditions, resource leaks and long-term stability; hardened string operations, fixed a memory leak, removed dead code.
+- CCU connection stability with automatic reconnect; UDP connection handling.
+- Vite code-splitting causing a blank WebUI; compilation errors (`esp_http_client_get_content_length`, `mdns_service_register_all` for ESP-IDF 5.1).
+- OTA panics on failed updates; memory leak and CI issues.
+- IPv6 support in the RateLimiter (fixed IP-resolution warning).
 
 ### Changed
-- 🎨 **UI/UX Modernization** - Comprehensive visual overhaul with custom scrollbars, glassmorphism effects, layered shadows, and smooth page transitions.
-- 📊 **Dashboard Widgets** - Gradient icons, hover effects, and horizontal scrolling on mobile for a polished dashboard experience.
-- 🧭 **Navigation Header** - Floating notifications and hardware-accelerated animations for smoother interaction.
-- 🔒 **Security Refactoring** - Extensive refactoring of JSON handling in System Info, Settings, and Login to use `cJSON` library, eliminating buffer overflow risks and injection vulnerabilities.
-- 🧹 **Memory Safety** - Implemented `secure_zero` to securely clear sensitive data (tokens, passwords) from memory; shared `secure_utils.h` with NULL-safe, XOR-based constant-time `secure_strcmp`.
-- 🚀 **Rate Limiting** - Improved Rate Limiter with full IPv6 support (`AF_INET6`) for dual-stack networks, using `inet_ntop` for human-readable logging.
-- 🌐 **Translation Keys** - Replaced all hardcoded fallback strings with proper `t()` translation keys across all WebUI components (login, settings, header, change-password, firmware update, changelog modal).
-- 🧹 **Code Deduplication** - Removed duplicate `secure_strcmp` from `webui.cpp` (uses shared header) and duplicate `compareVersions` from `updatecheck.cpp` (uses `semver.h`).
-- ♿ **Accessibility** - Removed low-contrast `text-muted` classes and added `aria-hidden` attributes to decorative icons for better screen reader support.
-- 📄 **Changelog Fetching** - Changed changelog fetching to use the raw GitHub URL to avoid CORS issues and improve reliability.
-- 👁️ **High Contrast Logs** - System log viewer uses black text on white background with orange accent border for maximum readability.
+- Removed the OTA-password requirement for firmware updates.
+
+## [2.1.2] - 2026-02-07
+
+Re-stabilization release restoring the v2.1.1 codebase after the experimental
+December line (2.1.3 / 2.1.4) was rolled back.
 
 ### Fixed
-- 🐛 **CCU Connection Stability** - Fixed critical bug where `portMAX_DELAY` in lwIP UDP receive callback could block the entire network stack when the queue was full; changed to non-blocking send with drop warning.
-- 🐛 **UDP Keep-Alive** - Increased timeout from 5s to 10s to prevent false disconnects; immediate keep-alive response sent back to CCU for better health detection.
-- 🐛 **UDP Queue** - Increased from 32 to 64 entries for better burst handling; reduced poll timeout from 100ms to 10ms for lower packet processing latency.
-- 🐛 **Disconnect Handling** - Fixed stale `_connectionStarted` state not being reset on keep-alive timeout; fixed race condition in disconnect ordering.
-- 🐛 **Memory Leak** - Fixed a memory leak in `RawUartUdpListener` by properly draining the packet queue before deletion.
-- 🐛 **Compilation** - Fixed `delayed_restart_task` not declared in scope by moving definition before `post_settings_json_handler_func`.
-- 🐛 **Validation** - Fixed strict IP validation in CheckMK agent configuration.
-- 🐛 **Static Analysis** - Resolved various static analysis warnings (cppcheck) for better code quality.
+- **RaspberryMatic Raw UART UDP connection**: accept the client endpoint ID to sync persistent sessions; set `_connectionStarted = true` on persistent-session reconnect; restore reliable reconnect after restart.
+- Simplified Raw-UART UDP connection handling (removed unnecessary port clearing).
 
-### Dependencies
-- 📦 Bumped `axios` from 1.13.4 to 1.13.5.
-- 📦 Bumped `crate-ci/typos` from 1.42.3 to 1.43.3.
+## [2.1.4] - 2025-12-20
 
-## [2.1.4] - 2026-02-06
-
-### Fixed
-- 🐛 **Memory Leak** - Fixed memory leak in OTA URL handler (`args` not freed on error)
-- 🐛 **Code Quality** - Fixed variable shadowing in `UpdateCheck` class
-- 🔧 **Const Correctness** - Improved C++ standards compliance in Settings class
-- 🌍 **Localization** - Corrected version display in French translation
-
-## [2.1.3]
+Experimental feature release (later rolled back; re-stabilized in 2.1.2 on 2026-02-07).
 
 ### Added
-- 📋 **Changelog Modal** - View full changelog directly in WebUI with markdown rendering
-- 🔔 **Update Status Notifications** - Prominent banner showing available updates with version number
-- 🌐 **Multi-language Changelog** - Changelog modal supports all UI languages
-- 🔌 **Improved CCU 3 Reconnect** - Enhanced mDNS announcements and network stabilization after restart
-  - 2-second delay before UDP listener starts to ensure network stability
-  - mDNS service announcements sent after all services are fully started
-  - Enhanced logging for connection troubleshooting
-
-### Added
-- 📋 **Changelog Modal** - View full changelog directly in WebUI with markdown rendering
-- 🔔 **Update Status Notifications** - Prominent banner showing available updates with version number
-- 🌐 **Multi-language Changelog** - Changelog modal supports all UI languages
+- Multi-variant firmware builds (HMLGW and Analyzer features via conditional compilation) with firmware-variant matching in the update check.
+- HomeMatic LAN Gateway (HMLGW) emulation mode.
+- Analyzer Light feature with RSSI and naming.
+- Optional DTLS/TLS transport encryption for Raw-UART UDP (ESP-IDF 5.x / mbedTLS 3.x).
+- Nextcloud WebDAV backup integration.
+- Content-Security-Policy and HTTP security headers; ETag caching for embedded static files.
+- Reboot-resistant system log; maintenance controls.
 
 ### Changed
-- 🔄 **Update Check** - Improved update detection using version.txt from GitHub
-- 📦 **Migration to Vite** - Replaced Parcel with Vite 6.3.5 build system
-  - Faster build times (~2s vs ~10s)
-  - Better code optimization
-  - Smaller bundle sizes
-- 🔧 **Release Workflow** - Improved release automation
-  - Better firmware file naming
-  - Comprehensive release notes
-  - All required files included in releases
+- Performance phases: FreeRTOS stack optimizations (~5 KB RAM saved), HMLGW ring-buffer & busy-wait elimination (~10–20 % CPU reduction), analyzer WebSocket buffer pool, `StreamParser` bulk copy, small-buffer optimization for `AnalyzerFrame` (~20 KB → ~1.5 KB queue heap).
+- Refactored WebUI JSON handling; standardized password inputs with visibility toggle; modals for maintenance actions; visual icons.
 
 ### Fixed
-- 🐛 **Critical Security Fix** - Fixed Origin Validation Error vulnerability in Parcel (CVE)
-- 🐛 **Update Detection** - Fixed version comparison using semantic versioning instead of string comparison
-- 🐛 **OTA Update** - Improved error handling prevents panic on failed updates
-- 🔨 **Build System** - Fixed vite-plugin-compression import syntax
-- 🌍 **Cross-platform Build** - Fixed UTF-8 encoding issues on Windows
+- Network-stack stall via non-blocking queue sends in UDP callbacks; CCU reconnection after restart.
+- Stack overflows in CheckMK/Analyzer agents; race condition in HMLGW task termination; analyzer WebSocket delivery.
 
 ### Security
-- 🔒 Removed all vulnerable Parcel dependencies
-- 🔒 Updated to Vite with better security practices
+- Cache-Control headers on sensitive endpoints; plain-text password removed from backup JSON; OTA rollback prevention; password-complexity enforcement; IP-whitelist bypass in CheckMK fixed.
 
-## [2.1.2]
-
-### Added
-- 🔐 **Enhanced Security**
-  - Stronger password requirements (8 chars, mixed case, numbers)
-  - Automatic logout after 5 minutes of inactivity
-  - Timing-attack protected password comparisons
-- 🎨 **UI/UX Improvements**
-  - Password strength indicator
-  - Dark/Light theme toggle
-  - Multi-language support (10 languages)
-  - LED brightness control (0-100%)
-- 📊 **Reset Reasons** - Detailed display of last restart reason in WebUI
-- 🌐 **OTA Update via URL** - Download firmware directly from network
-- 🔧 **Factory Reset** - Can now be triggered from WebUI
-
-### Changed
-- 📝 **OTA Password** - Removed requirement, standard authentication is sufficient
-- 🎯 **Update UX** - Automatic restart after successful firmware update
-- 📦 **Modern WebUI** - Responsive design for desktop and mobile
-
-### Fixed
-- 🐛 **Update Failure** - Improved error handling prevents system panic on failed updates
-- 🔧 **Recovery** - Better OTA abort handling when updates fail
-
-## [2.1.1] - 2025-01-XX
+## [2.1.3] - 2025-12-19
 
 ### Added
-- ✨ **ESP-IDF 5.x** - Updated to latest ESP-IDF framework
-- 🔧 **Modern Toolchains** - Compatible with GCC 14.2.0
-- 🎨 **Vue 3.5** - Modernized WebUI with latest Vue.js
-- ⚡ **Performance** - Improved stability and performance
-- 🔐 **Separate OTA Password** - Optional dedicated password for firmware updates
+- Cache-Control headers; ETag caching for embedded static files; maintenance controls; password visibility toggle.
 
 ### Changed
-- 📡 **API Updates** - Migrated to modern ESP-IDF APIs
-  - ADC: `esp_adc_cal` → `adc_oneshot`
-  - SNTP: Legacy → `esp_sntp_*`
-  - mDNS: Integrated as managed component
-- 🔨 **I2C Configuration** - Updated to ESP-IDF 5.1 syntax
+- Upgraded to ESP-IDF 5.5.1 (from 5.1.0); platform / dependency refresh.
 
 ### Fixed
-- 🔧 **RTC Driver** - Fixed circular include dependencies
-- 📦 **Build System** - Optimized CMake and PlatformIO configuration
+- 16+ critical bugfixes and optimizations; UDP packet handling (removed heap allocations).
 
-## [2.0.0] - 2025-01-XX
+### Security
+- Stack buffer overflow in the monitoring agent (CRITICAL); timing attack in auth (HIGH); IP-whitelist bypass in CheckMK; password-length validation enforced.
 
-### Major Changes - Modernized Fork by Xerolux
+## [2.1.1] - 2025-12-15
 
-This version represents a comprehensive modernization of the HB-RF-ETH firmware,
-originally developed by Alexander Reinert.
+### Added
+- **MQTT support** for system-status monitoring.
+- **Home Assistant MQTT Discovery** support.
+- Online update check with toggle; early-updates toggle and release-notes display.
+- WebUI: auto-logout and manual logout redirect; login button when unauthenticated.
 
-#### Framework & Toolchain
-- **ESP-IDF 5.1** - Updated from older ESP-IDF to version 5.1.0
-- **Modern Toolchain** - Compatibility with GCC 14.2.0
-- **Newlib 4.x** - Full support for modern newlib version
-- **Automated Patching** - Intelligent build system for framework compatibility
+### Changed
+- i18n: translations updated for all 10 languages; openCCU compatibility and i18n language switching.
+- Increased the max URI handlers for the WebUI.
 
-#### WebUI Modernization
-- **Vue 3.5.13** - Latest Vue.js with Composition API
-- **Pinia 2.3.1** - Modern state management
-- **Bootstrap Vue Next 0.28.5** - Current UI component library
-- **Improved UX** - Better user guidance for firmware updates
+### Fixed
+- 401 Unauthorized on backup download; variable shadowing and compiler warnings; CppCheck warnings.
 
-#### API Modernizations
-- **ADC API** - Migrated from deprecated `esp_adc_cal` to `adc_oneshot`
-- **SNTP API** - Updated to `esp_sntp_*` functions
-- **mDNS** - Integrated as managed component
+### Security
+- Timing-attack-resistant auth comparison; accessibility of the theme toggle.
 
-#### Code Improvements
-- **Better Error Handling** - More robust error handling across all components
-- **Memory Optimization** - More efficient memory usage
-- **Compilation** - All 21 source files compile without errors
+## [2.1.0] - 2025-12-14
 
-### Technical Details
-
-**Firmware Sizes:**
-- Firmware: 918 KB
-- Bootloader: 24 KB
-
-**Memory Usage:**
-- RAM: 18.9 KB / 327.6 KB (5.8%)
-- Flash: 918 KB / 1.9 MB (48.3%)
-
-**Framework Versions:**
-- ESP-IDF: 5.1.0
-- Platform: espressif32 ^6.9.0
-- Toolchain: xtensa-esp-elf 14.2.0
-
-### Known Limitations
-- No automatic reconnect after board restart (CCU software restart required)
-- Power supply via RPI-RF-MOD only without other power sources
-
-### Acknowledgments
-
-Special thanks to **Alexander Reinert** for developing the original HB-RF-ETH firmware and hardware.
-This version builds on his excellent work and modernizes it for current development environments.
-
----
-
-## Earlier Versions
-
-For changes in versions before 2.0.0, see the [Original Repository](https://github.com/alexreinert/HB-RF-ETH).
-
-[Unreleased]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.2.0-Beta.2...HEAD
-[2.2.0-Beta.2]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.2.0-Beta.1...v2.2.0-Beta.2
-[2.2.0-Beta.1]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.10...v2.2.0-Beta.1
-[2.1.10]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.9...v2.1.10
-[2.1.9]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.8...v2.1.9
-[2.1.8]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.7...v2.1.8
-[2.1.7]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.6...v2.1.7
-[2.1.6]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.5...v2.1.6
-[2.1.5]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.4...v2.1.5
-[2.1.4]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.3...v2.1.4
-[2.1.3]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.2...v2.1.3
-[2.1.2]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.1...v2.1.2
-[2.1.1]: https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.1.0...v2.1.1
-[2.0.0]: https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.0.0
+### Added
+- Initial public release of the HB-RF-ETH-ng fork: ESP32 firmware ported to ESP-IDF 5.x, based on the original HB-RF-ETH by Alexander Reinert. Connects HomeMatic radio modules (HM-MOD-RPI-PCB, RPI-RF-MOD) to debmatic / piVCCU3 over Ethernet.
