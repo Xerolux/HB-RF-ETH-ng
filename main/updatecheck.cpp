@@ -332,8 +332,9 @@ OtaSnapshot UpdateCheck::getOtaState()
         snap.state = _otaState;
         snap.progress_pct = _otaProgress;
         snap.error_code = _otaErrorCode;
-        strncpy(snap.error_text, _otaErrorText, sizeof(snap.error_text) - 1);
-        snap.error_text[sizeof(snap.error_text) - 1] = '\0';
+        // snprintf (not strncpy) to avoid -Wstringop-truncation: both buffers
+        // are 64 bytes and _otaErrorText is always null-terminated.
+        snprintf(snap.error_text, sizeof(snap.error_text), "%s", _otaErrorText);
         xSemaphoreGive(_stateMutex);
     } else {
         snap.state = OTA_STATE_IDLE;
