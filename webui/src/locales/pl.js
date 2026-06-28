@@ -459,6 +459,7 @@ export default {
     error: 'Nie udało się załadować dziennika zmian',
     fetchError: 'Nie udało się pobrać dziennika zmian. Sprawdź połączenie z internetem.',
     retry: 'Ponów',
+    checkFailed: 'Sprawdzanie aktualizacji nie powiodło się',
     close: 'Zamknij',
     viewOnGithub: 'Zobacz na GitHub'
   }

@@ -169,6 +169,19 @@
               <div class="release-notes-body" v-html="releaseNotesExcerpt"></div>
             </details>
           </div>
+          <div v-else-if="updateStore.checkError" class="update-info">
+            <div class="no-update">
+              <span class="check-icon"><AppIcon name="alert" /></span>
+              <span>{{ t('firmware.checkFailed') }}: {{ updateStore.checkError }}</span>
+            </div>
+            <button class="check-btn" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+              <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm"></span>
+              {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.retry') }}
+            </button>
+            <div v-if="updateStore.lastCheck" class="last-check">
+              {{ t('firmware.lastCheck') }}: {{ formatLastCheck(updateStore.lastCheck) }}
+            </div>
+          </div>
           <div v-else class="update-info">
             <div class="no-update">
               <span class="check-icon"><AppIcon name="check" /></span>

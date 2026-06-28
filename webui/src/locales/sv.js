@@ -459,6 +459,7 @@ export default {
     error: 'Misslyckades med att ladda ändringslogg',
     fetchError: 'Kunde inte hämta ändringslogg. Kontrollera din internetanslutning.',
     retry: 'Försök igen',
+    checkFailed: 'Uppdateringskontroll misslyckades',
     close: 'Stäng',
     viewOnGithub: 'Visa på GitHub'
   }

@@ -459,6 +459,7 @@ export default {
     error: 'Error al cargar el registro de cambios',
     fetchError: 'No se pudo obtener el registro de cambios. Por favor verifique su conexión a internet.',
     retry: 'Reintentar',
+    checkFailed: 'Error al comprobar actualización',
     close: 'Cerrar',
     viewOnGithub: 'Ver en GitHub'
   }

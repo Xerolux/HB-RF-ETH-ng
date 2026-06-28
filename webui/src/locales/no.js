@@ -459,6 +459,7 @@ export default {
     error: 'Kunne ikke laste endringslogg',
     fetchError: 'Kunne ikke hente endringslogg. Vennligst sjekk internettforbindelsen din.',
     retry: 'Prøv igjen',
+    checkFailed: 'Oppdateringssjekk mislyktes',
     close: 'Lukk',
     viewOnGithub: 'Vis på GitHub'
   }

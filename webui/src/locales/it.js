@@ -459,6 +459,7 @@ export default {
     error: 'Impossibile caricare il registro delle modifiche',
     fetchError: 'Impossibile recuperare il registro delle modifiche. Controlla la tua connessione internet.',
     retry: 'Riprova',
+    checkFailed: 'Verifica aggiornamento non riuscita',
     close: 'Chiudi',
     viewOnGithub: 'Vedi su GitHub'
   }

@@ -459,6 +459,7 @@ export default {
     error: 'Nepodařilo se načíst seznam změn',
     fetchError: 'Nepodařilo se načíst seznam změn. Zkontrolujte prosím své připojení k internetu.',
     retry: 'Zkusit znovu',
+    checkFailed: 'Kontrola aktualizace selhala',
     close: 'Zavřít',
     viewOnGithub: 'Zobrazit na GitHubu'
   }

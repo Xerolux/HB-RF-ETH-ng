@@ -459,6 +459,7 @@ export default {
     error: 'Échec du chargement du journal des modifications',
     fetchError: 'Impossible de récupérer le journal des modifications. Veuillez vérifier votre connexion Internet.',
     retry: 'Réessayer',
+    checkFailed: 'Échec de la vérification de mise à jour',
     close: 'Fermer',
     viewOnGithub: 'Voir sur GitHub'
   }

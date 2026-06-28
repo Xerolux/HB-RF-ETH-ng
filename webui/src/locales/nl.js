@@ -459,6 +459,7 @@ export default {
     error: 'Kon wijzigingslogboek niet laden',
     fetchError: 'Kon wijzigingslogboek niet ophalen. Controleer uw internetverbinding.',
     retry: 'Opnieuw proberen',
+    checkFailed: 'Update-controle mislukt',
     close: 'Sluiten',
     viewOnGithub: 'Bekijken op GitHub'
   }
