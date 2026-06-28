@@ -384,6 +384,17 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
         net_locked = true;
     }
 
+    // Declared here so goto cleanup never skips an initialisation (C++).
+    esp_http_client_handle_t client = NULL;
+    esp_err_t err = ESP_FAIL;
+    int status = 0;
+    size_t bodyLen = 0;
+    bool parsedOk = false;
+
+    // These are declared before the first goto so they're never skipped.
+    GhResponse resp = {};
+    esp_http_client_config_t config = {};
+
     char *responseBuf = (char *)malloc(GH_RESPONSE_CAP);
     if (!responseBuf) {
         snprintf(out->error, sizeof(out->error), "out of memory");
@@ -391,18 +402,16 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
         goto cleanup;
     }
 
-    GhResponse resp = {};
     resp.buf = responseBuf;
     resp.cap = GH_RESPONSE_CAP;
 
-    esp_http_client_config_t config = {};
     configure_ota_http_client(config, url);
     config.timeout_ms = 10000;
     config.buffer_size = 4096;
     config.event_handler = _gh_event_handler;
     config.user_data = &resp;
 
-    esp_http_client_handle_t client = esp_http_client_init(&config);
+    client = esp_http_client_init(&config);
     if (!client) {
         snprintf(out->error, sizeof(out->error), "HTTP client init failed");
         ESP_LOGE(TAG, "Failed to init HTTP client");
@@ -413,11 +422,11 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
     esp_http_client_set_header(client, "Accept", "application/vnd.github+json");
 
-    esp_err_t err = esp_http_client_perform(client);
-    int status = resp.httpStatus;
-    size_t bodyLen = resp.len;
+    err = esp_http_client_perform(client);
+    status = resp.httpStatus;
+    bodyLen = resp.len;
 
-    bool parsedOk = false;
+    parsedOk = false;
     if (err == ESP_OK && status == 200 && bodyLen > 0) {
         // Null-terminate before parsing.
         resp.buf[bodyLen < resp.cap ? bodyLen : resp.cap - 1] = 0;
