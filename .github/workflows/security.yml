@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -51,7 +51,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -64,11 +64,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Setup ESP-IDF v6.0
+      - name: Setup ESP-IDF v6.0.1
         if: matrix.language == 'cpp'
         run: |
           python -m pip install --upgrade pip
-          git clone --depth 1 --branch v6.0 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
+          git clone --depth 1 --branch v6.0.1 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
           git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
           "$HOME/esp-idf/install.sh" esp32
 
@@ -98,7 +98,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -115,10 +115,10 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Setup ESP-IDF v6.0
-        run: |
-          python -m pip install --upgrade pip
-          git clone --depth 1 --branch v6.0 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
+  - name: Setup ESP-IDF v6.0.1
+    run: |
+      python -m pip install --upgrade pip
+      git clone --depth 1 --branch v6.0.1 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
           git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
           "$HOME/esp-idf/install.sh" esp32
 
