@@ -129,6 +129,11 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_AddBoolToObject(mqtt, "tlsCaCertsSet",   strlen(config.mqtt.tls_ca_certs)  > 0);
     cJSON_AddBoolToObject(mqtt, "tlsCertfileSet",  strlen(config.mqtt.tls_certfile)  > 0);
     cJSON_AddBoolToObject(mqtt, "tlsKeyfileSet",   strlen(config.mqtt.tls_keyfile)   > 0);
+    // Command-topic security. Token is reported only as a boolean "set" flag
+    // to avoid leaking the shared secret through the API. The frontend
+    // sends "commandTokenClear=true" to remove it, or a new value to replace.
+    cJSON_AddBoolToObject(mqtt, "commandEnabled", config.mqtt.command_enabled);
+    cJSON_AddBoolToObject(mqtt, "commandTokenSet", strlen(config.mqtt.command_token) > 0);
     cJSON_AddItemToObject(root, "mqtt", mqtt);
 
     // CheckMK config
@@ -384,6 +389,35 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 return send_json_error(req, "MQTT TLS client key too long");
             }
             copy_string_field(config.mqtt.tls_keyfile, sizeof(config.mqtt.tls_keyfile), tlsKeyfile->valuestring);
+        }
+
+        // ---- Phase A: command-topic security ----------------------------
+        cJSON *commandEnabled = cJSON_GetObjectItem(mqtt, "commandEnabled");
+        if (commandEnabled != NULL && cJSON_IsBool(commandEnabled))
+        {
+            config.mqtt.command_enabled = cJSON_IsTrue(commandEnabled);
+        }
+
+        cJSON *commandTokenClear = cJSON_GetObjectItem(mqtt, "commandTokenClear");
+        if (commandTokenClear != NULL && cJSON_IsTrue(commandTokenClear))
+        {
+            config.mqtt.command_token[0] = '\0';
+        }
+        cJSON *commandToken = cJSON_GetObjectItem(mqtt, "commandToken");
+        if (commandToken != NULL && cJSON_IsString(commandToken) && strlen(commandToken->valuestring) > 0)
+        {
+            // The command token ends up in plain-text MQTT payloads AND HA
+            // discovery JSON. Restrict the alphabet so it cannot break out
+            // of the JSON string or be confused with topic separators.
+            if (!validateMqttCommandToken(commandToken->valuestring))
+            {
+                cJSON_Delete(root);
+                return send_json_error(req, "MQTT command token invalid (8..63 chars, "
+                                           "allowed: A-Z a-z 0-9 - _ .)");
+            }
+            copy_string_field(config.mqtt.command_token,
+                              sizeof(config.mqtt.command_token),
+                              commandToken->valuestring);
         }
     }
 

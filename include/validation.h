@@ -62,3 +62,9 @@ bool validateServerAddress(const char *server, size_t maxLength);
 // CCU address validation (hostname, IPv4, IPv6, WITHOUT port)
 // Used for HomeMatic CCU connection - does not allow port specification
 bool validateCcuAddress(const char *address);
+
+// MQTT command token validation. The token is embedded in plain-text MQTT
+// payloads and HA discovery JSON, so we restrict the alphabet to characters
+// that are unambiguously safe in any context (no spaces, quotes, slashes,
+// control chars). Length: 8..63 characters. Allowed: A-Z a-z 0-9 - _ .
+bool validateMqttCommandToken(const char *token);

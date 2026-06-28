@@ -234,6 +234,47 @@
                 </div>
               </Transition>
             </div>
+
+            <div class="col-12 mt-4">
+              <div class="command-section">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div>
+                    <h4>{{ t('monitoring.mqtt.commands.title') }}</h4>
+                    <div class="form-text mb-0">{{ t('monitoring.mqtt.commands.enableHelp') }}</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" v-model="mqttConfig.commandEnabled">
+                  </div>
+                </div>
+
+                <Transition name="expand">
+                  <div v-if="mqttConfig.commandEnabled">
+                    <div v-if="!mqttConfig.tlsEnable" class="alert-warning-soft mt-3">
+                      <div>{{ t('monitoring.mqtt.commands.aclHint') }}</div>
+                    </div>
+
+                    <div class="mt-3">
+                      <label class="form-label">{{ t('monitoring.mqtt.commands.token') }}</label>
+                      <div class="d-flex gap-2 align-items-center">
+                        <BFormInput v-model="mqttConfig.commandToken" type="text"
+                          :placeholder="t('monitoring.mqtt.commands.tokenPlaceholder')" />
+                        <button v-if="mqttConfig.commandTokenSet && !mqttConfig.commandToken"
+                                type="button" class="btn-link-danger"
+                                @click="clearCommandToken">
+                          {{ t('monitoring.mqtt.commands.clear') }}
+                        </button>
+                      </div>
+                      <div class="form-text">
+                        <span v-if="mqttConfig.commandTokenSet" class="cert-present-hint">
+                                          {{ t('monitoring.mqtt.commands.tokenPresent') }}
+                                        </span>
+                        {{ t('monitoring.mqtt.commands.tokenHelp') }}
+                      </div>
+                    </div>
+                  </div>
+                </Transition>
+              </div>
+            </div>
           </div>
         </div>
       </Transition>
@@ -275,7 +316,7 @@ const diagnosticBusy = ref({ checkmk: false, mqtt: false })
 const hasChanges = ref(false)
 const originalConfig = ref('')
 
-const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false })
+const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false })
 const pemFeedback = ref({ tlsCaCerts: null, tlsCertfile: null, tlsKeyfile: null })
 
 const MAX_PEM_BYTES = 8 * 1024
@@ -358,6 +399,12 @@ function clearCert(field, clearFlag, setFlag) {
   pemFeedback.value[field] = null
 }
 
+function clearCommandToken() {
+  mqttConfig.value.commandToken = ''
+  mqttConfig.value.commandTokenSet = false
+  tlsClearFlags.value.commandTokenClear = true
+}
+
 const mtlsInconsistent = computed(() => {
   const hasCert = !!(mqttConfig.value.tlsCertfile || mqttConfig.value.tlsCertfileSet)
   const hasKey  = !!(mqttConfig.value.tlsKeyfile  || mqttConfig.value.tlsKeyfileSet)
@@ -410,14 +457,15 @@ const saveConfig = async () => {
 
   saving.value = true
   try {
-    const { tlsCaCertsSet, tlsCertfileSet, tlsKeyfileSet, ...mqttPayload } = mqttConfig.value
+    const { tlsCaCertsSet, tlsCertfileSet, tlsKeyfileSet, commandTokenSet, ...mqttPayload } = mqttConfig.value
     mqttPayload.tlsCaCertsClear  = tlsClearFlags.value.tlsCaCertsClear
     mqttPayload.tlsCertfileClear = tlsClearFlags.value.tlsCertfileClear
     mqttPayload.tlsKeyfileClear  = tlsClearFlags.value.tlsKeyfileClear
+    mqttPayload.commandTokenClear = tlsClearFlags.value.commandTokenClear
 
     await monitoringStore.save({ checkmk: checkmkConfig.value, mqtt: mqttPayload })
     await monitoringStore.load()
-    tlsClearFlags.value = { tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false }
+    tlsClearFlags.value = { tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false }
 
     uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('monitoring.saveSuccess') })
     hasChanges.value = false
@@ -611,7 +659,12 @@ const runDiagnostic = async (target) => {
   margin-top: 16px;
 }
 
-.tls-section h4 {
+.command-section {
+  margin-top: 16px;
+}
+
+.tls-section h4,
+.command-section h4 {
   font-size: 1rem;
   margin: 0 0 4px;
 }

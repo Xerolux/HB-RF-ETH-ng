@@ -366,7 +366,14 @@ Retrieve monitoring configuration for MQTT and CheckMK.
     "password": "",
     "topicPrefix": "hb-rf-eth",
     "haDiscoveryEnabled": false,
-    "haDiscoveryPrefix": "homeassistant"
+    "haDiscoveryPrefix": "homeassistant",
+    "tlsEnable": false,
+    "tlsSkipVerify": false,
+    "tlsCaCertsSet": false,
+    "tlsCertfileSet": false,
+    "tlsKeyfileSet": false,
+    "commandEnabled": true,
+    "commandTokenSet": false
   },
   "checkmk": {
     "enabled": false,
@@ -387,6 +394,13 @@ Retrieve monitoring configuration for MQTT and CheckMK.
 - `topicPrefix`: Topic prefix for published entities and status messages
 - `haDiscoveryEnabled`: Enable Home Assistant auto-discovery payloads
 - `haDiscoveryPrefix`: Discovery prefix used for Home Assistant
+- `tlsEnable`: Connect to the broker via TLS (port 8883 by default)
+- `tlsSkipVerify`: Skip TLS certificate / hostname verification (insecure; lab only)
+- `tlsCaCertsSet`: `true` if a custom CA bundle is stored (PEM). Use `tlsCaCertsClear=true` to remove.
+- `tlsCertfileSet`: `true` if a client certificate (mTLS) is stored
+- `tlsKeyfileSet`: `true` if a client key (mTLS) is stored
+- `commandEnabled`: When `false`, the device does **not** subscribe to `<prefix>/command/#` and silently drops every command. Default: `true`.
+- `commandTokenSet`: `true` if a shared-secret token has been configured. The token itself is never returned by the API. Send `commandTokenClear=true` to remove it, or a new `commandToken` value to replace it.
 
 **CheckMK:**
 - `enabled`: Enable/disable CheckMK agent
@@ -416,7 +430,12 @@ Update monitoring configuration.
       "password": "secret",
       "topicPrefix": "hb-rf-eth",
       "haDiscoveryEnabled": true,
-      "haDiscoveryPrefix": "homeassistant"
+      "haDiscoveryPrefix": "homeassistant",
+      "tlsEnable": false,
+      "tlsSkipVerify": false,
+      "commandEnabled": true,
+      "commandToken": "my-shared-secret-123",
+      "commandTokenClear": false
   },
   "checkmk": {
     "enabled": true,
@@ -425,6 +444,10 @@ Update monitoring configuration.
   }
 }
 ```
+
+**Command token validation:** the token must be 8–63 characters long and may
+only contain `A–Z a–z 0–9 - _ .`. It is embedded verbatim in MQTT payloads
+and Home Assistant discovery JSON, so any other character is rejected.
 
 **Response (200 OK):**
 ```json

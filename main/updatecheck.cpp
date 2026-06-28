@@ -238,6 +238,15 @@ bool UpdateCheck::refresh()
         return false;
     }
 
+    // Reflect "checking" state for MQTT / WebUI. Only flip the state if no
+    // OTA is currently running so we never clobber OTA_DOWNLOADING etc.
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        if (_otaState == OTA_STATE_IDLE) {
+            _setOtaStateLocked(OTA_STATE_CHECKING);
+        }
+        xSemaphoreGive(_stateMutex);
+    }
+
     ReleaseInfo fresh = {};
     bool ok = _doFetch(&fresh);
     int64_t now = esp_timer_get_time() / 1000;
@@ -264,6 +273,11 @@ bool UpdateCheck::refresh()
                 _latestVersion[sizeof(_latestVersion) - 1] = 0;
             }
         }
+        // Clear CHECKING state unless an OTA ran in parallel (very unlikely
+        // but defensive). Reset back to IDLE so MQTT can show "idle".
+        if (_otaState == OTA_STATE_CHECKING) {
+            _setOtaStateLocked(OTA_STATE_IDLE);
+        }
         xSemaphoreGive(_stateMutex);
     }
 
@@ -277,6 +291,51 @@ bool UpdateCheck::isFetchInProgress()
     // xSemaphoreGetMutexHolder returns the owning task handle or NULL. We
     // don't care who owns it - any non-NULL value means "busy".
     return xSemaphoreGetMutexHolder(_fetchLock) != NULL;
+}
+
+void UpdateCheck::_setOtaStateLocked(ota_state_t state)
+{
+    _otaState = state;
+    if (state == OTA_STATE_IDLE) {
+        _otaProgress = -1;
+        _otaErrorText[0] = '\0';
+        _otaErrorCode = 0;
+    }
+}
+
+void UpdateCheck::_setOtaProgressLocked(int percent)
+{
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+    _otaProgress = percent;
+}
+
+void UpdateCheck::_setOtaErrorLocked(int code, const char* text)
+{
+    _otaErrorCode = code;
+    if (text) {
+        strncpy(_otaErrorText, text, sizeof(_otaErrorText) - 1);
+        _otaErrorText[sizeof(_otaErrorText) - 1] = '\0';
+    } else {
+        _otaErrorText[0] = '\0';
+    }
+}
+
+OtaSnapshot UpdateCheck::getOtaState()
+{
+    OtaSnapshot snap;
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        snap.state = _otaState;
+        snap.progress_pct = _otaProgress;
+        snap.error_code = _otaErrorCode;
+        strncpy(snap.error_text, _otaErrorText, sizeof(snap.error_text) - 1);
+        snap.error_text[sizeof(snap.error_text) - 1] = '\0';
+        xSemaphoreGive(_stateMutex);
+    } else {
+        snap.state = OTA_STATE_IDLE;
+        snap.progress_pct = -1;
+    }
+    return snap;
 }
 
 bool UpdateCheck::_doFetch(ReleaseInfo *out)
@@ -441,11 +500,23 @@ void UpdateCheck::performOnlineUpdate()
     if (!info.valid || info.downloadUrl[0] == 0) {
         ESP_LOGE(TAG, "No firmware asset URL available (latest: %s)",
                  info.valid ? info.version : "n/a");
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            _setOtaStateLocked(OTA_STATE_FAILED);
+            _setOtaErrorLocked(ESP_ERR_NOT_FOUND, "no firmware asset URL");
+            xSemaphoreGive(_stateMutex);
+        }
         return;
     }
 
     ESP_LOGI(TAG, "Starting OTA update from %s", info.downloadUrl);
     _statusLED->setState(LED_STATE_BLINK_FAST);
+
+    // Mark "starting" so MQTT / WebUI can show the new state immediately.
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        _setOtaStateLocked(OTA_STATE_STARTING);
+        _setOtaProgressLocked(0);
+        xSemaphoreGive(_stateMutex);
+    }
 
     esp_http_client_config_t config = {};
     configure_ota_http_client(config, info.downloadUrl);
@@ -455,13 +526,88 @@ void UpdateCheck::performOnlineUpdate()
     esp_https_ota_config_t ota_config = {};
     ota_config.http_config = &config;
 
-    esp_err_t ret = esp_https_ota(&ota_config);
+    // Use the advanced esp_https_ota API so we can report real progress to
+    // MQTT / WebUI. The simple esp_https_ota(&ota_config) call is a thin
+    // wrapper around these steps but hides all intermediate state.
+    esp_https_ota_handle_t ota_handle = NULL;
+    esp_err_t ret = esp_https_ota_begin(&ota_config, &ota_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_https_ota_begin failed: %s", esp_err_to_name(ret));
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            _setOtaStateLocked(OTA_STATE_FAILED);
+            _setOtaErrorLocked(ret, esp_err_to_name(ret));
+            xSemaphoreGive(_stateMutex);
+        }
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+        _statusLED->setState(LED_STATE_ON);
+        return;
+    }
+
+    int image_size = esp_https_ota_get_image_size(ota_handle);
+    ESP_LOGI(TAG, "OTA image size: %d bytes", image_size);
+
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        _setOtaStateLocked(OTA_STATE_DOWNLOADING);
+        xSemaphoreGive(_stateMutex);
+    }
+
+    // Loop until the full image has been streamed into the OTA partition.
+    // perform() pulls one buffer chunk at a time and writes it to flash.
+    while (true) {
+        ret = esp_https_ota_perform(ota_handle);
+        if (ret != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            break;
+        }
+        if (image_size > 0) {
+            int read = esp_https_ota_get_image_len_read(ota_handle);
+            int pct = (int)((uint64_t)read * 100 / (uint64_t)image_size);
+            if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+                _setOtaProgressLocked(pct);
+                xSemaphoreGive(_stateMutex);
+            }
+        }
+    }
+
+    bool complete = esp_https_ota_is_complete_data_received(ota_handle);
+    if (ret != ESP_OK || !complete) {
+        ESP_LOGE(TAG, "OTA perform failed: ret=%s complete=%d",
+                 esp_err_to_name(ret), complete ? 1 : 0);
+        const char* err_text = (ret == ESP_OK) ? "download incomplete" : esp_err_to_name(ret);
+        int err_code = (ret == ESP_OK) ? ESP_ERR_HTTPS_OTA_INCOMPLETE : ret;
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            _setOtaStateLocked(OTA_STATE_FAILED);
+            _setOtaErrorLocked(err_code, err_text);
+            xSemaphoreGive(_stateMutex);
+        }
+        esp_https_ota_abort(ota_handle);
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+        _statusLED->setState(LED_STATE_ON);
+        return;
+    }
+
+    // All bytes streamed - now validate and switch the boot partition.
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        _setOtaStateLocked(OTA_STATE_FLASHING);
+        _setOtaProgressLocked(100);
+        xSemaphoreGive(_stateMutex);
+    }
+
+    ret = esp_https_ota_finish(ota_handle);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Update successful, restarting...");
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            _setOtaStateLocked(OTA_STATE_SUCCESS);
+            xSemaphoreGive(_stateMutex);
+        }
         ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
         full_system_restart();
     } else {
-        ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "esp_https_ota_finish failed: %s", esp_err_to_name(ret));
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            _setOtaStateLocked(OTA_STATE_FAILED);
+            _setOtaErrorLocked(ret, esp_err_to_name(ret));
+            xSemaphoreGive(_stateMutex);
+        }
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         _statusLED->setState(LED_STATE_ON);
     }

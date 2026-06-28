@@ -315,6 +315,16 @@ export default {
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Default: homeassistant',
       serverRequired: 'Please enter an MQTT server address when MQTT is enabled.',
+      commands: {
+        title: 'Command Topics',
+        enableHelp: 'Allows remote control (restart, factory reset, OTA) over MQTT. Without a token or broker ACL, any client on the network can control the device.',
+        token: 'Command Token',
+        tokenPlaceholder: 'optional – shared secret',
+        tokenHelp: 'When set, command payloads must exactly match this token. Allowed: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Present – enter new value to replace',
+        clear: 'Clear',
+        aclHint: 'Note: without a broker ACL + token, any MQTT client can restart the device or trigger an OTA. Please configure an ACL on the broker that grants publish rights on the command topic only to this device.'
+      },
       tls: {
         title: 'TLS / SSL',
         enable: 'Enable TLS',

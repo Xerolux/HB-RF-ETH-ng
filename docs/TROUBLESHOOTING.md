@@ -638,3 +638,38 @@ If problems persist:
    - Isolate management interface
    - Use firewall rules
    - Disable unused monitoring services
+
+7. **MQTT Command Security (Phase A)**
+
+   The MQTT user/password configured in the WebUI authenticates the **device**
+   against the broker - it does NOT prevent other clients from publishing to
+   `<prefix>/command/#`. Anyone with publish rights on that topic can
+   restart the device, trigger OTA, or even factory-reset it. Three
+   complementary levers are available:
+
+   - **Broker ACL (most important).** Configure your broker so that only the
+     HB-RF-ETH-ng user may publish to `<prefix>/command/#`. Example
+     Mosquitto ACL:
+     ```text
+     user hb-rf-eth
+     topic hb-rf-eth/# rw
+     topic homeassistant/# rw
+     ```
+   - **Command token (device-side).** In *Monitoring → MQTT → Command
+     Topics* set a shared-secret token. Every command payload must then
+     match the token exactly. Allowed charset: `A-Z a-z 0-9 - _ .`,
+     length 8–63. Without the token the device rejects the command and
+     publishes an event to `<prefix>/event/command_rejected`.
+   - **Disable commands entirely.** Uncheck *Enable* under *Command Topics*
+     to stop the device from subscribing to the command tree. Restart /
+     Factory Reset / OTA are then only possible via WebUI.
+
+   TLS / mTLS can be enabled independently in *Monitoring → MQTT → TLS / SSL*
+   to encrypt the broker connection and to authenticate the device with a
+   client certificate. TLS is optional and is NOT required for the
+   command token to work.
+
+   When a command token is configured, the HA discovery JSON publishes the
+   token verbatim as `payload_press` / `payload_install` so the HA buttons
+   continue to work. Lock down write access to `homeassistant/#` on the
+   broker so other clients cannot read the token via the discovery topic.

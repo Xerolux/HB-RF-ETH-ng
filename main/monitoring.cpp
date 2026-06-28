@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <atomic>
+#include "ethernet.h"
+#include "radiomoduledetector.h"
+#include "systemclock.h"
 
 static const char *TAG = "MONITORING";
 
@@ -52,10 +55,29 @@ static volatile int checkmk_listen_sock = -1;
 #define NVS_MQTT_TLS_CA     "mqtt_tls_ca"
 #define NVS_MQTT_TLS_CRT    "mqtt_tls_crt"
 #define NVS_MQTT_TLS_KEY    "mqtt_tls_key"
+#define NVS_MQTT_CMD_EN     "mqtt_cmd_en"   // command topic enabled
+#define NVS_MQTT_CMD_TOK    "mqtt_cmd_tok"  // optional shared-secret
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
 static UpdateCheck* g_updateCheck = NULL;
+static Ethernet* g_ethernet = NULL;
+static RadioModuleDetector* g_radioModuleDetector = NULL;
+static SystemClock* g_systemClock = NULL;
+
+// Provider accessors for mqtt_handler.cpp
+Ethernet* monitoring_get_ethernet(void) { return g_ethernet; }
+RadioModuleDetector* monitoring_get_radiomodule(void) { return g_radioModuleDetector; }
+SystemClock* monitoring_get_systemclock(void) { return g_systemClock; }
+
+void monitoring_set_providers(Ethernet* ethernet,
+                              RadioModuleDetector* radioModuleDetector,
+                              SystemClock* systemClock)
+{
+    g_ethernet = ethernet;
+    g_radioModuleDetector = radioModuleDetector;
+    g_systemClock = systemClock;
+}
 
 // Get firmware version from app descriptor
 static const char* get_firmware_version(void)
@@ -338,6 +360,12 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CRT, config->mqtt.tls_certfile,  strlen(config->mqtt.tls_certfile) + 1);
     nvs_set_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile,   strlen(config->mqtt.tls_keyfile) + 1);
 
+    // Command-topic security (Phase A). Default for command_enabled is true
+    // so existing installations keep working after the upgrade. The token
+    // is optional; if empty no token check is applied.
+    nvs_set_u8(nvs_handle, NVS_MQTT_CMD_EN, config->mqtt.command_enabled ? 1 : 0);
+    nvs_set_str(nvs_handle, NVS_MQTT_CMD_TOK, config->mqtt.command_token);
+
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
@@ -370,6 +398,13 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.tls_ca_certs[0] = '\0';
         config->mqtt.tls_certfile[0] = '\0';
         config->mqtt.tls_keyfile[0] = '\0';
+
+        // Phase A defaults: commands enabled, no token. This preserves the
+        // pre-Phase-A behaviour where any client with broker publish rights
+        // could trigger a restart / OTA. Operators who care should set a
+        // token or restrict the broker ACL.
+        config->mqtt.command_enabled = true;
+        config->mqtt.command_token[0] = '\0';
 
         return ESP_OK;
     }
@@ -454,6 +489,19 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     blob_len = sizeof(config->mqtt.tls_keyfile);
     if (nvs_get_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile, &blob_len) != ESP_OK) {
         config->mqtt.tls_keyfile[0] = '\0';
+    }
+
+    // Phase A: command-topic security. command_enabled defaults to true for
+    // upgrades from a pre-Phase-A build (no NVS key present yet) so that
+    // existing MQTT integrations do not silently lose restart/update.
+    if (nvs_get_u8(nvs_handle, NVS_MQTT_CMD_EN, &u8_val) == ESP_OK) {
+        config->mqtt.command_enabled = (u8_val != 0);
+    } else {
+        config->mqtt.command_enabled = true;
+    }
+    str_len = sizeof(config->mqtt.command_token);
+    if (nvs_get_str(nvs_handle, NVS_MQTT_CMD_TOK, config->mqtt.command_token, &str_len) != ESP_OK) {
+        config->mqtt.command_token[0] = '\0';
     }
 
     nvs_close(nvs_handle);

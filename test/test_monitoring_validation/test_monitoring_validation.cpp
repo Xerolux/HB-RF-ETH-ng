@@ -1,8 +1,9 @@
 /*
  *  test_monitoring_validation.cpp
  *
- *  Unit tests for monitoring (MQTT/SNMP) validation
- *  Verifies validateServerAddress and validateSnmpCommunity
+ *  Unit tests for monitoring (MQTT) validation
+ *  - validateServerAddress (broker host / IP / port)
+ *  - validateMqttCommandToken (Phase A: shared-secret for MQTT commands)
  *
  *  These tests use the PlatformIO Unity test framework.
  */
@@ -132,128 +133,76 @@ void test_mqtt_invalid_too_long(void)
 }
 
 // ==========================================
-// Valid SNMP Community Tests
+// Valid Command Token Tests (Phase A)
 // ==========================================
 
-void test_snmp_valid_simple(void)
+void test_token_valid_alphanumeric(void)
 {
-    // Simple community strings
-    TEST_ASSERT_TRUE(validateSnmpCommunity("public"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("private"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("community"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("MyToken123"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("abcdefgh"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("ABCDEFGH"));
 }
 
-void test_snmp_valid_alphanumeric(void)
+void test_token_valid_with_separators(void)
 {
-    // Alphanumeric community strings
-    TEST_ASSERT_TRUE(validateSnmpCommunity("public123"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("MyComm456"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("ABC123xyz"));
+    // - _ . allowed in any position
+    TEST_ASSERT_TRUE(validateMqttCommandToken("my-token-123"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("my_token_456"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("my.token.789"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("a.b-c_d"));
 }
 
-void test_snmp_valid_with_hyphen(void)
+void test_token_valid_boundary_lengths(void)
 {
-    // With hyphens in middle
-    TEST_ASSERT_TRUE(validateSnmpCommunity("my-community"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("snmp-read-only"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("test-123"));
-}
-
-void test_snmp_valid_with_underscore(void)
-{
-    // With underscores in middle
-    TEST_ASSERT_TRUE(validateSnmpCommunity("my_community"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("snmp_read_only"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("test_123"));
-}
-
-void test_snmp_valid_mixed(void)
-{
-    // Mixed valid characters
-    TEST_ASSERT_TRUE(validateSnmpCommunity("my-snmp_community123"));
-    TEST_ASSERT_TRUE(validateSnmpCommunity("ABC_123-xyz"));
+    // Min length is 8, max is 63
+    TEST_ASSERT_TRUE(validateMqttCommandToken("12345678"));
+    TEST_ASSERT_TRUE(validateMqttCommandToken("1234567-"));  // separator at end is OK
+    char t[64];
+    memset(t, 'a', 63);
+    t[63] = '\0';
+    TEST_ASSERT_TRUE(validateMqttCommandToken(t));
 }
 
 // ==========================================
-// Invalid SNMP Community Tests
+// Invalid Command Token Tests (Phase A)
 // ==========================================
 
-void test_snmp_invalid_empty(void)
+void test_token_invalid_empty(void)
 {
-    // Empty or NULL
-    TEST_ASSERT_FALSE(validateSnmpCommunity(""));
-    TEST_ASSERT_FALSE(validateSnmpCommunity(NULL));
+    TEST_ASSERT_FALSE(validateMqttCommandToken(""));
+    TEST_ASSERT_FALSE(validateMqttCommandToken(NULL));
 }
 
-void test_snmp_invalid_start_with_hyphen(void)
+void test_token_invalid_too_short(void)
 {
-    // Starts with hyphen
-    TEST_ASSERT_FALSE(validateSnmpCommunity("-community"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("-public"));
+    // < 8 chars rejected (must resist trivial brute force and accidental
+    // single-char tokens like "-")
+    TEST_ASSERT_FALSE(validateMqttCommandToken("short"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("1234567"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("-"));
 }
 
-void test_snmp_invalid_end_with_hyphen(void)
+void test_token_invalid_too_long(void)
 {
-    // Ends with hyphen
-    TEST_ASSERT_FALSE(validateSnmpCommunity("community-"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public-"));
+    // > 63 chars rejected (NVS key/value size + sane upper bound)
+    char t[70];
+    memset(t, 'a', 69);
+    t[69] = '\0';
+    TEST_ASSERT_FALSE(validateMqttCommandToken(t));
 }
 
-void test_snmp_invalid_start_with_underscore(void)
+void test_token_invalid_special_chars(void)
 {
-    // Starts with underscore
-    TEST_ASSERT_FALSE(validateSnmpCommunity("_community"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("_public"));
-}
-
-void test_snmp_invalid_end_with_underscore(void)
-{
-    // Ends with underscore
-    TEST_ASSERT_FALSE(validateSnmpCommunity("community_"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public_"));
-}
-
-void test_snmp_invalid_special_chars(void)
-{
-    // Invalid special characters
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public@123"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public#snmp"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public.snmp"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public!"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public$"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public%"));
-}
-
-void test_snmp_invalid_spaces(void)
-{
-    // Spaces not allowed
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public snmp"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("my community"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity(" public"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("public "));
-}
-
-void test_snmp_invalid_too_long(void)
-{
-    // String too long (MAX_SNMP_COMMUNITY_LENGTH = 32)
-    char longComm[50];
-    memset(longComm, 'a', sizeof(longComm) - 1);
-    longComm[sizeof(longComm) - 1] = '\0';
-    TEST_ASSERT_FALSE(validateSnmpCommunity(longComm));
-}
-
-void test_snmp_invalid_only_hyphens(void)
-{
-    // Only hyphens (starts/ends with hyphen)
-    TEST_ASSERT_FALSE(validateSnmpCommunity("-"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("---"));
-}
-
-void test_snmp_invalid_only_underscores(void)
-{
-    // Only underscores (starts/ends with underscore)
-    TEST_ASSERT_FALSE(validateSnmpCommunity("_"));
-    TEST_ASSERT_FALSE(validateSnmpCommunity("___"));
+    // Anything outside [A-Za-z0-9-_.] must be rejected so the token is
+    // unambiguous inside JSON payloads, MQTT topics and plain text.
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token!123"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token with space"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token\"quote"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token/slash"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token#hash"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token@at"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token$colon:"));
+    TEST_ASSERT_FALSE(validateMqttCommandToken("token+plus"));
 }
 
 // ==========================================
@@ -280,23 +229,15 @@ void setup()
     RUN_TEST(test_mqtt_invalid_ipv6);
     RUN_TEST(test_mqtt_invalid_too_long);
 
-    // SNMP Community Tests
-    RUN_TEST(test_snmp_valid_simple);
-    RUN_TEST(test_snmp_valid_alphanumeric);
-    RUN_TEST(test_snmp_valid_with_hyphen);
-    RUN_TEST(test_snmp_valid_with_underscore);
-    RUN_TEST(test_snmp_valid_mixed);
+    // MQTT Command Token Tests (Phase A)
+    RUN_TEST(test_token_valid_alphanumeric);
+    RUN_TEST(test_token_valid_with_separators);
+    RUN_TEST(test_token_valid_boundary_lengths);
 
-    RUN_TEST(test_snmp_invalid_empty);
-    RUN_TEST(test_snmp_invalid_start_with_hyphen);
-    RUN_TEST(test_snmp_invalid_end_with_hyphen);
-    RUN_TEST(test_snmp_invalid_start_with_underscore);
-    RUN_TEST(test_snmp_invalid_end_with_underscore);
-    RUN_TEST(test_snmp_invalid_special_chars);
-    RUN_TEST(test_snmp_invalid_spaces);
-    RUN_TEST(test_snmp_invalid_too_long);
-    RUN_TEST(test_snmp_invalid_only_hyphens);
-    RUN_TEST(test_snmp_invalid_only_underscores);
+    RUN_TEST(test_token_invalid_empty);
+    RUN_TEST(test_token_invalid_too_short);
+    RUN_TEST(test_token_invalid_too_long);
+    RUN_TEST(test_token_invalid_special_chars);
 
     UNITY_END();
 }

@@ -15,6 +15,9 @@
 // Forward declarations
 class SysInfo;
 class UpdateCheck;
+class Ethernet;
+class RadioModuleDetector;
+class SystemClock;
 
 // CheckMK Agent Configuration
 typedef struct {
@@ -38,6 +41,15 @@ typedef struct {
     char tls_ca_certs[2048];    // MQTT TLS CA bundle (PEM); empty = use built-in ESP-IDF CA bundle
     char tls_certfile[2048];    // MQTT TLS client cert (mTLS), PEM; empty = no client cert
     char tls_keyfile[2048];     // MQTT TLS client key (mTLS), PEM; empty = no client key
+    // --- Command topic security (Phase A) ---
+    // When false, the device will not subscribe to <prefix>/command/# at all
+    // and ignores any command message (default: true to preserve previous
+    // behaviour where commands were tied to HA discovery being enabled).
+    bool command_enabled;
+    // Optional shared-secret that callers must place in the command payload
+    // (or in a "token" JSON field) for a command to be accepted. Empty means
+    // "no token required" - in that case rely on broker-side ACL + TLS/mTLS.
+    char command_token[65];
 } mqtt_config_t;
 
 // Monitoring configuration
@@ -48,6 +60,15 @@ typedef struct {
 
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
+
+// Register additional data providers so MQTT can publish richer status topics
+// (Ethernet link/IP, radio module info, system clock / NTP sync state).
+// All pointers are optional; pass NULL for any provider that is unavailable.
+// Must be called BEFORE monitoring_init() so the MQTT publish task can use
+// them from the very first status cycle.
+void monitoring_set_providers(Ethernet* ethernet,
+                              RadioModuleDetector* radioModuleDetector,
+                              SystemClock* systemClock);
 
 // Update configuration (synchronous - blocks caller)
 esp_err_t monitoring_update_config(const monitoring_config_t *config);

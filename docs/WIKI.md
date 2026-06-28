@@ -248,21 +248,50 @@ Die Firmware verwendet folgende Topic-Struktur:
 
 ```
 hb-rf-eth/                      (Standard Topic Prefix)
-├── status/                     (Status-Metriken)
-│   ├── cpu_usage
-│   ├── memory_usage
-│   ├── temperature
-│   ├── supply_voltage
-│   ├── uptime
-│   ├── uptime_text
+├── status/                     (Status-Metriken, retained, alle 5-60s)
+│   ├── online                  "online" / "offline" (LWT-Birth-Marker)
+│   ├── serial
 │   ├── version
 │   ├── latest_version
 │   ├── update_available
-│   └── board_revision
-└── command/                    (Commands für HA)
-    ├── restart
-    ├── factory_reset
-    └── update
+│   ├── board_revision
+│   ├── cpu_usage
+│   ├── memory_usage
+│   ├── free_heap
+│   ├── min_free_heap
+│   ├── supply_voltage
+│   ├── temperature
+│   ├── uptime
+│   ├── uptime_text
+│   ├── last_reset_reason
+│   ├── eth_connected           "true" / "false"
+│   ├── eth_link_speed          Mbit/s
+│   ├── eth_duplex              "Full" / "Half"
+│   ├── ip_address
+│   ├── gateway
+│   ├── radio_module_type       "HM-MOD-RPI-PCB" / "RPI-RF-MOD" / "none"
+│   ├── radio_module_serial
+│   ├── radio_module_firmware
+│   ├── ntp_synced              "true" / "false"
+│   ├── last_ntp_sync           Unix-Sekunden
+│   ├── ota_state               "idle" / "checking" / "starting" /
+│   │                                       "downloading" / "flashing" /
+│   │                                       "success" / "failed"
+│   ├── ota_progress            0..100 (-1 = unbekannt)
+│   └── ota_error               Fehler-Text (nur bei failed)
+├── event/                      (Ereignisse, NICHT retained)
+│   ├── restart
+│   ├── factory_reset
+│   ├── update_started
+│   ├── update_downloading
+│   ├── update_finished         "success" / "failed: ..."
+│   ├── check_update
+│   └── command_rejected        bei ungültigem Token
+└── command/                    (Commands – nur wenn commandEnabled)
+    ├── restart                 Payload: <token> oder leer
+    ├── factory_reset           Payload: <token> oder leer
+    ├── update                  Payload: <token> oder leer
+    └── check_update            Payload: <token> oder leer
 
 homeassistant/                  (HA Discovery Prefix)
 ├── sensor/
@@ -316,9 +345,35 @@ cards:
 ### Sicherheitshinweise
 
 - Die HA-Integration ist standardmäßig **DEAKTIVIERT** und muss explizit aktiviert werden
-- Commands (Restart, Factory Reset, Update) sind nur per MQTT möglich, wenn HA Discovery aktiviert ist
-- Alle Commands werden im Systemlog protokolliert
-- Die WebUI-Authentifizierung bleibt weiterhin aktiv
+- Commands (Restart, Factory Reset, Update, Check Update) sind nur dann per
+  MQTT möglich, wenn `commandEnabled` aktiv ist (Standard: ja)
+- Optional kann ein **Kommando-Token** gesetzt werden: jeder Kommando-Payload
+  muss dann exakt diesem Token entsprechen. Ohne Token gilt: jeder MQTT-Client
+  mit Publish-Rechten auf `<prefix>/command/#` kann das Gerät steuern
+- Bei gesetztem Token veröffentlicht das HA Discovery JSON den Token als
+  `payload_press` / `payload_install` – die Broker-ACL muss deshalb
+  sicherstellen, dass nur das Gerät auf `homeassistant/#` publishen darf
+- TLS/mTLS ist optional und unabhängig vom Token (z. B. für self-hosted
+  Mosquitto mit self-signed Cert)
+- Alle Commands werden im Systemlog protokolliert; bei ungültigem Token wird
+  zusätzlich ein Event auf `<prefix>/event/command_rejected` gepublished
+- Die WebUI-Authentifizierung bleibt unabhängig von MQTT jederzeit aktiv
+
+#### Empfohlene Broker-ACL (Mosquitto-Beispiel)
+
+```
+# /etc/mosquitto/acls/hb-rf-eth.acl
+user hb-rf-eth
+topic hb-rf-eth/# rw
+topic homeassistant/# rw
+
+pattern hb-rf-eth/%u/#
+
+# Alle anderen User dürfen nur lesen / nicht publishen
+user readonly
+topic read hb-rf-eth/#
+topic read homeassistant/#
+```
 
 ### Fehlersuche
 

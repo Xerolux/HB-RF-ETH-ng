@@ -44,6 +44,26 @@ struct ReleaseInfo {
     char error[128];            // human-readable last error (empty when valid)
 };
 
+// OTA state machine, published via MQTT status/ota_state. Thread-safe
+// snapshot via getOtaState(). The MQTT / web layers read this without
+// locking; updates go through the internal mutex.
+typedef enum {
+    OTA_STATE_IDLE = 0,         // No OTA activity
+    OTA_STATE_CHECKING,         // refresh() in flight (querying GitHub)
+    OTA_STATE_STARTING,         // esp_https_ota_begin about to be called
+    OTA_STATE_DOWNLOADING,      // esp_https_ota_perform loop running
+    OTA_STATE_FLASHING,         // Writing final chunks + switching partition
+    OTA_STATE_SUCCESS,          // OTA finished, restart pending
+    OTA_STATE_FAILED,           // OTA failed; check ota_error for details
+} ota_state_t;
+
+struct OtaSnapshot {
+    ota_state_t state = OTA_STATE_IDLE;
+    int progress_pct = 0;       // 0..100 (bytes downloaded / image size); -1 if unknown
+    int error_code = 0;         // esp_err_t value when state == OTA_STATE_FAILED
+    char error_text[64] = {0};  // human readable, e.g. "ESP_ERR_OTA_VALIDATE_FAILED"
+};
+
 class UpdateCheck
 {
 private:
@@ -62,7 +82,18 @@ private:
     // Mirror of _release.version for the legacy const char* accessor.
     char _latestVersion[32] = "n/a";
 
+    // OTA progress / state (guarded by _stateMutex). Read by MQTT publish task
+    // and the HTTP layer; written by performOnlineUpdate() running on its own
+    // task.
+    ota_state_t _otaState = OTA_STATE_IDLE;
+    int _otaProgress = -1;
+    int _otaErrorCode = 0;
+    char _otaErrorText[64] = {0};
+
     bool _doFetch(ReleaseInfo* out);
+    void _setOtaStateLocked(ota_state_t state);
+    void _setOtaProgressLocked(int percent);
+    void _setOtaErrorLocked(int code, const char* text);
 
 public:
     UpdateCheck(Settings* settings, SysInfo* sysInfo, LED *statusLED);
@@ -82,7 +113,14 @@ public:
     // Returns a thread-safe snapshot of the currently cached release info.
     ReleaseInfo getReleaseInfo();
 
+    // Returns a thread-safe snapshot of the OTA state machine. The MQTT layer
+    // publishes this as status/ota_state + status/ota_progress so that
+    // Home Assistant can show update progress and react on completion.
+    OtaSnapshot getOtaState();
+
     // Triggers OTA from the cached downloadUrl (the GitHub asset URL).
+    // Updates the OTA state machine while running. Blocks until OTA either
+    // succeeds (and restarts) or fails.
     void performOnlineUpdate();
 
     // Legacy accessor: returns a pointer to the cached version string

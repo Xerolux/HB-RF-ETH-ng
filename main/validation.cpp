@@ -704,3 +704,26 @@ bool validateIPv6Address(const char *ipv6)
 
     return true;
 }
+
+bool validateMqttCommandToken(const char *token)
+{
+    // The command token is published verbatim inside HA discovery JSON
+    // payloads AND compared byte-by-byte against incoming MQTT payloads.
+    // Restrict the alphabet so the token is unambiguous in any context.
+    if (token == NULL || token[0] == '\0') {
+        return false;
+    }
+    size_t len = strlen(token);
+    if (len < 8 || len > 63) {
+        return false;
+    }
+    for (size_t i = 0; i < len; i++) {
+        char c = token[i];
+        bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                  (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.';
+        if (!ok) {
+            return false;
+        }
+    }
+    return true;
+}

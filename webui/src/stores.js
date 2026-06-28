@@ -397,7 +397,11 @@ export const useMonitoringStore = defineStore('monitoring', {
       tlsKeyfile: '',
       tlsCaCertsSet: false,
       tlsCertfileSet: false,
-      tlsKeyfileSet: false
+      tlsKeyfileSet: false,
+      // Phase A: command-topic security
+      commandEnabled: true,
+      commandToken: '',
+      commandTokenSet: false
     },
     diagnostics: {
       checkmk: null,

@@ -427,6 +427,69 @@ components:
               type: string
               description: Discovery prefix used for Home Assistant
               example: homeassistant
+            tlsEnable:
+              type: boolean
+              description: Connect to broker via TLS (port 8883 by default)
+              example: false
+            tlsSkipVerify:
+              type: boolean
+              description: Skip TLS cert/hostname verification (INSECURE, lab only)
+              example: false
+            tlsCaCerts:
+              type: string
+              description: Custom CA bundle (PEM). Empty = built-in Mozilla bundle. Write-only.
+              format: pem
+            tlsCaCertsClear:
+              type: boolean
+              description: Drop any stored custom CA bundle
+            tlsCertfile:
+              type: string
+              description: mTLS client certificate (PEM). Write-only.
+              format: pem
+            tlsCertfileClear:
+              type: boolean
+              description: Drop any stored mTLS client certificate
+            tlsKeyfile:
+              type: string
+              description: mTLS client key (PEM). Write-only.
+              format: pem
+            tlsKeyfileClear:
+              type: boolean
+              description: Drop any stored mTLS client key
+            tlsCaCertsSet:
+              type: boolean
+              description: Read-only flag indicating a custom CA bundle is stored
+              readOnly: true
+            tlsCertfileSet:
+              type: boolean
+              description: Read-only flag indicating a client cert is stored
+              readOnly: true
+            tlsKeyfileSet:
+              type: boolean
+              description: Read-only flag indicating a client key is stored
+              readOnly: true
+            commandEnabled:
+              type: boolean
+              description: >
+                When false, the device does not subscribe to
+                <prefix>/command/# and silently drops every command.
+                Default true.
+              example: true
+            commandToken:
+              type: string
+              description: >
+                Shared-secret that command payloads must match exactly.
+                Allowed charset: A-Z a-z 0-9 - _ . (8..63 chars).
+                Write-only; the stored value is never returned by the API.
+              maxLength: 63
+              writeOnly: true
+            commandTokenClear:
+              type: boolean
+              description: Drop any stored command token
+            commandTokenSet:
+              type: boolean
+              description: Read-only flag indicating a command token is configured
+              readOnly: true
         checkmk:
           type: object
           description: CheckMK agent configuration

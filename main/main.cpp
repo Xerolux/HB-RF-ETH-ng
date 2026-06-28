@@ -220,6 +220,11 @@ void app_main()
     static WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
+    // Register data providers for MQTT status topics (Ethernet link/IP,
+    // radio module info, system clock / NTP sync state). Must happen before
+    // monitoring_init() so the very first status publish cycle sees them.
+    monitoring_set_providers(&ethernet, &radioModuleDetector, &clk);
+
     // Initialize monitoring (CheckMK, MQTT)
     monitoring_init(NULL, &sysInfo, &updateCheck);
 
