@@ -237,7 +237,7 @@ export default {
     otaSuccess: 'Nedlasting vellykket. Installerer...',
     currentVersion: 'Nåværende Versjon',
     installedVersion: 'Installert versjon',
-    versionInfo: 'Modernisert fork v2.2.0-Beta.5 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
+    versionInfo: 'Modernisert fork v2.2.0-Beta.6 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
     newVersionAvailable: 'Ny versjon {version} er tilgjengelig!',
     viewUpdate: 'Vis',
@@ -343,7 +343,7 @@ export default {
   // About Page
   about: {
     title: 'Om',
-    version: 'Versjon 2.2.0-Beta.5',
+    version: 'Versjon 2.2.0-Beta.6',
     fork: 'Modernisert Fork',
     forkDescription: 'Denne versjonen er en modernisert fork av Xerolux (2025), basert på den originale HB-RF-ETH-fastvaren. Oppdatert til ESP-IDF 6.0, moderne verktøykjeder og nåværende WebUI-teknologier (Vue 3, Vite, Pinia).',
     original: 'Original Forfatter',
