@@ -64,6 +64,17 @@ struct OtaSnapshot {
     char error_text[64] = {0};  // human readable, e.g. "ESP_ERR_OTA_VALIDATE_FAILED"
 };
 
+// Lightweight release snapshot — omits the 4 KB body / 256 B URL fields so
+// periodic callers (MQTT publish every 5 s, update-check task) don't copy a
+// 5 KB struct on their stack.  WebUI (which needs body/URLs) still uses
+// the full ReleaseInfo via getReleaseInfo().
+struct VersionSnapshot {
+    bool valid = false;
+    char version[32] = "n/a";
+    bool isPrerelease = false;
+    char error[128] = {0};
+};
+
 class UpdateCheck
 {
 private:
@@ -112,6 +123,11 @@ public:
 
     // Returns a thread-safe snapshot of the currently cached release info.
     ReleaseInfo getReleaseInfo();
+
+    // Lightweight alternative: omits the 4 KB body / URL fields. Use this
+    // from periodic tasks (MQTT publish, background checker) to avoid ~5 KB
+    // on the stack.
+    VersionSnapshot getVersionSnapshot();
 
     // Returns a thread-safe snapshot of the OTA state machine. The MQTT layer
     // publishes this as status/ota_state + status/ota_progress so that

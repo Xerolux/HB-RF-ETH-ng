@@ -33,6 +33,7 @@
 #include "system_reset.h"
 #include "semver.h"
 #include "ota_config.h"
+#include "monitoring.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -40,10 +41,10 @@ static const char *TAG = "UpdateCheck";
 // release notes and firmware binary.
 static const char *GITHUB_REPO = "Xerolux/HB-RF-ETH-ng";
 
-// Cap for the heap buffer used to receive the GitHub releases JSON. A typical
-// release payload is 5-15 KB; we allow generous headroom for verbose bodies
-// and cap the body field of ReleaseInfo separately.
-static const size_t GH_RESPONSE_CAP = 24 * 1024;
+// Cap for the heap buffer used to receive the GitHub releases JSON. A single
+// release payload (per_page=1 for beta, /releases/latest for stable) is 3–8 KB;
+// 12 KB gives comfortable headroom while keeping the heap footprint frugal.
+static const size_t GH_RESPONSE_CAP = 12 * 1024;
 
 // esp_https_ota in IDF 6.x no longer exposes ESP_ERR_HTTPS_OTA_INCOMPLETE; use
 // a private application code to report a download that ended prematurely.
@@ -239,6 +240,21 @@ ReleaseInfo UpdateCheck::getReleaseInfo()
     return snap;
 }
 
+VersionSnapshot UpdateCheck::getVersionSnapshot()
+{
+    VersionSnapshot s;
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        s.valid = _release.valid;
+        strncpy(s.version, _release.version, sizeof(s.version) - 1);
+        s.version[sizeof(s.version) - 1] = '\0';
+        s.isPrerelease = _release.isPrerelease;
+        strncpy(s.error, _release.error, sizeof(s.error) - 1);
+        s.error[sizeof(s.error) - 1] = '\0';
+        xSemaphoreGive(_stateMutex);
+    }
+    return s;
+}
+
 bool UpdateCheck::refresh()
 {
     // Refuse to stack fetches - a single GitHub request can take several
@@ -359,11 +375,20 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     ESP_LOGI(TAG, "Fetching %s release info from GitHub (beta channel: %d)",
              beta ? "latest (incl. pre-release)" : "stable", beta ? 1 : 0);
 
+    // Serialize with the changelog proxy — two TLS handshakes at once exhaust
+    // the heap on the ESP32. 15 s timeout: GitHub should never take that long
+    // for a single release.
+    bool net_locked = false;
+    if (g_net_fetch_mutex &&
+        xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+        net_locked = true;
+    }
+
     char *responseBuf = (char *)malloc(GH_RESPONSE_CAP);
     if (!responseBuf) {
         snprintf(out->error, sizeof(out->error), "out of memory");
         ESP_LOGE(TAG, "Failed to allocate %u bytes for GitHub response", (unsigned)GH_RESPONSE_CAP);
-        return false;
+        goto cleanup;
     }
 
     GhResponse resp = {};
@@ -379,10 +404,9 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
-        free(responseBuf);
         snprintf(out->error, sizeof(out->error), "HTTP client init failed");
         ESP_LOGE(TAG, "Failed to init HTTP client");
-        return false;
+        goto cleanup;
     }
 
     // GitHub requires a User-Agent and accepts a vendor media type for JSON.
@@ -400,10 +424,6 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
 
         cJSON *root = cJSON_Parse(resp.buf);
         if (root) {
-            // Stable channel returns a single object, beta channel returns
-            // an array (newest first, including prereleases). Skip any
-            // draft entries defensively - drafts should never appear in the
-            // public API response but we check anyway.
             if (cJSON_IsArray(root)) {
                 int count = cJSON_GetArraySize(root);
                 for (int i = 0; i < count; i++) {
@@ -432,8 +452,6 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
             ESP_LOGE(TAG, "cJSON_Parse failed for GitHub response");
         }
     } else if (err == ESP_OK && status == 404) {
-        // /releases/latest returns 404 when no stable release exists yet
-        // (e.g. only prereleases are published).
         snprintf(out->error, sizeof(out->error),
                  "no stable release available yet");
         ESP_LOGW(TAG, "GitHub returned 404 - no stable release published");
@@ -448,7 +466,10 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     }
 
     esp_http_client_cleanup(client);
+
+cleanup:
     free(responseBuf);
+    if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
 
     if (parsedOk) {
         ESP_LOGI(TAG, "Latest %s release: %s%s (asset: %s)",
@@ -470,6 +491,8 @@ void UpdateCheck::_taskFunc()
 
   for (;;)
   {
+    ESP_LOGI(TAG, "Stack high water mark: %u bytes free",
+             (unsigned)uxTaskGetStackHighWaterMark(NULL));
     ESP_LOGI(TAG, "Checking for firmware updates...");
     ESP_LOGI(TAG, "Current version: %s", _sysInfo->getCurrentVersion());
 
@@ -477,7 +500,7 @@ void UpdateCheck::_taskFunc()
     // progress (coalesced) - that is NOT an error. Use info.valid as the
     // authoritative signal so we don't log a bogus error during the boot race.
     refresh();
-    ReleaseInfo info = getReleaseInfo();
+    VersionSnapshot info = getVersionSnapshot();
 
     if (info.valid)
     {

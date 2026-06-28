@@ -29,6 +29,7 @@
 #include "systemclock.h"
 
 static const char *TAG = "MONITORING";
+SemaphoreHandle_t g_net_fetch_mutex = NULL;
 
 static monitoring_config_t current_config = {};
 static SemaphoreHandle_t config_mutex = NULL;
@@ -517,6 +518,13 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
     if (config_mutex == NULL) {
         ESP_LOGE(TAG, "Failed to create config mutex");
         return ESP_ERR_NO_MEM;
+    }
+
+    g_net_fetch_mutex = xSemaphoreCreateMutex();
+    if (g_net_fetch_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create net-fetch mutex");
+        // Non-critical: continue without serialisation; the changelog-proxy
+        // retry will handle the transient double-TLS OOM.
     }
 
     g_sysInfo = sysInfo;

@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "esp_err.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 // Forward declarations
 class SysInfo;
@@ -85,5 +87,9 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message,
 // CheckMK Agent functions
 esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);
+
+// Serialize external HTTPS requests (update-check + changelog proxy) so two
+// TLS connections never occupy the heap at once on memory-constrained devices.
+extern SemaphoreHandle_t g_net_fetch_mutex;
 
 #endif // MONITORING_H

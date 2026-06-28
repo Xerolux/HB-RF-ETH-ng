@@ -252,8 +252,14 @@ void mqtt_publish_task(void *pvParameters)
     // status update the moment it changes (rather than waiting up to 60 s).
     ota_state_t last_ota_state = OTA_STATE_IDLE;
     int last_ota_progress = -1;
+    int publish_cycle = 0;
 
     while (mqtt_running) {
+        if (publish_cycle == 0) {
+            ESP_LOGI(TAG, "mqtt_publish stack high water mark: %u bytes free",
+                     (unsigned)uxTaskGetStackHighWaterMark(NULL));
+        }
+        publish_cycle++;
         mqtt_handler_publish_status();
         publish_ota_state();
 
@@ -382,7 +388,7 @@ void mqtt_handler_publish_status(void)
 
     // ---- Update info ------------------------------------------------------
     if (updateCheck) {
-        ReleaseInfo rel = updateCheck->getReleaseInfo();
+        VersionSnapshot rel = updateCheck->getVersionSnapshot();
         const char* latest = rel.valid ? rel.version : "n/a";
         PUBLISH_STR("status/latest_version", latest);
         bool updateAvailable = rel.valid &&

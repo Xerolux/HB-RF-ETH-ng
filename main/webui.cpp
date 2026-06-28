@@ -34,6 +34,7 @@
 #include "mbedtls/md.h"
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
+#include "monitoring.h"
 #include "rate_limiter.h"
 #include "security_headers.h"
 #include "secure_utils.h"
@@ -1434,6 +1435,14 @@ static void _async_proxy_task(void *arg)
 {
     AsyncProxyJob *job = (AsyncProxyJob *)arg;
 
+    // Serialize with UpdateCheck background fetch so two TLS handshakes never
+    // exhaust the heap at once. The retry below is a secondary safety net.
+    bool net_locked = false;
+    if (g_net_fetch_mutex &&
+        xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+        net_locked = true;
+    }
+
     esp_http_client_config_t config = {};
     configure_ota_http_client(config, job->url);
     config.event_handler = _proxy_http_event_handler;
@@ -1446,9 +1455,6 @@ static void _async_proxy_task(void *arg)
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
-        // At boot the UpdateCheck background fetch and this proxy can open two
-        // TLS connections at once and exhaust heap. Retry once after a short
-        // delay so the changelog load self-heals instead of erroring out.
         vTaskDelay(pdMS_TO_TICKS(2000));
         client = esp_http_client_init(&config);
     }
@@ -1456,7 +1462,6 @@ static void _async_proxy_task(void *arg)
     int status_code = client ? esp_http_client_get_status_code(client) : 0;
 
     if ((err == ESP_OK && status_code == 200) || job->header_sent) {
-        // Complete (or at least terminate) the chunked response
         httpd_resp_send_chunk(job->req, NULL, 0);
         if (err != ESP_OK || status_code != 200) {
             ESP_LOGE(TAG, "%s (%s, HTTP %d)", job->error_message, esp_err_to_name(err), status_code);
@@ -1469,6 +1474,7 @@ static void _async_proxy_task(void *arg)
     if (client) {
         esp_http_client_cleanup(client);
     }
+    if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
 
     httpd_req_async_handler_complete(job->req);
     free(job);
