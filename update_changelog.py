@@ -27,6 +27,15 @@ def get_commits_since_tag(tag):
         return ""
 
 def update_changelog(version):
+    with open('CHANGELOG.md', 'r') as f:
+        content = f.read()
+
+    # Idempotent: never duplicate an existing version section. This lets a
+    # release workflow re-run safely when the changelog was curated by hand.
+    if re.search(rf"## \[{re.escape(version)}\]", content):
+        print(f"Section ## [{version}] already present in CHANGELOG.md — leaving it unchanged.")
+        return
+
     last_tag = get_last_tag()
     commits = get_commits_since_tag(last_tag)
 
@@ -35,9 +44,6 @@ def update_changelog(version):
 
     date_str = datetime.now().strftime('%Y-%m-%d')
     new_entry = f"## [{version}] - {date_str}\n\n### Changes\n{commits}\n\n"
-
-    with open('CHANGELOG.md', 'r') as f:
-        content = f.read()
 
     unreleased_pattern = r"## \[Unreleased\]"
     if re.search(unreleased_pattern, content):
