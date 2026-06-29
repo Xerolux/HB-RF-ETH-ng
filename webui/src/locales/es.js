@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Configuración del sistema',
     ledBrightness: 'Brillo del LED',
-    updateLedBlink: 'Parpadear LED en actualizaciones',
+    ledPrograms: 'Programas LED',
+    ledProgramsHelp: 'Personaliza el comportamiento de los LED para los distintos estados del sistema.',
     checkUpdates: 'Buscar actualizaciones',
     allowPrerelease: 'Permitir actualizaciones tempranas (Beta/Alpha)',
     language: 'Idioma',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Versión instalada',
     versionInfo: 'Fork modernizado v2.2.0-Beta.7 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: 'Hay una actualización disponible para la versión {latestVersion}.',
+    upToDate: 'El firmware está actualizado',
+    checkNow: 'Comprobar ahora',
+    checking: 'Comprobando...',
+    checkSuccess: 'Comprobación de actualización correcta',
+    checkFailed: 'Error al comprobar actualización',
+    lastCheck: 'Última comprobación',
     newVersionAvailable: '¡Nueva versión {version} disponible!',
     viewUpdate: 'Ver',
     onlineUpdate: 'Actualizar en línea',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Descubrimiento de Home Assistant',
       haDiscoveryPrefix: 'Prefijo de descubrimiento',
       haDiscoveryPrefixHelp: 'Predeterminado: homeassistant',
+      commands: {
+        title: 'Topics de comando',
+        enableHelp: 'Permite el control remoto (reinicio, restablecimiento de fábrica, OTA) a través de MQTT. Sin token ni ACL del broker, cualquier cliente de la red puede controlar el dispositivo.',
+        token: 'Token de comando',
+        tokenPlaceholder: 'opcional – secreto compartido',
+        tokenHelp: 'Si se define, la carga útil del comando debe coincidir exactamente con este token. Permitido: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Presente – introduzca un nuevo valor para reemplazar',
+        clear: 'Borrar',
+        aclHint: 'Nota: sin ACL del broker + token, cualquier cliente MQTT puede reiniciar el dispositivo o iniciar una OTA. Configure en el broker una ACL que conceda permisos de publicación en el topic de comando solo a este dispositivo.',
+      },
       serverRequired: 'Por favor, introduzca una dirección de servidor MQTT cuando MQTT esté habilitado.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Aún no hay entradas de registro.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Privacidad',
+    updateCheck: 'Las actualizaciones automáticas y las comprobaciones de firmware se conectan al servidor xerolux.de. Se transmite su dirección IP para comprobar la disponibilidad de nuevas versiones.',
+  },
+
   // Changelog
   changelog: {
     title: 'Registro de cambios',
@@ -459,7 +482,6 @@ export default {
     error: 'Error al cargar el registro de cambios',
     fetchError: 'No se pudo obtener el registro de cambios. Por favor verifique su conexión a internet.',
     retry: 'Reintentar',
-    checkFailed: 'Error al comprobar actualización',
     close: 'Cerrar',
     viewOnGithub: 'Ver en GitHub'
   }

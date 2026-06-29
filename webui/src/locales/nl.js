@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Systeeminstellingen',
     ledBrightness: 'LED Helderheid',
-    updateLedBlink: 'LED knipperen bij updates',
+    ledPrograms: 'LED-programma\'s',
+    ledProgramsHelp: 'Pas het LED-gedrag aan voor verschillende systeemstatussen.',
     checkUpdates: 'Controleren op updates',
     allowPrerelease: 'Vroege updates toestaan (Beta/Alpha)',
     language: 'Taal',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Geïnstalleerde versie',
     versionInfo: 'Gemoderniseerde fork v2.2.0-Beta.7 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Een update naar versie {latestVersion} is beschikbaar.',
+    upToDate: 'Firmware is up-to-date',
+    checkNow: 'Nu controleren',
+    checking: 'Controleren...',
+    checkSuccess: 'Update-controle geslaagd',
+    checkFailed: 'Update-controle mislukt',
+    lastCheck: 'Laatst gecontroleerd',
     newVersionAvailable: 'Nieuwe versie {version} is beschikbaar!',
     viewUpdate: 'Bekijken',
     onlineUpdate: 'Online Updaten',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Standaard: homeassistant',
+      commands: {
+        title: 'Commando-topics',
+        enableHelp: 'Maakt afstandsbediening (herstart, fabrieksreset, OTA) via MQTT mogelijk. Zonder token of broker-ACL kan elke client in het netwerk het apparaat besturen.',
+        token: 'Commando-token',
+        tokenPlaceholder: 'optioneel – gedeeld geheim',
+        tokenHelp: 'Indien ingesteld moet de payload van een commando exact overeenkomen met dit token. Toegestaan: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Aanwezig – voer een nieuwe waarde in om te vervangen',
+        clear: 'Wissen',
+        aclHint: 'Let op: zonder broker-ACL + token kan elke MQTT-client het apparaat herstarten of een OTA starten. Configureer op de broker een ACL die publicatierechten op het commando-topic alleen aan dit apparaat verleent.',
+      },
       serverRequired: 'Voer een MQTT-serveradres in wanneer MQTT is ingeschakeld.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Nog geen logboekvermeldingen.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Privacy',
+    updateCheck: 'Automatische updates en firmwarecontroles maken verbinding met de server xerolux.de. Daarbij wordt uw IP-adres verzonden om te controleren op nieuwe versies.',
+  },
+
   // Changelog
   changelog: {
     title: 'Wijzigingslogboek',
@@ -459,7 +482,6 @@ export default {
     error: 'Kon wijzigingslogboek niet laden',
     fetchError: 'Kon wijzigingslogboek niet ophalen. Controleer uw internetverbinding.',
     retry: 'Opnieuw proberen',
-    checkFailed: 'Update-controle mislukt',
     close: 'Sluiten',
     viewOnGithub: 'Bekijken op GitHub'
   }

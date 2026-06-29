@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Nastavení systému',
     ledBrightness: 'Jas LED',
-    updateLedBlink: 'Blikat LED při aktualizacích',
+    ledPrograms: 'Programy LED',
+    ledProgramsHelp: 'Přizpůsobte chování LED pro různé stavy systému.',
     checkUpdates: 'Zkontrolovat aktualizace',
     allowPrerelease: 'Povolit dřívější aktualizace (Beta/Alpha)',
     language: 'Jazyk',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Nainstalovaná verze',
     versionInfo: 'Modernizovaný fork v2.2.0-Beta.7 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Je k dispozici aktualizace na verzi {latestVersion}.',
+    upToDate: 'Firmware je aktuální',
+    checkNow: 'Zkontrolovat nyní',
+    checking: 'Kontrola...',
+    checkSuccess: 'Kontrola aktualizace úspěšná',
+    checkFailed: 'Kontrola aktualizace selhala',
+    lastCheck: 'Naposledy zkontrolováno',
     newVersionAvailable: 'Nová verze {version} je k dispozici!',
     viewUpdate: 'Zobrazit',
     onlineUpdate: 'Aktualizovat online',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Výchozí: homeassistant',
+      commands: {
+        title: 'Příkazová témata',
+        enableHelp: 'Umožňuje vzdálené ovládání (restart, tovární nastavení, OTA) přes MQTT. Bez tokenu nebo ACL brokeru může zařízení ovládat jakýkoli klient v síti.',
+        token: 'Příkazový token',
+        tokenPlaceholder: 'volitelné – sdílené tajemství',
+        tokenHelp: 'Pokud je nastaven, musí se obsah příkazu přesně shodovat s tímto tokenem. Povoleno: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Přítomen – zadejte novou hodnotu pro nahrazení',
+        clear: 'Vymazat',
+        aclHint: 'Poznámka: bez ACL brokeru + tokenu může jakýkoli MQTT klient restartovat zařízení nebo spustit OTA. Nastavte prosím na brokeru ACL, která uděluje práva publikování do příkazového tématu pouze tomuto zařízení.',
+      },
       serverRequired: 'Please enter an MQTT server address when MQTT is enabled.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Zatím žádné záznamy v protokolu.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Soukromí',
+    updateCheck: 'Automatické aktualizace a kontroly firmwaru se připojují k serveru xerolux.de. Vaše IP adresa je přenášena za účelem kontroly dostupnosti nových verzí.',
+  },
+
   // Changelog
   changelog: {
     title: 'Seznam změn',
@@ -459,7 +482,6 @@ export default {
     error: 'Nepodařilo se načíst seznam změn',
     fetchError: 'Nepodařilo se načíst seznam změn. Zkontrolujte prosím své připojení k internetu.',
     retry: 'Zkusit znovu',
-    checkFailed: 'Kontrola aktualizace selhala',
     close: 'Zavřít',
     viewOnGithub: 'Zobrazit na GitHubu'
   }

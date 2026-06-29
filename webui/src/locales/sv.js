@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Systeminställningar',
     ledBrightness: 'LED Ljusstyrka',
-    updateLedBlink: 'Blinka LED vid uppdateringar',
+    ledPrograms: 'LED-program',
+    ledProgramsHelp: 'Anpassa LED-beteendet för olika systemtillstånd.',
     checkUpdates: 'Sök efter uppdateringar',
     allowPrerelease: 'Tillåt tidiga uppdateringar (Beta/Alpha)',
     language: 'Språk',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Installerad version',
     versionInfo: 'Moderniserad fork v2.2.0-Beta.7 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
     updateAvailable: 'En uppdatering till version {latestVersion} finns tillgänglig.',
+    upToDate: 'Den fasta programvaran är uppdaterad',
+    checkNow: 'Kontrollera nu',
+    checking: 'Kontrollerar...',
+    checkSuccess: 'Uppdateringskontroll lyckades',
+    checkFailed: 'Uppdateringskontroll misslyckades',
+    lastCheck: 'Senast kontrollerad',
     newVersionAvailable: 'Ny version {version} finns tillgänglig!',
     viewUpdate: 'Visa',
     onlineUpdate: 'Uppdatera Online',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Standard: homeassistant',
+      commands: {
+        title: 'Kommando-ämnen',
+        enableHelp: 'Tillåter fjärrstyrning (omstart, fabriksåterställning, OTA) via MQTT. Utan token eller broker-ACL kan vilken klient som helst i nätverket styra enheten.',
+        token: 'Kommandotoken',
+        tokenPlaceholder: 'valfritt – delad hemlighet',
+        tokenHelp: 'När den är inställd måste kommandots nyttolast exakt matcha denna token. Tillåtet: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Finns – ange ett nytt värde för att ersätta',
+        clear: 'Rensa',
+        aclHint: 'Obs: utan broker-ACL + token kan vilken MQTT-klient som helst starta om enheten eller utlösa en OTA. Konfigurera en ACL på brokern som endast ger den här enheten publiceringsrättigheter på kommando-ämnet.',
+      },
       serverRequired: 'Ange en MQTT-serveradress när MQTT är aktiverat.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Inga loggposter ännu.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Integritet',
+    updateCheck: 'Automatiska uppdateringar och kontroller av fast programvara ansluter till servern xerolux.de. Din IP-adress överförs för att kontrollera om nya versioner finns tillgängliga.',
+  },
+
   // Changelog
   changelog: {
     title: 'Ändringslogg',
@@ -459,7 +482,6 @@ export default {
     error: 'Misslyckades med att ladda ändringslogg',
     fetchError: 'Kunde inte hämta ändringslogg. Kontrollera din internetanslutning.',
     retry: 'Försök igen',
-    checkFailed: 'Uppdateringskontroll misslyckades',
     close: 'Stäng',
     viewOnGithub: 'Visa på GitHub'
   }

@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Paramètres système',
     ledBrightness: 'Luminosité LED',
-    updateLedBlink: 'LED clignotante lors des mises à jour',
+    ledPrograms: 'Programmes LED',
+    ledProgramsHelp: 'Personnalisez le comportement des LED pour différents états du système.',
     checkUpdates: 'Vérifier les mises à jour',
     allowPrerelease: 'Autoriser les mises à jour anticipées (Beta/Alpha)',
     language: 'Langue',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Version installée',
     versionInfo: 'Fork modernisé v2.2.0-Beta.7 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Une mise à jour vers la version {latestVersion} est disponible.',
+    upToDate: 'Le firmware est à jour',
+    checkNow: 'Vérifier maintenant',
+    checking: 'Vérification...',
+    checkSuccess: 'Vérification de mise à jour réussie',
+    checkFailed: 'Échec de la vérification de mise à jour',
+    lastCheck: 'Dernière vérification',
     newVersionAvailable: 'Nouvelle version {version} disponible !',
     viewUpdate: 'Voir',
     onlineUpdate: 'Mise à jour en ligne',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Découverte Home Assistant',
       haDiscoveryPrefix: 'Préfixe de découverte',
       haDiscoveryPrefixHelp: 'Par défaut : homeassistant',
+      commands: {
+        title: 'Topics de commande',
+        enableHelp: 'Permet le contrôle à distance (redémarrage, réinitialisation, OTA) via MQTT. Sans jeton ni ACL de broker, tout client du réseau peut contrôler l\'appareil.',
+        token: 'Jeton de commande',
+        tokenPlaceholder: 'optionnel – secret partagé',
+        tokenHelp: 'Si défini, la charge utile d\'une commande doit correspondre exactement à ce jeton. Autorisé : A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Présent – saisir une nouvelle valeur pour remplacer',
+        clear: 'Effacer',
+        aclHint: 'Remarque : sans ACL de broker + jeton, tout client MQTT peut redémarrer l\'appareil ou déclencher une OTA. Veuillez configurer sur le broker une ACL qui n\'accorde les droits de publication sur le topic de commande qu\'à cet appareil.',
+      },
       serverRequired: 'Veuillez entrer une adresse de serveur MQTT lorsque MQTT est activé.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Aucune entrée de journal pour le moment.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Confidentialité',
+    updateCheck: 'Les mises à jour automatiques et les vérifications du firmware se connectent au serveur xerolux.de. Votre adresse IP est transmise pour vérifier la disponibilité de nouvelles versions.',
+  },
+
   // Changelog
   changelog: {
     title: 'Journal des modifications',
@@ -459,7 +482,6 @@ export default {
     error: 'Échec du chargement du journal des modifications',
     fetchError: 'Impossible de récupérer le journal des modifications. Veuillez vérifier votre connexion Internet.',
     retry: 'Réessayer',
-    checkFailed: 'Échec de la vérification de mise à jour',
     close: 'Fermer',
     viewOnGithub: 'Voir sur GitHub'
   }

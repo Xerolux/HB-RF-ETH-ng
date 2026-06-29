@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Ustawienia systemu',
     ledBrightness: 'Jasność LED',
-    updateLedBlink: 'Migaj LED podczas aktualizacji',
+    ledPrograms: 'Programy LED',
+    ledProgramsHelp: 'Dostosuj zachowanie diod LED dla różnych stanów systemu.',
     checkUpdates: 'Sprawdź aktualizacje',
     allowPrerelease: 'Zezwalaj na wczesne aktualizacje (Beta/Alpha)',
     language: 'Język',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Zainstalowana wersja',
     versionInfo: 'Zmodernizowany fork v2.2.0-Beta.7 autorstwa Xerolux (2025) - Na podstawie oryginalnej pracy Alexandra Reinerta.',
     updateAvailable: 'Dostępna jest aktualizacja do wersji {latestVersion}.',
+    upToDate: 'Oprogramowanie jest aktualne',
+    checkNow: 'Sprawdź teraz',
+    checking: 'Sprawdzanie...',
+    checkSuccess: 'Sprawdzanie aktualizacji powiodło się',
+    checkFailed: 'Sprawdzanie aktualizacji nie powiodło się',
+    lastCheck: 'Ostatnie sprawdzenie',
     newVersionAvailable: 'Nowa wersja {version} jest dostępna!',
     viewUpdate: 'Zobacz',
     onlineUpdate: 'Aktualizuj Online',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Wykrywanie Home Assistant',
       haDiscoveryPrefix: 'Prefiks Wykrywania',
       haDiscoveryPrefixHelp: 'Domyślnie: homeassistant',
+      commands: {
+        title: 'Tematy poleceń',
+        enableHelp: 'Umożliwia zdalne sterowanie (restart, przywracanie ustawień fabrycznych, OTA) przez MQTT. Bez tokenu lub ACL brokera dowolny klient w sieci może sterować urządzeniem.',
+        token: 'Token polecenia',
+        tokenPlaceholder: 'opcjonalnie – wspólny sekret',
+        tokenHelp: 'Jeśli ustawiony, ładunek polecenia musi dokładnie odpowiadać temu tokenowi. Dozwolone: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Obecny – wprowadź nową wartość, aby zastąpić',
+        clear: 'Wyczyść',
+        aclHint: 'Uwaga: bez ACL brokera + tokenu dowolny klient MQTT może zrestartować urządzenie lub uruchomić OTA. Skonfiguruj na brokerze ACL, która przyznaje prawa publikowania w temacie poleceń tylko temu urządzeniu.',
+      },
       serverRequired: 'Proszę podać adres serwera MQTT gdy MQTT jest włączone.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Brak wpisów w dzienniku.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Prywatność',
+    updateCheck: 'Automatyczne aktualizacje i sprawdzanie oprogramowania łączą się z serwerem xerolux.de. Twój adres IP jest przesyłany w celu sprawdzenia dostępności nowych wersji.',
+  },
+
   // Changelog
   changelog: {
     title: 'Dziennik Zmian',
@@ -459,7 +482,6 @@ export default {
     error: 'Nie udało się załadować dziennika zmian',
     fetchError: 'Nie udało się pobrać dziennika zmian. Sprawdź połączenie z internetem.',
     retry: 'Ponów',
-    checkFailed: 'Sprawdzanie aktualizacji nie powiodło się',
     close: 'Zamknij',
     viewOnGithub: 'Zobacz na GitHub'
   }

@@ -129,7 +129,8 @@ export default {
     // System Settings
     systemSettings: 'Systeminnstillinger',
     ledBrightness: 'LED-lysstyrke',
-    updateLedBlink: 'Blink LED for oppdateringer',
+    ledPrograms: 'LED-programmer',
+    ledProgramsHelp: 'Tilpass LED-oppførselen for ulike systemtilstander.',
     checkUpdates: 'Se etter oppdateringer',
     allowPrerelease: 'Tillat tidlige oppdateringer (Beta/Alpha)',
     language: 'Språk',
@@ -239,6 +240,12 @@ export default {
     installedVersion: 'Installert versjon',
     versionInfo: 'Modernisert fork v2.2.0-Beta.7 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
+    upToDate: 'Fastvaren er oppdatert',
+    checkNow: 'Sjekk nå',
+    checking: 'Sjekker...',
+    checkSuccess: 'Oppdateringssjekk vellykket',
+    checkFailed: 'Oppdateringssjekk mislyktes',
+    lastCheck: 'Sist sjekket',
     newVersionAvailable: 'Ny versjon {version} er tilgjengelig!',
     viewUpdate: 'Vis',
     onlineUpdate: 'Oppdater Online',
@@ -306,6 +313,16 @@ export default {
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery-prefiks',
       haDiscoveryPrefixHelp: 'Standard: homeassistant',
+      commands: {
+        title: 'Kommando-emner',
+        enableHelp: 'Tillater fjernstyring (omstart, fabrikkinnstilling, OTA) via MQTT. Uten token eller megler-ACL kan enhver klient på nettverket styre enheten.',
+        token: 'Kommandotoken',
+        tokenPlaceholder: 'valgfritt – delt hemmelighet',
+        tokenHelp: 'Når satt, må kommandoens nyttelast samsvare nøyaktig med dette tokenet. Tillatt: A-Z a-z 0-9 - _ .',
+        tokenPresent: '✓ Til stede – skriv inn ny verdi for å erstatte',
+        clear: 'Tøm',
+        aclHint: 'Merk: uten megler-ACL + token kan enhver MQTT-klient starte enheten på nytt eller utløse en OTA. Konfigurer en ACL på megleren som kun gir denne enheten publiseringsrettigheter på kommando-emnet.',
+      },
       serverRequired: 'Vennligst oppgi en MQTT-serveradresse når MQTT er aktivert.',
       tls: {
         title: 'TLS / SSL',
@@ -451,6 +468,12 @@ export default {
     empty: 'Ingen loggoppføringer ennå.'
   },
 
+  // Privacy
+  privacy: {
+    title: 'Personvern',
+    updateCheck: 'Automatiske oppdateringer og fastvaresjekker kobler til serveren xerolux.de. IP-adressen din overføres for å sjekke om nye versjoner er tilgjengelige.',
+  },
+
   // Changelog
   changelog: {
     title: 'Endringslogg',
@@ -459,7 +482,6 @@ export default {
     error: 'Kunne ikke laste endringslogg',
     fetchError: 'Kunne ikke hente endringslogg. Vennligst sjekk internettforbindelsen din.',
     retry: 'Prøv igjen',
-    checkFailed: 'Oppdateringssjekk mislyktes',
     close: 'Lukk',
     viewOnGithub: 'Vis på GitHub'
   }
