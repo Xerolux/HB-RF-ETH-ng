@@ -1,13 +1,15 @@
 #include "ota_config.h"
+#include "esp_crt_bundle.h"
 
 void configure_ota_http_client(esp_http_client_config_t& config, const char* url) {
     config.url = url;
 
-    // crt_bundle_attach deliberately omitted: the ESP-IDF 6.x PSA Crypto CA
-    // bundle has a known issue (PSA_ERROR_GENERIC_ERROR / 0xffffff73) that
-    // causes TLS handshake failures with newer Let's Encrypt / ISRG Root X2
-    // certificates (the ones used by GitHub). Without the bundle, the TLS
-    // layer still encrypts but does not verify the server certificate chain.
+    // Verify the server certificate chain against the bundled Mozilla root CAs.
+    // The full bundle (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL) is used so
+    // that the ECDSA roots GitHub's CDN can present (e.g. ISRG Root X2) are
+    // covered. Keeping verification on protects the OTA path against
+    // man-in-the-middle delivery of arbitrary firmware.
+    config.crt_bundle_attach = esp_crt_bundle_attach;
 
     // Fix for Bug #235: GitHub redirects fail with keep-alive
     config.keep_alive_enable = false;

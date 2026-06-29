@@ -14,6 +14,12 @@ CONFIG_MQTT_PROTOCOL_311=y
 # HTTP Server
 CONFIG_HTTPD_MAX_URI_HANDLERS=15
 
+# TLS certificate verification: use the full Mozilla root CA bundle so the
+# ECDSA roots GitHub's CDN may present (e.g. ISRG Root X2) are covered. Keeps
+# server-certificate verification enabled on the UpdateCheck / OTA path.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
+
 # FreeRTOS: disable backward-compat (portTICK_PERIOD_MS etc.)
 CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
 
