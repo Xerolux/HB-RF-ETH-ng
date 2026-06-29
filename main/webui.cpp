@@ -1985,13 +1985,36 @@ static void _share_log_task(void *arg)
         body += encoded;
         body += "&syntax=text";
 
+        // Event handler captures the Location response header from the 303
+        // redirect. ESP-IDF's esp_http_client_get_header() reads REQUEST
+        // headers, not response headers — so we MUST use the event callback.
+        struct PasteCtx {
+            char location[256];
+            bool hasLocation;
+        };
+        PasteCtx pctx = {};
+        pctx.hasLocation = false;
+
         esp_http_client_config_t config = {};
         config.url = "https://paste.blueml.eu/";
         config.method = HTTP_METHOD_POST;
         config.crt_bundle_attach = esp_crt_bundle_attach;
         config.keep_alive_enable = false;
-        config.max_redirection_count = 0;
+        config.disable_auto_redirect = true;
         config.timeout_ms = 20000;
+        config.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
+            PasteCtx *ctx = (PasteCtx *)evt->user_data;
+            if (!ctx) return ESP_OK;
+            if (evt->event_id == HTTP_EVENT_ON_HEADER) {
+                if (strcasecmp(evt->header_key, "Location") == 0) {
+                    strncpy(ctx->location, evt->header_value, sizeof(ctx->location) - 1);
+                    ctx->location[sizeof(ctx->location) - 1] = 0;
+                    ctx->hasLocation = true;
+                }
+            }
+            return ESP_OK;
+        };
+        config.user_data = &pctx;
 
         esp_http_client_handle_t client = esp_http_client_init(&config);
         if (!client)
@@ -2002,7 +2025,6 @@ static void _share_log_task(void *arg)
         }
 
         esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
-        esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
         esp_http_client_set_post_field(client, body.c_str(), body.length());
 
         esp_err_t err = esp_http_client_perform(client);
@@ -2010,19 +2032,10 @@ static void _share_log_task(void *arg)
         if (err == ESP_OK)
         {
             int status = esp_http_client_get_status_code(client);
-            if (status == 303 || status == 302 || status == 301)
+            if ((status == 303 || status == 302 || status == 301) && pctx.hasLocation)
             {
-                char *location = NULL;
-                if (esp_http_client_get_header(client, "Location", &location) == ESP_OK && location)
-                {
-                    snprintf(result, sizeof(result),
-                             "{\"success\":true,\"url\":\"%s\"}", location);
-                }
-                else
-                {
-                    snprintf(result, sizeof(result),
-                             "{\"success\":false,\"error\":\"No Location header in redirect\"}");
-                }
+                snprintf(result, sizeof(result),
+                         "{\"success\":true,\"url\":\"%s\"}", pctx.location);
             }
             else
             {

@@ -39,7 +39,7 @@
             {{ paused ? t('systemlog.resume') : t('systemlog.pause') }}
           </button>
           <button class="tool-btn" type="button" :disabled="!logEnabled" @click="toggleAutoScroll">
-            <AppIcon name="download" />
+            <AppIcon name="chevronDown" />
             {{ autoScroll ? t('systemlog.autoScroll') : t('systemlog.manualScroll') }}
           </button>
           <button class="tool-btn" type="button" :disabled="!filteredEntries.length" @click="copyVisibleLog">
@@ -57,10 +57,6 @@
           <button class="btn btn-primary btn-sm" type="button" :disabled="!filteredEntries.length" @click="shareLog">
             <AppIcon name="share" />
             {{ t('systemlog.share') }}
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" @click="downloadLog">
-            <AppIcon name="download" />
-            {{ t('systemlog.download') }}
           </button>
         </div>
       </div>
