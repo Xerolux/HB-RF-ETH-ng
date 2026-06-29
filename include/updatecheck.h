@@ -150,7 +150,10 @@ public:
 
 // Build the GitHub Releases API URL for the given channel.
 //   beta=false -> ".../releases/latest"
-//   beta=true  -> ".../releases"
+//   beta=true  -> ".../releases?per_page=3"
+// per_page=3: enough to cover API ordering quirks (releases are not always
+// returned in strict chronological order). 3 bodies with metadata fit
+// comfortably within the 32 KB response cap.
 void buildReleasesApiUrl(bool beta, char* out, size_t outLen);
 
 // Normalize a Git tag (strip leading 'v'/'V', copy into out).

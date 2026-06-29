@@ -41,11 +41,10 @@ static const char *TAG = "UpdateCheck";
 // release notes and firmware binary.
 static const char *GITHUB_REPO = "Xerolux/HB-RF-ETH-ng";
 
-// Cap for the heap buffer used to receive the GitHub releases JSON. A single
-// release payload (per_page=1 for beta, /releases/latest for stable) is 3–8 KB
-// normally, but a release with a long CHANGELOG body can exceed 12 KB. 24 KB
-// handles even the largest single-release payloads comfortably.
-static const size_t GH_RESPONSE_CAP = 24 * 1024;
+// Cap for the heap buffer used to receive the GitHub releases JSON.
+// Per_page=3 returns up to 3 releases at ~6-8 KB each plus overhead.
+// 32 KB handles 3 releases comfortably and leaves margin for long bodies.
+static const size_t GH_RESPONSE_CAP = 32 * 1024;
 
 // esp_https_ota in IDF 6.x no longer exposes ESP_ERR_HTTPS_OTA_INCOMPLETE; use
 // a private application code to report a download that ended prematurely.
@@ -63,12 +62,12 @@ void buildReleasesApiUrl(bool beta, char* out, size_t outLen)
     // "/releases/latest" excludes prereleases; "/releases" lists every
     // non-draft release including prereleases, newest first.
     if (beta) {
-        // per_page=1: the beta channel only needs the single newest release
-        // (incl. prereleases). The full /releases list ships 15+ entries with
-        // their complete bodies and easily exceeds GH_RESPONSE_CAP (24 KB),
-        // which truncates the JSON and breaks cJSON_Parse.
+        // per_page=3: GitHub's /releases endpoint does not always return
+        // releases in strict chronological order (GitHub API quirk). By
+        // fetching 3 releases we can iterate and pick the highest version
+        // via semver comparison even when the API order is unreliable.
         snprintf(out, outLen,
-                 "https://api.github.com/repos/%s/releases?per_page=1",
+                 "https://api.github.com/repos/%s/releases?per_page=3",
                  GITHUB_REPO);
     } else {
         snprintf(out, outLen,
@@ -436,16 +435,26 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
         if (root) {
             if (cJSON_IsArray(root)) {
                 int count = cJSON_GetArraySize(root);
+                // Iterate all releases and pick the one with the highest
+                // version.  The API may not return them in chronological
+                // order (GitHub quirk), so the first item is not guaranteed
+                // to be the newest.
+                ReleaseInfo best = {};
                 for (int i = 0; i < count; i++) {
                     cJSON *item = cJSON_GetArrayItem(root, i);
                     cJSON *draft = cJSON_GetObjectItem(item, "draft");
                     if (draft && cJSON_IsTrue(draft)) continue;
-                    if (_parseReleaseObject(item, out)) {
-                        parsedOk = true;
-                        break;
+                    ReleaseInfo cur = {};
+                    if (_parseReleaseObject(item, &cur)) {
+                        if (!best.valid || compareVersions(cur.version, best.version) > 0) {
+                            best = cur;
+                        }
                     }
                 }
-                if (!parsedOk) {
+                if (best.valid) {
+                    *out = best;
+                    parsedOk = true;
+                } else {
                     snprintf(out->error, sizeof(out->error),
                              "no usable release in list");
                 }

@@ -33,8 +33,8 @@ void test_ota_config_defaults(void) {
 }
 
 // GitHub Releases API URL: stable channel hits /releases/latest, beta
-// channel hits the array endpoint /releases?per_page=1 (newest release,
-// includes prereleases; per_page=1 keeps the payload under the response cap).
+// channel hits /releases?per_page=3 — fetches enough releases to handle
+// API ordering quirks while staying within the 32 KB response cap.
 void test_build_releases_api_url_stable(void) {
     char buf[128];
     buildReleasesApiUrl(false, buf, sizeof(buf));
@@ -47,7 +47,7 @@ void test_build_releases_api_url_beta(void) {
     char buf[128];
     buildReleasesApiUrl(true, buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING(
-        "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=1",
+        "https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=3",
         buf);
 }
 
