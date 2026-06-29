@@ -152,9 +152,12 @@ let pollTimer = null
 const MAX_LOG_LINES = 2500
 const MAX_COPY_LINES = 500
 
-const copyToClipboard = (text) => {
-  if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(text)
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    return
+  } catch {
+    // fall through to fallback
   }
   const textarea = document.createElement('textarea')
   textarea.value = text
@@ -165,7 +168,7 @@ const copyToClipboard = (text) => {
   const ok = document.execCommand('copy')
   document.body.removeChild(textarea)
   if (!ok) {
-    return Promise.reject(new Error('execCommand copy failed'))
+    throw new Error('execCommand copy failed')
   }
 }
 

@@ -270,20 +270,24 @@ const copyValue = async (value, label) => {
   if (!value) return
   try {
     await navigator.clipboard.writeText(value)
-    uiStore.pushToast({
-      type: 'success',
-      title: t('common.success'),
-      message: t('sysinfo.copied', { label }),
-      duration: 2200
-    })
-  } catch (error) {
-    uiStore.pushToast({
-      type: 'error',
-      title: t('common.error'),
-      message: `Could not copy ${label}`,
-      duration: 2800
-    })
+  } catch {
+    // execCommand fallback for non-HTTPS contexts
+    const textarea = document.createElement('textarea')
+    textarea.value = value
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    if (!ok) throw new Error('copy failed')
   }
+  uiStore.pushToast({
+    type: 'success',
+    title: t('common.success'),
+    message: t('sysinfo.copied', { label }),
+    duration: 2200
+  })
 }
 
 let updateTimer = null
