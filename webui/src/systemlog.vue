@@ -153,23 +153,29 @@ const MAX_LOG_LINES = 2500
 const MAX_COPY_LINES = 500
 
 const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
-    return
-  } catch {
-    // fall through to fallback
-  }
+  // execCommand runs synchronously within the click handler, so it still has
+  // the user-gesture activation. Awaiting the async Clipboard API first can
+  // consume that activation before falling back, breaking copy on HTTP pages.
   const textarea = document.createElement('textarea')
   textarea.value = text
   textarea.style.position = 'fixed'
   textarea.style.opacity = '0'
   document.body.appendChild(textarea)
   textarea.select()
-  const ok = document.execCommand('copy')
-  document.body.removeChild(textarea)
-  if (!ok) {
-    throw new Error('execCommand copy failed')
+  let ok = false
+  try {
+    ok = document.execCommand('copy')
+  } catch {
+    ok = false
   }
+  document.body.removeChild(textarea)
+  if (ok) return
+
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  throw new Error('execCommand copy failed')
 }
 
 const getEntryLevel = (line) => {

@@ -268,19 +268,28 @@ const safePercent = (value) => Math.max(0, Math.min(100, Number(value || 0).toFi
 
 const copyValue = async (value, label) => {
   if (!value) return
+  // execCommand runs synchronously within the click handler, so it still has
+  // the user-gesture activation. Awaiting the async Clipboard API first can
+  // consume that activation before falling back, breaking copy on HTTP pages.
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  let ok = false
   try {
-    await navigator.clipboard.writeText(value)
+    ok = document.execCommand('copy')
   } catch {
-    // execCommand fallback for non-HTTPS contexts
-    const textarea = document.createElement('textarea')
-    textarea.value = value
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(textarea)
-    if (!ok) throw new Error('copy failed')
+    ok = false
+  }
+  document.body.removeChild(textarea)
+  if (!ok) {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value)
+    } else {
+      throw new Error('copy failed')
+    }
   }
   uiStore.pushToast({
     type: 'success',
