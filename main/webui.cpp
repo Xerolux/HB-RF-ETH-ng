@@ -1744,32 +1744,6 @@ httpd_uri_t get_log_download_handler = {
 
 // ---- Share log to paste.blueml.eu ----
 
-static void _url_encode(const char *src, size_t src_len, std::string &out)
-{
-    out.clear();
-    out.reserve(src_len * 3);
-    for (size_t i = 0; i < src_len; i++)
-    {
-        char c = src[i];
-        if (('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') ||
-            ('0' <= c && c <= '9') ||
-            c == '-' || c == '_' || c == '.' || c == '~')
-        {
-            out += c;
-        }
-        else if (c == ' ')
-        {
-            out += '+';
-        }
-        else
-        {
-            char hex[4];
-            snprintf(hex, sizeof(hex), "%%%02X", (unsigned char)c);
-            out += hex;
-        }
-    }
-}
-
 struct ShareLogJob
 {
     httpd_req_t *req;
@@ -1976,16 +1950,28 @@ static void _share_log_task(void *arg)
     }
 
     {
-        std::string encoded;
-        _url_encode(report.c_str(), report.length(), encoded);
+        // MicroBin (the software behind paste.blueml.eu) only accepts
+        // multipart/form-data uploads on /upload — it does not implement
+        // the classic application/x-www-form-urlencoded POST to "/".
+        static const char boundary[] = "----HBRFETHngBoundary7331";
+
+        auto appendField = [&](std::string &body, const char *name, const char *value) {
+            body += "--"; body += boundary; body += "\r\n";
+            body += "Content-Disposition: form-data; name=\""; body += name; body += "\"\r\n\r\n";
+            body += value;
+            body += "\r\n";
+        };
 
         std::string body;
-        body.reserve(encoded.length() + 32);
-        body = "content=";
-        body += encoded;
-        body += "&syntax=text";
+        body.reserve(report.length() + 512);
+        appendField(body, "content", report.c_str());
+        appendField(body, "expiration", "24hour");
+        appendField(body, "burn_after", "0");
+        appendField(body, "syntax_highlight", "none");
+        appendField(body, "privacy", "unlisted");
+        body += "--"; body += boundary; body += "--\r\n";
 
-        // Event handler captures the Location response header from the 303
+        // Event handler captures the Location response header from the 302
         // redirect. ESP-IDF's esp_http_client_get_header() reads REQUEST
         // headers, not response headers — so we MUST use the event callback.
         struct PasteCtx {
@@ -1996,7 +1982,7 @@ static void _share_log_task(void *arg)
         pctx.hasLocation = false;
 
         esp_http_client_config_t config = {};
-        config.url = "https://paste.blueml.eu/";
+        config.url = "https://paste.blueml.eu/upload";
         config.method = HTTP_METHOD_POST;
         config.crt_bundle_attach = esp_crt_bundle_attach;
         config.keep_alive_enable = false;
@@ -2024,7 +2010,10 @@ static void _share_log_task(void *arg)
             goto respond;
         }
 
+        std::string contentType = "multipart/form-data; boundary=";
+        contentType += boundary;
         esp_http_client_set_header(client, "User-Agent", "HB-RF-ETH-ng");
+        esp_http_client_set_header(client, "Content-Type", contentType.c_str());
         esp_http_client_set_post_field(client, body.c_str(), body.length());
 
         esp_err_t err = esp_http_client_perform(client);
