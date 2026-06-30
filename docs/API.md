@@ -8,6 +8,17 @@ The HB-RF-ETH firmware provides a RESTful HTTP API for configuration and monitor
 
 **Authentication:** Token-based authentication using `Authorization: Token <token>` header
 
+**Current Version:** v2.0 (Firmware 2.2.0-Beta.10 or later)
+
+### Recent API Additions
+
+| Feature | Version | Endpoint |
+|---------|---------|----------|
+| System Log Sharing | 2.2.0-Beta.8 | `POST /api/log/share` |
+| Token Persistence | 2.2.0-Beta.7 | All endpoints (token survives reboots) |
+| OTA Success Feedback | 2.2.0-Beta.9 | GET/POST `/api/check_update`, `POST /api/ota_url` |
+| Enhanced TLS Support | 2.2.0-Beta.10 | All HTTPS endpoints (Mozilla CA bundle) |
+
 ## Authentication
 
 ### POST /login.json
@@ -636,6 +647,79 @@ device cannot reach GitHub (e.g. air-gapped network) or for custom builds.
 curl -X POST http://192.168.1.100/ota_update \
   -H "Authorization: Token YOUR_TOKEN_HERE" \
   -F "file=@firmware_2_1_0.bin"
+```
+
+---
+
+## System Log Management
+
+### GET /log.json
+
+Retrieve the system log buffer.
+
+**Authentication:** Required
+
+**Response (200 OK):**
+```json
+{
+  "log": "boot: Formatted one FS partition\nI (23) esp_image: segment 0: paddr=0x001000 vaddr=0x40080000 size=0x02f4ac ( 194732) map\n..."
+}
+```
+
+**Example:**
+```bash
+curl -X GET http://192.168.1.100/log.json \
+  -H "Authorization: Token YOUR_TOKEN_HERE"
+```
+
+---
+
+### POST /api/log/share
+
+Share the system log as a comprehensive debug report via an external paste service (MicroBin).
+
+The payload includes:
+- System information (version, board revision, serial number)
+- Network configuration (IP, DNS, Ethernet status)
+- Radio module status (type, serial, firmware)
+- Monitoring configuration (MQTT/CheckMK settings)
+- LED programs and patterns
+- Complete system log
+
+**Authentication:** Required
+
+**Request:**
+```json
+{}
+```
+
+**Response (200 OK):**
+```json
+{
+  "url": "https://microbin.example.com/pastes/abc123def456",
+  "success": true
+}
+```
+
+**Response (Error):**
+```json
+{
+  "success": false,
+  "error": "Failed to upload log"
+}
+```
+
+**Security:** Sensitive data is automatically redacted:
+- Passwords → `****`
+- MQTT command tokens → `****`
+- TLS keys/certificates → `<set>`
+
+**Example:**
+```bash
+curl -X POST http://192.168.1.100/api/log/share \
+  -H "Authorization: Token YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{}'
 ```
 
 ---
