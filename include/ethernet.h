@@ -25,6 +25,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <atomic>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_netif.h"
@@ -49,9 +50,9 @@ private:
   esp_event_handler_instance_t _ip_event_instance;
 
   Settings *_settings;
-  bool _isConnected;
-  eth_speed_t _linkSpeed;
-  eth_duplex_t _duplexMode;
+  std::atomic<bool> _isConnected;
+  std::atomic<eth_speed_t> _linkSpeed;
+  std::atomic<eth_duplex_t> _duplexMode;
 
   // DNS Cache
   static const int DNS_CACHE_SIZE = 8;
@@ -72,7 +73,7 @@ public:
 
   void getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2);
 
-  bool isConnected() { return _isConnected; }
+  bool isConnected() { return _isConnected.load(); }
   int getLinkSpeedMbps();
   const char* getDuplexMode();
 

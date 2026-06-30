@@ -234,7 +234,7 @@ void Ethernet::stop()
 
 void Ethernet::getNetworkSettings(ip4_addr_t *ip, ip4_addr_t *netmask, ip4_addr_t *gateway, ip4_addr_t *dns1, ip4_addr_t *dns2)
 {
-    if (_isConnected)
+    if (_isConnected.load())
     {
         esp_netif_ip_info_t ipInfo;
         esp_netif_get_ip_info(_eth_netif, &ipInfo);
@@ -266,15 +266,21 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
     switch (event_id)
     {
     case ETHERNET_EVENT_CONNECTED:
+        {
+        eth_speed_t linkSpeed = ETH_SPEED_10M;
+        eth_duplex_t duplexMode = ETH_DUPLEX_HALF;
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_SPEED, &_linkSpeed));
-        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_DUPLEX_MODE, &_duplexMode));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_SPEED, &linkSpeed));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_ioctl(eth_handle, ETH_CMD_G_DUPLEX_MODE, &duplexMode));
+        _linkSpeed.store(linkSpeed);
+        _duplexMode.store(duplexMode);
         ESP_LOGI(TAG, "Link Up");
         ESP_LOGI(TAG, "HW Addr %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-        ESP_LOGI(TAG, "Speed %dMbps, %s duplex", _linkSpeed == ETH_SPEED_100M ? 100 : 10, _duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
+        ESP_LOGI(TAG, "Speed %dMbps, %s duplex", linkSpeed == ETH_SPEED_100M ? 100 : 10, duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
+        }
         break;
     case ETHERNET_EVENT_DISCONNECTED:
-        _isConnected = false;
+        _isConnected.store(false);
         ESP_LOGI(TAG, "Link Down");
         break;
     case ETHERNET_EVENT_START:
@@ -282,7 +288,7 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
         ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_set_hostname(_eth_netif, _settings->getHostname()));
         break;
     case ETHERNET_EVENT_STOP:
-        _isConnected = false;
+        _isConnected.store(false);
         ESP_LOGI(TAG, "Stopped");
         break;
     default:
@@ -295,16 +301,16 @@ void Ethernet::_handleIPEvent(esp_event_base_t event_base, int32_t event_id, voi
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
     const esp_netif_ip_info_t *ip_info = &event->ip_info;
 
-    _isConnected = true;
+    _isConnected.store(true);
     ESP_LOGI(TAG, "IPv4: " IPSTR, IP2STR(&ip_info->ip));
 }
 
 int Ethernet::getLinkSpeedMbps()
 {
-    return _linkSpeed == ETH_SPEED_100M ? 100 : 10;
+    return _linkSpeed.load() == ETH_SPEED_100M ? 100 : 10;
 }
 
 const char* Ethernet::getDuplexMode()
 {
-    return _duplexMode == ETH_DUPLEX_FULL ? "Full" : "Half";
+    return _duplexMode.load() == ETH_DUPLEX_FULL ? "Full" : "Half";
 }

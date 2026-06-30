@@ -36,12 +36,14 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "reset_info.h"
 #include "pins.h"
+#include <atomic>
 
 #define DEFAULT_VREF 1100
 
 static const char *TAG = "SysInfo";
 
-static double _cpuUsage;
+// Store hundredths of a percent so reads are atomic on the 32-bit ESP32.
+static std::atomic<uint32_t> _cpuUsageHundredths{0};
 static char _serial[13];
 static const char *_currentVersion;
 static board_type_t _board;
@@ -85,7 +87,7 @@ void updateCPUUsageTask(void *arg)
             double usage = 100.0 - ((idleRunTime - lastIdleRunTime) * 100.0 / (totalDelta * 2));
             if (usage < 0.0) usage = 0.0;
             if (usage > 100.0) usage = 100.0;
-            _cpuUsage = usage;
+            _cpuUsageHundredths.store((uint32_t)(usage * 100.0 + 0.5));
         }
 
         lastIdleRunTime = idleRunTime;
@@ -229,7 +231,7 @@ SysInfo::SysInfo()
 
 double SysInfo::getCpuUsage()
 {
-    return _cpuUsage;
+    return _cpuUsageHundredths.load() / 100.0;
 }
 
 double SysInfo::getMemoryUsage()
