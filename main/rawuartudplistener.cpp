@@ -37,15 +37,11 @@ void _raw_uart_udpQueueHandlerTask(void *parameter)
 
 void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
-    while (pb != NULL)
+    // A pbuf chain is one UDP datagram, not multiple packets. Transfer the
+    // complete chain to the worker; splitting it corrupts larger CCU frames.
+    if (pb != NULL && !((RawUartUdpListener *)arg)->_udpReceivePacket(pb, addr, port))
     {
-        pbuf *this_pb = pb;
-        pb = pb->next;
-        this_pb->next = NULL;
-        if (!((RawUartUdpListener *)arg)->_udpReceivePacket(this_pb, addr, port))
-        {
-            pbuf_free(this_pb);
-        }
+        pbuf_free(pb);
     }
 }
 
@@ -60,13 +56,17 @@ RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnecto
 
 void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 {
-    size_t length = pb->len;
-    unsigned char *data = (unsigned char *)(pb->payload);
+    size_t length = pb->tot_len;
+    unsigned char data[1500];
     unsigned char response_buffer[3];
 
-    if (length < 4)
+    if (length < 4 || length > sizeof(data))
     {
         ESP_LOGE(TAG, "Received invalid raw-uart packet, length %d", length);
+        return;
+    }
+    if (pbuf_copy_partial(pb, data, length, 0) != length) {
+        ESP_LOGE(TAG, "Could not linearize raw-uart packet, length %d", length);
         return;
     }
 
@@ -279,18 +279,35 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
+    if (_tHandle || _pcb || _udp_queue) return;
+
     _udp_queue = xQueueCreate(64, sizeof(udp_event_t *));
     if (_udp_queue == NULL)
     {
         ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");
         return;
     }
-    xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler", 4096, this, 15, &_tHandle);
+    _pcb = _udp_new();
+    if (!_pcb || _udp_bind(_pcb, IP4_ADDR_ANY, 3008) != ERR_OK) {
+        ESP_LOGE(TAG, "Failed to create/bind UDP listener on port 3008");
+        _udp_remove(_pcb);
+        _pcb = NULL;
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+        return;
+    }
+    _udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
-    _pcb = udp_new();
-    udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
-
-    _udp_bind(_pcb, IP4_ADDR_ANY, 3008);
+    if (xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler",
+                    4096, this, 15, &_tHandle) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create UDP listener task");
+        _udp_recv(_pcb, NULL, NULL);
+        _udp_remove(_pcb);
+        _pcb = NULL;
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+        return;
+    }
 
     _radioModuleConnector->setFrameHandler(this, false);
 
@@ -299,13 +316,26 @@ void RawUartUdpListener::start()
 
 void RawUartUdpListener::stop()
 {
-    _udp_disconnect(_pcb);
-    udp_recv(_pcb, NULL, NULL);
-    _udp_remove(_pcb);
-    _pcb = NULL;
-
     _radioModuleConnector->setFrameHandler(NULL, false);
-    vTaskDelete(_tHandle);
+    if (_pcb) {
+        _udp_recv(_pcb, NULL, NULL);
+        _udp_disconnect(_pcb);
+        _udp_remove(_pcb);
+        _pcb = NULL;
+    }
+    if (_tHandle) {
+        vTaskDelete(_tHandle);
+        _tHandle = NULL;
+    }
+    if (_udp_queue) {
+        udp_event_t *event = NULL;
+        while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
+            pbuf_free(event->pb);
+            free(event);
+        }
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+    }
 }
 
 void RawUartUdpListener::_udpQueueHandler()

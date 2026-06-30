@@ -35,8 +35,41 @@ typedef struct
   const ip_addr_t *addr;
   uint16_t port;
   struct pbuf *pb;
+  udp_recv_fn recv;
+  void *recv_arg;
   err_t err;
 } udp_api_call_t;
+
+static err_t _udp_new_api(struct tcpip_api_call_data *api_call_msg)
+{
+  udp_api_call_t *msg = (udp_api_call_t *)api_call_msg;
+  msg->pcb = udp_new();
+  return msg->pcb ? ERR_OK : ERR_MEM;
+}
+
+static udp_pcb *_udp_new(void)
+{
+  udp_api_call_t msg = {};
+  tcpip_api_call(_udp_new_api, (struct tcpip_api_call_data *)&msg);
+  return msg.pcb;
+}
+
+static err_t _udp_recv_api(struct tcpip_api_call_data *api_call_msg)
+{
+  udp_api_call_t *msg = (udp_api_call_t *)api_call_msg;
+  udp_recv(msg->pcb, msg->recv, msg->recv_arg);
+  return ERR_OK;
+}
+
+static void _udp_recv(udp_pcb *pcb, udp_recv_fn recv, void *recv_arg)
+{
+  if (!pcb) return;
+  udp_api_call_t msg = {};
+  msg.pcb = pcb;
+  msg.recv = recv;
+  msg.recv_arg = recv_arg;
+  tcpip_api_call(_udp_recv_api, (struct tcpip_api_call_data *)&msg);
+}
 
 typedef struct
 {
@@ -55,6 +88,7 @@ static err_t _udp_remove_api(struct tcpip_api_call_data *api_call_msg)
 
 static void _udp_remove(struct udp_pcb *pcb)
 {
+  if (!pcb) return;
   udp_api_call_t msg;
   msg.pcb = pcb;
   tcpip_api_call(_udp_remove_api, (struct tcpip_api_call_data *)&msg);
@@ -69,6 +103,7 @@ static err_t _udp_bind_api(struct tcpip_api_call_data *api_call_msg)
 
 static err_t _udp_bind(struct udp_pcb *pcb, const ip_addr_t *addr, u16_t port)
 {
+  if (!pcb) return ERR_ARG;
   udp_api_call_t msg;
   msg.pcb = pcb;
   msg.addr = addr;
@@ -87,6 +122,7 @@ static err_t _udp_disconnect_api(struct tcpip_api_call_data *api_call_msg)
 
 static void _udp_disconnect(struct udp_pcb *pcb)
 {
+  if (!pcb) return;
   udp_api_call_t msg;
   msg.pcb = pcb;
   tcpip_api_call(_udp_disconnect_api, (struct tcpip_api_call_data *)&msg);
@@ -101,6 +137,7 @@ static err_t _udp_sendto_api(struct tcpip_api_call_data *api_call_msg)
 
 static err_t _udp_sendto(struct udp_pcb *pcb, struct pbuf *pb, const ip_addr_t *addr, u16_t port)
 {
+  if (!pcb || !pb || !addr) return ERR_ARG;
   udp_api_call_t msg;
   msg.pcb = pcb;
   msg.addr = addr;

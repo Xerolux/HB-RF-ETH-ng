@@ -35,15 +35,9 @@ void _ntp_udpQueueHandlerTask(void *parameter)
 
 void _ntp_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
-    while (pb != NULL)
+    if (pb != NULL && !((NtpServer *)arg)->_udpReceivePacket(pb, addr, port))
     {
-        pbuf *this_pb = pb;
-        pb = pb->next;
-        this_pb->next = NULL;
-        if (!((NtpServer *)arg)->_udpReceivePacket(this_pb, addr, port))
-        {
-            pbuf_free(this_pb);
-        }
+        pbuf_free(pb);
     }
 }
 
@@ -71,14 +65,17 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         return;
     }
 
-    if (pb->len != sizeof(ntp_packet_t))
+    if (pb->tot_len != sizeof(ntp_packet_t))
     {
-        ESP_LOGE(TAG, "Ignoring packet with bad length %d (should be %d)", pb->len, sizeof(ntp_packet_t));
+        ESP_LOGE(TAG, "Ignoring packet with bad length %d (should be %d)", pb->tot_len, sizeof(ntp_packet_t));
         return;
     }
 
     ntp_packet_t ntp;
-    memcpy(&ntp, pb->payload, sizeof(ntp));
+    if (pbuf_copy_partial(pb, &ntp, sizeof(ntp), 0) != sizeof(ntp)) {
+        ESP_LOGE(TAG, "Could not linearize NTP request");
+        return;
+    }
 
     pbuf *resp_pb = pbuf_alloc_reference(&ntp, sizeof(ntp_packet_t), PBUF_REF);
     if (!resp_pb) {
@@ -109,23 +106,56 @@ void NtpServer::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
 void NtpServer::start()
 {
+    if (_tHandle || _pcb || _udp_queue) return;
+
     _udp_queue = xQueueCreate(32, sizeof(udp_event_t *));
-    xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler", 4096, this, 10, &_tHandle);
+    if (!_udp_queue) {
+        ESP_LOGE(TAG, "Failed to create NTP queue");
+        return;
+    }
+    _pcb = _udp_new();
+    if (!_pcb || _udp_bind(_pcb, IP4_ADDR_ANY, 123) != ERR_OK) {
+        ESP_LOGE(TAG, "Failed to create/bind NTP server on port 123");
+        _udp_remove(_pcb);
+        _pcb = NULL;
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+        return;
+    }
+    _udp_recv(_pcb, &_ntp_udpReceivePaket, (void *)this);
 
-    _pcb = udp_new();
-    udp_recv(_pcb, &_ntp_udpReceivePaket, (void *)this);
-
-    _udp_bind(_pcb, IP4_ADDR_ANY, 123);
+    if (xTaskCreate(_ntp_udpQueueHandlerTask, "NTPServer_UDP_QueueHandler",
+                    4096, this, 10, &_tHandle) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create NTP server task");
+        _udp_recv(_pcb, NULL, NULL);
+        _udp_remove(_pcb);
+        _pcb = NULL;
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+    }
 }
 
 void NtpServer::stop()
 {
-    _udp_disconnect(_pcb);
-    udp_recv(_pcb, NULL, NULL);
-    _udp_remove(_pcb);
-    _pcb = NULL;
-
-    vTaskDelete(_tHandle);
+    if (_pcb) {
+        _udp_recv(_pcb, NULL, NULL);
+        _udp_disconnect(_pcb);
+        _udp_remove(_pcb);
+        _pcb = NULL;
+    }
+    if (_tHandle) {
+        vTaskDelete(_tHandle);
+        _tHandle = NULL;
+    }
+    if (_udp_queue) {
+        udp_event_t *event = NULL;
+        while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
+            pbuf_free(event->pb);
+            free(event);
+        }
+        vQueueDelete(_udp_queue);
+        _udp_queue = NULL;
+    }
 }
 
 void NtpServer::_udpQueueHandler()
