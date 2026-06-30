@@ -552,7 +552,7 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
                 while (*p == ' ' || *p == '"') p++;
                 const char *end = strchr(p, '"');
                 if (!end) break;
-                char tag[64] = {};
+                char tag[32] = {};
                 size_t tagLen = (size_t)(end - p);
                 if (tagLen >= sizeof(tag)) tagLen = sizeof(tag) - 1;
                 memcpy(tag, p, tagLen);
