@@ -28,6 +28,7 @@
 #include <sys/param.h>
 #include <atomic>
 #include <new>
+#include <stdarg.h>
 #include "webui.h"
 #include "esp_log.h"
 #include "cJSON.h"
@@ -847,9 +848,30 @@ enum ota_status_t {
     OTA_FAILED
 };
 
-static volatile ota_status_t _ota_status = OTA_IDLE;
-static volatile int _ota_progress = 0;  // 0-100
+static std::atomic<ota_status_t> _ota_status{OTA_IDLE};
+static std::atomic<int> _ota_progress{0};  // 0-100
 static char _ota_error[128] = {0};
+static portMUX_TYPE _ota_error_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static void set_ota_error(const char *format, ...)
+{
+    char text[sizeof(_ota_error)];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(text, sizeof(text), format, args);
+    va_end(args);
+
+    portENTER_CRITICAL(&_ota_error_mux);
+    snprintf(_ota_error, sizeof(_ota_error), "%s", text);
+    portEXIT_CRITICAL(&_ota_error_mux);
+}
+
+static void copy_ota_error(char *dest, size_t size)
+{
+    portENTER_CRITICAL(&_ota_error_mux);
+    snprintf(dest, size, "%s", _ota_error);
+    portEXIT_CRITICAL(&_ota_error_mux);
+}
 
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
@@ -868,6 +890,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
     _ota_status = OTA_DOWNLOADING;
+    _ota_progress = 0;
+    set_ota_error("");
 
     esp_ota_handle_t ota_handle = 0;
     bool ota_begun = false;
@@ -948,12 +972,14 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += recv_len;
+            _ota_progress = (int)((int64_t)content_received * 100 / content_length);
             ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
         }
         else
         {
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += recv_len;
+            _ota_progress = (int)((int64_t)content_received * 100 / content_length);
             ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
         }
     } while (content_received < content_length);
@@ -986,6 +1012,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware update completed, restarting in 3 seconds...\"}");
 
     _statusLED->setState(LED_STATE_OFF);
+    _ota_progress = 100;
     _ota_status = OTA_SUCCESS;
 
     // Store reset reason for successful firmware update
@@ -1096,7 +1123,8 @@ static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
     cJSON *root = cJSON_CreateObject();
 
     const char *status_str;
-    switch (_ota_status) {
+    const ota_status_t status = _ota_status.load();
+    switch (status) {
         case OTA_DOWNLOADING: status_str = "downloading"; break;
         case OTA_SUCCESS:     status_str = "success"; break;
         case OTA_FAILED:      status_str = "failed"; break;
@@ -1104,9 +1132,13 @@ static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
     }
 
     cJSON_AddStringToObject(root, "status", status_str);
-    cJSON_AddNumberToObject(root, "progress", _ota_progress);
-    if (_ota_status == OTA_FAILED && _ota_error[0] != '\0') {
-        cJSON_AddStringToObject(root, "error", _ota_error);
+    cJSON_AddNumberToObject(root, "progress", _ota_progress.load());
+    if (status == OTA_FAILED) {
+        char error[sizeof(_ota_error)];
+        copy_ota_error(error, sizeof(error));
+        if (error[0] != '\0') {
+            cJSON_AddStringToObject(root, "error", error);
+        }
     }
 
     char *json_string = cJSON_Print(root);
@@ -1231,13 +1263,13 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 
         _ota_status = OTA_DOWNLOADING;
         _ota_progress = 0;
-        _ota_error[0] = '\0';
+        set_ota_error("");
 
         bool net_locked = false;
         if (g_net_fetch_mutex) {
             if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(30000)) != pdTRUE) {
                 ESP_LOGE(TAG, "OTA URL update could not start: HTTPS subsystem busy");
-                snprintf(_ota_error, sizeof(_ota_error), "HTTPS subsystem busy");
+                set_ota_error("HTTPS subsystem busy");
                 _ota_status = OTA_FAILED;
                 a->statusLED->setState(LED_STATE_ON);
                 free(a->url);
@@ -1265,7 +1297,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "OTA begin failed: %s", esp_err_to_name(ret));
-            snprintf(_ota_error, sizeof(_ota_error), "OTA begin failed: %s", esp_err_to_name(ret));
+            set_ota_error("OTA begin failed: %s", esp_err_to_name(ret));
             _ota_status = OTA_FAILED;
             a->statusLED->setState(LED_STATE_ON);
             if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
@@ -1300,7 +1332,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             esp_https_ota_abort(ota_handle);
             if (ret == ESP_OK) {
                 ret = ESP_ERR_INVALID_SIZE;
-                snprintf(_ota_error, sizeof(_ota_error), "OTA download incomplete");
+                set_ota_error("OTA download incomplete");
             }
         }
 
@@ -1317,9 +1349,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             full_system_restart();
         } else {
             ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
-            if (_ota_error[0] == '\0') {
-                snprintf(_ota_error, sizeof(_ota_error), "OTA failed: %s", esp_err_to_name(ret));
-            }
+            set_ota_error("OTA failed: %s", esp_err_to_name(ret));
             _ota_status = OTA_FAILED;
             ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
             a->statusLED->setState(LED_STATE_ON);
