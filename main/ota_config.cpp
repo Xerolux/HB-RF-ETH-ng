@@ -26,8 +26,11 @@ void configure_ota_http_client(esp_http_client_config_t& config, const char* url
     // This was a deliberate choice to restore update functionality on
     // memory-constrained hardware. MQTT TLS and the log-share upload keep full
     // certificate verification (they do not use this helper).
+    // Leave skip_cert_common_name_check at its default (false): with no CA
+    // attached the connection already skips all verification, and keeping the
+    // hostname check enabled means that if a CA bundle is ever re-attached here
+    // later, hostname verification is not silently left off.
     config.crt_bundle_attach = nullptr;
-    config.skip_cert_common_name_check = true;
 
     // Fix for Bug #235: GitHub redirects fail with keep-alive
     config.keep_alive_enable = false;

@@ -30,9 +30,10 @@ void test_ota_config_defaults(void) {
 
     // Cert verification is intentionally disabled on the OTA/fetch path to work
     // around PSA insufficient-memory (-141) handshake failures on the ESP32, so
-    // no CA bundle must be attached and the CN check is skipped.
+    // no CA bundle must be attached. The CN check stays at its default (false)
+    // so it is not silently left off if a CA bundle is re-attached later.
     TEST_ASSERT_NULL(config.crt_bundle_attach);
-    TEST_ASSERT_TRUE(config.skip_cert_common_name_check);
+    TEST_ASSERT_FALSE(config.skip_cert_common_name_check);
 }
 
 // GitHub Releases API URL: stable channel hits /releases/latest, beta
