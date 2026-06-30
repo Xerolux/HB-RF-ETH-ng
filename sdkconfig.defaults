@@ -39,3 +39,8 @@ CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
 # FreeRTOS: needed for CPU usage monitoring (uxTaskGetSystemState)
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+
+# WiFi support disabled: the HB-RF-ETH board uses Ethernet (LAN8720A) only.
+# Keeping WiFi enabled wastes ~30KB+ DRAM which is needed for the TLS handshake
+# during the GitHub update check on the WROOM-32 (no PSRAM).
+# CONFIG_ESP_WIFI_ENABLED is not set

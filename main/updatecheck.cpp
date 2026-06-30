@@ -34,6 +34,7 @@
 #include "semver.h"
 #include "ota_config.h"
 #include "monitoring.h"
+#include "esp_heap_caps.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -46,14 +47,16 @@ static const char *GITHUB_REPO = "Xerolux/HB-RF-ETH-ng";
 // object is large: the full release-notes markdown body runs several KB AND
 // GitHub repeats a verbose uploader object for every attached asset (we now
 // ship 5 assets per release), so a single release object is ~15 KB. With
-// per_page=3 the response reached ~45 KB and was getting truncated mid-JSON
-// at the old 48 KB cap, so cJSON_Parse failed ("JSON parse failed") and the
-// update check never completed. per_page was lowered to 2 (~30 KB) and this
-// cap raised to 64 KB so the full response always fits with headroom for
-// growing release bodies. The buffer is heap-allocated only for the duration
-// of the mutex-serialized fetch (and only after the TLS handshake completes),
-// so it never overlaps with another TLS handshake's memory use.
-static const size_t GH_RESPONSE_CAP = 64 * 1024;
+    // per_page=3 the response reached ~45 KB and was getting truncated mid-JSON
+    // at the old 48 KB cap, so cJSON_Parse failed ("JSON parse failed") and the
+    // update check never completed. per_page was lowered to 2 (~30 KB) and this
+    // cap raised to 64 KB so the full response always fits with headroom for
+    // growing release bodies. The buffer is heap-allocated only for the duration
+    // of the mutex-serialized fetch (and only after the TLS handshake completes),
+    // so it never overlaps with another TLS handshake's memory use.
+    // With WiFi now disabled (Ethernet-only board) the ~30 KB (per_page=2) still
+    // fits comfortably in 48 KB; this reduction saves 16 KB of momentary heap.
+static const size_t GH_RESPONSE_CAP = 48 * 1024;
 
 // esp_https_ota in IDF 6.x no longer exposes ESP_ERR_HTTPS_OTA_INCOMPLETE; use
 // a private application code to report a download that ended prematurely.
@@ -406,8 +409,10 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     char url[128];
     buildReleasesApiUrl(beta, url, sizeof(url));
 
-    ESP_LOGI(TAG, "Fetching %s release info from GitHub (beta channel: %d)",
-             beta ? "latest (incl. pre-release)" : "stable", beta ? 1 : 0);
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGI(TAG, "Fetching %s release info from GitHub (beta: %d, heap free: %u KB)",
+             beta ? "latest (incl. pre-release)" : "stable", beta ? 1 : 0,
+             (unsigned)(free_heap / 1024));
 
     // Serialize with the changelog proxy — two TLS handshakes at once exhaust
     // the heap on the ESP32. 15 s timeout: GitHub should never take that long
@@ -435,7 +440,7 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
 
     configure_ota_http_client(config, url);
     config.timeout_ms = 10000;
-    config.buffer_size = 4096;
+    config.buffer_size = 2048;
     config.event_handler = _gh_event_handler;
     config.user_data = &resp;
 
@@ -521,6 +526,11 @@ cleanup:
     free(resp.buf);   // free(NULL) is safe when no body ever arrived
     if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
 
+    size_t heap_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGI(TAG, "Fetch complete: heap free %u KB (delta %+d KB)",
+             (unsigned)(heap_after / 1024),
+             (int)((int)heap_after - (int)free_heap) / 1024);
+
     if (parsedOk) {
         ESP_LOGI(TAG, "Latest %s release: %s%s (asset: %s)",
                  beta ? "any" : "stable",
@@ -541,8 +551,10 @@ void UpdateCheck::_taskFunc()
 
   for (;;)
   {
-    ESP_LOGI(TAG, "Stack high water mark: %u bytes free",
-             (unsigned)uxTaskGetStackHighWaterMark(NULL));
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    ESP_LOGI(TAG, "Stack high water: %u B, heap free: %u KB",
+             (unsigned)uxTaskGetStackHighWaterMark(NULL),
+             (unsigned)(free_heap / 1024));
     ESP_LOGI(TAG, "Checking for firmware updates...");
     ESP_LOGI(TAG, "Current version: %s", _sysInfo->getCurrentVersion());
 
