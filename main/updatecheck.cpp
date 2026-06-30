@@ -42,14 +42,18 @@ static const char *TAG = "UpdateCheck";
 static const char *GITHUB_REPO = "Xerolux/HB-RF-ETH-ng";
 
 // Cap for the heap buffer used to receive the GitHub releases JSON.
-// Per_page=3 returns up to 3 releases; each release body is the full
-// release-notes markdown, which can run several KB on its own, so 32 KB
-// was getting truncated mid-JSON on releases with a long changelog body
-// (cJSON_Parse then fails on the cut-off response). 48 KB gives enough
-// headroom for 3 releases with long bodies; the buffer is heap-allocated
-// only for the duration of the mutex-serialized fetch, so it never
-// overlaps with another TLS handshake's memory use.
-static const size_t GH_RESPONSE_CAP = 48 * 1024;
+// The beta channel lists releases (see buildReleasesApiUrl). Each release
+// object is large: the full release-notes markdown body runs several KB AND
+// GitHub repeats a verbose uploader object for every attached asset (we now
+// ship 5 assets per release), so a single release object is ~15 KB. With
+// per_page=3 the response reached ~45 KB and was getting truncated mid-JSON
+// at the old 48 KB cap, so cJSON_Parse failed ("JSON parse failed") and the
+// update check never completed. per_page was lowered to 2 (~30 KB) and this
+// cap raised to 64 KB so the full response always fits with headroom for
+// growing release bodies. The buffer is heap-allocated only for the duration
+// of the mutex-serialized fetch (and only after the TLS handshake completes),
+// so it never overlaps with another TLS handshake's memory use.
+static const size_t GH_RESPONSE_CAP = 64 * 1024;
 
 // esp_https_ota in IDF 6.x no longer exposes ESP_ERR_HTTPS_OTA_INCOMPLETE; use
 // a private application code to report a download that ended prematurely.
@@ -67,12 +71,16 @@ void buildReleasesApiUrl(bool beta, char* out, size_t outLen)
     // "/releases/latest" excludes prereleases; "/releases" lists every
     // non-draft release including prereleases, newest first.
     if (beta) {
-        // per_page=3: GitHub's /releases endpoint does not always return
-        // releases in strict chronological order (GitHub API quirk). By
-        // fetching 3 releases we can iterate and pick the highest version
-        // via semver comparison even when the API order is unreliable.
+        // per_page=2: GitHub's /releases endpoint does not always return
+        // releases in strict chronological order (GitHub API quirk), so we
+        // fetch more than one and pick the highest version via semver
+        // comparison rather than blindly trusting the first entry. This was 3,
+        // but each release object is ~15 KB (long body + verbose per-asset
+        // uploader metadata), and 3 of them overflowed the response buffer and
+        // truncated the JSON. 2 keeps the response well within GH_RESPONSE_CAP
+        // while still guarding against the newest release not being first.
         snprintf(out, outLen,
-                 "https://api.github.com/repos/%s/releases?per_page=3",
+                 "https://api.github.com/repos/%s/releases?per_page=2",
                  GITHUB_REPO);
     } else {
         snprintf(out, outLen,

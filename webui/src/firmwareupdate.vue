@@ -563,8 +563,16 @@ const formatLastCheck = (dateStr) => {
 let updateCheckInterval = null
 
 onMounted(async () => {
+  // Load system info and read the cached update snapshot independently: a
+  // failure fetching system info must not stop us from showing the device's
+  // cached firmware status (and vice versa).
   try {
     await sysInfoStore.update()
+  } catch (e) {
+    console.warn('Failed to load system info:', e.response?.status || e.message)
+  }
+
+  try {
     // Only read the device's cached snapshot - opening the Firmware page must
     // never trigger a live GitHub fetch. The device runs its own 24h
     // background check, and the user can force a check on demand with the
