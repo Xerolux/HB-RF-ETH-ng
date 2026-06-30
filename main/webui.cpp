@@ -2006,9 +2006,14 @@ static void _share_log_task(void *arg)
         // never run at once - concurrent mbedtls SSL context allocation is
         // what exhausts the ESP32 heap and makes mbedtls_ssl_setup() fail.
         bool net_locked = false;
-        if (g_net_fetch_mutex &&
-            xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
-            net_locked = true;
+        if (g_net_fetch_mutex) {
+            if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+                net_locked = true;
+            } else {
+                snprintf(result, sizeof(result),
+                         "{\"success\":false,\"error\":\"Network busy, please try again later\"}");
+                goto respond;
+            }
         }
 
         esp_http_client_handle_t client = esp_http_client_init(&config);
