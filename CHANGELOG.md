@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-Beta.13] - 2026-06-30
+
+### Changes
+- feat: add low-heap watchdog as a last-resort restart safety net
+- fix: free DCF flank-event queue handle on stop instead of just resetting it
+- docs: bring CLAUDE.md in line with the actual repo (ESP-IDF, not PlatformIO)
+- fix: 24h update-check interval overflowed to ~500s, hammering GitHub API
+- fix: abort log-share with a clear error if the net-fetch mutex times out
+- fix: serialize log-share TLS handshake and grow GitHub response buffer
+- chore: bump version to 2.2.0-Beta.12
+- copy-button-bug
+- fix: copy-to-clipboard button not working on HTTP WebUI
+- fix: iterate all fetched releases and pick highest version
+- chore: bump version to 2.2.0-Beta.11
+- fix: clipboard copy in non-HTTPS context (HTTP WebUI)
+- fix: semver pre-release comparison now handles numeric segments correctly
+- release: v2.2.0-Beta.10
+- paste-sharing-upload
+- perf: avoid temporary std::string allocations in appendField
+- fix: use MicroBin multipart upload API for log sharing
+- graphics-issue
+- feat: replace favicon with satellite-dish app icon
+- fix: restore TLS cert verification using full CA bundle on OTA path
+- fix: remove crt_bundle_attach to work around ESP-IDF PSA Crypto TLS handshake failure
+- release: v2.2.0-Beta.9 — OTA success modal, paste service fix, duplicate button fix
+- fix: remove duplicate download button, fix paste service redirect handling (event handler + disable_auto_redirect)
+- feat: redirect to home page after OTA update with success modal (auto-close 10s)
+- fix: compile errors in share log task (format strings, enum, ip4_addr_t, header API)
+- graphics-issue
+- fix: prevent firmware update banner from overlapping header nav
+- ci: auto-trigger release build on tag push
+- docs: complete MQTT API reference in wiki (all status/event/command topics, HA entities, TLS/mTLS)
+- feat: system log sharing, globe favicon, clipboard HTTP fallback, update buffer fix (Beta.8)
+- webui-improvements-optimization
+- fix(webui): complete i18n translations for 8 locales
+- fix(build): snprintf instead of strncpy in getVersionSnapshot (-Wstringop-truncation)
+- fix(build): move variable declarations above goto cleanup (C++17 jump-misses-init)
+- docs: fold performance optimizations into Beta.7 changelog
+- perf: lightweight getVersionSnapshot, GH_RESPONSE_CAP 12KB, net-fetch serialization, stack watermarks
+- chore: bump version to 2.2.0-Beta.7
+- fix: token NVS persistence (no 401 after reboot), task stack overflows, idle logout, log noise
+- fix(webui): hide native file input to prevent double file dialog on manual firmware upload
+- chore: bump version to 2.2.0-Beta.6
+- fix(webui): show real error instead of 'up to date' when update check fails
+- chore: bump version to 2.2.0-Beta.5
+- fix: beta-channel JSON parse, updatecheck boot race, changelog proxy OOM retry
+- fix(build): silence -Wstringop-truncation in OTA error snapshot (snprintf)
+- fix(build): replace removed ESP_ERR_HTTPS_OTA_INCOMPLETE with private OTA error code
+- fix(ci): make update_version.py idempotent; fix mangled TROUBLESHOOTING version string
+- fix(build): resolve Beta.4 compile errors (NO_DATA macro clash, snprintf truncation)
+- chore: bump version to 2.2.0-Beta.4
+- fix(ci): make update_changelog.py idempotent to avoid duplicate sections
+- chore: bump version to 2.2.0-Beta.4
+- docs: rewrite CHANGELOG with full curated history (2.1.0 -> 2.2.0-Beta.4)
+- Merge pull request #333 from Xerolux/dependabot/github_actions/actions/checkout-7
+- Merge pull request #325 from Xerolux/dependabot/github_actions/crate-ci/typos-1.47.2
+- mqtt-phase-a-b
+- feat(mqtt): Phase A + B - LWT/Birth, command token, OTA state, extended status topics
+- refactor(webui): unify icons and design-token usage across UI
+- feat(update): switch to GitHub Releases API with optional beta channel
+- chore: upgrade toolchain and dependencies to latest
+- fix(webui): fix dirty-tracking, auth redirect, OTA feedback and version compare
+- fix(firmware): harden memory safety and bounds checks
+- chore(ci)(deps): bump actions/checkout from 6 to 7
+- fix-firmware-hardening
+- fix: harden monitoring and log handling
+- chore: bump version to 2.2.0-Beta.3
+- performance-stability-upgrade
+- feat: async monitoring diagnostic, i18n for hardcoded UI strings
+- perf(webui): move update-check/changelog proxies off the httpd task
+- fix(webui): OTA upload timeout, 401 redirect for visitors, polling robustness
+- fix: boot hang hardening, httpd/MQTT/NTP stability fixes
+- fix: RTC detection broken on IDF 6.0 and perf-oriented build config
+- chore(ci)(deps): bump crate-ci/typos from 1.45.1 to 1.47.2
+- chore: bump version to 2.2.0-Beta.2
+- chore: bump version to 2.2.0-Beta.2 - IDF 6.0.1 compat & deps upgrade
+- Merge pull request #316 from EarlSneedSinclair/mqtt-tls
+- feat(mqtt): add TLS/SSL support for MQTT configuration
+- Merge pull request #310 from Xerolux/dependabot/npm_and_yarn/webui/vue-i18n-11.4.0
+- chore(deps)(deps): bump vue-i18n from 11.3.2 to 11.4.0 in /webui
+- fix: correct update banner showing when running version is newer than available
+- fix: semver pre-release comparison and log polling stability
+- feat: live LED brightness update without restart
+- chore: bump version to 2.2.0-Beta.1
+- chore: prepare v2.2.0-Beta.1 release
+
 ## [2.2.0-Beta.10] - 2026-06-29
 
 ### Fixed

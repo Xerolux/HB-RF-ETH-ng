@@ -27,6 +27,10 @@
 #include "ethernet.h"
 #include "radiomoduledetector.h"
 #include "systemclock.h"
+#include "reset_info.h"
+#include "esp_heap_caps.h"
+#include "esp_system.h"
+#include "updatecheck.h"
 
 static const char *TAG = "MONITORING";
 SemaphoreHandle_t g_net_fetch_mutex = NULL;
@@ -509,6 +513,62 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     return ESP_OK;
 }
 
+// Low-heap watchdog: this is not a "cleaner" (there is no GC/page-cache on
+// the ESP32 to reclaim) - it is a last-resort safety net for leaks we don't
+// yet know about. If free heap stays below the critical threshold for
+// several consecutive samples, restart cleanly rather than risk a hard
+// crash/lockup from a failed allocation deep in the network or TLS stack.
+static constexpr size_t HEAP_WATCHDOG_CRITICAL_BYTES = 20 * 1024;
+static constexpr int HEAP_WATCHDOG_CONSECUTIVE_HITS = 5;     // ~5 * 60s = 5 min sustained
+static constexpr TickType_t HEAP_WATCHDOG_INTERVAL_TICKS = pdMS_TO_TICKS(60000);
+
+static void heap_watchdog_task(void *pvParameters)
+{
+    (void)pvParameters;
+    int low_heap_streak = 0;
+
+    for (;;)
+    {
+        vTaskDelay(HEAP_WATCHDOG_INTERVAL_TICKS);
+
+        // Skip checks during an active OTA: TLS handshakes, HTTP buffers and
+        // flash writes routinely push free heap below the threshold, and a
+        // restart here would interrupt and fail the firmware upgrade.
+        if (g_updateCheck)
+        {
+            OtaSnapshot ota = g_updateCheck->getOtaState();
+            if (ota.state == OTA_STATE_STARTING ||
+                ota.state == OTA_STATE_DOWNLOADING ||
+                ota.state == OTA_STATE_FLASHING)
+            {
+                low_heap_streak = 0;
+                continue;
+            }
+        }
+
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        if (free_heap < HEAP_WATCHDOG_CRITICAL_BYTES)
+        {
+            low_heap_streak++;
+            ESP_LOGW(TAG, "Low heap: %u bytes free (streak %d/%d)",
+                     (unsigned)free_heap, low_heap_streak, HEAP_WATCHDOG_CONSECUTIVE_HITS);
+
+            if (low_heap_streak >= HEAP_WATCHDOG_CONSECUTIVE_HITS)
+            {
+                ESP_LOGE(TAG, "Heap critically low for %d consecutive checks - restarting",
+                         low_heap_streak);
+                ResetInfo::storeResetReason(RESET_REASON_WATCHDOG);
+                vTaskDelay(pdMS_TO_TICKS(200));
+                esp_restart();
+            }
+        }
+        else
+        {
+            low_heap_streak = 0;
+        }
+    }
+}
+
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
 {
@@ -549,6 +609,13 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
     // Start MQTT if enabled
     if (current_config.mqtt.enabled) {
         mqtt_handler_start(&current_config.mqtt);
+    }
+
+    // Heap watchdog runs regardless of monitoring config - it's a safety
+    // net for the whole firmware, not a monitoring feature.
+    BaseType_t wd_ret = xTaskCreate(heap_watchdog_task, "heap_watchdog", 4096, NULL, 2, NULL);
+    if (wd_ret != pdPASS) {
+        ESP_LOGW(TAG, "Failed to start heap watchdog task");
     }
 
     return ESP_OK;
