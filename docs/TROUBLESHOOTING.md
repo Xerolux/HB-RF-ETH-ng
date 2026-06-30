@@ -384,6 +384,152 @@ The script will authenticate, trigger the OTA update, and monitor progress until
 
 ---
 
+## MQTT Integration Issues
+
+### MQTT Connection Fails
+
+**Symptoms:**
+- Device shows "MQTT disconnected" in WebUI
+- No messages published to broker
+- "Connection refused" or timeout errors
+
+**Solutions:**
+
+1. **Verify Broker Connectivity**
+   ```bash
+   # From device network
+   ping <mqtt-server-ip>
+   nc -zv <mqtt-server> 1883    # Check if port is open
+   ```
+
+2. **Check Configuration**
+   - WebUI → Monitoring → MQTT
+   - Verify server address/IP is correct
+   - Verify port (default: 1883 for TCP, 8883 for TLS)
+   - Check username/password if required
+
+3. **Network/Firewall**
+   - Ensure port 1883 (or 8883 for TLS) is allowed outbound
+   - Check firewall rules
+   - Try without TLS first to isolate issue
+
+4. **TLS Certificate Issues**
+   - If using custom CA: verify PEM format is correct
+   - Try `tlsSkipVerify=true` temporarily for testing (not recommended for production)
+   - Check certificate expiry
+
+### Home Assistant Discovery Not Working
+
+**Symptoms:**
+- Devices don't appear in Home Assistant
+- No MQTT entities created
+
+**Solutions:**
+
+1. **Enable Discovery**
+   - WebUI → Monitoring → MQTT
+   - Check "Home Assistant Discovery" checkbox
+   - Save settings and restart device
+
+2. **Check Discovery Topic**
+   - Default prefix: `homeassistant/`
+   - MQTT client should receive messages on `homeassistant/+/hb-rf-eth-*/#`
+   - Example: `mosquitto_sub -h <broker> -t "homeassistant/#" -v`
+
+3. **Verify MQTT Broker is Healthy**
+   - Check broker logs for errors
+   - Restart broker if needed
+   - Ensure broker allows discovery topics
+
+4. **Home Assistant MQTT Integration**
+   - Verify HA's MQTT integration is configured and connected
+   - Check HA's MQTT logs: Dev Tools → Logs
+
+### Command Topics Not Working
+
+**Symptoms:**
+- Can't restart device via MQTT
+- Commands are ignored
+
+**Solutions:**
+
+1. **Verify Commands Enabled**
+   - WebUI → Monitoring → MQTT
+   - Check "Enable Commands" checkbox
+   - Device will only subscribe to `<prefix>/command/#` when enabled
+
+2. **Check Command Token (if configured)**
+   - If command token is set, payload must match exactly
+   - Allowed characters: `A-Z a-z 0-9 - _ .`
+   - Length: 8-63 characters
+   - Publish: `mosquitto_pub -h <broker> -t "hb-rf-eth/command/restart" -m "<token>"`
+
+3. **Topic Name Check**
+   - Default prefix: `hb-rf-eth`
+   - Check custom prefix if changed
+   - Commands: `<prefix>/command/restart`, `<prefix>/command/factory_reset`, etc.
+
+4. **Broker ACL**
+   - Ensure device user has publish rights on `<prefix>/command/#`
+   - Check broker ACL configuration
+   - Consider restricting other users from command topics for security
+
+### Sporadic MQTT Disconnections
+
+**Symptoms:**
+- MQTT frequently disconnects and reconnects
+- Message gaps in Home Assistant
+
+**Solutions:**
+
+1. **Check Keep-Alive Settings**
+   - Default: 120 seconds (ESP-IDF default)
+   - If network drops packets, may need shorter timeout
+   - Try adjusting on broker side if possible
+
+2. **Network Stability**
+   - Check for network issues: `ping -c 100 <broker>`
+   - Look for packet loss
+   - Check switch/router logs for errors
+
+3. **Broker Load**
+   - Monitor broker CPU/memory usage
+   - Check for broker-side errors
+   - Consider restarting broker during low-traffic period
+
+4. **Reconnect Interval**
+   - Current: 30 seconds between reconnect attempts
+   - View in device logs: System Log → System Events
+
+### No MQTT Messages Published
+
+**Symptoms:**
+- MQTT connected but no status messages
+- Subscription shows no messages
+
+**Solutions:**
+
+1. **Verify MQTT is Enabled**
+   - WebUI → Monitoring → MQTT
+   - Toggle off/on to restart MQTT client
+
+2. **Check Topic Prefix**
+   - Default: `hb-rf-eth`
+   - Subscribe to: `hb-rf-eth/status/#` (not retained)
+   - Check: `mosquitto_sub -h <broker> -t "hb-rf-eth/status/#" -v`
+
+3. **Publish Interval**
+   - Messages published every 5 seconds (idle)
+   - 1 second during OTA updates
+   - Check broker is actually receiving: enable broker logging
+
+4. **System Log**
+   - Check device system log for MQTT errors
+   - Share log via WebUI (System Log → Share button)
+   - Review for connection errors or failed publishes
+
+---
+
 ## Time Synchronization
 
 ### Time Not Syncing
@@ -575,6 +721,39 @@ When reporting issues, include:
    - Open DevTools (F12)
    - Screenshot Console tab
 
+### Automated Log Sharing (v2.2.0-Beta.8+)
+
+**Easiest way to gather diagnostics:**
+
+1. Open the WebUI and log in
+2. Go to **System Log** page
+3. Click the **Share** button (top right)
+4. A comprehensive debug report is uploaded to MicroBin paste service
+5. Share link is automatically copied to clipboard
+
+**What's included in the report:**
+- Complete system log
+- System info (version, board revision, serial)
+- Network configuration
+- Ethernet status
+- Radio module information
+- MQTT/CheckMK configuration
+- LED programs
+- All diagnostic data needed for support
+
+**Privacy:**
+- Passwords, tokens, TLS keys are automatically redacted
+- IP addresses and hostnames retained (needed for debugging)
+- You can review the link before sharing
+
+**Alternative (Manual API Call):**
+```bash
+curl -X POST http://192.168.1.100/api/log/share \
+  -H "Authorization: Token YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
 ### Common Error Messages
 
 | Error Message | Meaning | Solution |
@@ -584,6 +763,7 @@ When reporting issues, include:
 | `ETH_START_BIT not found` | Ethernet PHY issue | Check hardware |
 | `httpd_uri: uri /... not found` | WebUI routing error | Re-flash firmware |
 | `OTA: Firmware too large` | OTA partition full | Check firmware size |
+| `Failed to upload log` | Network/paste service issue | Check internet connectivity |
 
 ---
 
