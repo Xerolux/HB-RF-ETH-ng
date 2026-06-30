@@ -555,7 +555,15 @@ void UpdateCheck::_taskFunc()
       ESP_LOGI(TAG, "Release info not available yet (fetch in progress).");
     }
 
-    vTaskDelay(pdMS_TO_TICKS(24 * 60 * 60000)); // 24h
+    // 24h, split into 1h chunks: pdMS_TO_TICKS((TickType_t)ms * configTICK_RATE_HZ)
+    // overflows 32-bit TickType_t arithmetic for a 24h millisecond value
+    // (86,400,000 ms * 100 Hz > UINT32_MAX), which silently wrapped this
+    // delay down to ~500 s - hammering the GitHub API every ~8 minutes
+    // instead of once a day. 1h chunks stay well within range.
+    for (int hour = 0; hour < 24; hour++)
+    {
+      vTaskDelay(pdMS_TO_TICKS(60 * 60000));
+    }
   }
 
   vTaskDelete(NULL);
