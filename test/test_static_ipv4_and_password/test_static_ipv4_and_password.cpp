@@ -13,6 +13,7 @@
 #include <unity.h>
 #include <string.h>
 #include "settings.h"
+#include "validation.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
@@ -362,73 +363,58 @@ void test_password_change_after_static_ipv4(void)
 // Password Validation Tests (backend logic)
 // ==========================================
 
-// These test the same validation logic as in webui.cpp post_change_password_handler_func
-static bool validate_password_backend(const char *password)
-{
-    if (password == NULL || strlen(password) < 8)
-        return false;
-
-    bool has_lower = false;
-    bool has_upper = false;
-    bool has_digit = false;
-
-    for (int i = 0; password[i] != 0; i++)
-    {
-        if (password[i] >= 'a' && password[i] <= 'z')
-            has_lower = true;
-        else if (password[i] >= 'A' && password[i] <= 'Z')
-            has_upper = true;
-        else if (password[i] >= '0' && password[i] <= '9')
-            has_digit = true;
-    }
-
-    return has_lower && has_upper && has_digit;
-}
-
 void test_password_validation_rejects_short(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend("Ab1"));
-    TEST_ASSERT_FALSE(validate_password_backend("Abcde1"));  // 6 chars - too short
-    TEST_ASSERT_FALSE(validate_password_backend("Abcdef1")); // 7 chars - too short
+    TEST_ASSERT_FALSE(validateAdminPassword("Ab1"));
+    TEST_ASSERT_FALSE(validateAdminPassword("Abcde1"));  // 6 chars - too short
+    TEST_ASSERT_FALSE(validateAdminPassword("Abcdef1")); // 7 chars - too short
 }
 
 void test_password_validation_rejects_no_uppercase(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend("abcdefg1"));
+    TEST_ASSERT_FALSE(validateAdminPassword("abcdefg1"));
 }
 
 void test_password_validation_rejects_no_lowercase(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend("ABCDEFG1"));
+    TEST_ASSERT_FALSE(validateAdminPassword("ABCDEFG1"));
 }
 
 void test_password_validation_rejects_no_digit(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend("Abcdefgh"));
+    TEST_ASSERT_FALSE(validateAdminPassword("Abcdefgh"));
 }
 
 void test_password_validation_rejects_null(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend(NULL));
+    TEST_ASSERT_FALSE(validateAdminPassword(NULL));
 }
 
 void test_password_validation_rejects_empty(void)
 {
-    TEST_ASSERT_FALSE(validate_password_backend(""));
+    TEST_ASSERT_FALSE(validateAdminPassword(""));
 }
 
 void test_password_validation_accepts_valid(void)
 {
-    TEST_ASSERT_TRUE(validate_password_backend("Admin123"));
-    TEST_ASSERT_TRUE(validate_password_backend("MyPass99"));
-    TEST_ASSERT_TRUE(validate_password_backend("Abcdefg1"));
-    TEST_ASSERT_TRUE(validate_password_backend("aB345678"));
+    TEST_ASSERT_TRUE(validateAdminPassword("Admin123"));
+    TEST_ASSERT_TRUE(validateAdminPassword("MyPass99"));
+    TEST_ASSERT_TRUE(validateAdminPassword("Abcdefg1"));
+    TEST_ASSERT_TRUE(validateAdminPassword("aB345678"));
 }
 
 void test_password_validation_accepts_special_chars(void)
 {
-    TEST_ASSERT_TRUE(validate_password_backend("Admin!@#1"));
-    TEST_ASSERT_TRUE(validate_password_backend("My-Pass_1"));
+    TEST_ASSERT_TRUE(validateAdminPassword("Admin!@#1"));
+    TEST_ASSERT_TRUE(validateAdminPassword("My-Pass_1"));
+}
+
+void test_password_validation_rejects_unstorable_length(void)
+{
+    TEST_ASSERT_TRUE(validateAdminPassword("Abcdefghijklmnopqrstuvwxyz123456"));
+    TEST_ASSERT_FALSE(validateAdminPassword("Abcdefghijklmnopqrstuvwxyz1234567"));
+    TEST_ASSERT_FALSE(settings->setAdminPassword("Abcdefghijklmnopqrstuvwxyz1234567"));
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
 }
 
 // ==========================================
@@ -468,6 +454,7 @@ void app_main(void)
     RUN_TEST(test_password_validation_rejects_empty);
     RUN_TEST(test_password_validation_accepts_valid);
     RUN_TEST(test_password_validation_accepts_special_chars);
+    RUN_TEST(test_password_validation_rejects_unstorable_length);
 
     UNITY_END();
 }

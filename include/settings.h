@@ -79,7 +79,7 @@ public:
   void clear();
 
   char *getAdminPassword();
-  void setAdminPassword(const char* password);
+  bool setAdminPassword(const char* password);
   bool getPasswordChanged();
 
   char *getHostname();

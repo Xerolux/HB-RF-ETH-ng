@@ -46,6 +46,7 @@
 #include "esp_crt_bundle.h"
 #include "ota_config.h"
 #include "semver.h"
+#include "validation.h"
 // #include "prometheus.h"
 
 static const char *TAG = "WebUI";
@@ -559,8 +560,13 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
-    if (adminPassword && strlen(adminPassword) > 0)
-        _settings->setAdminPassword(adminPassword);
+    if (adminPassword && adminPassword[0] != '\0') {
+        if (!validateAdminPassword(adminPassword) || !_settings->setAdminPassword(adminPassword)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                       "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+        }
+    }
 
     if (hostname) {
         if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
@@ -758,8 +764,10 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
-    if (adminPassword && strlen(adminPassword) > 0)
-        _settings->setAdminPassword(adminPassword);
+    if (adminPassword && adminPassword[0] != '\0' && !_settings->setAdminPassword(adminPassword)) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password in backup is too long");
+    }
 
     if (hostname) {
         _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
@@ -1364,31 +1372,17 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     char *newPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "newPassword"));
 
-    // Password requirements: min 8 chars, uppercase, lowercase, digit
-    bool has_lower = false;
-    bool has_upper = false;
-    bool has_digit = false;
-    bool is_valid_length = (newPassword != NULL) && (strlen(newPassword) >= 8);
-
-    if (is_valid_length) {
-        for (int i = 0; newPassword[i] != 0; i++) {
-            if (newPassword[i] >= 'a' && newPassword[i] <= 'z') {
-                has_lower = true;
-            } else if (newPassword[i] >= 'A' && newPassword[i] <= 'Z') {
-                has_upper = true;
-            } else if (newPassword[i] >= '0' && newPassword[i] <= '9') {
-                has_digit = true;
-            }
-        }
-    }
-
-    if (!is_valid_length || !has_lower || !has_upper || !has_digit)
+    if (!validateAdminPassword(newPassword))
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be at least 8 characters with uppercase, lowercase, and numbers");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be 8-32 characters with uppercase, lowercase, and numbers");
     }
 
-    _settings->setAdminPassword(newPassword);
+    if (!_settings->setAdminPassword(newPassword))
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid password");
+    }
     _settings->save();
 
     cJSON_Delete(root);

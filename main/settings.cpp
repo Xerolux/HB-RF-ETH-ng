@@ -293,11 +293,18 @@ char *Settings::getAdminPassword()
   return _adminPassword;
 }
 
-void Settings::setAdminPassword(const char *adminPassword)
+bool Settings::setAdminPassword(const char *adminPassword)
 {
-  strncpy(_adminPassword, adminPassword, sizeof(_adminPassword) - 1);
+  if (adminPassword == nullptr || adminPassword[0] == '\0' || strlen(adminPassword) >= sizeof(_adminPassword))
+  {
+    ESP_LOGE(TAG, "Invalid admin password length, keeping current password");
+    return false;
+  }
+
+  snprintf(_adminPassword, sizeof(_adminPassword), "%s", adminPassword);
   // Mark password as changed when it's explicitly set
   _passwordChanged = true;
+  return true;
 }
 
 bool Settings::getPasswordChanged()

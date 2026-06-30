@@ -157,6 +157,33 @@ bool validateDcfOffset(int offset)
     return true;
 }
 
+bool validateAdminPassword(const char *password)
+{
+    if (password == NULL)
+    {
+        return false;
+    }
+
+    const size_t len = strlen(password);
+    if (len < MIN_ADMIN_PASSWORD_LENGTH || len > MAX_ADMIN_PASSWORD_LENGTH)
+    {
+        return false;
+    }
+
+    bool hasLower = false;
+    bool hasUpper = false;
+    bool hasDigit = false;
+    for (size_t i = 0; i < len; ++i)
+    {
+        const unsigned char c = (unsigned char)password[i];
+        hasLower |= islower(c) != 0;
+        hasUpper |= isupper(c) != 0;
+        hasDigit |= isdigit(c) != 0;
+    }
+
+    return hasLower && hasUpper && hasDigit;
+}
+
 // Helper function to check if a string is a valid IPv4 address
 static bool isValidIPv4(const char *str, size_t len)
 {

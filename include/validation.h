@@ -35,6 +35,8 @@
 #define MAX_DCF_OFFSET 60000
 #define MAX_NTP_SERVER_LENGTH 64
 #define MAX_SERVER_ADDRESS_LENGTH 128
+#define MIN_ADMIN_PASSWORD_LENGTH 8
+#define MAX_ADMIN_PASSWORD_LENGTH 32
 
 // Validation functions
 bool validateHostname(const char *hostname);
@@ -43,6 +45,7 @@ bool validateNetmask(ip4_addr_t addr);
 bool validateLEDBrightness(int brightness);
 bool validateGpsBaudrate(int baudrate);
 bool validateDcfOffset(int offset);
+bool validateAdminPassword(const char *password);
 // NTP server validation (hostname, IPv4, IPv6, with optional port)
 bool validateNtpServer(const char *ntpServer);
 
