@@ -196,7 +196,10 @@ board_type_t detectBoard()
 
 SysInfo::SysInfo()
 {
-    xTaskCreate(updateCPUUsageTask, "UpdateCPUUsage", 4096, NULL, 3, NULL);
+    if (xTaskCreate(updateCPUUsageTask, "UpdateCPUUsage", 4096,
+                    NULL, 3, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create CPU usage task");
+    }
 
     uint8_t baseMac[6];
     esp_read_mac(baseMac, ESP_MAC_WIFI_STA);

@@ -69,7 +69,11 @@ void SystemClock::start(void)
 
         ESP_LOGI(TAG, "Updated time from RTC to %02d-%02d-%02d %02d:%02d:%02d %s", now->tm_year + 1900, now->tm_mon + 1, now->tm_mday, now->tm_hour, now->tm_min, now->tm_sec, get_tzname(now->tm_isdst));
 
-        xTaskCreate(updateRtcTask, "SystemClock_RtcUpdateTask", 4096, _rtc, 10, &_tHandle);
+        if (xTaskCreate(updateRtcTask, "SystemClock_RtcUpdateTask",
+                        4096, _rtc, 10, &_tHandle) != pdPASS) {
+            _tHandle = NULL;
+            ESP_LOGE(TAG, "Failed to create RTC update task");
+        }
     }
 }
 

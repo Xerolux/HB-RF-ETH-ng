@@ -83,7 +83,10 @@ void LED::start(Settings *settings)
 
     if (!_switchTaskHandle)
     {
-        xTaskCreate(ledSwitcherTask, "LED_Switcher", 4096, NULL, 10, &_switchTaskHandle);
+        if (xTaskCreate(ledSwitcherTask, "LED_Switcher", 4096,
+                        NULL, 10, &_switchTaskHandle) != pdPASS) {
+            _switchTaskHandle = NULL;
+        }
     }
 }
 

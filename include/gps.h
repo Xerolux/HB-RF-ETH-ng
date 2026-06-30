@@ -35,7 +35,7 @@ private:
     Settings *_settings;
     SystemClock *_clk;
     TaskHandle_t _tHandle = NULL;
-    QueueHandle_t _uart_queue;
+    QueueHandle_t _uart_queue = NULL;
     LineReader *_lineReader;
     uint64_t _nextSync = 0;
 

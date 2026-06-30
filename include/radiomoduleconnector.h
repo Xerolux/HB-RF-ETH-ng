@@ -46,7 +46,7 @@ private:
     LED *_blueLED;
     StreamParser *_streamParser;
     std::atomic<FrameHandler *> _frameHandler = ATOMIC_VAR_INIT(0);
-    QueueHandle_t _uart_queue;
+    QueueHandle_t _uart_queue = NULL;
     TaskHandle_t _tHandle = NULL;
 
     void _handleFrame(unsigned char *buffer, uint16_t len);

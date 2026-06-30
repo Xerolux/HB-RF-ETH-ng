@@ -220,8 +220,19 @@ static void flankEventQueueHandler(void *arg)
 
 void DCF::start()
 {
+    if (_queueHandlerTask || _flank_queue) return;
     _flank_queue = xQueueCreate(8, sizeof(flank_event_t));
-    xTaskCreate(flankEventQueueHandler, "DFC_FlankEvent_QueueHandler", 4096, NULL, 17, &_queueHandlerTask);
+    if (!_flank_queue) {
+        ESP_LOGE(TAG, "Failed to create DCF event queue");
+        return;
+    }
+    if (xTaskCreate(flankEventQueueHandler, "DFC_FlankEvent_QueueHandler",
+                    4096, NULL, 17, &_queueHandlerTask) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create DCF event task");
+        vQueueDelete(_flank_queue);
+        _flank_queue = NULL;
+        return;
+    }
 
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_ANYEDGE;
@@ -229,15 +240,31 @@ void DCF::start()
     io_conf.pin_bit_mask = 1ULL << DCF_PIN;
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-    gpio_config(&io_conf);
+    esp_err_t err = gpio_config(&io_conf);
+    if (err != ESP_OK) goto fail;
 
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(DCF_PIN, onPinChange, NULL);
+    err = gpio_install_isr_service(0);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) goto fail;
+    err = gpio_isr_handler_add(DCF_PIN, onPinChange, NULL);
+    if (err == ESP_OK) return;
+
+fail:
+    ESP_LOGE(TAG, "Failed to initialize DCF GPIO/ISR: %s", esp_err_to_name(err));
+    vTaskDelete(_queueHandlerTask);
+    _queueHandlerTask = NULL;
+    vQueueDelete(_flank_queue);
+    _flank_queue = NULL;
 }
 
 void DCF::stop()
 {
     gpio_isr_handler_remove(DCF_PIN);
-    vTaskDelete(_queueHandlerTask);
-    vQueueDelete(_flank_queue);
+    if (_queueHandlerTask) {
+        vTaskDelete(_queueHandlerTask);
+        _queueHandlerTask = NULL;
+    }
+    if (_flank_queue) {
+        vQueueDelete(_flank_queue);
+        _flank_queue = NULL;
+    }
 }

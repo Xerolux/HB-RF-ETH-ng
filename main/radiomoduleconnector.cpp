@@ -67,19 +67,37 @@ RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blue
 
 void RadioModuleConnector::start()
 {
+    if (_tHandle) return;
     setLED(false, false, false);
 
-    uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2, 0, 20, &_uart_queue, 0);
+    esp_err_t err = uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2,
+                                        0, 20, &_uart_queue, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE("RadioModuleConnector", "Failed to install UART driver: %s",
+                 esp_err_to_name(err));
+        _uart_queue = NULL;
+        return;
+    }
 
-    xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler", 4096, this, 15, &_tHandle);
+    if (xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler",
+                    4096, this, 15, &_tHandle) != pdPASS) {
+        ESP_LOGE("RadioModuleConnector", "Failed to create UART handler task");
+        uart_driver_delete(UART_NUM_1);
+        _uart_queue = NULL;
+        return;
+    }
     resetModule();
 }
 
 void RadioModuleConnector::stop()
 {
-    resetModule();
+    if (_tHandle) {
+        vTaskDelete(_tHandle);
+        _tHandle = NULL;
+    }
     uart_driver_delete(UART_NUM_1);
-    vTaskDelete(_tHandle);
+    _uart_queue = NULL;
+    resetModule();
 }
 
 void RadioModuleConnector::setFrameHandler(FrameHandler *frameHandler, bool decodeEscaped)
@@ -118,6 +136,7 @@ void RadioModuleConnector::_serialQueueHandler()
     uint8_t *buffer = (uint8_t *)malloc(bufSize);
     if (!buffer) {
         ESP_LOGE("RadioModuleConnector", "Failed to allocate UART buffer");
+        _tHandle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -131,8 +150,18 @@ void RadioModuleConnector::_serialQueueHandler()
             switch (event.type)
             {
             case UART_DATA:
-                uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
-                _streamParser->append(buffer, event.size);
+                if (event.size > bufSize) {
+                    ESP_LOGE("RadioModuleConnector", "UART event exceeds RX buffer: %u",
+                             (unsigned)event.size);
+                    uart_flush_input(UART_NUM_1);
+                    xQueueReset(_uart_queue);
+                    _streamParser->flush();
+                    break;
+                }
+                {
+                    int read = uart_read_bytes(UART_NUM_1, buffer, event.size, portMAX_DELAY);
+                    if (read > 0) _streamParser->append(buffer, (uint16_t)read);
+                }
                 break;
             case UART_FIFO_OVF:
             case UART_BUFFER_FULL:

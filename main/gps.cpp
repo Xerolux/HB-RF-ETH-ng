@@ -56,14 +56,30 @@ GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
 
 void GPS::start()
 {
-    uart_driver_install(UART_NUM_2, UART_HW_FIFO_LEN(UART_NUM_2) * 2, 0, 20, &_uart_queue, 0);
-    xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler", 4096, this, 15, &_tHandle);
+    if (_tHandle) return;
+    esp_err_t err = uart_driver_install(UART_NUM_2, UART_HW_FIFO_LEN(UART_NUM_2) * 2,
+                                        0, 20, &_uart_queue, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE("GPS", "Failed to install UART driver: %s", esp_err_to_name(err));
+        _uart_queue = NULL;
+        return;
+    }
+    if (xTaskCreate(gpsSerialQueueHandlerTask, "GPS_UART_QueueHandler",
+                    4096, this, 15, &_tHandle) != pdPASS) {
+        ESP_LOGE("GPS", "Failed to create UART handler task");
+        uart_driver_delete(UART_NUM_2);
+        _uart_queue = NULL;
+    }
 }
 
 void GPS::stop()
 {
+    if (_tHandle) {
+        vTaskDelete(_tHandle);
+        _tHandle = NULL;
+    }
     uart_driver_delete(UART_NUM_2);
-    vTaskDelete(_tHandle);
+    _uart_queue = NULL;
 }
 
 void GPS::_gpsSerialQueueHandler()
@@ -74,6 +90,7 @@ void GPS::_gpsSerialQueueHandler()
     uint8_t *buffer = (uint8_t *)malloc(bufSize);
     if (!buffer) {
         ESP_LOGE("GPS", "Failed to allocate UART buffer");
+        _tHandle = NULL;
         vTaskDelete(NULL);
         return;
     }
@@ -87,8 +104,17 @@ void GPS::_gpsSerialQueueHandler()
             switch (event.type)
             {
             case UART_DATA:
-                uart_read_bytes(UART_NUM_2, buffer, event.size, portMAX_DELAY);
-                _lineReader->Append(buffer, event.size);
+                if (event.size > bufSize) {
+                    ESP_LOGE("GPS", "UART event exceeds RX buffer: %u", (unsigned)event.size);
+                    uart_flush_input(UART_NUM_2);
+                    xQueueReset(_uart_queue);
+                    _lineReader->Flush();
+                    break;
+                }
+                {
+                    int read = uart_read_bytes(UART_NUM_2, buffer, event.size, portMAX_DELAY);
+                    if (read > 0) _lineReader->Append(buffer, (uint16_t)read);
+                }
                 break;
             case UART_FIFO_OVF:
             case UART_BUFFER_FULL:
