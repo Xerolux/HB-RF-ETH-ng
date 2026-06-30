@@ -158,10 +158,18 @@ const copyToClipboard = async (text) => {
   // consume that activation before falling back, breaking copy on HTTP pages.
   const textarea = document.createElement('textarea')
   textarea.value = text
+  // readonly avoids popping the virtual keyboard on mobile, which can steal
+  // focus/selection before execCommand('copy') runs.
+  textarea.setAttribute('readonly', '')
   textarea.style.position = 'fixed'
+  textarea.style.top = '0'
+  textarea.style.left = '0'
   textarea.style.opacity = '0'
   document.body.appendChild(textarea)
+  textarea.focus()
   textarea.select()
+  // .select() alone is unreliable on some mobile browsers; pin the range explicitly.
+  textarea.setSelectionRange(0, text.length)
   let ok = false
   try {
     ok = document.execCommand('copy')
