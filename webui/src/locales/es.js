@@ -484,7 +484,7 @@ export default {
   // Privacy
   privacy: {
     title: 'Privacidad',
-    updateCheck: 'Las actualizaciones automáticas y las comprobaciones de firmware se conectan al servidor xerolux.de. Se transmite su dirección IP para comprobar la disponibilidad de nuevas versiones.',
+    updateCheck: 'Las actualizaciones automáticas y las comprobaciones de firmware se conectan al servidor api.github.com. Se transmite su dirección IP para comprobar la disponibilidad de nuevas versiones.',
   },
 
   // Changelog

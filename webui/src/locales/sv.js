@@ -484,7 +484,7 @@ export default {
   // Privacy
   privacy: {
     title: 'Integritet',
-    updateCheck: 'Automatiska uppdateringar och kontroller av fast programvara ansluter till servern xerolux.de. Din IP-adress överförs för att kontrollera om nya versioner finns tillgängliga.',
+    updateCheck: 'Automatiska uppdateringar och kontroller av fast programvara ansluter till servern api.github.com. Din IP-adress överförs för att kontrollera om nya versioner finns tillgängliga.',
   },
 
   // Changelog

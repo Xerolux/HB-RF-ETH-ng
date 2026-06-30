@@ -484,7 +484,7 @@ export default {
   // Privacy
   privacy: {
     title: 'Privacy',
-    updateCheck: 'Automatische updates en firmwarecontroles maken verbinding met de server xerolux.de. Daarbij wordt uw IP-adres verzonden om te controleren op nieuwe versies.',
+    updateCheck: 'Automatische updates en firmwarecontroles maken verbinding met de server api.github.com. Daarbij wordt uw IP-adres verzonden om te controleren op nieuwe versies.',
   },
 
   // Changelog
