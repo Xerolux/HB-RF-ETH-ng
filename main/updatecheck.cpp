@@ -100,10 +100,11 @@ void normalizeTag(const char* tag, char* out, size_t outLen)
 // ---- HTTP response accumulator --------------------------------------------
 
 struct GhResponse {
-    char *buf;        // heap-allocated, NH_RESPONSE_CAP bytes
+    char *buf;        // heap-allocated lazily (up to GH_RESPONSE_CAP bytes)
     size_t len;
     size_t cap;
     int httpStatus;
+    bool allocFailed; // true if the lazy buffer allocation could not be served
 };
 
 static esp_err_t _gh_event_handler(esp_http_client_event_t *evt)
@@ -118,13 +119,29 @@ static esp_err_t _gh_event_handler(esp_http_client_event_t *evt)
         // Only buffer successful responses. A 403 (rate limit) or 404 (no
         // releases yet) body is small and not worth parsing.
         if (r->httpStatus == 200) {
-            size_t copy = evt->data_len;
-            if (r->len + copy > r->cap) {
-                copy = (r->len < r->cap) ? (r->cap - r->len) : 0;
+            // Allocate the (large) response buffer lazily, only once body data
+            // is actually arriving. By this point the TLS handshake is already
+            // complete, so we never hold ~48 KB of heap across the handshake -
+            // that starved the PSA-crypto signature verification on the
+            // WROOM-32 (no PSRAM) and aborted the handshake with
+            // PSA_ERROR_INSUFFICIENT_MEMORY (-0x008D / -141).
+            if (!r->buf && !r->allocFailed) {
+                r->buf = (char *)malloc(r->cap);
+                if (!r->buf) {
+                    r->allocFailed = true;
+                    ESP_LOGE(TAG, "Failed to allocate %u bytes for GitHub response",
+                             (unsigned)r->cap);
+                }
             }
-            if (copy > 0) {
-                memcpy(r->buf + r->len, evt->data, copy);
-                r->len += copy;
+            if (r->buf) {
+                size_t copy = evt->data_len;
+                if (r->len + copy > r->cap) {
+                    copy = (r->len < r->cap) ? (r->cap - r->len) : 0;
+                }
+                if (copy > 0) {
+                    memcpy(r->buf + r->len, evt->data, copy);
+                    r->len += copy;
+                }
             }
         }
     }
@@ -400,14 +417,8 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     GhResponse resp = {};
     esp_http_client_config_t config = {};
 
-    char *responseBuf = (char *)malloc(GH_RESPONSE_CAP);
-    if (!responseBuf) {
-        snprintf(out->error, sizeof(out->error), "out of memory");
-        ESP_LOGE(TAG, "Failed to allocate %u bytes for GitHub response", (unsigned)GH_RESPONSE_CAP);
-        goto cleanup;
-    }
-
-    resp.buf = responseBuf;
+    // The response buffer is allocated lazily in _gh_event_handler once body
+    // data starts arriving, so its ~48 KB is not held during the TLS handshake.
     resp.cap = GH_RESPONSE_CAP;
 
     configure_ota_http_client(config, url);
@@ -432,7 +443,10 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     bodyLen = resp.len;
 
     parsedOk = false;
-    if (err == ESP_OK && status == 200 && bodyLen > 0) {
+    if (resp.allocFailed) {
+        snprintf(out->error, sizeof(out->error), "out of memory");
+        ESP_LOGE(TAG, "GitHub response buffer allocation failed");
+    } else if (err == ESP_OK && status == 200 && bodyLen > 0) {
         // Null-terminate before parsing.
         resp.buf[bodyLen < resp.cap ? bodyLen : resp.cap - 1] = 0;
 
@@ -492,7 +506,7 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
     esp_http_client_cleanup(client);
 
 cleanup:
-    free(responseBuf);
+    free(resp.buf);   // free(NULL) is safe when no body ever arrived
     if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
 
     if (parsedOk) {

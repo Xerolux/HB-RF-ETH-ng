@@ -26,6 +26,15 @@ void configure_ota_http_client(esp_http_client_config_t& config, const char* url
     // This was a deliberate choice to restore update functionality on
     // memory-constrained hardware. MQTT TLS and the log-share upload keep full
     // certificate verification (they do not use this helper).
+    //
+    // NOTE: skipping verification alone did NOT fix the handshake - it still
+    // aborted with PSA_ERROR_INSUFFICIENT_MEMORY (mbedtls_ssl_handshake
+    // returned -0x008D / -141) because the handshake's own ECDHE signature
+    // verification runs through PSA crypto and needs heap regardless of chain
+    // verification. The actual fix is freeing heap during the handshake:
+    // CONFIG_MBEDTLS_DYNAMIC_BUFFER (dynamic RX/TX buffers) plus deferring the
+    // ~48 KB GitHub-response allocation in updatecheck.cpp until after the
+    // handshake completes.
     // Leave skip_cert_common_name_check at its default (false): with no CA
     // attached the connection already skips all verification, and keeping the
     // hostname check enabled means that if a CA bundle is ever re-attached here

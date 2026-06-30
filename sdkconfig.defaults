@@ -20,6 +20,19 @@ CONFIG_HTTPD_MAX_URI_HANDLERS=15
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 
+# mbedTLS dynamic buffers: the WROOM-32 has no PSRAM, so heap during a TLS
+# handshake is scarce. With static buffers mbedTLS reserves a full 16 KB RX
+# buffer (CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN) for the entire connection, which
+# - combined with the GitHub-response buffer - starved the PSA-crypto signature
+# verification and aborted the handshake with PSA_ERROR_INSUFFICIENT_MEMORY
+# (mbedtls_ssl_handshake returned -0x008D / -141), failing both the update
+# check and the OTA download. Dynamic buffers allocate the RX/TX buffers to the
+# actual record size and free per-connection state when idle, freeing the heap
+# the handshake needs.
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
+CONFIG_MBEDTLS_DYNAMIC_FREE_CA_CERT=y
+
 # FreeRTOS: disable backward-compat (portTICK_PERIOD_MS etc.)
 CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
 
