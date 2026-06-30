@@ -296,9 +296,13 @@ export const useUpdateStore = defineStore('update', {
       this.checkError = null
 
       try {
+        // Worst case on the device: up to 15 s waiting for g_net_fetch_mutex
+        // (another TLS fetch already running) plus up to 10 s for the GitHub
+        // request itself - give the client enough headroom to not time out
+        // while the device is still legitimately working.
         const config = cached
           ? { params: { t: Date.now() } }
-          : { timeout: 15000 }
+          : { timeout: 30000 }
         const response = cached
           ? await axios.get('/api/check_update', config)
           : await axios.post('/api/check_update', {}, config)
