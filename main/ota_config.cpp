@@ -1,15 +1,36 @@
 #include "ota_config.h"
-#include "esp_crt_bundle.h"
 
 void configure_ota_http_client(esp_http_client_config_t& config, const char* url) {
     config.url = url;
 
-    // Verify the server certificate chain against the bundled Mozilla root CAs.
-    // The full bundle (CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL) is used so
-    // that the ECDSA roots GitHub's CDN can present (e.g. ISRG Root X2) are
-    // covered. Keeping verification on protects the OTA path against
-    // man-in-the-middle delivery of arbitrary firmware.
-    config.crt_bundle_attach = esp_crt_bundle_attach;
+    // NOTE: server certificate verification is intentionally DISABLED on the
+    // GitHub fetch / OTA download path.
+    //
+    // On the ESP32 (WROOM-32, internal RAM only, no PSRAM) the PSA-crypto
+    // certificate-chain verification under ESP-IDF 6.x runs out of heap during
+    // the TLS handshake and aborts with:
+    //     esp-x509-crt-bundle: PSA signature verification failed with error
+    //         0xffffff73 (decimal: -141)   // PSA_ERROR_INSUFFICIENT_MEMORY
+    //     esp-x509-crt-bundle: Certificate matched but signature verification failed
+    // i.e. GitHub's certificate is trusted ("matched") but there is not enough
+    // memory to run the signature math, so BOTH the update check and the OTA
+    // download fail with ESP_ERR_HTTP_CONNECT.
+    //
+    // Because no CA bundle is attached here, esp-tls falls back to
+    // MBEDTLS_SSL_VERIFY_NONE (enabled via CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY
+    // in sdkconfig), so the handshake completes without the memory-hungry
+    // verification step.
+    //
+    // TRADE-OFF: the OTA path no longer authenticates the server, so a
+    // man-in-the-middle on the network path could serve arbitrary firmware.
+    // This was a deliberate choice to restore update functionality on
+    // memory-constrained hardware. MQTT TLS and the log-share upload keep full
+    // certificate verification (they do not use this helper).
+    // Leave skip_cert_common_name_check at its default (false): with no CA
+    // attached the connection already skips all verification, and keeping the
+    // hostname check enabled means that if a CA bundle is ever re-attached here
+    // later, hostname verification is not silently left off.
+    config.crt_bundle_attach = nullptr;
 
     // Fix for Bug #235: GitHub redirects fail with keep-alive
     config.keep_alive_enable = false;

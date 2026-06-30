@@ -28,8 +28,12 @@ void test_ota_config_defaults(void) {
     // Verify Fix 3: Max redirection count set
     TEST_ASSERT_EQUAL(5, config.max_redirection_count);
 
-    // Verify CRT bundle is attached
-    TEST_ASSERT_NOT_NULL(config.crt_bundle_attach);
+    // Cert verification is intentionally disabled on the OTA/fetch path to work
+    // around PSA insufficient-memory (-141) handshake failures on the ESP32, so
+    // no CA bundle must be attached. The CN check stays at its default (false)
+    // so it is not silently left off if a CA bundle is re-attached later.
+    TEST_ASSERT_NULL(config.crt_bundle_attach);
+    TEST_ASSERT_FALSE(config.skip_cert_common_name_check);
 }
 
 // GitHub Releases API URL: stable channel hits /releases/latest, beta
