@@ -1471,10 +1471,20 @@ static void _async_proxy_task(void *arg)
     AsyncProxyJob *job = (AsyncProxyJob *)arg;
 
     // Serialize with UpdateCheck background fetch so two TLS handshakes never
-    // exhaust the heap at once. The retry below is a secondary safety net.
+    // exhaust the heap at once. Never continue unlocked after a timeout.
     bool net_locked = false;
-    if (g_net_fetch_mutex &&
-        xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+    if (g_net_fetch_mutex) {
+        if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) != pdTRUE) {
+            ESP_LOGW(TAG, "External proxy rejected: HTTPS subsystem busy");
+            httpd_resp_set_status(job->req, "503 Service Unavailable");
+            httpd_resp_set_type(job->req, "text/plain");
+            httpd_resp_sendstr(job->req, "HTTPS subsystem busy, try again shortly");
+            httpd_req_async_handler_complete(job->req);
+            free(job);
+            _proxy_busy.store(false);
+            vTaskDelete(NULL);
+            return;
+        }
         net_locked = true;
     }
 
