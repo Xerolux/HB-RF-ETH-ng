@@ -105,17 +105,18 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * **Event-basierte Benachrichtigungen** - Nicht-retained Events für Automatisierungen
 
 ### Technische Basis
-* **ESP-IDF 5.5.3** mit nativer `idf.py` Toolchain
-* **GCC 14.2.0+20251107** Toolchain (xtensa-esp-elf)
-* **PlatformIO** als Build-System für Firmware
+* **ESP-IDF 6.0.1** mit nativer `idf.py` Toolchain
+* **Xtensa GCC 14.2.0+20251107** Toolchain (xtensa-esp-elf)
+* **CMake** Build-System für Firmware (nicht PlatformIO)
 * **Vue.js 3** mit Composition API, Vue Router, Pinia, Vue i18n
 * **Bootstrap 5** + **Bootstrap Vue Next** UI-Komponentenbibliothek
 * **Vite** Build-System (schnelle Builds, optimierte Bundles)
 
-### Abhängigkeiten & Versionen
-* `framework-espidf@~3.50503.0`
-* `espressif32@^6.13.0` (Platform-Paket)
+### Build & Abhängigkeiten
+* Managed Components: `mdns ^1.11.2`, `mqtt ^1.0.0`
+* External: `esp-eth-drivers` für LAN87xx PHY
 * Modern C++17/20 für Firmware-Code
+* Komplett native ESP-IDF Toolchain (keine PlatformIO-Abhängigkeit)
 
 ## Mobile Ansicht
 Die Benutzeroberfläche wurde speziell für mobile Endgeräte optimiert und bietet eine intuitive Bedienung auf Smartphones und Tablets.
