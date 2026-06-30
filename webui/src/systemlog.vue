@@ -153,59 +153,60 @@ const MAX_LOG_LINES = 2500
 const MAX_COPY_LINES = 500
 
 const copyToClipboard = async (text) => {
+  // Modern async Clipboard API. It only exists and only works in a secure
+  // context (HTTPS / localhost). The device WebUI is normally served over
+  // plain HTTP, so this branch is usually skipped and we fall through to the
+  // synchronous execCommand fallback below.
   if (navigator.clipboard && window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text)
       return
     } catch (e) {
-      // fallback
+      // fall through to the synchronous fallback
     }
   }
 
-  // execCommand runs synchronously within the click handler, so it still has
-  // the user-gesture activation. Awaiting the async Clipboard API first can
-  // consume that activation before falling back, breaking copy on HTTP pages.
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  // readonly avoids popping the virtual keyboard on mobile, which can steal
-  // focus/selection before execCommand('copy') runs.
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.top = '0'
-  textarea.style.left = '0'
-  textarea.style.opacity = '0'
+  // Synchronous fallback for insecure (HTTP) contexts. We copy via a
+  // document-level Range/Selection on a throwaway element rather than focusing
+  // a form field. A focused <textarea> fights the modal focus-trap (which is
+  // exactly what broke the share-link copy button inside the BModal), whereas a
+  // Selection lives at the document level and is copied regardless of which
+  // element holds focus. execCommand('copy') copies the current selection even
+  // when it is not editable.
+  const span = document.createElement('span')
+  span.textContent = text
+  span.style.position = 'fixed'
+  span.style.top = '0'
+  span.style.left = '0'
+  span.style.opacity = '0'
+  span.style.pointerEvents = 'none'
+  span.style.whiteSpace = 'pre'   // preserve newlines in multi-line copies
+  span.style.userSelect = 'text'  // override any global `user-select: none`
+  span.setAttribute('aria-hidden', 'true')
+  // contentEditable makes the selection copyable on iOS Safari as well.
+  span.contentEditable = 'true'
+  document.body.appendChild(span)
 
-  // Try to append to modal content if it exists to bypass focus trap
-  const modalContent = document.querySelector('.modal-content')
-  if (modalContent) {
-    modalContent.appendChild(textarea)
-  } else {
-    document.body.appendChild(textarea)
-  }
-
-  textarea.focus({ preventScroll: true })
-  textarea.select()
-  // .select() alone is unreliable on some mobile browsers; pin the range explicitly.
-  textarea.setSelectionRange(0, textarea.value.length)
+  const selection = window.getSelection()
+  const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
   let ok = false
   try {
+    const range = document.createRange()
+    range.selectNodeContents(span)
+    selection.removeAllRanges()
+    selection.addRange(range)
     ok = document.execCommand('copy')
   } catch {
     ok = false
   }
 
-  if (modalContent) {
-    modalContent.removeChild(textarea)
-  } else {
-    document.body.removeChild(textarea)
+  if (selection) {
+    selection.removeAllRanges()
+    if (previousRange) selection.addRange(previousRange)
   }
+  document.body.removeChild(span)
 
   if (ok) return
-
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
   throw new Error('copy failed')
 }
 
@@ -419,7 +420,14 @@ const copyShareUrl = async () => {
     await copyToClipboard(shareUrl.value)
     uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('systemlog.shareCopied'), duration: 1800 })
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.copyVisibleFailed') })
+    // Programmatic copy was blocked by the browser. Select the visible link
+    // field so the user can copy it manually (Ctrl+C / long-press) - the link
+    // must not be lost.
+    if (shareUrlInput.value) {
+      shareUrlInput.value.focus()
+      shareUrlInput.value.select()
+    }
+    uiStore.pushToast({ type: 'warning', title: t('common.error'), message: t('systemlog.shareCopyManual'), duration: 4000 })
   }
 }
 
