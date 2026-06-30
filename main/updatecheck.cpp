@@ -108,8 +108,9 @@ void normalizeTag(const char* tag, char* out, size_t outLen)
         p[1] >= '0' && p[1] <= '9') {
         p++;
     }
-    strncpy(out, p, outLen - 1);
-    out[outLen - 1] = 0;
+    // snprintf always null-terminates; strncpy triggers -Wstringop-truncation
+    // when the compiler deduces source and destination have the same length.
+    snprintf(out, outLen, "%s", p);
 }
 
 // ---- HTTP response accumulator --------------------------------------------
