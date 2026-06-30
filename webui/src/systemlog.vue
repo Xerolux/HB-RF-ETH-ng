@@ -166,10 +166,10 @@ const copyToClipboard = async (text) => {
   textarea.style.left = '0'
   textarea.style.opacity = '0'
   document.body.appendChild(textarea)
-  textarea.focus()
+  textarea.focus({ preventScroll: true })
   textarea.select()
   // .select() alone is unreliable on some mobile browsers; pin the range explicitly.
-  textarea.setSelectionRange(0, text.length)
+  textarea.setSelectionRange(0, textarea.value.length)
   let ok = false
   try {
     ok = document.execCommand('copy')
