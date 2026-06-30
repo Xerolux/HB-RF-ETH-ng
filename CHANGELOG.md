@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-Beta.18] - 2026-06-30
+
+### Changes
+- hb-rf-eth-update-failure
+- fix: prevent truncated GitHub releases JSON breaking the update check
+- fix: don't auto-check for firmware updates on every page open
+
 ## [2.2.0-Beta.17] - 2026-06-30
 
 ### Changes
