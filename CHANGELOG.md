@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0-Beta.17] - 2026-06-30
+
+### Changes
+- hb-rf-eth-update-failure
+- fix: make WebUI clipboard copy work over HTTP and abort fetch on OOM
+- fix: resolve TLS handshake OOM (-0x008D) breaking update check and OTA
+- chore: bump version to 2.2.0-Beta.16
+- update-check-and-log-share
+- Fix update check, log share, and translation text
+
 ## [2.2.0-Beta.16] - 2026-06-30
 
 ### Changes
