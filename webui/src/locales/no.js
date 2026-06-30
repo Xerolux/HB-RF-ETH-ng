@@ -484,7 +484,7 @@ export default {
   // Privacy
   privacy: {
     title: 'Personvern',
-    updateCheck: 'Automatiske oppdateringer og fastvaresjekker kobler til serveren xerolux.de. IP-adressen din overføres for å sjekke om nye versjoner er tilgjengelige.',
+    updateCheck: 'Automatiske oppdateringer og fastvaresjekker kobler til serveren api.github.com. IP-adressen din overføres for å sjekke om nye versjoner er tilgjengelige.',
   },
 
   // Changelog

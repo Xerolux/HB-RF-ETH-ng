@@ -484,7 +484,7 @@ export default {
   // Privacy
   privacy: {
     title: 'Soukromí',
-    updateCheck: 'Automatické aktualizace a kontroly firmwaru se připojují k serveru xerolux.de. Vaše IP adresa je přenášena za účelem kontroly dostupnosti nových verzí.',
+    updateCheck: 'Automatické aktualizace a kontroly firmwaru se připojují k serveru api.github.com. Vaše IP adresa je přenášena za účelem kontroly dostupnosti nových verzí.',
   },
 
   // Changelog

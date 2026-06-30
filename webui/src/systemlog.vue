@@ -153,6 +153,15 @@ const MAX_LOG_LINES = 2500
 const MAX_COPY_LINES = 500
 
 const copyToClipboard = async (text) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch (e) {
+      // fallback
+    }
+  }
+
   // execCommand runs synchronously within the click handler, so it still has
   // the user-gesture activation. Awaiting the async Clipboard API first can
   // consume that activation before falling back, breaking copy on HTTP pages.
@@ -165,7 +174,15 @@ const copyToClipboard = async (text) => {
   textarea.style.top = '0'
   textarea.style.left = '0'
   textarea.style.opacity = '0'
-  document.body.appendChild(textarea)
+
+  // Try to append to modal content if it exists to bypass focus trap
+  const modalContent = document.querySelector('.modal-content')
+  if (modalContent) {
+    modalContent.appendChild(textarea)
+  } else {
+    document.body.appendChild(textarea)
+  }
+
   textarea.focus({ preventScroll: true })
   textarea.select()
   // .select() alone is unreliable on some mobile browsers; pin the range explicitly.
@@ -176,14 +193,20 @@ const copyToClipboard = async (text) => {
   } catch {
     ok = false
   }
-  document.body.removeChild(textarea)
+
+  if (modalContent) {
+    modalContent.removeChild(textarea)
+  } else {
+    document.body.removeChild(textarea)
+  }
+
   if (ok) return
 
   if (navigator.clipboard) {
     await navigator.clipboard.writeText(text)
     return
   }
-  throw new Error('execCommand copy failed')
+  throw new Error('copy failed')
 }
 
 const getEntryLevel = (line) => {

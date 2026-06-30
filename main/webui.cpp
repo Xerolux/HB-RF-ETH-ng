@@ -1647,7 +1647,7 @@ esp_err_t post_check_update_handler_func(httpd_req_t *req)
     }
     job->req = async_req;
 
-    if (xTaskCreate(_refresh_task, "rel_refresh", 9216, job, 5, NULL) != pdPASS) {
+    if (xTaskCreate(_refresh_task, "rel_refresh", 16384, job, 5, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create refresh task");
         httpd_resp_send_err(async_req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
         httpd_req_async_handler_complete(async_req);
@@ -1984,7 +1984,7 @@ static void _share_log_task(void *arg)
         esp_http_client_config_t config = {};
         config.url = "https://paste.blueml.eu/upload";
         config.method = HTTP_METHOD_POST;
-        config.crt_bundle_attach = esp_crt_bundle_attach;
+        config.crt_bundle_attach = nullptr;
         config.keep_alive_enable = false;
         config.disable_auto_redirect = true;
         config.timeout_ms = 20000;
@@ -2038,6 +2038,10 @@ static void _share_log_task(void *arg)
             int status = esp_http_client_get_status_code(client);
             if ((status == 303 || status == 302 || status == 301) && pctx.hasLocation)
             {
+                char* upload_ptr = strstr(pctx.location, "/upload");
+                if (upload_ptr) {
+                    memmove(upload_ptr, upload_ptr + 7, strlen(upload_ptr + 7) + 1);
+                }
                 snprintf(result, sizeof(result),
                          "{\"success\":true,\"url\":\"%s\"}", pctx.location);
             }
