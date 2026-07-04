@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta updates disabled – re-checked',
     releaseNotesPreview: 'Release notes',
     viewOnGithub: 'View on GitHub',
-    noDownloadUrl: 'No firmware binary attached to this release. Please try again later or upload manually.'
+    noDownloadUrl: 'No firmware binary attached to this release. Please try again later or upload manually.',
+    archiveTitle: 'Firmware Archive',
+    archiveHint: 'Install an earlier release, switch from beta to stable, or test a specific version.',
+    archiveFilter: 'Firmware archive filter',
+    archiveStable: 'Stable',
+    archiveBeta: 'Beta',
+    archiveAll: 'All',
+    archiveRefresh: 'Refresh list',
+    archiveLoading: 'Loading releases...',
+    archiveWarning: 'Create a backup before switching firmware. Older versions may not understand newer settings.',
+    archiveLoadError: 'Could not load firmware archive',
+    archiveEmpty: 'No matching firmware releases found.',
+    archiveCurrent: 'Installed',
+    archiveInstalled: 'Installed',
+    archiveInstall: 'Install',
+    archiveInstallConfirm: 'Install firmware version {version}? The device will download it online and restart automatically. Please create a backup first.',
+    archiveReleaseNotes: 'Changelog / release notes'
   },
 
   // Monitoring

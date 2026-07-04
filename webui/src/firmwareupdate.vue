@@ -209,6 +209,100 @@
       </div>
     </div>
 
+    <!-- Firmware Archive -->
+    <div class="update-card archive-card">
+      <div class="card-header">
+        <div class="header-icon bg-warning-light text-warning"><AppIcon name="download" /></div>
+        <div class="header-text">
+          <h3>{{ t('firmware.archiveTitle') }}</h3>
+          <p>{{ t('firmware.archiveHint') }}</p>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="archive-toolbar">
+          <div class="archive-filters" role="group" :aria-label="t('firmware.archiveFilter')">
+            <button
+              v-for="filter in archiveFilters"
+              :key="filter.value"
+              type="button"
+              :class="['filter-btn', { active: archiveFilter === filter.value }]"
+              @click="archiveFilter = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive" :disabled="archiveLoading">
+            <span v-if="archiveLoading" class="spinner-border spinner-border-sm"></span>
+            <AppIcon v-else name="refresh" />
+            {{ archiveLoading ? t('firmware.archiveLoading') : t('firmware.archiveRefresh') }}
+          </button>
+        </div>
+
+        <div class="archive-warning">
+          <AppIcon name="alert" />
+          <span>{{ t('firmware.archiveWarning') }}</span>
+        </div>
+
+        <div v-if="archiveError" class="archive-error">
+          <AppIcon name="alert" />
+          <span>{{ archiveError }}</span>
+        </div>
+
+        <div v-if="archiveLoading && firmwareArchive.length === 0" class="archive-empty">
+          <span class="spinner-border spinner-border-sm"></span>
+          {{ t('firmware.archiveLoading') }}
+        </div>
+
+        <div v-else-if="filteredFirmwareArchive.length === 0" class="archive-empty">
+          <AppIcon name="info" />
+          {{ t('firmware.archiveEmpty') }}
+        </div>
+
+        <div v-else class="archive-list">
+          <div v-for="release in filteredFirmwareArchive" :key="release.id" class="archive-item">
+            <div class="archive-main-row">
+              <div class="archive-version">
+                <div class="archive-title-row">
+                  <strong>v{{ release.version }}</strong>
+                  <span v-if="release.prerelease" class="beta-badge">{{ t('firmware.beta') }}</span>
+                  <span v-if="release.isCurrent" class="current-badge">{{ t('firmware.archiveCurrent') }}</span>
+                </div>
+                <div class="archive-meta">
+                  <span>{{ formatReleaseDate(release.publishedAt) }}</span>
+                  <span v-if="release.assetName">· {{ release.assetName }}</span>
+                  <span v-if="release.assetSize">· {{ formatSize(release.assetSize) }}</span>
+                </div>
+              </div>
+              <div class="archive-actions">
+                <a class="archive-link" :href="release.releaseUrl" target="_blank" rel="noopener noreferrer">
+                  <AppIcon name="externalLink" />
+                  {{ t('firmware.viewOnGithub') }}
+                </a>
+                <button
+                  class="archive-install-btn"
+                  type="button"
+                  :disabled="otaUpdating || !release.downloadUrl || release.isCurrent"
+                  @click="installArchivedFirmware(release)"
+                >
+                  <span v-if="archiveInstallingVersion === release.version" class="spinner-border spinner-border-sm"></span>
+                  <AppIcon v-else name="download" />
+                  {{ release.isCurrent ? t('firmware.archiveInstalled') : t('firmware.archiveInstall') }}
+                </button>
+              </div>
+            </div>
+            <details v-if="release.notes" class="archive-notes">
+              <summary>
+                <AppIcon name="logs" />
+                {{ t('firmware.archiveReleaseNotes') }}
+              </summary>
+              <pre>{{ release.notes }}</pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- System Actions -->
     <div class="system-actions">
       <div class="action-tile warning" @click="restartClick">
@@ -235,7 +329,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useUpdateStore, useFirmwareUpdateStore, useUiStore } from './stores.js'
 import axios from 'axios'
@@ -259,6 +353,31 @@ const showCountdown = ref(false)
 const countdown = ref(30)
 const showChangelogModal = ref(false)
 const betaToggleSaving = ref(false)
+const archiveFilter = ref('stable')
+const archiveLoading = ref(false)
+const archiveError = ref('')
+const firmwareArchive = ref([])
+const archiveInstallingVersion = ref('')
+
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=50'
+
+const archiveFilters = computed(() => [
+  { value: 'stable', label: t('firmware.archiveStable') },
+  { value: 'beta', label: t('firmware.archiveBeta') },
+  { value: 'all', label: t('firmware.archiveAll') }
+])
+
+const normalizeVersion = (version) => String(version || '').replace(/^v/i, '')
+
+const filteredFirmwareArchive = computed(() => {
+  if (archiveFilter.value === 'stable') {
+    return firmwareArchive.value.filter((release) => !release.prerelease)
+  }
+  if (archiveFilter.value === 'beta') {
+    return firmwareArchive.value.filter((release) => release.prerelease)
+  }
+  return firmwareArchive.value
+})
 
 const onBetaToggle = async (event) => {
   const enabled = event.target.checked
@@ -293,6 +412,61 @@ const formatSize = (bytes) => {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const formatReleaseDate = (dateStr) => {
+  if (!dateStr) return ''
+  return new Date(dateStr).toLocaleDateString()
+}
+
+const pickFirmwareAsset = (assets = []) => {
+  const binAssets = assets.filter((asset) => asset?.name?.toLowerCase().endsWith('.bin'))
+  return binAssets.find((asset) => /hb-rf-eth-ng/i.test(asset.name)) || binAssets[0] || null
+}
+
+const loadFirmwareArchive = async () => {
+  archiveLoading.value = true
+  archiveError.value = ''
+
+  try {
+    const response = await fetch(GITHUB_RELEASES_API, {
+      headers: { Accept: 'application/vnd.github+json' },
+      cache: 'no-store'
+    })
+
+    if (!response.ok) {
+      throw new Error(`${t('firmware.archiveLoadError')} (${response.status})`)
+    }
+
+    const releases = await response.json()
+    const currentVersion = normalizeVersion(sysInfoStore.currentVersion)
+
+    firmwareArchive.value = releases
+      .filter((release) => !release.draft)
+      .map((release) => {
+        const asset = pickFirmwareAsset(release.assets || [])
+        const version = normalizeVersion(release.tag_name || release.name)
+        return {
+          id: release.id,
+          version,
+          name: release.name || release.tag_name || version,
+          prerelease: !!release.prerelease,
+          publishedAt: release.published_at,
+          releaseUrl: release.html_url,
+          downloadUrl: asset?.browser_download_url || '',
+          assetName: asset?.name || '',
+          assetSize: asset?.size || 0,
+          notes: release.body || '',
+          isCurrent: currentVersion && normalizeVersion(version) === currentVersion
+        }
+      })
+      .filter((release) => release.version)
+  } catch (error) {
+    archiveError.value = error.message || t('firmware.archiveLoadError')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
+  } finally {
+    archiveLoading.value = false
+  }
 }
 
 const handleFileSelect = (event) => {
@@ -356,6 +530,24 @@ const startOtaUpdate = async () => {
     return
   }
 
+  await startOtaFromUrl(updateUrl, version)
+}
+
+const installArchivedFirmware = async (release) => {
+  if (!release?.downloadUrl || release.isCurrent) return
+
+  const confirmed = window.confirm(t('firmware.archiveInstallConfirm', { version: release.version }))
+  if (!confirmed) return
+
+  archiveInstallingVersion.value = release.version
+  try {
+    await startOtaFromUrl(release.downloadUrl, release.version)
+  } finally {
+    archiveInstallingVersion.value = ''
+  }
+}
+
+const startOtaFromUrl = async (updateUrl, version) => {
   otaUpdating.value = true
   otaProgress.value = 0
 
@@ -522,6 +714,7 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Initial cached update read failed:', e.response?.status || e.message)
   }
+  loadFirmwareArchive()
   // Periodically re-read the cache while the page is open so the
   // "last check" indicator and download URL stay fresh (cached read only,
   // no GitHub call).
@@ -935,6 +1128,195 @@ onUnmounted(() => {
   margin-top: auto;
   border-radius: var(--radius-lg);
   padding: 12px;
+}
+
+/* Firmware Archive */
+.archive-card {
+  margin-bottom: var(--spacing-xl);
+}
+
+.archive-toolbar,
+.archive-main-row,
+.archive-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.archive-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-md);
+}
+
+.archive-filters {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+}
+
+.filter-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filter-btn.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.archive-refresh {
+  margin-top: 0;
+}
+
+.archive-warning,
+.archive-error,
+.archive-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.archive-warning {
+  margin-bottom: var(--spacing-md);
+  color: var(--color-warning);
+  background: var(--color-warning-light);
+}
+
+.archive-error {
+  margin-bottom: var(--spacing-md);
+  color: var(--color-danger);
+  background: var(--color-danger-light);
+}
+
+.archive-empty {
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+}
+
+.archive-list {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.archive-item {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+
+.archive-main-row {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.archive-version {
+  min-width: 0;
+}
+
+.archive-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.archive-meta {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.current-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  color: var(--color-success);
+  background: var(--color-success-light);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.archive-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.archive-link,
+.archive-install-btn {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.archive-link {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.archive-install-btn {
+  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.archive-install-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.archive-notes {
+  margin-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border-light);
+  padding-top: var(--spacing-sm);
+}
+
+.archive-notes summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.archive-notes pre {
+  margin: var(--spacing-sm) 0 0;
+  padding: var(--spacing-sm);
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  font-family: inherit;
+  font-size: 0.8125rem;
 }
 
 /* System Actions */

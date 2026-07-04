@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta-oppdateringer deaktivert – sjekket på nytt',
     releaseNotesPreview: 'Utgivelsesnotater',
     viewOnGithub: 'Vis på GitHub',
-    noDownloadUrl: 'Ingen firmware-binær knyttet til denne utgivelsen. Prøv igjen senere eller last opp manuelt.'
+    noDownloadUrl: 'Ingen firmware-binær knyttet til denne utgivelsen. Prøv igjen senere eller last opp manuelt.',
+    archiveTitle: 'Fastvarearkiv',
+    archiveHint: 'Installer en tidligere utgivelse, bytt fra beta til stabil eller test en bestemt versjon.',
+    archiveFilter: 'Filter for fastvarearkiv',
+    archiveStable: 'Stabil',
+    archiveBeta: 'Beta',
+    archiveAll: 'Alle',
+    archiveRefresh: 'Oppdater liste',
+    archiveLoading: 'Laster utgivelser...',
+    archiveWarning: 'Lag en sikkerhetskopi før du bytter fastvare. Eldre versjoner forstår kanskje ikke nyere innstillinger fullt ut.',
+    archiveLoadError: 'Kunne ikke laste fastvarearkivet',
+    archiveEmpty: 'Ingen passende fastvareutgivelser funnet.',
+    archiveCurrent: 'Installert',
+    archiveInstalled: 'Installert',
+    archiveInstall: 'Installer',
+    archiveInstallConfirm: 'Installere fastvareversjon {version}? Enheten laster den ned online og starter automatisk på nytt. Lag en sikkerhetskopi først.',
+    archiveReleaseNotes: 'Changelog / utgivelsesnotater'
   },
 
   // Monitoring

@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta aktualizace zakázány – znovu zkontrolováno',
     releaseNotesPreview: 'Poznámky k vydání',
     viewOnGithub: 'Zobrazit na GitHubu',
-    noDownloadUrl: 'K tomuto vydání není připojen žádný binární soubor firmwaru. Zkuste to prosím později nebo nahrajte ručně.'
+    noDownloadUrl: 'K tomuto vydání není připojen žádný binární soubor firmwaru. Zkuste to prosím později nebo nahrajte ručně.',
+    archiveTitle: 'Archiv firmwaru',
+    archiveHint: 'Nainstalujte starší vydání, přejděte z beta verze na stabilní nebo otestujte konkrétní verzi.',
+    archiveFilter: 'Filtr archivu firmwaru',
+    archiveStable: 'Stabilní',
+    archiveBeta: 'Beta',
+    archiveAll: 'Vše',
+    archiveRefresh: 'Obnovit seznam',
+    archiveLoading: 'Načítání vydání...',
+    archiveWarning: 'Před změnou firmwaru vytvořte zálohu. Starší verze nemusí plně rozumět novějším nastavením.',
+    archiveLoadError: 'Archiv firmwaru se nepodařilo načíst',
+    archiveEmpty: 'Nebyla nalezena žádná odpovídající vydání firmwaru.',
+    archiveCurrent: 'Nainstalováno',
+    archiveInstalled: 'Nainstalováno',
+    archiveInstall: 'Nainstalovat',
+    archiveInstallConfirm: 'Nainstalovat firmware verze {version}? Zařízení jej stáhne online a automaticky se restartuje. Nejprve vytvořte zálohu.',
+    archiveReleaseNotes: 'Changelog / poznámky k vydání'
   },
 
   // Monitoring

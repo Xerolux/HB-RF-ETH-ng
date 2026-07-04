@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta-Updates deaktiviert – neu geprüft',
     releaseNotesPreview: 'Release Notes',
     viewOnGithub: 'Auf GitHub ansehen',
-    noDownloadUrl: 'Keine Firmware-Datei mit diesem Release verknüpft. Bitte später erneut versuchen oder manuell hochladen.'
+    noDownloadUrl: 'Keine Firmware-Datei mit diesem Release verknüpft. Bitte später erneut versuchen oder manuell hochladen.',
+    archiveTitle: 'Firmware-Archiv',
+    archiveHint: 'Eine frühere Version installieren, von Beta auf Stable wechseln oder gezielt eine Version testen.',
+    archiveFilter: 'Firmware-Archiv Filter',
+    archiveStable: 'Stable',
+    archiveBeta: 'Beta',
+    archiveAll: 'Alle',
+    archiveRefresh: 'Liste aktualisieren',
+    archiveLoading: 'Releases werden geladen...',
+    archiveWarning: 'Vor dem Firmware-Wechsel bitte ein Backup erstellen. Ältere Versionen verstehen neuere Einstellungen eventuell nicht vollständig.',
+    archiveLoadError: 'Firmware-Archiv konnte nicht geladen werden',
+    archiveEmpty: 'Keine passenden Firmware-Releases gefunden.',
+    archiveCurrent: 'Installiert',
+    archiveInstalled: 'Installiert',
+    archiveInstall: 'Installieren',
+    archiveInstallConfirm: 'Firmware-Version {version} installieren? Das Gerät lädt sie online herunter und startet danach automatisch neu. Bitte vorher ein Backup erstellen.',
+    archiveReleaseNotes: 'Changelog / Release Notes'
   },
 
   // Monitoring

@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Aggiornamenti beta disattivati – ricontrollato',
     releaseNotesPreview: 'Note di rilascio',
     viewOnGithub: 'Vedi su GitHub',
-    noDownloadUrl: 'Nessun binario firmware collegato a questa versione. Riprova più tardi o caricalo manualmente.'
+    noDownloadUrl: 'Nessun binario firmware collegato a questa versione. Riprova più tardi o caricalo manualmente.',
+    archiveTitle: 'Archivio firmware',
+    archiveHint: 'Installa una versione precedente, passa da beta a stabile o testa una versione specifica.',
+    archiveFilter: 'Filtro archivio firmware',
+    archiveStable: 'Stabile',
+    archiveBeta: 'Beta',
+    archiveAll: 'Tutte',
+    archiveRefresh: 'Aggiorna elenco',
+    archiveLoading: 'Caricamento versioni...',
+    archiveWarning: 'Crea un backup prima di cambiare firmware. Le versioni più vecchie potrebbero non comprendere le impostazioni più recenti.',
+    archiveLoadError: 'Impossibile caricare l’archivio firmware',
+    archiveEmpty: 'Nessuna versione firmware corrispondente trovata.',
+    archiveCurrent: 'Installata',
+    archiveInstalled: 'Installata',
+    archiveInstall: 'Installa',
+    archiveInstallConfirm: 'Installare la versione firmware {version}? Il dispositivo la scaricherà online e si riavvierà automaticamente. Crea prima un backup.',
+    archiveReleaseNotes: 'Changelog / note di rilascio'
   },
 
   // Monitoring

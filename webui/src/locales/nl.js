@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta-updates uitgeschakeld – opnieuw gecontroleerd',
     releaseNotesPreview: 'Release-opmerkingen',
     viewOnGithub: 'Bekijk op GitHub',
-    noDownloadUrl: 'Geen firmware-binair bestand gekoppeld aan deze release. Probeer het later opnieuw of upload handmatig.'
+    noDownloadUrl: 'Geen firmware-binair bestand gekoppeld aan deze release. Probeer het later opnieuw of upload handmatig.',
+    archiveTitle: 'Firmwarearchief',
+    archiveHint: 'Installeer een eerdere release, wissel van bèta naar stabiel of test een specifieke versie.',
+    archiveFilter: 'Filter voor firmwarearchief',
+    archiveStable: 'Stabiel',
+    archiveBeta: 'Bèta',
+    archiveAll: 'Alles',
+    archiveRefresh: 'Lijst vernieuwen',
+    archiveLoading: 'Releases laden...',
+    archiveWarning: 'Maak een back-up voordat u van firmware wisselt. Oudere versies begrijpen nieuwere instellingen mogelijk niet volledig.',
+    archiveLoadError: 'Firmwarearchief kon niet worden geladen',
+    archiveEmpty: 'Geen passende firmwarereleases gevonden.',
+    archiveCurrent: 'Geïnstalleerd',
+    archiveInstalled: 'Geïnstalleerd',
+    archiveInstall: 'Installeren',
+    archiveInstallConfirm: 'Firmwareversie {version} installeren? Het apparaat downloadt deze online en start daarna automatisch opnieuw op. Maak eerst een back-up.',
+    archiveReleaseNotes: 'Changelog / releasenotes'
   },
 
   // Monitoring

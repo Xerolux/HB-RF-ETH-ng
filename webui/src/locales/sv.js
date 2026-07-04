@@ -293,7 +293,23 @@ export default {
     betaChannelOff: 'Beta-uppdateringar inaktiverade – markerade om',
     releaseNotesPreview: 'Versionsanteckningar',
     viewOnGithub: 'Visa på GitHub',
-    noDownloadUrl: 'Ingen firmware-binär kopplad till denna utgåva. Försök igen senare eller ladda upp manuellt.'
+    noDownloadUrl: 'Ingen firmware-binär kopplad till denna utgåva. Försök igen senare eller ladda upp manuellt.',
+    archiveTitle: 'Firmwarearkiv',
+    archiveHint: 'Installera en tidigare utgåva, byt från beta till stabil eller testa en viss version.',
+    archiveFilter: 'Filter för firmwarearkiv',
+    archiveStable: 'Stabil',
+    archiveBeta: 'Beta',
+    archiveAll: 'Alla',
+    archiveRefresh: 'Uppdatera lista',
+    archiveLoading: 'Läser in utgåvor...',
+    archiveWarning: 'Skapa en säkerhetskopia innan du byter firmware. Äldre versioner kanske inte förstår nyare inställningar fullt ut.',
+    archiveLoadError: 'Kunde inte läsa in firmwarearkivet',
+    archiveEmpty: 'Inga matchande firmwareutgåvor hittades.',
+    archiveCurrent: 'Installerad',
+    archiveInstalled: 'Installerad',
+    archiveInstall: 'Installera',
+    archiveInstallConfirm: 'Installera firmwareversion {version}? Enheten laddar ned den online och startar om automatiskt. Skapa en säkerhetskopia först.',
+    archiveReleaseNotes: 'Changelog / versionsinformation'
   },
 
   // Monitoring
