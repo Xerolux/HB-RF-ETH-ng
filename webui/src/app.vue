@@ -1,7 +1,7 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ 'newdesign-shell': experimentalStore.testDesignEnabled }">
     <div class="app-container">
-      <Header />
+      <component :is="experimentalStore.testDesignEnabled ? NewDesignHeader : Header" />
       <main class="main-content">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
@@ -12,17 +12,9 @@
       <footer class="app-footer">
         <div class="footer-content">
           <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025-2026 Xerolux</small>
-          <div class="footer-actions">
-            <button class="sponsor-btn" @click="showSponsorModal = true">
-              <AppIcon name="support" /> Sponsor
-            </button>
-            <a class="footer-social" href="https://x.com/Xerolux" target="_blank" rel="noopener noreferrer" aria-label="X">
-              <AppIcon name="xSocial" />
-            </a>
-            <a class="footer-social" href="https://wa.me/" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
-              <AppIcon name="whatsapp" />
-            </a>
-          </div>
+          <button class="sponsor-btn" @click="showSponsorModal = true">
+            <AppIcon name="support" /> Sponsor
+          </button>
         </div>
       </footer>
     </div>
@@ -54,14 +46,16 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useSysInfoStore } from './stores.js'
+import { useExperimentalStore, useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
+import NewDesignHeader from './components/NewDesignHeader.vue'
 import SponsorModal from './components/SponsorModal.vue'
 import AppToastContainer from './components/AppToastContainer.vue'
 
 const { t } = useI18n()
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
+const experimentalStore = useExperimentalStore()
 const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)
 const otaUpdateVersion = ref('')
@@ -108,56 +102,86 @@ onUnmounted(() => {
 }
 
 .app-container {
-  max-width: none;
+  max-width: min(1080px, 94vw);
   width: 100%;
-  margin: 0;
-  padding: 0;
+  margin: 0 auto;
+  padding: var(--spacing-md);
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
+.newdesign-shell .app-container {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 @media (min-width: 768px) {
   .app-container {
-    padding: 0;
+    padding: var(--spacing-lg);
   }
 }
 
 @media (max-width: 480px) {
   .app-container {
-    padding: 0;
+    padding: var(--spacing-sm);
   }
 }
 
 /* Safe area padding for notch devices */
 @supports (padding: env(safe-area-inset-left)) {
   .app-container {
-    padding-left: 0;
-    padding-right: 0;
+    padding-left: max(var(--spacing-sm), env(safe-area-inset-left));
+    padding-right: max(var(--spacing-sm), env(safe-area-inset-right));
   }
 }
 
 .main-content {
   flex: 1;
-  min-height: 100vh;
-  padding: 112px 24px 24px 384px;
+  margin-bottom: var(--spacing-lg);
+  /* Prevent content from overflowing horizontally on mobile */
   overflow-x: hidden;
 }
 
+.newdesign-shell .main-content {
+  min-height: 100vh;
+  margin-bottom: 0;
+  padding: 112px 24px 24px 384px;
+}
+
 @media (max-width: 991px) {
-  .main-content {
+  .newdesign-shell .main-content {
     padding: 96px 8px 24px;
   }
 }
 
+@media (max-width: 768px) {
+  .main-content {
+    margin-bottom: var(--spacing-md);
+  }
+}
+
 .app-footer {
+  padding: var(--spacing-lg) 0 var(--spacing-xl);
+  /* border-top: 1px solid var(--color-border); */ /* Cleaner look without border */
+  margin-top: auto;
+}
+
+.newdesign-shell .app-footer {
   padding: 8px 24px 18px 384px;
   margin-top: 0;
 }
 
 @media (max-width: 991px) {
-  .app-footer {
+  .newdesign-shell .app-footer {
     padding: 8px 8px 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    padding: var(--spacing-md) 0 var(--spacing-lg);
   }
 }
 
@@ -165,20 +189,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+  gap: var(--spacing-md);
 }
 
 .sponsor-btn {
-  background: transparent;
-  border: 1px solid var(--color-border-strong);
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  padding: 8px 20px;
+  border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -187,29 +205,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  box-shadow: var(--shadow-sm);
 }
 
 .sponsor-btn:hover {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
-  border-color: var(--color-primary);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
-.footer-social {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  text-decoration: none;
+.newdesign-shell .sponsor-btn {
   border-radius: var(--radius-sm);
-  transition: color var(--transition-fast), background var(--transition-fast);
-}
-
-.footer-social:hover {
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: transparent;
+  box-shadow: none;
 }
 
 .update-success-body {

@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
-import { useLoginStore, useThemeStore, useUiStore } from './stores.js'
+import { useExperimentalStore, useLoginStore, useThemeStore, useUiStore } from './stores.js'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
@@ -196,6 +196,10 @@ app.component('AppIcon', AppIcon)
 // Initialize theme
 const themeStore = useThemeStore()
 themeStore.init()
+
+// Initialize optional experimental UI features
+const experimentalStore = useExperimentalStore()
+experimentalStore.init()
 
 // Activity tracking for idle timeout
 let lastUpdate = 0

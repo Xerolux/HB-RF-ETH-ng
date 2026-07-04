@@ -54,6 +54,25 @@ export const useUiStore = defineStore('ui', {
   }
 })
 
+export const useExperimentalStore = defineStore('experimental', {
+  state: () => ({
+    testDesignEnabled: localStorage.getItem("hb-rf-eth-ng-test-design") === "1"
+  }),
+  actions: {
+    applyDesignClass() {
+      document.documentElement.classList.toggle('newdesign-active', this.testDesignEnabled)
+    },
+    setTestDesignEnabled(enabled) {
+      this.testDesignEnabled = !!enabled
+      localStorage.setItem("hb-rf-eth-ng-test-design", this.testDesignEnabled ? "1" : "0")
+      this.applyDesignClass()
+    },
+    init() {
+      this.applyDesignClass()
+    }
+  }
+})
+
 export const useLoginStore = defineStore('login', {
   state: () => ({
     isLoggedIn: localStorage.getItem("hb-rf-eth-ng-pw") != null,

@@ -13,6 +13,7 @@
         <span class="meta-chip"><AppIcon name="shield" /> {{ t('settings.security') }}</span>
         <span class="meta-chip"><AppIcon name="network" /> IPv4 / IPv6</span>
         <span class="meta-chip"><AppIcon name="backup" /> Backup</span>
+        <span class="meta-chip"><AppIcon name="alert" /> {{ t('settings.tabExperimental') }}</span>
         <span class="meta-chip" :class="hasUnsavedChanges ? 'warning-chip' : ''">
           <AppIcon :name="hasUnsavedChanges ? 'alert' : 'check'" />
           {{ hasUnsavedChanges ? t('settings.unsavedChanges') : t('settings.allSaved') }}
@@ -393,6 +394,41 @@
           </div>
         </div>
       </Transition>
+
+      <!-- Experimental Tab -->
+      <Transition name="fade" mode="out-in">
+        <div v-if="activeTab === 'experimental'" class="tab-panel">
+          <div class="settings-card">
+            <div class="card-header">
+              <h3>{{ t('settings.experimentalTitle') }}</h3>
+            </div>
+            <div class="card-body">
+              <div class="experimental-warning">
+                <AppIcon name="alert" />
+                <div>
+                  <strong>{{ t('settings.experimentalWarningTitle') }}</strong>
+                  <p>{{ t('settings.experimentalWarningText') }}</p>
+                </div>
+              </div>
+
+              <div class="switch-row experimental-switch-row">
+                <div class="switch-copy">
+                  <h4>{{ t('settings.experimentalDesign') }}</h4>
+                  <p>{{ t('settings.experimentalDesignHint') }}</p>
+                </div>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="experimentalStore.testDesignEnabled"
+                    @change="experimentalStore.setTestDesignEnabled($event.target.checked)"
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </div>
 
     <!-- Floating Action Bar for Save -->
@@ -470,7 +506,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore, useLoginStore, useUiStore } from './stores.js'
+import { useExperimentalStore, useSettingsStore, useLoginStore, useUiStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -479,6 +515,7 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const loginStore = useLoginStore()
 const uiStore = useUiStore()
+const experimentalStore = useExperimentalStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -504,7 +541,8 @@ const tabs = computed(() => [
   { id: 'general', label: t('settings.tabGeneral'), icon: 'shield' },
   { id: 'network', label: t('settings.tabNetwork'), icon: 'network' },
   { id: 'time', label: t('settings.tabTime'), icon: 'clock' },
-  { id: 'backup', label: t('settings.tabBackup'), icon: 'backup' }
+  { id: 'backup', label: t('settings.tabBackup'), icon: 'backup' },
+  { id: 'experimental', label: t('settings.tabExperimental'), icon: 'alert' }
 ])
 
 const timeSources = computed(() => [
@@ -1027,6 +1065,55 @@ hr {
 .switch-label {
   font-size: 1rem;
   font-weight: 500;
+}
+
+.switch-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: var(--spacing-md);
+}
+
+.switch-copy h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.switch-copy p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.experimental-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-text);
+}
+
+.experimental-warning .app-icon {
+  color: var(--color-warning);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.experimental-warning p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.experimental-switch-row {
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
 }
 
 /* Brightness Slider */
