@@ -359,8 +359,7 @@ const archiveError = ref('')
 const firmwareArchive = ref([])
 const archiveInstallingVersion = ref('')
 
-const ARCHIVE_MANIFEST_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/archive.json'
-const GITHUB_RELEASES_API = 'https://api.github.com/repos/Xerolux/HB-RF-ETH-ng/releases?per_page=50'
+const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
 
 const archiveFilters = computed(() => [
   { value: 'stable', label: t('firmware.archiveStable') },
@@ -420,11 +419,6 @@ const formatReleaseDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString()
 }
 
-const pickFirmwareAsset = (assets = []) => {
-  const binAssets = assets.filter((asset) => asset?.name?.toLowerCase().endsWith('.bin'))
-  return binAssets.find((asset) => /hb-rf-eth-ng/i.test(asset.name)) || binAssets[0] || null
-}
-
 const normalizeArchiveEntry = (entry, index = 0) => {
   const version = normalizeVersion(entry.version || entry.tagName || entry.tag_name || entry.name)
   if (!version) return null
@@ -450,16 +444,11 @@ const normalizeArchiveEntry = (entry, index = 0) => {
 }
 
 const loadArchiveManifest = async () => {
-  const response = await fetch(ARCHIVE_MANIFEST_URL, {
+  const response = await axios.get(ARCHIVE_MANIFEST_URL, {
     headers: { Accept: 'application/json' },
-    cache: 'no-store'
+    silent: true
   })
-
-  if (!response.ok) {
-    throw new Error(`${t('firmware.archiveLoadError')} (${response.status})`)
-  }
-
-  const data = await response.json()
+  const data = response.data
   const entries = Array.isArray(data) ? data : data.releases
   if (!Array.isArray(entries)) {
     throw new Error(t('firmware.archiveLoadError'))
@@ -470,38 +459,6 @@ const loadArchiveManifest = async () => {
     .filter((release) => release?.version && release.downloadUrl)
 }
 
-const loadGithubReleaseArchive = async () => {
-  const response = await fetch(GITHUB_RELEASES_API, {
-    headers: { Accept: 'application/vnd.github+json' },
-    cache: 'no-store'
-  })
-
-  if (!response.ok) {
-    throw new Error(`${t('firmware.archiveLoadError')} (${response.status})`)
-  }
-
-  const releases = await response.json()
-
-  return releases
-    .filter((release) => !release.draft)
-    .map((release) => {
-      const asset = pickFirmwareAsset(release.assets || [])
-      return normalizeArchiveEntry({
-        id: release.id,
-        version: release.tag_name || release.name,
-        name: release.name,
-        prerelease: release.prerelease,
-        publishedAt: release.published_at,
-        releaseUrl: release.html_url,
-        downloadUrl: asset?.browser_download_url || '',
-        assetName: asset?.name || '',
-        assetSize: asset?.size || 0,
-        notes: release.body || ''
-      })
-    })
-    .filter((release) => release?.version && release.downloadUrl)
-}
-
 const loadFirmwareArchive = async () => {
   archiveLoading.value = true
   archiveError.value = ''
@@ -509,12 +466,12 @@ const loadFirmwareArchive = async () => {
   try {
     firmwareArchive.value = await loadArchiveManifest()
   } catch (error) {
-    try {
-      firmwareArchive.value = await loadGithubReleaseArchive()
-    } catch (fallbackError) {
-      archiveError.value = fallbackError.message || error.message || t('firmware.archiveLoadError')
-      uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
-    }
+    const status = error.response?.status
+    const serverMessage = typeof error.response?.data === 'string' ? error.response.data : ''
+    archiveError.value = status
+      ? `${t('firmware.archiveLoadError')} (${status}${serverMessage ? `: ${serverMessage}` : ''})`
+      : error.message || t('firmware.archiveLoadError')
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
   } finally {
     archiveLoading.value = false
   }

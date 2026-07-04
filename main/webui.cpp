@@ -1513,7 +1513,8 @@ httpd_uri_t post_change_password_handler = {
 
 
 // ---- Async proxy for external HTTPS fetches --------------------------------
-// /api/check_update and /api/changelog relay content from external servers.
+// /api/check_update, /api/changelog and /api/firmware_archive relay content
+// from external servers.
 // The fetch (DNS + TLS handshake + download, up to 10 s) must not run inside
 // the httpd task: esp_http_server is single-threaded, so every other request
 // (login, sysinfo polling, OTA status) would stall for the duration. The
@@ -1808,6 +1809,20 @@ httpd_uri_t get_changelog_handler = {
     .uri = "/api/changelog",
     .method = HTTP_GET,
     .handler = get_changelog_handler_func,
+    .user_ctx = NULL};
+
+esp_err_t get_firmware_archive_handler_func(httpd_req_t *req)
+{
+    return start_async_proxy(req,
+                             "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/refs/heads/main/archive.json",
+                             "application/json",
+                             "Failed to fetch firmware archive from GitHub");
+}
+
+httpd_uri_t get_firmware_archive_handler = {
+    .uri = "/api/firmware_archive",
+    .method = HTTP_GET,
+    .handler = get_firmware_archive_handler_func,
     .user_ctx = NULL};
 
 esp_err_t get_log_handler_func(httpd_req_t *req)
@@ -2459,7 +2474,7 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 30;
+    config.max_uri_handlers = 32;
     config.uri_match_fn = httpd_uri_match_wildcard;
     // Increase stack: POST handlers allocate content buffers + config structs
     // that together exceed the default 4096-byte stack, causing overflow/corruption.
@@ -2488,6 +2503,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &get_check_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
         httpd_register_uri_handler(_httpd_handle, &get_changelog_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_firmware_archive_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_log_enable_handler);
