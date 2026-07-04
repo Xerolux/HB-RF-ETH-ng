@@ -769,13 +769,19 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
 
-    if (adminPassword && adminPassword[0] != '\0' && !_settings->setAdminPassword(adminPassword)) {
-        cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password in backup is too long");
+    if (adminPassword && adminPassword[0] != '\0') {
+        if (!validateAdminPassword(adminPassword) || !_settings->setAdminPassword(adminPassword)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                       "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+        }
     }
 
     if (hostname) {
-        _settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+        if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
+            cJSON_Delete(root);
+            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
+        }
     }
     _settings->setTimesource(timesource);
     _settings->setDcfOffset(dcfOffset);
