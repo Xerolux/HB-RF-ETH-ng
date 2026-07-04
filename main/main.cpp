@@ -121,6 +121,22 @@ void app_main()
     // boot hang via stack overflow into adjacent heap allocations.
     static Settings settings;
 
+    // Default: disabled to save 8 KB heap. If the user enabled system log
+    // capture in the WebUI, persist that choice and resume capture early on
+    // boot so startup diagnostics are included.
+    if (settings.getSystemLogEnabled())
+    {
+        LogManager::begin(8192);
+        if (LogManager::instance().isEnabled())
+        {
+            ESP_LOGI(TAG, "System log capture restored from settings");
+        }
+        else
+        {
+            ESP_LOGE(TAG, "System log capture is enabled in settings but the buffer could not be allocated");
+        }
+    }
+
     static LED powerLED(LED_PWR_PIN);
     static LED statusLED(LED_STATUS_PIN);
 
@@ -243,11 +259,6 @@ void app_main()
 
     static RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
     rawUartUdpLister.start();
-
-    // LogManager initialized on-demand via WebUI (systemlog page).
-    // Default: disabled — saves 8 KB heap that is needed for TLS handshake
-    // during firmware update checks.
-    // LogManager::begin(8192);
 
     // Initialize reset info system
     ResetInfo::init();

@@ -73,6 +73,9 @@ private:
   // Update channel: when true, pre-release versions are considered.
   bool _betaChannel;
 
+  // System log capture persists across reboots when enabled from the WebUI.
+  bool _systemLogEnabled;
+
 public:
   Settings();
   void load();
@@ -131,6 +134,9 @@ public:
   // Update channel selection
   bool getBetaChannel();
   void setBetaChannel(bool enabled);
+
+  bool getSystemLogEnabled();
+  void setSystemLogEnabled(bool enabled);
 
   // Authentication token persistence (NVS).  The token survives reboots so
   // the browser "remember me" stays valid after a firmware update or restart.

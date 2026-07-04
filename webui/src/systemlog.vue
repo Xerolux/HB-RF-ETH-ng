@@ -465,9 +465,8 @@ const clearLog = () => {
 }
 
 onMounted(async () => {
-  // Ask the device whether the in-memory log buffer is active. It is disabled
-  // by default at boot (saves ~8 KB heap for the TLS handshake during firmware
-  // update checks); the user enables it here on demand.
+  // Ask the device whether the in-memory log buffer is active. Once enabled,
+  // the device persists that choice and restores capture after a reboot.
   try {
     const response = await axios.get('/api/log/status', { silent: true })
     syncingFromBackend = true

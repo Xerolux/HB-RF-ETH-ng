@@ -54,9 +54,10 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * **Dark/Light Theme Toggle** für helles und dunkles Design
 * **Multi-Language Support** (10 Sprachen: Deutsch, Englisch, Spanisch, Französisch, Italienisch, Niederländisch, Norwegisch, Polnisch, Tschechisch, Schwedisch)
 * **System Log Viewer** - Live-Ansicht der Systemlogs mit 3-Sekunden-Polling, Download-Funktion, Ein/Aus-Schalter und manueller Aktualisierung (High-Contrast)
+  * Aktivierung bleibt ueber Reboots erhalten; beim Deaktivieren bleibt das Log nach dem naechsten Start wieder aus
 * **Changelog Modal** - Vollständiger Changelog direkt in der WebUI mit Markdown-Rendering
 * **Dashboard** mit Gradient-Icons, Hover-Effekten und kompaktem 3-Spalten-Grid auf Mobile
-* **Hostname-Anzeige im Systemstatus** - Der unter Einstellungen/Netzwerk konfigurierte Hostname wird auf der Startseite prominent angezeigt, hilfreich bei mehreren HB-RF-ETH-ng Boards
+* **Hostname-Anzeige im Systemstatus und Header** - Der unter Einstellungen/Netzwerk konfigurierte Hostname wird auf der Startseite, in der Kopfzeile und im Browser-Tab angezeigt, hilfreich bei mehreren HB-RF-ETH-ng Boards
 * **Sponsor-Button** im Footer mit verschiedenen Optionen (PayPal, Buy Me a Coffee, Tesla referral)
 * **LED-Helligkeitssteuerung** (0-100%) für alle Status-LEDs
 * **Konfigurierbare LED-Programme** für verschiedene Systemzustände
@@ -86,6 +87,7 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * HTTP gzip Kompression für schnellere Übertragung
 * **Backup & Restore** der Einstellungen über die WebUI
   * Der Administrator-Benutzername wird im Backup gespeichert und beim Restore wiederhergestellt
+  * Die System-Log-Aktivierung wird im Backup gespeichert und beim Restore wiederhergestellt
   * Das Administrator-Passwort wird aus Sicherheitsgründen nicht exportiert; beim Restore bleibt das aktuelle Passwort des Zielgeräts erhalten
 
 ### Netzwerk-Optimierung

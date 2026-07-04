@@ -44,7 +44,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLoginStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
@@ -58,9 +58,14 @@ const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)
 const otaUpdateVersion = ref('')
 let updateSuccessTimer = null
+const pageTitle = computed(() => `${sysInfoStore.hostname || 'HB-RF-ETH-ng'} - HB-RF-ETH-ng`)
 
 // Idle timeout is handled globally in main.js via the login store's
 // activity tracking (5-minute timeout with cross-tab sync via localStorage).
+
+watch(pageTitle, (title) => {
+  document.title = title
+}, { immediate: true })
 
 onMounted(() => {
   sysInfoStore.update().catch((error) => {

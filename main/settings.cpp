@@ -232,6 +232,7 @@ void Settings::load()
   if (nvs_get_str(handle, "ccuIP", _ccuIP, &len) != ESP_OK) _ccuIP[0] = 0;
 
   GET_BOOL(handle, "betaChannel", _betaChannel, false);
+  GET_BOOL(handle, "systemLogEnabled", _systemLogEnabled, false);
 
   nvs_close(handle);
 }
@@ -288,6 +289,7 @@ void Settings::save()
   SET_STR(handle, "ccuIP", _ccuIP);
 
   SET_BOOL(handle, "betaChannel", _betaChannel);
+  SET_BOOL(handle, "systemLogEnabled", _systemLogEnabled);
 
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
@@ -659,6 +661,16 @@ bool Settings::getBetaChannel()
 void Settings::setBetaChannel(bool enabled)
 {
   _betaChannel = enabled;
+}
+
+bool Settings::getSystemLogEnabled()
+{
+  return _systemLogEnabled;
+}
+
+void Settings::setSystemLogEnabled(bool enabled)
+{
+  _systemLogEnabled = enabled;
 }
 
 // ---- Admin token persistence (survives reboots) ---------------------------

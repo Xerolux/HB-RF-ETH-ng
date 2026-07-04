@@ -29,9 +29,14 @@
         </span>
         <span class="brand-copy">
           <strong>HB-RF-ETH-ng</strong>
-          <small>{{ t('sysinfo.dashboardTitle') }}</small>
+          <small>{{ deviceName }}</small>
         </span>
       </router-link>
+
+      <div class="device-chip desktop-only" :title="deviceName">
+        <AppIcon name="router" />
+        <span>{{ deviceName }}</span>
+      </div>
 
       <div class="desktop-nav">
         <router-link to="/" class="nav-item" active-class="active">{{ t('nav.home') }}</router-link>
@@ -92,7 +97,10 @@
       <div v-if="mobileMenuOpen" class="mobile-overlay" @click.self="closeMobileMenu">
         <div class="mobile-panel glass-panel">
           <div class="mobile-panel-top">
-            <strong>HB-RF-ETH-ng</strong>
+            <div class="mobile-device-title">
+              <strong>HB-RF-ETH-ng</strong>
+              <small>{{ deviceName }}</small>
+            </div>
             <button class="icon-button" @click="closeMobileMenu">
               <AppIcon name="close" />
             </button>
@@ -174,6 +182,7 @@ const mobileMenuOpen = ref(false)
 let updateCheckTimer = null
 
 const currentLocale = computed(() => locale.value)
+const deviceName = computed(() => sysInfoStore.hostname || 'HB-RF-ETH-ng')
 
 watch(mobileMenuOpen, (isOpen) => {
   document.body.style.overflow = isOpen ? 'hidden' : ''
@@ -298,6 +307,31 @@ onUnmounted(() => {
 .brand-copy small {
   color: var(--color-text-secondary);
   font-size: 0.78rem;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--color-primary-strong);
+  background: var(--color-primary-soft);
+  font-weight: 800;
+  font-size: 0.86rem;
+}
+
+.device-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-nav {
@@ -472,6 +506,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-device-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-device-title small {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-links,

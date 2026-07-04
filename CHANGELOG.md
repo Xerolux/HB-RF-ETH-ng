@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- System log activation now persists across reboots. When enabled, the log buffer is restored early during startup; when disabled, it stays disabled after the next reboot.
+- The configured hostname is now shown in the top navigation and browser tab title for easier identification of multiple HB-RF-ETH-ng devices.
+
 ## [2.2.3-Beta.2] - 2026-07-04
 
 ### Fixed

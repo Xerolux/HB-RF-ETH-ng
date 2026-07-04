@@ -86,6 +86,8 @@ static RadioModuleConnector *_radioModuleConnector;
 static RadioModuleDetector *_radioModuleDetector;
 static char _token[46];
 
+static void emit_log_enable_snapshot();
+
 void generateToken()
 {
     // Try persisted token first (survives reboots — keeps "remember me" valid
@@ -397,6 +399,7 @@ void add_settings(cJSON *root)
     cJSON_AddStringToObject(settings, "ccuIP", _settings->getCCUIP());
 
     cJSON_AddBoolToObject(settings, "betaChannel", _settings->getBetaChannel());
+    cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -626,6 +629,19 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setBetaChannel(betaChannelItem->type == cJSON_True);
     }
 
+    cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
+    if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
+        _settings->setSystemLogEnabled(systemLogEnabledItem->type == cJSON_True);
+        if (systemLogEnabledItem->type == cJSON_True) {
+            LogManager::begin(8192);
+            if (LogManager::instance().isEnabled()) {
+                emit_log_enable_snapshot();
+            }
+        } else {
+            LogManager::stop();
+        }
+    }
+
     _settings->save();
 
     cJSON_Delete(root);
@@ -839,6 +855,11 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     cJSON *betaChannelItem = cJSON_GetObjectItem(root, "betaChannel");
     if (betaChannelItem && cJSON_IsBool(betaChannelItem)) {
         _settings->setBetaChannel(betaChannelItem->type == cJSON_True);
+    }
+
+    cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
+    if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
+        _settings->setSystemLogEnabled(systemLogEnabledItem->type == cJSON_True);
     }
 
     _settings->save();
@@ -1830,8 +1851,8 @@ httpd_uri_t get_log_handler = {
     .user_ctx = NULL};
 
 // GET /api/log/status - whether the in-memory log ring buffer is active.
-// The buffer is NOT allocated at boot (saves ~8 KB heap for the TLS handshake
-// during firmware update checks); the WebUI enables it on demand.
+// When enabled from the WebUI, the preference is persisted and capture starts
+// again on the next boot.
 esp_err_t get_log_status_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -1843,9 +1864,10 @@ esp_err_t get_log_status_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    char body[32];
-    snprintf(body, sizeof(body), "{\"enabled\":%s}",
-             LogManager::instance().isEnabled() ? "true" : "false");
+    char body[64];
+    snprintf(body, sizeof(body), "{\"enabled\":%s,\"persistent\":%s}",
+             LogManager::instance().isEnabled() ? "true" : "false",
+             (_settings && _settings->getSystemLogEnabled()) ? "true" : "false");
     httpd_resp_send(req, body, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
@@ -1949,6 +1971,10 @@ esp_err_t post_log_enable_handler_func(httpd_req_t *req)
 
     LogManager::begin(8192);
     if (LogManager::instance().isEnabled()) {
+        if (_settings) {
+            _settings->setSystemLogEnabled(true);
+            _settings->save();
+        }
         emit_log_enable_snapshot();
     }
     httpd_resp_set_type(req, "application/json");
@@ -1987,6 +2013,10 @@ esp_err_t post_log_disable_handler_func(httpd_req_t *req)
     }
 
     LogManager::stop();
+    if (_settings) {
+        _settings->setSystemLogEnabled(false);
+        _settings->save();
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, "{\"enabled\":false}", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
