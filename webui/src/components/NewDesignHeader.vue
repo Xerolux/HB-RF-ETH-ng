@@ -172,6 +172,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from '../stores.js'
 import { availableLocales } from '../locales/index.js'
+import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -189,15 +190,7 @@ let clockTimer = null
 
 const currentLocale = computed(() => locale.value)
 const deviceName = computed(() => sysInfoStore.hostname || 'HB-RF-ETH-ng')
-const navItems = computed(() => [
-  { to: '/', icon: 'dashboard', label: t('nav.home'), public: true },
-  { to: '/settings', icon: 'settings', label: t('nav.settings') },
-  { to: '/firmware', icon: 'firmware', label: t('nav.firmware') },
-  { to: '/monitoring', icon: 'monitoring', label: t('nav.monitoring') },
-  { to: '/systemlog', icon: 'logs', label: t('nav.systemlog') },
-  { to: '/about', icon: 'info', label: t('nav.about'), public: true }
-])
-const visibleNavItems = computed(() => navItems.value.filter((item) => item.public || loginStore.isLoggedIn))
+const { visibleNavItems } = useHeaderNavigation(t, loginStore)
 const currentTime = computed(() => now.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
 const uptimeShort = computed(() => {
   const seconds = sysInfoStore.uptimeSeconds || 0

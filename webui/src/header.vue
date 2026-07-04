@@ -39,17 +39,16 @@
       </div>
 
       <div class="desktop-nav">
-        <router-link to="/" class="nav-item" active-class="active">{{ t('nav.home') }}</router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/settings" class="nav-item" active-class="active">
-          {{ t('nav.settings') }}
+        <router-link
+          v-for="item in visibleNavItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          active-class="active"
+        >
+          {{ item.label }}
+          <span v-if="item.to === '/firmware' && updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
         </router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/firmware" class="nav-item" active-class="active">
-          {{ t('nav.firmware') }}
-          <span v-if="updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
-        </router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/monitoring" class="nav-item" active-class="active">{{ t('nav.monitoring') }}</router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/systemlog" class="nav-item" active-class="active">{{ t('nav.systemlog') }}</router-link>
-        <router-link to="/about" class="nav-item" active-class="active">{{ t('nav.about') }}</router-link>
       </div>
 
       <div class="header-actions">
@@ -107,29 +106,15 @@
           </div>
 
           <div class="mobile-links">
-            <router-link to="/" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="dashboard" />
-              {{ t('nav.home') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/settings" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="settings" />
-              {{ t('nav.settings') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/firmware" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="firmware" />
-              {{ t('nav.firmware') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/monitoring" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="monitoring" />
-              {{ t('nav.monitoring') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/systemlog" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="logs" />
-              {{ t('nav.systemlog') }}
-            </router-link>
-            <router-link to="/about" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="info" />
-              {{ t('nav.about') }}
+            <router-link
+              v-for="item in visibleNavItems"
+              :key="item.to"
+              :to="item.to"
+              class="mobile-link"
+              @click="closeMobileMenu"
+            >
+              <AppIcon :name="item.icon" />
+              {{ item.label }}
             </router-link>
           </div>
 
@@ -168,6 +153,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
+import { useHeaderNavigation } from './composables/useHeaderNavigation.js'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -183,6 +169,7 @@ let updateCheckTimer = null
 
 const currentLocale = computed(() => locale.value)
 const deviceName = computed(() => sysInfoStore.hostname || 'HB-RF-ETH-ng')
+const { visibleNavItems } = useHeaderNavigation(t, loginStore)
 
 watch(mobileMenuOpen, (isOpen) => {
   document.body.style.overflow = isOpen ? 'hidden' : ''
