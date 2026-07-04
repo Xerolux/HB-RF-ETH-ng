@@ -94,6 +94,16 @@ const icons = {
       { type: 'path', d: 'm5 12 4.2 4.2L19 6.5' }
     ]
   },
+  coffee: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M5 7h11v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V7Z' },
+      { type: 'path', d: 'M16 9h1.5a2.5 2.5 0 0 1 0 5H16' },
+      { type: 'path', d: 'M7 3.5v1.2' },
+      { type: 'path', d: 'M11 3.5v1.2' },
+      { type: 'path', d: 'M15 3.5v1.2' }
+    ]
+  },
   chevronDown: {
     viewBox: '0 0 24 24',
     nodes: [
@@ -208,13 +218,6 @@ const icons = {
       { type: 'circle', cx: 12, cy: 12, r: 8.5 },
       { type: 'line', x1: 12, y1: 10, x2: 12, y2: 15 },
       { type: 'circle', cx: 12, cy: 7.5, r: 0.8 }
-    ]
-  },
-  user: {
-    viewBox: '0 0 24 24',
-    nodes: [
-      { type: 'circle', cx: 12, cy: 8, r: 3.5 },
-      { type: 'path', d: 'M5.5 20a6.5 6.5 0 0 1 13 0' }
     ]
   },
   language: {
@@ -451,6 +454,21 @@ const icons = {
     nodes: [
       { type: 'circle', cx: 12, cy: 9, r: 3.5 },
       { type: 'path', d: 'M5.5 19a6.5 6.5 0 0 1 13 0' }
+    ]
+  },
+  whatsapp: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M5.4 19.2 6.3 16A7.3 7.3 0 1 1 9 18.7l-3.6.5Z' },
+      { type: 'path', d: 'M9.2 8.8c.2-.4.4-.4.7-.4h.5c.2 0 .4.1.5.4l.7 1.6c.1.3.1.5-.1.7l-.4.5c.7 1.2 1.7 2.1 3 2.7l.5-.5c.2-.2.4-.3.7-.2l1.5.7c.3.1.4.3.4.6v.4c0 .4-.2.7-.6.9-.5.3-1.2.4-2.1.2-2.9-.6-5.5-3-6.3-5.8-.2-.8-.1-1.5.4-2Z' }
+    ]
+  },
+  xSocial: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M4 4 20 20' },
+      { type: 'path', d: 'M20 4 13.2 11.2' },
+      { type: 'path', d: 'M10.8 13 4 20' }
     ]
   }
 }

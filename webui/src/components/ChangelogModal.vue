@@ -122,71 +122,81 @@ watch(() => props.modelValue, (newValue) => {
 
 <style scoped>
 .changelog-modal {
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #fff;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 .changelog-header {
-  background: #fff;
-  border-bottom: 1px solid var(--color-border-light);
-  color: #111827;
-  padding: 1.5rem;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 1rem 1.25rem;
 }
 
 .changelog-header .close-icon {
-  font-size: 2rem;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
-  opacity: 0.8;
-  transition: opacity 0.2s;
+  opacity: 1;
+  transition: background 0.2s;
 }
 
 .changelog-header .close-icon:hover {
-  opacity: 1;
+  background: var(--color-bg-alt);
 }
 
 .changelog-body {
-  padding: 2rem;
-  background: #fff;
+  padding: 1rem 1.25rem;
+  background: var(--color-surface);
   max-height: 60vh;
 }
 
 .changelog-content {
   color: var(--color-text, #343a40);
-  line-height: 1.8;
+  line-height: 1.6;
 }
 
 .changelog-content :deep(h1) {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #667eea;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e9ecef;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0 0 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .changelog-content :deep(h2) {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #764ba2;
-  margin-top: 2rem;
-  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-primary-strong);
+  margin: 1rem 0 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .changelog-content :deep(h3) {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 800;
   color: var(--color-text, #495057);
-  margin-top: 1.5rem;
-  margin-bottom: 0.75rem;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .changelog-content :deep(h4) {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 800;
   color: var(--color-text-secondary, #6c757d);
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   margin-bottom: 0.5rem;
 }
 
@@ -197,14 +207,14 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-content :deep(li) {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .changelog-content :deep(code) {
-  background: var(--color-border-light, #e9ecef);
-  color: #d63384;
+  background: var(--color-bg-alt);
+  color: var(--color-primary-strong);
   padding: 0.125rem 0.375rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.875em;
 }
 
@@ -212,7 +222,7 @@ watch(() => props.modelValue, (newValue) => {
   background: #212529;
   color: #f8f9fa;
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
   margin: 1rem 0;
 }
@@ -224,18 +234,18 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-content :deep(a) {
-  color: #667eea;
+  color: var(--color-primary-strong);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .changelog-content :deep(a:hover) {
-  color: #764ba2;
+  color: var(--color-primary);
   text-decoration: underline;
 }
 
 .changelog-content :deep(blockquote) {
-  border-left: 4px solid #667eea;
+  border-left: 3px solid var(--color-primary);
   padding-left: 1rem;
   margin: 1rem 0;
   color: var(--color-text-secondary, #6c757d);
@@ -262,9 +272,9 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .changelog-footer {
-  background: #fff;
+  background: var(--color-surface);
   border-top: 1px solid var(--color-border, #e9ecef);
-  padding: 1rem 1.5rem;
+  padding: 0.85rem 1.25rem;
 }
 
 /* Dark mode is handled via CSS variables (--color-bg, --color-text, etc.)

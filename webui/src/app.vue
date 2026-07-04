@@ -12,9 +12,17 @@
       <footer class="app-footer">
         <div class="footer-content">
           <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025-2026 Xerolux</small>
-          <button class="sponsor-btn" @click="showSponsorModal = true">
-            <AppIcon name="support" /> Sponsor
-          </button>
+          <div class="footer-actions">
+            <button class="sponsor-btn" @click="showSponsorModal = true">
+              <AppIcon name="support" /> Sponsor
+            </button>
+            <a class="footer-social" href="https://x.com/Xerolux" target="_blank" rel="noopener noreferrer" aria-label="X">
+              <AppIcon name="xSocial" />
+            </a>
+            <a class="footer-social" href="https://wa.me/" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
+              <AppIcon name="whatsapp" />
+            </a>
+          </div>
         </div>
       </footer>
     </div>
@@ -100,10 +108,10 @@ onUnmounted(() => {
 }
 
 .app-container {
-  max-width: min(1080px, 94vw);
+  max-width: none;
   width: 100%;
-  margin: 0 auto;
-  padding: var(--spacing-md);
+  margin: 0;
+  padding: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -111,46 +119,45 @@ onUnmounted(() => {
 
 @media (min-width: 768px) {
   .app-container {
-    padding: var(--spacing-lg);
+    padding: 0;
   }
 }
 
 @media (max-width: 480px) {
   .app-container {
-    padding: var(--spacing-sm);
+    padding: 0;
   }
 }
 
 /* Safe area padding for notch devices */
 @supports (padding: env(safe-area-inset-left)) {
   .app-container {
-    padding-left: max(var(--spacing-sm), env(safe-area-inset-left));
-    padding-right: max(var(--spacing-sm), env(safe-area-inset-right));
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 
 .main-content {
   flex: 1;
-  margin-bottom: var(--spacing-lg);
-  /* Prevent content from overflowing horizontally on mobile */
+  min-height: 100vh;
+  padding: 112px 24px 24px 384px;
   overflow-x: hidden;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991px) {
   .main-content {
-    margin-bottom: var(--spacing-md);
+    padding: 96px 8px 24px;
   }
 }
 
 .app-footer {
-  padding: var(--spacing-lg) 0 var(--spacing-xl);
-  /* border-top: 1px solid var(--color-border); */ /* Cleaner look without border */
-  margin-top: auto;
+  padding: 8px 24px 18px 384px;
+  margin-top: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 991px) {
   .app-footer {
-    padding: var(--spacing-md) 0 var(--spacing-lg);
+    padding: 8px 8px 18px;
   }
 }
 
@@ -158,14 +165,20 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 10px;
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .sponsor-btn {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-light);
-  padding: 8px 20px;
-  border-radius: var(--radius-full);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -174,15 +187,29 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: var(--shadow-sm);
 }
 
 .sponsor-btn:hover {
-  background: var(--color-danger-soft);
-  color: var(--color-danger);
-  border-color: var(--color-danger);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+  border-color: var(--color-primary);
+}
+
+.footer-social {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.footer-social:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .update-success-body {

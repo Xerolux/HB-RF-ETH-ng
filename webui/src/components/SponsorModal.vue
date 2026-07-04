@@ -16,7 +16,7 @@
       </button>
 
       <div class="header-section">
-        <div class="heart-icon">❤️</div>
+        <div class="support-icon"><AppIcon name="support" /></div>
         <h2 class="title">{{ t('sponsor.title') }}</h2>
         <p class="description">
           {{ t('sponsor.description') }}
@@ -25,18 +25,28 @@
 
       <div class="options-grid">
         <a href="https://paypal.me/Xerolux" target="_blank" rel="noopener noreferrer" class="sponsor-option paypal">
-          <span class="icon">☕</span>
+          <AppIcon name="support" />
           <span class="label">PayPal</span>
         </a>
 
         <a href="https://www.buymeacoffee.com/xerolux" target="_blank" rel="noopener noreferrer" class="sponsor-option bmc">
-          <span class="icon">🥤</span>
+          <AppIcon name="coffee" />
           <span class="label">Buy Me a Coffee</span>
         </a>
 
         <a href="https://ts.la/sebastian564489" target="_blank" rel="noopener noreferrer" class="sponsor-option tesla">
-          <span class="icon">🚗</span>
+          <AppIcon name="link" />
           <span class="label">Tesla Referral</span>
+        </a>
+
+        <a href="https://x.com/Xerolux" target="_blank" rel="noopener noreferrer" class="sponsor-option social">
+          <AppIcon name="xSocial" />
+          <span class="label">X</span>
+        </a>
+
+        <a href="https://wa.me/" target="_blank" rel="noopener noreferrer" class="sponsor-option social">
+          <AppIcon name="whatsapp" />
+          <span class="label">WhatsApp</span>
         </a>
       </div>
 
@@ -78,15 +88,15 @@ const closeModal = () => {
 
 <style scoped>
 :deep(.sponsor-modal-content) {
-  border-radius: var(--radius-xl);
-  border: none;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
   overflow: hidden;
   background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-lg);
 }
 
 .sponsor-modal-body {
-  padding: 40px;
+  padding: 32px;
   text-align: center;
   position: relative;
 }
@@ -95,14 +105,13 @@ const closeModal = () => {
   position: absolute;
   top: 16px;
   right: 16px;
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
   color: var(--color-text-secondary);
   cursor: pointer;
   padding: 8px;
   line-height: 1;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   transition: background-color 0.2s;
 }
 
@@ -111,25 +120,29 @@ const closeModal = () => {
   color: var(--color-text);
 }
 
-.heart-icon {
-  font-size: 4rem;
-  margin-bottom: var(--spacing-md);
-  animation: pulse 2s infinite;
+.support-icon {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary-strong);
+  background: var(--color-primary-soft);
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+.support-icon .app-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .title {
-  font-size: 1.75rem;
+  font-size: 1.35rem;
   font-weight: 800;
   margin-bottom: var(--spacing-sm);
-  background: linear-gradient(135deg, #ff6b35 0%, #ff9f43 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-text);
 }
 
 .description {
@@ -141,7 +154,7 @@ const closeModal = () => {
 
 .options-grid {
   display: grid;
-  gap: var(--spacing-md);
+  gap: 10px;
   margin-bottom: var(--spacing-xl);
 }
 
@@ -149,42 +162,43 @@ const closeModal = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-md);
-  padding: 16px;
-  border-radius: var(--radius-lg);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   font-weight: 700;
-  font-size: 1.125rem;
-  transition: all 0.2s;
-}
-
-.sponsor-option.github {
-  background-color: #24292e;
-  color: white;
+  font-size: 1rem;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .sponsor-option.paypal {
-  background-color: #0070ba;
-  color: white;
+  color: #0070ba;
 }
 
 .sponsor-option.bmc {
-  background-color: #FFDD00;
-  color: #000000;
+  color: #9a7400;
 }
 
 .sponsor-option.tesla {
-  background-color: #cc0000;
-  color: white;
+  color: #cc0000;
+}
+
+.sponsor-option.social {
+  color: var(--color-text-secondary);
 }
 
 .sponsor-option:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: var(--color-bg-alt);
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
 }
 
-.sponsor-option .icon {
-  font-size: 1.5rem;
+.sponsor-option .app-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .footer-text {
@@ -197,8 +211,9 @@ const closeModal = () => {
   .sponsor-modal-body {
     padding: 24px 16px;
   }
-  .heart-icon {
-    font-size: 3rem;
+  .support-icon {
+    width: 40px;
+    height: 40px;
   }
   .title {
     font-size: 1.375rem;

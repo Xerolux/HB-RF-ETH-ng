@@ -1,7 +1,7 @@
 <template>
   <header class="header-shell">
     <Transition name="slide-down">
-      <div v-if="updateStore.shouldShowUpdateBadge && showBanner" class="update-banner glass-panel">
+      <div v-if="updateStore.shouldShowUpdateBadge && showBanner" class="update-banner">
         <div class="update-banner-copy">
           <span class="hero-eyebrow">
             <AppIcon name="firmware" />
@@ -22,10 +22,10 @@
       </div>
     </Transition>
 
-    <nav class="header-nav glass-panel">
+    <aside class="desktop-sidebar">
       <router-link to="/" class="brand" @click="closeMobileMenu">
-        <span class="brand-mark">
-          <AppIcon name="router" />
+        <span class="brand-orbit" aria-hidden="true">
+          <span></span><span></span><span></span>
         </span>
         <span class="brand-copy">
           <strong>HB-RF-ETH-ng</strong>
@@ -33,61 +33,79 @@
         </span>
       </router-link>
 
-      <div class="device-chip desktop-only" :title="deviceName">
-        <AppIcon name="router" />
-        <span>{{ deviceName }}</span>
-      </div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <router-link
+          v-for="item in visibleNavItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          active-class="active"
+          @click="closeMobileMenu"
+        >
+          <AppIcon :name="item.icon" />
+          <span>{{ item.label }}</span>
+          <span v-if="item.to === '/firmware' && updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
+        </router-link>
+      </nav>
 
-      <div class="desktop-nav">
-        <router-link to="/" class="nav-item" active-class="active">{{ t('nav.home') }}</router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/settings" class="nav-item" active-class="active">
-          {{ t('nav.settings') }}
-        </router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/firmware" class="nav-item" active-class="active">
-          {{ t('nav.firmware') }}
-          <span v-if="updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
-        </router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/monitoring" class="nav-item" active-class="active">{{ t('nav.monitoring') }}</router-link>
-        <router-link v-if="loginStore.isLoggedIn" to="/systemlog" class="nav-item" active-class="active">{{ t('nav.systemlog') }}</router-link>
-        <router-link to="/about" class="nav-item" active-class="active">{{ t('nav.about') }}</router-link>
+      <div class="sidebar-footer">
+        <button class="utility-row" type="button" @click="localeOpen = !localeOpen">
+          <AppIcon name="language" />
+          <span>{{ currentLocale.toUpperCase() }}</span>
+          <AppIcon name="chevronDown" />
+        </button>
+        <Transition name="dropdown-fade">
+          <div v-if="localeOpen" class="locale-menu">
+            <button
+              v-for="loc in availableLocales"
+              :key="loc.code"
+              class="locale-menu-item"
+              :class="{ active: loc.code === currentLocale }"
+              @click="changeLocale(loc.code)"
+            >
+              <span>{{ loc.flag }}</span>
+              <span>{{ loc.name }}</span>
+            </button>
+          </div>
+        </Transition>
+        <button class="utility-row" type="button" @click="themeStore.toggleTheme">
+          <AppIcon :name="themeStore.theme === 'light' ? 'moon' : 'sun'" />
+          <span>{{ t('nav.toggleTheme') }}</span>
+        </button>
+        <router-link v-if="!loginStore.isLoggedIn" to="/login" class="utility-row">{{ t('nav.login') }}</router-link>
+        <button v-else class="utility-row" type="button" @click="logout">
+          <AppIcon name="power" />
+          <span>{{ t('nav.logout') }}</span>
+        </button>
+      </div>
+    </aside>
+
+    <nav class="header-nav">
+      <router-link to="/" class="mobile-brand" @click="closeMobileMenu">
+        <span class="brand-orbit small" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span class="mobile-title">{{ deviceName }}</span>
+      </router-link>
+
+      <div class="top-status">
+        <span class="connection-label">{{ t('sysinfo.ethernetStatus') }}</span>
+        <span class="status-pill" :class="sysInfoStore.ethernetConnected ? 'online' : 'offline'">
+          {{ sysInfoStore.ethernetConnected ? 'LAN' : t('sysinfo.offline') }}
+        </span>
+        <span class="top-separator"></span>
+        <span>{{ t('sysinfo.uptime') }}: <strong>{{ uptimeShort }}</strong></span>
+        <span class="clock-chip"><AppIcon name="clock" /> {{ currentTime }}</span>
       </div>
 
       <div class="header-actions">
         <button v-if="updateStore.shouldShowUpdateBadge && !showBanner" class="icon-button" @click="showBanner = true">
           <AppIcon name="firmware" />
         </button>
-
-        <div class="locale-picker desktop-only">
-          <button class="icon-button locale-button" @click="localeOpen = !localeOpen">
-            <AppIcon name="language" />
-            <span>{{ currentLocale.toUpperCase() }}</span>
-          </button>
-          <Transition name="dropdown-fade">
-            <div v-if="localeOpen" class="locale-menu glass-panel">
-              <button
-                v-for="loc in availableLocales"
-                :key="loc.code"
-                class="locale-menu-item"
-                :class="{ active: loc.code === currentLocale }"
-                @click="changeLocale(loc.code)"
-              >
-                <span>{{ loc.flag }}</span>
-                <span>{{ loc.name }}</span>
-              </button>
-            </div>
-          </Transition>
-        </div>
-
         <button class="icon-button" :title="t('nav.toggleTheme')" @click="themeStore.toggleTheme">
           <AppIcon :name="themeStore.theme === 'light' ? 'moon' : 'sun'" />
         </button>
-
-        <router-link v-if="!loginStore.isLoggedIn" to="/login" class="auth-button">{{ t('nav.login') }}</router-link>
-        <button v-else class="icon-button logout-button desktop-only" :title="t('nav.logout')" @click="logout">
-          <AppIcon name="power" />
-        </button>
-
-        <button class="icon-button mobile-menu-toggle mobile-only" @click="mobileMenuOpen = !mobileMenuOpen">
+        <button class="icon-button mobile-menu-toggle" @click="mobileMenuOpen = !mobileMenuOpen">
           <AppIcon :name="mobileMenuOpen ? 'close' : 'menu'" />
         </button>
       </div>
@@ -95,7 +113,7 @@
 
     <Transition name="mobile-menu">
       <div v-if="mobileMenuOpen" class="mobile-overlay" @click.self="closeMobileMenu">
-        <div class="mobile-panel glass-panel">
+        <div class="mobile-panel">
           <div class="mobile-panel-top">
             <div class="mobile-device-title">
               <strong>HB-RF-ETH-ng</strong>
@@ -107,29 +125,15 @@
           </div>
 
           <div class="mobile-links">
-            <router-link to="/" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="dashboard" />
-              {{ t('nav.home') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/settings" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="settings" />
-              {{ t('nav.settings') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/firmware" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="firmware" />
-              {{ t('nav.firmware') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/monitoring" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="monitoring" />
-              {{ t('nav.monitoring') }}
-            </router-link>
-            <router-link v-if="loginStore.isLoggedIn" to="/systemlog" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="logs" />
-              {{ t('nav.systemlog') }}
-            </router-link>
-            <router-link to="/about" class="mobile-link" @click="closeMobileMenu">
-              <AppIcon name="info" />
-              {{ t('nav.about') }}
+            <router-link
+              v-for="item in visibleNavItems"
+              :key="item.to"
+              :to="item.to"
+              class="mobile-link"
+              @click="closeMobileMenu"
+            >
+              <AppIcon :name="item.icon" />
+              {{ item.label }}
             </router-link>
           </div>
 
@@ -179,10 +183,31 @@ const sysInfoStore = useSysInfoStore()
 const showBanner = ref(true)
 const localeOpen = ref(false)
 const mobileMenuOpen = ref(false)
+const now = ref(new Date())
 let updateCheckTimer = null
+let clockTimer = null
 
 const currentLocale = computed(() => locale.value)
 const deviceName = computed(() => sysInfoStore.hostname || 'HB-RF-ETH-ng')
+const navItems = computed(() => [
+  { to: '/', icon: 'dashboard', label: t('nav.home'), public: true },
+  { to: '/settings', icon: 'settings', label: t('nav.settings') },
+  { to: '/firmware', icon: 'firmware', label: t('nav.firmware') },
+  { to: '/monitoring', icon: 'monitoring', label: t('nav.monitoring') },
+  { to: '/systemlog', icon: 'logs', label: t('nav.systemlog') },
+  { to: '/about', icon: 'info', label: t('nav.about'), public: true }
+])
+const visibleNavItems = computed(() => navItems.value.filter((item) => item.public || loginStore.isLoggedIn))
+const currentTime = computed(() => now.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+const uptimeShort = computed(() => {
+  const seconds = sysInfoStore.uptimeSeconds || 0
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+})
 
 watch(mobileMenuOpen, (isOpen) => {
   document.body.style.overflow = isOpen ? 'hidden' : ''
@@ -232,6 +257,10 @@ onMounted(async () => {
       updateStore.checkForUpdate(sysInfoStore.currentVersion, { cached: true })
     }
   }, 24 * 60 * 60 * 1000)
+
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 30000)
 })
 
 onUnmounted(() => {
@@ -239,59 +268,117 @@ onUnmounted(() => {
   if (updateCheckTimer) {
     clearInterval(updateCheckTimer)
   }
+  if (clockTimer) {
+    clearInterval(clockTimer)
+  }
 })
 </script>
 
 <style scoped>
 .header-shell {
-  position: relative;
+  position: fixed;
+  inset: 0 0 auto 0;
   z-index: 1000;
-  margin-bottom: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  pointer-events: none;
 }
 
 .update-banner {
-  position: relative;
-  z-index: 1001;
-  padding: 14px 18px;
-  border-radius: 24px;
+  position: fixed;
+  top: 12px;
+  left: 384px;
+  right: 24px;
+  z-index: 1003;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  box-shadow: var(--shadow-lg);
+  gap: 12px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+.desktop-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 360px;
+  padding: 24px 12px 20px;
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  pointer-events: auto;
 }
 
 .header-nav {
+  position: fixed;
+  top: 0;
+  left: 360px;
+  right: 0;
+  height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 12px 16px;
-  border-radius: 28px;
+  gap: 18px;
+  padding: 0 24px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  pointer-events: auto;
 }
 
-.brand {
+.brand,
+.mobile-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   color: var(--color-text);
   text-decoration: none;
   min-width: 0;
 }
 
-.brand-mark {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
+.brand-orbit {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
-  box-shadow: var(--shadow-sm);
+}
+
+.brand-orbit.small {
+  width: 34px;
+  height: 34px;
+}
+
+.brand-orbit span {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(242, 106, 61, 0.72);
+}
+
+.brand-orbit.small span {
+  width: 20px;
+  height: 20px;
+}
+
+.brand-orbit span:nth-child(1) {
+  left: 3px;
+  top: 5px;
+}
+
+.brand-orbit span:nth-child(2) {
+  right: 4px;
+  top: 5px;
+}
+
+.brand-orbit span:nth-child(3) {
+  left: 12px;
+  bottom: 2px;
 }
 
 .brand-copy {
@@ -301,64 +388,45 @@ onUnmounted(() => {
 }
 
 .brand-copy strong {
-  font-size: 1rem;
+  font-size: 2.25rem;
+  line-height: 1;
+  letter-spacing: 0;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .brand-copy small {
   color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  max-width: 180px;
+  font-size: 0.95rem;
+  max-width: 230px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.device-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  max-width: 220px;
-  padding: 8px 12px;
-  border-radius: var(--radius-pill);
-  color: var(--color-primary-strong);
-  background: var(--color-primary-soft);
-  font-weight: 800;
-  font-size: 0.86rem;
-}
-
-.device-chip span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desktop-nav {
+.side-nav {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .nav-item {
-  display: inline-flex;
+  min-height: 42px;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border-radius: var(--radius-pill);
+  gap: 12px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-weight: 700;
-  font-size: 0.9rem;
-  transition: all var(--transition-fast);
+  font-weight: 650;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .nav-item:hover,
 .nav-item.active {
-  color: var(--color-text);
-  background: rgba(127, 127, 127, 0.18);
+  color: white;
+  background: var(--color-primary);
 }
 
 .mini-dot {
@@ -368,72 +436,61 @@ onUnmounted(() => {
   background: var(--color-warning);
 }
 
-.header-actions {
+.sidebar-footer {
+  margin-top: auto;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
 }
 
+.utility-row,
+.auth-button,
+.mobile-logout {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 12px;
+  text-decoration: none;
+  font-weight: 650;
+}
+
+.utility-row:hover,
+.auth-button:hover,
+.mobile-logout:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
 .icon-button {
-  width: 42px;
-  height: 42px;
-  border: none;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.42);
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-[data-bs-theme="dark"] .icon-button {
-  background: rgba(255, 255, 255, 0.04);
-}
-
 .icon-button:hover {
-  background: rgba(255, 255, 255, 0.65);
-}
-
-.auth-button,
-.mobile-logout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
-  font-weight: 700;
-  border: none;
-}
-
-.auth-button {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
-  color: white;
-}
-
-.logout-button {
-  color: var(--color-danger);
-}
-
-.locale-picker {
-  position: relative;
-}
-
-.locale-button {
-  width: auto;
-  padding: 0 12px;
-  gap: 8px;
+  background: var(--color-bg-alt);
 }
 
 .locale-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  min-width: 200px;
-  padding: 10px;
-  border-radius: 22px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
 }
 
 .locale-menu-item {
@@ -444,14 +501,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
   text-align: left;
 }
 
 .locale-menu-item.active,
 .locale-menu-item:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--color-bg-alt);
 }
 
 .update-banner-copy {
@@ -475,31 +532,107 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.mobile-only {
+.mobile-brand {
+  display: none;
+}
+
+.mobile-title {
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.top-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 1;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.top-status strong {
+  color: var(--color-text);
+}
+
+.connection-label {
+  color: var(--color-text);
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid currentColor;
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.status-pill.online {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.status-pill.offline {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.top-separator {
+  width: 1px;
+  height: 22px;
+  background: var(--color-border-strong);
+}
+
+.clock-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text);
+}
+
+.clock-chip .app-icon {
+  color: var(--color-success);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-menu-toggle {
   display: none;
 }
 
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 14, 20, 0.38);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.36);
   display: flex;
   justify-content: flex-end;
   padding: 12px;
+  pointer-events: auto;
 }
 
 .mobile-panel {
   width: min(340px, 100%);
   height: 100%;
   min-height: 0;
-  border-radius: 28px;
+  border-radius: var(--radius-sm);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  background: var(--color-sidebar);
 }
 
 .mobile-panel-top {
@@ -536,15 +669,15 @@ onUnmounted(() => {
   gap: 12px;
   min-height: 46px;
   padding: 0 14px;
-  border-radius: 16px;
+  border-radius: var(--radius-sm);
   color: var(--color-text);
   text-decoration: none;
   font-weight: 700;
 }
 
 .mobile-link.router-link-active {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
+  background: var(--color-primary);
+  color: white;
 }
 
 .mobile-section-title {
@@ -565,8 +698,8 @@ onUnmounted(() => {
 .mobile-locale {
   min-height: 52px;
   border: none;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.34);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   color: var(--color-text);
   display: flex;
   flex-direction: column;
@@ -576,8 +709,8 @@ onUnmounted(() => {
 }
 
 .mobile-locale.active {
-  background: var(--color-primary-soft);
-  color: var(--color-primary-strong);
+  background: var(--color-primary);
+  color: white;
 }
 
 .mobile-auth,
@@ -586,7 +719,6 @@ onUnmounted(() => {
 }
 
 .mobile-logout {
-  background: var(--color-danger-soft);
   color: var(--color-danger);
 }
 
@@ -613,22 +745,29 @@ onUnmounted(() => {
 }
 
 @media (max-width: 991px) {
-  .desktop-nav,
-  .desktop-only {
+  .desktop-sidebar {
     display: none;
-  }
-
-  .mobile-only {
-    display: inline-flex;
   }
 
   .header-nav {
-    padding: 10px 12px;
-    border-radius: 24px;
+    left: 0;
+    height: 72px;
+    padding: 0 16px;
   }
 
-  .brand-copy small {
+  .mobile-brand,
+  .mobile-menu-toggle {
+    display: inline-flex;
+  }
+
+  .top-status {
     display: none;
+  }
+
+  .update-banner {
+    left: 8px;
+    right: 8px;
+    top: 78px;
   }
 
   .update-banner {
