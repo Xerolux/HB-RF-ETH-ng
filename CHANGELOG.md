@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.4] - 2026-07-04
+
+### Changes
+- style: align experimental and desktop navigation design
+- chore: rebuild firmware archive
+- fix: load firmware archive from manifest
+- chore: update manifests for v2.2.3-Beta.3
+
 ## [2.2.3-Beta.3] - 2026-07-04
 
 ### Changes
