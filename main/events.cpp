@@ -301,7 +301,7 @@ static bool send_email(const EventEntry &e, const EventMeta &m)
         bool tls_active = false;
         char line[256];
         int code = 0;
-        char hostbuf[64];
+        char hostbuf[65];
         int r = 0;
         unsigned char obuf[128];
         size_t olen = 0;

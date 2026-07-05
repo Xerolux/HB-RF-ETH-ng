@@ -36,13 +36,13 @@ static const char *TAG = "metrics";
 // registration lock.
 static constexpr int MAX_COUNTERS = 32;
 
-struct metrics_counter_impl {
+struct metrics_counter {
     const char *name;
     const char *help;
     std::atomic<uint64_t> value{0};
 };
 
-static metrics_counter_impl s_counters[MAX_COUNTERS];
+static metrics_counter s_counters[MAX_COUNTERS];
 static int s_counter_count = 0;
 static SemaphoreHandle_t s_registry_mutex = NULL;
 
@@ -83,7 +83,7 @@ extern "C" metrics_counter_t metrics_register_counter(const char *name, const ch
 extern "C" void metrics_inc(metrics_counter_t counter, uint64_t delta)
 {
     if (!counter) return;
-    reinterpret_cast<metrics_counter_impl *>(counter)->value.fetch_add(delta, std::memory_order_relaxed);
+    counter->value.fetch_add(delta, std::memory_order_relaxed);
 }
 
 extern "C" void metrics_inc_one(metrics_counter_t counter)
@@ -94,7 +94,7 @@ extern "C" void metrics_inc_one(metrics_counter_t counter)
 extern "C" uint64_t metrics_get(metrics_counter_t counter)
 {
     if (!counter) return 0;
-    return reinterpret_cast<metrics_counter_impl *>(counter)->value.load(std::memory_order_relaxed);
+    return counter->value.load(std::memory_order_relaxed);
 }
 
 extern "C" size_t metrics_render_prometheus(char *out, size_t cap, size_t offset)
