@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.9] - 2026-07-05
+
+### Changes
+- fix: persist log toggle, German umlauts, Experimentell tab overflow
+- docs: correct REST API endpoint paths in CLAUDE.md
+- fix: require current password to change admin password
+- fix: update update_headers.py to scan main/ instead of non-existent src/
+- ci: fix GitHub Actions version pins to known existing versions
+- fix: disable deprecated ESP32_WIFI_ENABLED to reclaim ~30 KB RAM
+- fix: protect Settings with mutex and route factory-reset through settings
+- chore: sync openapi.yaml and CHANGELOG.md with version.txt
+- fix: repair version-update regexes and discover locales dynamically
+- fix: sanitize changelog markdown links and improve close button accessibility
+- fix: store auth token in sessionStorage instead of localStorage
+- fix: validate cJSON types before reading numeric/boolean values
+- fix: protect Ethernet DNS cache with mutex and initialize it
+- fix: serialize MQTT lifecycle and initial TLS handshake
+- fix: allow 32-character admin credentials and clean up class destructors
+- fix: reject over-long OTA URLs instead of silently truncating
+- fix: make secure_strcmp timing-safe and add missing include
+- chore: add missing or incomplete license headers to firmware sources
+- fix: correct HA MQTT update entity discovery config
+- feat: complete new design coverage for all pages, menus, and modals
+- chore: update manifests for v2.2.3-Beta.8
+
 ## [2.2.3-Beta.8] - 2026-07-04
 
 ### Fixed

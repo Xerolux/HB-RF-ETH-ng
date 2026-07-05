@@ -260,7 +260,7 @@ export default {
     otaSuccess: 'Nedladdning lyckades. Installerar...',
     currentVersion: 'Nuvarande Version',
     installedVersion: 'Installerad version',
-    versionInfo: 'Moderniserad fork v2.2.3-Beta.8 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
+    versionInfo: 'Moderniserad fork v2.2.3-Beta.9 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
     updateAvailable: 'Uppdatering tillgänglig!',
     updateAvailableMessage: 'En uppdatering till version {latestVersion} finns tillgänglig.',
     upToDate: 'Den fasta programvaran är uppdaterad',

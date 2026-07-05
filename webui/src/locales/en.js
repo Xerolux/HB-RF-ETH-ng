@@ -267,7 +267,7 @@ export default {
     otaSuccess: 'Download successful. Installing...',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
-    versionInfo: 'Modernized fork v2.2.3-Beta.8 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    versionInfo: 'Modernized fork v2.2.3-Beta.9 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailableMessage: 'An update to version {latestVersion} is available.',
     newVersionAvailable: 'New version {version} is available!',
     viewUpdate: 'View',
