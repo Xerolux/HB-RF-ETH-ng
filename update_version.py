@@ -24,65 +24,55 @@ def update_version_txt(version: str):
 def update_readme(version: str):
     """Update README.md with new version"""
     readme_file = Path("README.md")
-    content = readme_file.read_text(encoding='utf-8')
+    if not readme_file.exists():
+        print("⚠ README.md not found, skipping")
+        return
 
-    # Update the main title (match full semver incl. optional pre-release so
-    # repeated runs are idempotent)
-    content = re.sub(
-        r"# HB-RF-ETH-ng (?:Firmware )?v[\d.]+(?:-[A-Za-z]+\.\d+)?",
-        f"# HB-RF-ETH-ng v{version}",
-        content
-    )
+    content = readme_file.read_text(encoding='utf-8')
 
     # Update version changes section if exists
     content = re.sub(
-        r"\*\*Version [\d.]+ Änderungen:\*\*",
+        r"\*\*Version [\d.]+(?:-[A-Za-z]+\.\d+)? Änderungen:\*\*",
         f"**Version {version} Änderungen:**",
         content
     )
 
     readme_file.write_text(content, encoding='utf-8')
+    print(f"Updated README.md to version {version}")
 def update_locales(version: str):
     """Update version in locale files"""
     # Use full version for display (e.g. "Version 2.1.0")
 
-    locales = ["cs.js", "de.js", "en.js", "es.js", "fr.js", "it.js", "nl.js", "no.js", "pl.js", "sv.js"]
+    locales_dir = Path("webui/src/locales")
+    if not locales_dir.exists():
+        print("⚠ webui/src/locales not found, skipping")
+        return
 
-    for locale in locales:
-        file_path = Path(f"webui/src/locales/{locale}")
-        if file_path.exists():
-            content = file_path.read_text(encoding='utf-8')
-            # Update version: 'Word X.X' (preserves localized "Version" word)
-            content = re.sub(
-                r"(version: '.*? )([\d.]+(?:-[A-Za-z]+\.\d+)?)(\",|',)",
-                f"\\g<1>{version}\\g<3>",
-                content
-            )
-            content = re.sub(
-                r"(versionInfo:.*v)(\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?)",
-                f"\\g<1>{version}",
-                content
-            )
-            file_path.write_text(content, encoding='utf-8')
-            print(f"Updated {locale} to version {version}")
+    for file_path in sorted(locales_dir.glob("*.js")):
+        locale = file_path.name
+        content = file_path.read_text(encoding='utf-8')
+        # Update version: 'Word X.X' (preserves localized "Version" word)
+        content = re.sub(
+            r"(version: '.*? )([\d.]+(?:-[A-Za-z]+\.\d+)?)(\"|,')",
+            f"\\g<1>{version}\\g<3>",
+            content
+        )
+        content = re.sub(
+            r"(versionInfo:.*v)(\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?)",
+            f"\\g<1>{version}",
+            content
+        )
+        file_path.write_text(content, encoding='utf-8')
+        print(f"Updated {locale} to version {version}")
 
 def update_about_vue(version: str):
-    """Update about.vue with new version"""
-    about_file = Path("webui/src/about.vue")
-    content = about_file.read_text(encoding='utf-8')
+    """Update about.vue with new version.
 
-    # Extract major.minor version (e.g., "2.1" from "2.1.0")
-    major_minor = '.'.join(version.split('.')[:2])
-
-    # Update GitHub link (Fork vX.X)
-    content = re.sub(
-        r'<a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_new">GitHub Repository \(Fork v[\d.]+\)</a>',
-        f'<a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_new">GitHub Repository (Fork v{major_minor})</a>',
-        content
-    )
-
-    about_file.write_text(content, encoding='utf-8')
-    print(f"Updated about.vue link to fork version {major_minor}")
+    The about page now reads the version from /sysinfo.json at runtime, so
+    there is no static version string left to update here. This function is
+    kept as a no-op for backwards compatibility with existing release scripts.
+    """
+    print(f"About page uses runtime sysinfo version, skipping static update")
 
 def update_package_json(version: str):
     """Update webui/package.json with new version"""
@@ -130,7 +120,7 @@ def update_openapi_yaml(version: str):
     content = openapi_file.read_text(encoding='utf-8')
 
     content = re.sub(
-        r"version: '[\d.]+(?:-[A-Za-z]+\.\d+)?'",
+        r"version:\s*['\"]?[\d.]+(?:-[A-Za-z]+\.\d+)?['\"]?",
         f"version: '{version}'",
         content
     )
