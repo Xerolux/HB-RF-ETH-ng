@@ -110,7 +110,7 @@ extern "C" size_t metrics_render_prometheus(char *out, size_t cap, size_t offset
     int n = s_counter_count;
     for (int i = 0; i < n; i++) {
         if (offset + 1 >= cap) break;
-        const metrics_counter_impl &c = s_counters[i];
+        const metrics_counter &c = s_counters[i];
         uint64_t v = c.value.load(std::memory_order_relaxed);
         int written = snprintf(out + offset, cap - offset,
                                "# HELP %s %s\n# TYPE %s counter\n%s %llu\n",
