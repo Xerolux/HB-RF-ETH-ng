@@ -10,8 +10,8 @@
         <p class="hero-subtitle">{{ t('monitoring.description') }}</p>
       </div>
       <div class="hero-meta">
-        <span class="meta-chip"><AppIcon name="activity" /> MQTT</span>
-        <span class="meta-chip"><AppIcon name="logs" /> CheckMK</span>
+        <span class="meta-chip"><AppIcon name="activity" /> {{ t('monitoring.chipLabelMqtt') }}</span>
+        <span class="meta-chip"><AppIcon name="logs" /> {{ t('monitoring.chipLabelCheckmk') }}</span>
       </div>
     </section>
 
@@ -27,7 +27,7 @@
         <button class="tool-btn" type="button" :disabled="diagnosticBusy[item.key]" @click="runDiagnostic(item.key)">
           <span v-if="diagnosticBusy[item.key]" class="spinner-border spinner-border-sm me-2"></span>
           <AppIcon v-else name="refresh" />
-          Test
+          {{ t('monitoring.testButton') }}
         </button>
       </article>
     </section>
@@ -412,8 +412,8 @@ const mtlsInconsistent = computed(() => {
 })
 
 const diagnosticCards = computed(() => [
-  { key: 'checkmk', title: 'CheckMK', icon: 'logs', tone: 'warning' },
-  { key: 'mqtt', title: 'MQTT', icon: 'activity', tone: 'success' }
+  { key: 'checkmk', title: t('monitoring.chipLabelCheckmk'), icon: 'logs', tone: 'warning' },
+  { key: 'mqtt', title: t('monitoring.chipLabelMqtt'), icon: 'activity', tone: 'success' }
 ])
 
 const diagnosticState = (target) => {

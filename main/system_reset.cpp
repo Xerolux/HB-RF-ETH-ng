@@ -31,6 +31,12 @@
 
 static const char *TAG = "SystemReset";
 
+static bool g_flashPauseEnabled = false;
+
+void set_flash_pause_enabled(bool enabled) {
+    g_flashPauseEnabled = enabled;
+}
+
 void full_system_restart() {
     ESP_LOGI(TAG, "Initiating full system restart...");
 
@@ -49,8 +55,18 @@ void full_system_restart() {
     gpio_set_level(ETH_POWER_PIN, 0);
     gpio_set_level(HM_RST_PIN, 0);
 
-    // Hold reset for 500ms to ensure peripherals are fully reset
-    vTaskDelay(pdMS_TO_TICKS(500));
+    if (g_flashPauseEnabled) {
+        // Hold Ethernet PHY in reset for 35 s so the CCU watchdog (30 s
+        // timeout) detects the link loss and triggers a clean CCU restart.
+        // The PHY nRST pin is driven, not a power rail — PoE is unaffected.
+        // pdMS_TO_TICKS overflows for large values, so loop in 5 s chunks.
+        ESP_LOGI(TAG, "Flash pause: Ethernet off for 35 s (CCU watchdog trigger)...");
+        for (int i = 0; i < 7; i++) {
+            vTaskDelay(pdMS_TO_TICKS(5000));
+        }
+    } else {
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
 
     ESP_LOGI(TAG, "Peripherals reset complete. Restarting ESP32...");
     esp_restart();

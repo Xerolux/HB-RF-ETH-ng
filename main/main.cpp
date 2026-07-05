@@ -52,6 +52,7 @@
 #include "monitoring.h"
 #include "log_manager.h"
 #include "reset_info.h"
+#include "system_reset.h"
 
 static const char *TAG = "HB-RF-ETH";
 
@@ -136,6 +137,8 @@ void app_main()
             ESP_LOGE(TAG, "System log capture is enabled in settings but the buffer could not be allocated");
         }
     }
+
+    set_flash_pause_enabled(settings.getFlashPause());
 
     static LED powerLED(LED_PWR_PIN);
     static LED statusLED(LED_STATUS_PIN);

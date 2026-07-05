@@ -186,7 +186,7 @@ board_type_t detectBoard()
 
     switch (voltage) // R31/R32
     {
-    case 400 ... 700: // 10K/2K
+    case 400 ... 700: // 10K/2K (Rev 1.10 and 1.11 share the same divider)
         return BOARD_TYPE_REV_1_10_PUB;
 
     case 1500 ... 1800: // 10K/10K
@@ -262,9 +262,9 @@ const char* SysInfo::getBoardRevisionString()
     case BOARD_TYPE_REV_1_8_SK:
         return "REV 1.8 (SK)";
     case BOARD_TYPE_REV_1_10_PUB:
-        return "REV 1.10 (PUB)";
+        return "REV 1.10/1.11 (PUB)";
     case BOARD_TYPE_REV_1_10_SK:
-        return "REV 1.10 (SK)";
+        return "REV 1.10/1.11 (SK)";
     default:
         return "Unknown";
     }

@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Estas funciones están pensadas para pruebas. No hay garantía de funcionamiento ni de visualización.',
     experimentalDesign: 'Diseño de prueba',
     experimentalDesignHint: 'Activa el nuevo diseño experimental. La elección se guarda solo en este navegador y puede desactivarse en cualquier momento.',
+    flashPause: 'Pausa Flash',
+    flashPauseHint: 'Tras una actualización de firmware, desconecta el enlace Ethernet durante 35 s antes de reiniciar, para que el watchdog de la CCU detecte la desconexión y reinicie limpiamente.',
     restoreSuccess: 'Configuración restaurada correctamente. Reiniciando el sistema...',
     restoreError: 'Error al restaurar la configuración',
     backupError: 'Error al descargar la copia de seguridad'
@@ -260,7 +262,7 @@ export default {
     otaSuccess: 'Descarga exitosa. Instalando...',
     currentVersion: 'Versión actual',
     installedVersion: 'Versión instalada',
-    versionInfo: 'Fork modernizado v2.2.3-Beta.9 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    versionInfo: 'Fork modernizado v2.2.3-Beta.10 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: '¡Actualización disponible!',
     updateAvailableMessage: 'Hay una actualización disponible para la versión {latestVersion}.',
     upToDate: 'El firmware está actualizado',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Ejecuta una autocomprobación rápida para verificar la configuración actual.',
+    testButton: 'Test',
     checkFinished: 'Comprobación finalizada',
     diagnosticFailed: 'La solicitud de diagnóstico falló',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Monitoreo',
     description: 'Configure el monitoreo CheckMK y MQTT para la puerta de enlace HB-RF-ETH.',
     save: 'Guardar',
@@ -349,7 +354,7 @@ export default {
       password: 'Contraseña',
       passwordHelp: 'Opcional: Contraseña MQTT',
       topicPrefix: 'Prefijo del tema',
-      topicPrefixHelp: 'Predeterminado: hb-rf-eth-ng - Los temas serán como prefijo/estado/...',
+      topicPrefixHelp: 'Segmento raíz de cada topic MQTT que este dispositivo publica/suscribe. Predeterminado: hb-rf-eth-ng. Ejemplos: "prefijo/status/uptime", "prefijo/status/version", "prefijo/command/update". Visible en su broker MQTT (ej. MQTT Explorer), no en la interfaz Web.',
       haDiscoveryEnabled: 'Descubrimiento de Home Assistant',
       haDiscoveryPrefix: 'Prefijo de descubrimiento',
       haDiscoveryPrefixHelp: 'Predeterminado: homeassistant',

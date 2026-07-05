@@ -107,7 +107,7 @@
           </div>
         </article>
 
-        <article class="card-glass metric-card card-hover">
+        <article v-if="loginStore.isLoggedIn" class="card-glass metric-card card-hover">
           <div class="metric-top">
             <div>
               <div class="metric-label">{{ t('sysinfo.radioModule') }}</div>
@@ -159,7 +159,7 @@
           </div>
         </article>
 
-        <article class="card-glass card-hover">
+        <article v-if="loginStore.isLoggedIn" class="card-glass card-hover">
           <div class="card-section-title">
             <span class="icon-badge info"><AppIcon name="network" /></span>
             <div>
@@ -218,7 +218,7 @@
           </div>
         </article>
 
-        <article class="card-glass card-hover radio-card">
+        <article v-if="loginStore.isLoggedIn" class="card-glass card-hover radio-card">
           <div class="card-section-title">
             <span class="icon-badge warning"><AppIcon name="firmware" /></span>
             <div>
@@ -274,12 +274,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useUpdateStore, useUiStore } from './stores.js'
+import { useSysInfoStore, useUpdateStore, useUiStore, useLoginStore } from './stores.js'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
 const updateStore = useUpdateStore()
 const uiStore = useUiStore()
+const loginStore = useLoginStore()
 const isLoading = ref(true)
 
 const ethernetStatus = computed(() => {

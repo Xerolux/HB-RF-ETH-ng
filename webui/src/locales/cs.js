@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Tyto funkce jsou určeny k testování. Funkčnost ani vzhled nejsou zaručeny.',
     experimentalDesign: 'Testovací design',
     experimentalDesignHint: 'Aktivuje nové experimentální rozvržení. Volba se ukládá pouze v tomto prohlížeči a lze ji kdykoli znovu vypnout.',
+    flashPause: 'Pauza Flash',
+    flashPauseHint: 'Po aktualizaci firmware odpojí Ethernet na 35 s před restartem, aby watchdog CCU detekoval odpojení a provedl čistý restart.',
     restoreSuccess: 'Nastavení úspěšně obnoveno. Restartování systému...',
     restoreError: 'Chyba při obnově nastavení',
     backupError: 'Chyba při stahování zálohy'
@@ -260,7 +262,7 @@ export default {
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.2.3-Beta.9 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.2.3-Beta.10 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Aktualizace k dispozici!',
     updateAvailableMessage: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     upToDate: 'Firmware je aktuální',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Spusťte rychlý autotest pro ověření aktuální konfigurace.',
+    testButton: 'Test',
     checkFinished: 'Kontrola dokončena',
     diagnosticFailed: 'Diagnostický požadavek selhal',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Monitorování',
     description: 'Nakonfigurujte monitorování CheckMK a MQTT pro bránu HB-RF-ETH.',
     save: 'Uložit',
@@ -349,7 +354,7 @@ export default {
       password: 'Heslo',
       passwordHelp: 'Volitelné: Heslo MQTT',
       topicPrefix: 'Prefix tématu',
-      topicPrefixHelp: 'Výchozí: hb-rf-eth-ng - Témata budou jako prefix/status/...',
+      topicPrefixHelp: 'Kořenový segment každého MQTT tématu, které toto zařízení publikuje/odebírá. Výchozí: hb-rf-eth-ng. Příklady: "prefix/status/uptime", "prefix/status/version", "prefix/command/update". Viditelné v MQTT brokeru (např. MQTT Explorer), ne v rozhraní WebUI.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Výchozí: homeassistant',

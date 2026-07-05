@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Deze functies zijn bedoeld om te testen. Er is geen garantie voor werking of weergave.',
     experimentalDesign: 'Testontwerp',
     experimentalDesignHint: 'Schakelt de nieuwe experimentele lay-out in. De keuze wordt alleen in deze browser opgeslagen en kan op elk moment weer worden uitgeschakeld.',
+    flashPause: 'Flash Pauze',
+    flashPauseHint: 'Na een firmware-update wordt de Ethernet-link 35 s verbroken vóór de herstart, zodat de CCU-watchdog de onderbreking detecteert en de CCU schoon opnieuw opstart.',
     restoreSuccess: 'Instellingen succesvol hersteld. Systeem herstart...',
     restoreError: 'Fout bij het herstellen van instellingen',
     backupError: 'Fout bij het downloaden van back-up'
@@ -260,7 +262,7 @@ export default {
     otaSuccess: 'Download succesvol. Installeren...',
     currentVersion: 'Huidige Versie',
     installedVersion: 'Geïnstalleerde versie',
-    versionInfo: 'Gemoderniseerde fork v2.2.3-Beta.9 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
+    versionInfo: 'Gemoderniseerde fork v2.2.3-Beta.10 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Update beschikbaar!',
     updateAvailableMessage: 'Een update naar versie {latestVersion} is beschikbaar.',
     upToDate: 'Firmware is up-to-date',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Voer een snelle zelftest uit om de huidige configuratie te controleren.',
+    testButton: 'Test',
     checkFinished: 'Controle voltooid',
     diagnosticFailed: 'Diagnoseverzoek mislukt',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Monitoring',
     description: 'Configureer CheckMK en MQTT monitoring voor de HB-RF-ETH gateway.',
     save: 'Opslaan',
@@ -349,7 +354,7 @@ export default {
       password: 'Wachtwoord',
       passwordHelp: 'Optioneel: MQTT Wachtwoord',
       topicPrefix: 'Onderwerp Prefix',
-      topicPrefixHelp: 'Standaard: hb-rf-eth-ng - Onderwerpen zullen zijn als prefix/status/...',
+      topicPrefixHelp: 'Wortelsegment van elk MQTT-onderwerp dat dit apparaat publiceert/abonneert. Standaard: hb-rf-eth-ng. Voorbeelden: "prefix/status/uptime", "prefix/status/version", "prefix/command/update". Zichtbaar in uw MQTT-broker (bijv. MQTT Explorer), niet in de WebUI.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Standaard: homeassistant',

@@ -425,6 +425,21 @@
                   >
                 </div>
               </div>
+
+              <div class="switch-row experimental-switch-row">
+                <div class="switch-copy">
+                  <h4>{{ t('settings.flashPause') }}</h4>
+                  <p>{{ t('settings.flashPauseHint') }}</p>
+                </div>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="settingsStore.flashPause"
+                    @change="settingsStore.flashPause = $event.target.checked"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -426,6 +426,7 @@ void add_settings(cJSON *root)
 
     cJSON_AddBoolToObject(settings, "betaChannel", _settings->getBetaChannel());
     cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
+    cJSON_AddBoolToObject(settings, "flashPause", _settings->getFlashPause());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -676,6 +677,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         } else {
             LogManager::stop();
         }
+
+    cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
+    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
+        _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
+        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
+    }
     }
 
     _settings->save();
@@ -910,6 +917,12 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
         _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
+    }
+
+    cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
+    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
+        _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
+        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
     }
 
     _settings->save();

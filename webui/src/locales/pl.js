@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Te funkcje są przeznaczone do testów. Nie ma gwarancji działania ani wyglądu.',
     experimentalDesign: 'Projekt testowy',
     experimentalDesignHint: 'Włącza nowy eksperymentalny układ. Wybór jest zapisywany tylko w tej przeglądarce i można go w każdej chwili wyłączyć.',
+    flashPause: 'Pauza Flash',
+    flashPauseHint: 'Po aktualizacji firmware odłącza łącze Ethernet na 35 s przed restartem, aby watchdog CCU wykrył rozłączenie i uruchomił się ponownie.',
     restoreSuccess: 'Ustawienia przywrócone pomyślnie. Restartowanie systemu...',
     restoreError: 'Błąd przywracania ustawień',
     backupError: 'Błąd pobierania kopii zapasowej'
@@ -260,7 +262,7 @@ export default {
     otaSuccess: 'Pobieranie udane. Instalowanie...',
     currentVersion: 'Obecna Wersja',
     installedVersion: 'Zainstalowana wersja',
-    versionInfo: 'Zmodernizowany fork v2.2.3-Beta.9 autorstwa Xerolux (2025) - Na podstawie oryginalnej pracy Alexandra Reinerta.',
+    versionInfo: 'Zmodernizowany fork v2.2.3-Beta.10 autorstwa Xerolux (2025) - Na podstawie oryginalnej pracy Alexandra Reinerta.',
     updateAvailable: 'Dostępna aktualizacja!',
     updateAvailableMessage: 'Dostępna jest aktualizacja do wersji {latestVersion}.',
     upToDate: 'Oprogramowanie jest aktualne',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Uruchom szybki autotest, aby zweryfikować bieżącą konfigurację.',
+    testButton: 'Test',
     checkFinished: 'Sprawdzanie zakończone',
     diagnosticFailed: 'Żądanie diagnostyczne nie powiodło się',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Monitoring',
     description: 'Skonfiguruj monitoring CheckMK i MQTT dla bramki HB-RF-ETH.',
     save: 'Zapisz',
@@ -349,7 +354,7 @@ export default {
       password: 'Hasło',
       passwordHelp: 'Opcjonalnie: Hasło MQTT',
       topicPrefix: 'Prefiks Tematu',
-      topicPrefixHelp: 'Domyślnie: hb-rf-eth-ng - Tematy będą wyglądać jak prefiks/status/...',
+      topicPrefixHelp: 'Główny segment każdego tematu MQTT publikowanego/subskrybowanego przez to urządzenie. Domyślnie: hb-rf-eth-ng. Przykłady: "prefiks/status/uptime", "prefiks/status/version", "prefiks/command/update". Widoczny w brokerze MQTT (np. MQTT Explorer), nie w WebUI.',
       haDiscoveryEnabled: 'Wykrywanie Home Assistant',
       haDiscoveryPrefix: 'Prefiks Wykrywania',
       haDiscoveryPrefixHelp: 'Domyślnie: homeassistant',

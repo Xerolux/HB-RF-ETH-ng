@@ -78,6 +78,9 @@ private:
   // System log capture persists across reboots when enabled from the WebUI.
   bool _systemLogEnabled;
 
+  // Extend Ethernet drop during restart to >30s so the CCU watchdog triggers.
+  bool _flashPause;
+
   // Serializes concurrent reads/writes across FreeRTOS tasks.
   SemaphoreHandle_t _mutex = NULL;
 
@@ -142,6 +145,9 @@ public:
 
   bool getSystemLogEnabled();
   void setSystemLogEnabled(bool enabled);
+
+  bool getFlashPause();
+  void setFlashPause(bool enabled);
 
   // Authentication token persistence (NVS).  The token survives reboots so
   // the browser "remember me" stays valid after a firmware update or restart.

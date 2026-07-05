@@ -185,6 +185,7 @@ export const useSettingsStore = defineStore('settings', {
     hostname: "",
     adminUsername: "admin",
     systemLogEnabled: false,
+    flashPause: false,
     useDHCP: true,
     localIP: "",
     netmask: "",

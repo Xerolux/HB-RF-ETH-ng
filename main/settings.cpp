@@ -241,6 +241,7 @@ void Settings::load()
   // NVS key max length is 15; do not rename to "systemLogEnabled" (16) — it
   // silently fails with ESP_ERR_NVS_KEY_TOO_LONG and the toggle won't persist.
   GET_BOOL(handle, "sysLogEnabled", _systemLogEnabled, false);
+  GET_BOOL(handle, "flashPause", _flashPause, false);
 
   nvs_close(handle);
 
@@ -303,6 +304,7 @@ void Settings::save()
 
   SET_BOOL(handle, "betaChannel", _betaChannel);
   SET_BOOL(handle, "sysLogEnabled", _systemLogEnabled);
+  SET_BOOL(handle, "flashPause", _flashPause);
 
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
@@ -826,6 +828,21 @@ void Settings::setSystemLogEnabled(bool enabled)
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   _systemLogEnabled = enabled;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+bool Settings::getFlashPause()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _flashPause;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setFlashPause(bool enabled)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  _flashPause = enabled;
   if (_mutex) xSemaphoreGive(_mutex);
 }
 

@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Diese Funktionen sind zum Testen gedacht. Es gibt keine Garantie auf Funktion oder Darstellung.',
     experimentalDesign: 'Testdesign',
     experimentalDesignHint: 'Aktiviert das neue experimentelle Layout. Die Auswahl wird nur in diesem Browser gespeichert und kann jederzeit wieder deaktiviert werden.',
+    flashPause: 'Flash-Pause',
+    flashPauseHint: 'Nach einem Firmware-Update die Ethernet-Verbindung für 35 Sekunden trennen, bevor der Neustart erfolgt. So erkennt der CCU-Watchdog (30 s Timeout) den Verbindungsabbruch und startet die CCU sauber neu — dadurch werden veraltete Verbindungen nach dem Update vermieden.',
     restoreSuccess: 'Einstellungen erfolgreich wiederhergestellt. System startet neu...',
     restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
     backupError: 'Fehler beim Herunterladen der Sicherung'
@@ -267,7 +269,7 @@ export default {
     otaSuccess: 'Download erfolgreich. Installation...',
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
-    versionInfo: 'Modernisierte Fork v2.2.3-Beta.9 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
+    versionInfo: 'Modernisierte Fork v2.2.3-Beta.10 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailableMessage: 'Ein Update auf Version {latestVersion} ist verfügbar.',
     newVersionAvailable: 'Neue Version {version} ist verfügbar!',
     viewUpdate: 'Ansehen',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Führe einen kurzen Selbsttest aus, um die aktuelle Konfiguration zu prüfen.',
+    testButton: 'Test',
     checkFinished: 'Prüfung abgeschlossen',
     diagnosticFailed: 'Diagnoseanfrage fehlgeschlagen',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Monitoring',
     description: 'CheckMK und MQTT Monitoring für das HB-RF-ETH Gateway konfigurieren.',
     save: 'Speichern',

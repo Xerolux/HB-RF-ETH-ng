@@ -170,6 +170,8 @@ export default {
     experimentalWarningText: 'Disse funksjonene er ment for testing. Det gis ingen garanti for funksjon eller utseende.',
     experimentalDesign: 'Testdesign',
     experimentalDesignHint: 'Aktiverer det nye eksperimentelle oppsettet. Valget lagres bare i denne nettleseren og kan deaktiveres når som helst.',
+    flashPause: 'Flash Pause',
+    flashPauseHint: 'Etter en fastvareoppdatering kobles Ethernet-lenken ned i 35 s før omstart, slik at CCU-watchdogen oppdager frakoblingen og starter CCU rent på nytt.',
     restoreSuccess: 'Innstillinger gjenopprettet. Starter systemet på nytt...',
     restoreError: 'Feil ved gjenoppretting av innstillinger',
     backupError: 'Feil ved nedlasting av sikkerhetskopi'
@@ -260,7 +262,7 @@ export default {
     otaSuccess: 'Nedlasting vellykket. Installerer...',
     currentVersion: 'Nåværende Versjon',
     installedVersion: 'Installert versjon',
-    versionInfo: 'Modernisert fork v2.2.3-Beta.9 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
+    versionInfo: 'Modernisert fork v2.2.3-Beta.10 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'Oppdatering tilgjengelig!',
     updateAvailableMessage: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
     upToDate: 'Fastvaren er oppdatert',
@@ -321,8 +323,11 @@ export default {
   // Monitoring
   monitoring: {
     selfTestHint: 'Kjør en rask selvtest for å verifisere gjeldende konfigurasjon.',
+    testButton: 'Test',
     checkFinished: 'Sjekk fullført',
     diagnosticFailed: 'Diagnoseforespørselen mislyktes',
+    chipLabelCheckmk: 'CheckMK',
+    chipLabelMqtt: 'MQTT',
     title: 'Overvåking',
     description: 'Konfigurer CheckMK og MQTT-overvåking for HB-RF-ETH-gatewayen.',
     save: 'Lagre',
@@ -349,7 +354,7 @@ export default {
       password: 'Passord',
       passwordHelp: 'Valgfritt: MQTT Passord',
       topicPrefix: 'Emne-prefiks',
-      topicPrefixHelp: 'Standard: hb-rf-eth-ng - Emner vil være som prefiks/status/...',
+      topicPrefixHelp: 'Rotsegmentet til hvert MQTT-emne denne enheten publiserer/abonnerer på. Standard: hb-rf-eth-ng. Eksempler: "prefiks/status/uptime", "prefiks/status/version", "prefiks/command/update". Synlig i MQTT-megleren din (f.eks. MQTT Explorer), ikke i WebUI.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery-prefiks',
       haDiscoveryPrefixHelp: 'Standard: homeassistant',
