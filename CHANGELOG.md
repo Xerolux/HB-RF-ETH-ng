@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.8] - 2026-07-04
+
+### Fixed
+- fix: migrate legacy MQTT topic prefix `hb-rf-eth` to `hb-rf-eth-ng` and relabel CCU connection in the WebUI.
+
+## [2.2.3-Beta.7] - 2026-07-04
+
+### Fixed
+- fix: resolve `ethernet.cpp` compile errors related to IPv6 address constants and `ip6addr_ntoa_r` typing.
+- fix: cast `esp_ip6_addr_t` to `ip6_addr_t` for `ip6addr_ntoa_r` compatibility.
+- fix: monitoring save-twice bug, improve Home Assistant device name, and add live network details to system info.
+
+### Changed
+- i18n: refine Italian translations for natural phrasing and consistency.
+
 ## [2.2.3-Beta.6] - 2026-07-04
 
 ### Changes
