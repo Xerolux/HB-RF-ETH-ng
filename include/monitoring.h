@@ -31,6 +31,7 @@
 #include "freertos/semphr.h"
 
 // Forward declarations
+class Settings;
 class SysInfo;
 class UpdateCheck;
 class Ethernet;
@@ -87,6 +88,12 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
 void monitoring_set_providers(Ethernet* ethernet,
                               RadioModuleDetector* radioModuleDetector,
                               SystemClock* systemClock);
+
+// Register the Settings instance so MQTT-initiated factory-reset can use
+// Settings::clear() instead of direct NVS calls. Must be called before any
+// MQTT command that could trigger a factory reset.
+void monitoring_set_settings(Settings* settings);
+Settings* monitoring_get_settings(void);
 
 // Update configuration (synchronous - blocks caller)
 esp_err_t monitoring_update_config(const monitoring_config_t *config);

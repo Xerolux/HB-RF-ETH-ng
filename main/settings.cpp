@@ -31,6 +31,10 @@
 
 Settings::Settings()
 {
+  _mutex = xSemaphoreCreateMutex();
+  if (_mutex == NULL) {
+    ESP_LOGE("Settings", "FAILED to create settings mutex - configuration will not be thread-safe");
+  }
   load();
 }
 
@@ -67,6 +71,8 @@ static const char *NVS_NAMESPACE = "HB-RF-ETH";
 
 void Settings::load()
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+
   uint32_t handle = 0;
 
   esp_err_t err = nvs_flash_init();
@@ -235,16 +241,21 @@ void Settings::load()
   GET_BOOL(handle, "systemLogEnabled", _systemLogEnabled, false);
 
   nvs_close(handle);
+
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 void Settings::save()
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+
   uint32_t handle;
 
   esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
   if (err != ESP_OK)
   {
     ESP_LOGE(TAG, "nvs_open failed in save(): %s - settings not persisted", esp_err_to_name(err));
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
 
@@ -293,54 +304,74 @@ void Settings::save()
 
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
+
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 void Settings::clear()
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+
   uint32_t handle;
 
   esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
   if (err != ESP_OK)
   {
     ESP_LOGE(TAG, "nvs_open failed in clear(): %s", esp_err_to_name(err));
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_erase_all(handle));
   ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
   nvs_close(handle);
 
+  if (_mutex) xSemaphoreGive(_mutex);
+
+  // reload defaults (load acquires the mutex again, which is fine because
+  // FreeRTOS mutexes are recursive-safe on ESP-IDF)
   load();
 }
 
 char *Settings::getAdminPassword()
 {
-  return _adminPassword;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _adminPassword;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 char *Settings::getAdminUsername()
 {
-  return _adminUsername;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _adminUsername;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 bool Settings::setAdminPassword(const char *adminPassword)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (adminPassword == nullptr || adminPassword[0] == '\0' || strlen(adminPassword) >= sizeof(_adminPassword) - 1)
   {
     ESP_LOGE(TAG, "Invalid admin password length, keeping current password");
+    if (_mutex) xSemaphoreGive(_mutex);
     return false;
   }
 
   snprintf(_adminPassword, sizeof(_adminPassword), "%s", adminPassword);
   // Mark password as changed when it's explicitly set
   _passwordChanged = true;
+  if (_mutex) xSemaphoreGive(_mutex);
   return true;
 }
 
 bool Settings::setAdminUsername(const char *adminUsername)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (adminUsername == nullptr || adminUsername[0] == '\0' || strlen(adminUsername) >= sizeof(_adminUsername) - 1)
   {
     ESP_LOGE(TAG, "Invalid admin username length, keeping current username");
+    if (_mutex) xSemaphoreGive(_mutex);
     return false;
   }
 
@@ -355,60 +386,88 @@ bool Settings::setAdminUsername(const char *adminUsername)
     if (!valid)
     {
       ESP_LOGE(TAG, "Invalid character in admin username, keeping current username");
+      if (_mutex) xSemaphoreGive(_mutex);
       return false;
     }
   }
 
   snprintf(_adminUsername, sizeof(_adminUsername), "%s", adminUsername);
+  if (_mutex) xSemaphoreGive(_mutex);
   return true;
 }
 
 bool Settings::getPasswordChanged()
 {
-  return _passwordChanged;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _passwordChanged;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 char *Settings::getHostname()
 {
-  return _hostname;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _hostname;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 bool Settings::getUseDHCP()
 {
-  return _useDHCP;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _useDHCP;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 ip4_addr_t Settings::getLocalIP()
 {
-  return _localIP;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  ip4_addr_t result = _localIP;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 ip4_addr_t Settings::getNetmask()
 {
-  return _netmask;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  ip4_addr_t result = _netmask;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 ip4_addr_t Settings::getGateway()
 {
-  return _gateway;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  ip4_addr_t result = _gateway;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 ip4_addr_t Settings::getDns1()
 {
-  return _dns1;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  ip4_addr_t result = _dns1;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 ip4_addr_t Settings::getDns2()
 {
-  return _dns2;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  ip4_addr_t result = _dns2;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t localIP, ip4_addr_t netmask, ip4_addr_t gateway, ip4_addr_t dns1, ip4_addr_t dns2)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   // Validate hostname
   if (!validateHostname(hostname))
   {
     ESP_LOGE(TAG, "Invalid hostname provided, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return false;
   }
 
@@ -418,16 +477,19 @@ bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
     if (!validateIPAddress(localIP))
     {
       ESP_LOGE(TAG, "Invalid local IP address, keeping current settings");
+      if (_mutex) xSemaphoreGive(_mutex);
       return false;
     }
     if (!validateNetmask(netmask))
     {
       ESP_LOGE(TAG, "Invalid netmask, keeping current settings");
+      if (_mutex) xSemaphoreGive(_mutex);
       return false;
     }
     if (!validateIPAddress(gateway))
     {
       ESP_LOGE(TAG, "Invalid gateway, keeping current settings");
+      if (_mutex) xSemaphoreGive(_mutex);
       return false;
     }
   }
@@ -436,11 +498,13 @@ bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
   if (dns1.addr != IPADDR_ANY && !validateIPAddress(dns1))
   {
     ESP_LOGE(TAG, "Invalid DNS1 address, keeping current settings");
+    if (_mutex) xSemaphoreGive(_mutex);
     return false;
   }
   if (dns2.addr != IPADDR_ANY && !validateIPAddress(dns2))
   {
     ESP_LOGE(TAG, "Invalid DNS2 address, keeping current settings");
+    if (_mutex) xSemaphoreGive(_mutex);
     return false;
   }
 
@@ -453,112 +517,187 @@ bool Settings::setNetworkSettings(const char *hostname, bool useDHCP, ip4_addr_t
   _dns1 = dns1;
   _dns2 = dns2;
 
+  if (_mutex) xSemaphoreGive(_mutex);
   return true;
 }
 
 int Settings::getDcfOffset()
 {
-  return _dcfOffset;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _dcfOffset;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setDcfOffset(int dcfOffset)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (!validateDcfOffset(dcfOffset))
   {
     ESP_LOGE(TAG, "Invalid DCF offset, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   _dcfOffset = dcfOffset;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 int Settings::getGpsBaudrate()
 {
-  return _gpsBaudrate;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _gpsBaudrate;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setGpsBaudrate(int gpsBaudrate)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (!validateGpsBaudrate(gpsBaudrate))
   {
     ESP_LOGE(TAG, "Invalid GPS baudrate, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   _gpsBaudrate = gpsBaudrate;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 timesource_t Settings::getTimesource()
 {
-  return (timesource_t)_timesource;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  timesource_t result = (timesource_t)_timesource;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setTimesource(timesource_t timesource)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (timesource < TIMESOURCE_NTP || timesource > TIMESOURCE_GPS)
   {
     ESP_LOGE(TAG, "Invalid time source, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   _timesource = timesource;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 char *Settings::getNtpServer()
 {
-  return _ntpServer;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ntpServer;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setNtpServer(const char *ntpServer)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (!validateNtpServer(ntpServer))
   {
     ESP_LOGE(TAG, "Invalid NTP server, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   strncpy(_ntpServer, ntpServer, sizeof(_ntpServer) - 1);
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 int Settings::getLEDBrightness()
 {
-  return _ledBrightness;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _ledBrightness;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setLEDBrightness(int ledBrightness)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (!validateLEDBrightness(ledBrightness))
   {
     ESP_LOGE(TAG, "Invalid LED brightness, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
   _ledBrightness = ledBrightness;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 int Settings::getLedProgram(int program)
 {
-    if (program < 0 || program >= 7) return 0;
-    return _ledPrograms[program];
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+    if (program < 0 || program >= 7) {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return 0;
+    }
+    int result = _ledPrograms[program];
+    if (_mutex) xSemaphoreGive(_mutex);
+    return result;
 }
 
 void Settings::setLedProgram(int program, int state)
 {
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
     if (program >= 0 && program < 7) {
         // Validate state (0-10)
         if (state >= 0 && state <= 10) {
             _ledPrograms[program] = state;
         }
     }
+    if (_mutex) xSemaphoreGive(_mutex);
 }
 
 // IPv6 Getters
-bool Settings::getEnableIPv6() { return _enableIPv6; }
-char *Settings::getIPv6Mode() { return _ipv6Mode; }
-char *Settings::getIPv6Address() { return _ipv6Address; }
-int Settings::getIPv6PrefixLength() { return _ipv6PrefixLength; }
-char *Settings::getIPv6Gateway() { return _ipv6Gateway; }
-char *Settings::getIPv6Dns1() { return _ipv6Dns1; }
-char *Settings::getIPv6Dns2() { return _ipv6Dns2; }
+bool Settings::getEnableIPv6() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _enableIPv6;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+char *Settings::getIPv6Mode() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ipv6Mode;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+char *Settings::getIPv6Address() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ipv6Address;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+int Settings::getIPv6PrefixLength() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _ipv6PrefixLength;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+char *Settings::getIPv6Gateway() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ipv6Gateway;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+char *Settings::getIPv6Dns1() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ipv6Dns1;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+char *Settings::getIPv6Dns2() {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ipv6Dns2;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
 
 // IPv6 Setter
 void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char *ipv6Address, int ipv6PrefixLength, const char *ipv6Gateway, const char *ipv6Dns1, const char *ipv6Dns2)
 {
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
     _enableIPv6 = enableIPv6;
 
     // Validate IPv6 mode
@@ -597,7 +736,6 @@ void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char
         if (!validateIPv6Address(ipv6Gateway))
         {
             ESP_LOGE(TAG, "Invalid IPv6 gateway, keeping current value");
-            // Don't update _ipv6Gateway if invalid
         }
         else
         {
@@ -611,7 +749,6 @@ void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char
         if (!validateIPv6Address(ipv6Dns1))
         {
             ESP_LOGE(TAG, "Invalid IPv6 DNS1, keeping current value");
-            // Don't update _ipv6Dns1 if invalid
         }
         else
         {
@@ -624,84 +761,122 @@ void Settings::setIPv6Settings(bool enableIPv6, const char *ipv6Mode, const char
         if (!validateIPv6Address(ipv6Dns2))
         {
             ESP_LOGE(TAG, "Invalid IPv6 DNS2, keeping current value");
-            // Don't update _ipv6Dns2 if invalid
         }
         else
         {
             strncpy(_ipv6Dns2, ipv6Dns2, sizeof(_ipv6Dns2) - 1);
         }
     }
+    if (_mutex) xSemaphoreGive(_mutex);
 }
 
 char *Settings::getCCUIP()
 {
-  return _ccuIP;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _ccuIP;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setCCUIP(const char *ip)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   if (ip == NULL || ip[0] == '\0') {
     _ccuIP[0] = 0;
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
 
   if (!validateCcuAddress(ip)) {
     ESP_LOGE(TAG, "Invalid CCU address, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
 
   strncpy(_ccuIP, ip, sizeof(_ccuIP) - 1);
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 bool Settings::getBetaChannel()
 {
-  return _betaChannel;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _betaChannel;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setBetaChannel(bool enabled)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   _betaChannel = enabled;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 bool Settings::getSystemLogEnabled()
 {
-  return _systemLogEnabled;
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _systemLogEnabled;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
 }
 
 void Settings::setSystemLogEnabled(bool enabled)
 {
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   _systemLogEnabled = enabled;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 // ---- Admin token persistence (survives reboots) ---------------------------
 
 bool Settings::loadAdminToken(char *out, size_t size)
 {
-    if (!out || size == 0) return false;
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+    if (!out || size == 0) {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return false;
+    }
     out[0] = '\0';
     nvs_handle_t handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return false;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return false;
+    }
     size_t len = size;
     esp_err_t err = nvs_get_str(handle, "adminToken", out, &len);
     nvs_close(handle);
+    if (_mutex) xSemaphoreGive(_mutex);
     return (err == ESP_OK && len > 1);
 }
 
 void Settings::saveAdminToken(const char *token)
 {
-    if (!token || token[0] == '\0') return;
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+    if (!token || token[0] == '\0') {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return;
+    }
     nvs_handle_t handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return;
+    }
     nvs_set_str(handle, "adminToken", token);
     nvs_commit(handle);
     nvs_close(handle);
+    if (_mutex) xSemaphoreGive(_mutex);
 }
 
 void Settings::clearAdminToken()
 {
+    if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
     nvs_handle_t handle;
-    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
+      if (_mutex) xSemaphoreGive(_mutex);
+      return;
+    }
     nvs_erase_key(handle, "adminToken");
     nvs_commit(handle);
     nvs_close(handle);
+    if (_mutex) xSemaphoreGive(_mutex);
 }

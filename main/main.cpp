@@ -270,6 +270,7 @@ void app_main()
     // radio module info, system clock / NTP sync state). Must happen before
     // monitoring_init() so the very first status publish cycle sees them.
     monitoring_set_providers(&ethernet, &radioModuleDetector, &clk);
+    monitoring_set_settings(&settings);
 
     // Initialize monitoring (CheckMK, MQTT)
     esp_err_t monitoringResult = monitoring_init(NULL, &sysInfo, &updateCheck);

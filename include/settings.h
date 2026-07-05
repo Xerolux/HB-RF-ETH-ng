@@ -26,6 +26,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <lwip/ip4_addr.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 typedef enum
 {
@@ -75,6 +77,9 @@ private:
 
   // System log capture persists across reboots when enabled from the WebUI.
   bool _systemLogEnabled;
+
+  // Serializes concurrent reads/writes across FreeRTOS tasks.
+  SemaphoreHandle_t _mutex = NULL;
 
 public:
   Settings();

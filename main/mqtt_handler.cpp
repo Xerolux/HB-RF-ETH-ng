@@ -25,7 +25,7 @@
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "updatecheck.h"
-#include "nvs_flash.h"
+#include "settings.h"
 #include "reset_info.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
@@ -100,15 +100,12 @@ static void perform_factory_reset()
 
     ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
 
-    nvs_handle_t nvs_handle;
-    esp_err_t err = nvs_open("settings", NVS_READWRITE, &nvs_handle);
-    if (err == ESP_OK) {
-        nvs_erase_all(nvs_handle);
-        nvs_commit(nvs_handle);
-        nvs_close(nvs_handle);
-        ESP_LOGI(TAG, "Settings NVS erased");
+    Settings* settingsPtr = monitoring_get_settings();
+    if (settingsPtr) {
+        settingsPtr->clear();
+        ESP_LOGI(TAG, "Settings NVS erased via Settings::clear()");
     } else {
-        ESP_LOGE(TAG, "Failed to open NVS settings namespace: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Cannot factory-reset: Settings not registered with monitoring");
     }
 
     vTaskDelay(pdMS_TO_TICKS(1000));

@@ -81,8 +81,12 @@ void ResetInfo::storeResetReason(reset_reason_type_t reason) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to store reset reason: %s", esp_err_to_name(err));
     } else {
-        nvs_commit(nvs_handle);
-        ESP_LOGI(TAG, "Stored reset reason: %d", reason);
+        err = nvs_commit(nvs_handle);
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to commit reset reason: %s", esp_err_to_name(err));
+        } else {
+            ESP_LOGI(TAG, "Stored reset reason: %d", reason);
+        }
     }
     nvs_close(nvs_handle);
 }
@@ -166,7 +170,10 @@ void ResetInfo::clearResetReason() {
         return;
     }
 
-    nvs_erase_key(nvs_handle, NVS_KEY);
+    err = nvs_erase_key(nvs_handle, NVS_KEY);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Failed to erase reset reason: %s", esp_err_to_name(err));
+    }
     nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 }

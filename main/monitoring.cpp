@@ -23,6 +23,7 @@
 
 #include "monitoring.h"
 #include "mqtt_handler.h"
+#include "settings.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -86,11 +87,15 @@ static UpdateCheck* g_updateCheck = NULL;
 static Ethernet* g_ethernet = NULL;
 static RadioModuleDetector* g_radioModuleDetector = NULL;
 static SystemClock* g_systemClock = NULL;
+static Settings* g_settings = NULL;
 
 // Provider accessors for mqtt_handler.cpp
 Ethernet* monitoring_get_ethernet(void) { return g_ethernet; }
 RadioModuleDetector* monitoring_get_radiomodule(void) { return g_radioModuleDetector; }
 SystemClock* monitoring_get_systemclock(void) { return g_systemClock; }
+
+void monitoring_set_settings(Settings* settings) { g_settings = settings; }
+Settings* monitoring_get_settings(void) { return g_settings; }
 
 void monitoring_set_providers(Ethernet* ethernet,
                               RadioModuleDetector* radioModuleDetector,
@@ -381,32 +386,41 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
         return err;
     }
 
+#define NVS_CHECK(expr, label) \
+    do { \
+        if ((err = (expr)) != ESP_OK) { \
+            ESP_LOGW(TAG, "NVS write error on %s: %s", label, esp_err_to_name(err)); \
+        } \
+    } while (0)
+
     // Save CheckMK config
-    nvs_set_u8(nvs_handle, NVS_CHECKMK_ENABLED, config->checkmk.enabled);
-    nvs_set_u16(nvs_handle, NVS_CHECKMK_PORT, config->checkmk.port);
-    nvs_set_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts);
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_CHECKMK_ENABLED, config->checkmk.enabled), "checkmk enabled");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_CHECKMK_PORT, config->checkmk.port), "checkmk port");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_CHECKMK_HOSTS, config->checkmk.allowed_hosts), "checkmk hosts");
 
     // Save MQTT config
-    nvs_set_u8(nvs_handle, NVS_MQTT_ENABLED, config->mqtt.enabled);
-    nvs_set_str(nvs_handle, NVS_MQTT_SERVER, config->mqtt.server);
-    nvs_set_u16(nvs_handle, NVS_MQTT_PORT, config->mqtt.port);
-    nvs_set_str(nvs_handle, NVS_MQTT_USER, config->mqtt.user);
-    nvs_set_str(nvs_handle, NVS_MQTT_PASS, config->mqtt.password);
-    nvs_set_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix);
-    nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled);
-    nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix);
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_ENABLED, config->mqtt.enabled), "mqtt enabled");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_SERVER, config->mqtt.server), "mqtt server");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_MQTT_PORT, config->mqtt.port), "mqtt port");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_USER, config->mqtt.user), "mqtt user");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_PASS, config->mqtt.password), "mqtt pass");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_PREFIX, config->mqtt.topic_prefix), "mqtt prefix");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_HA_ENABLED, config->mqtt.ha_discovery_enabled), "mqtt ha");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_HA_PREFIX, config->mqtt.ha_discovery_prefix), "mqtt ha prefix");
 
-    nvs_set_u8(nvs_handle, NVS_MQTT_TLS_EN, config->mqtt.tls_enable);
-    nvs_set_u8(nvs_handle, NVS_MQTT_TLS_SKIP, config->mqtt.tls_skip_verify);
-    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CA,  config->mqtt.tls_ca_certs,  strlen(config->mqtt.tls_ca_certs) + 1);
-    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CRT, config->mqtt.tls_certfile,  strlen(config->mqtt.tls_certfile) + 1);
-    nvs_set_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile,   strlen(config->mqtt.tls_keyfile) + 1);
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_TLS_EN, config->mqtt.tls_enable), "mqtt tls en");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_TLS_SKIP, config->mqtt.tls_skip_verify), "mqtt tls skip");
+    NVS_CHECK(nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CA,  config->mqtt.tls_ca_certs,  strlen(config->mqtt.tls_ca_certs) + 1), "mqtt tls ca");
+    NVS_CHECK(nvs_set_blob(nvs_handle, NVS_MQTT_TLS_CRT, config->mqtt.tls_certfile,  strlen(config->mqtt.tls_certfile) + 1), "mqtt tls crt");
+    NVS_CHECK(nvs_set_blob(nvs_handle, NVS_MQTT_TLS_KEY, config->mqtt.tls_keyfile,   strlen(config->mqtt.tls_keyfile) + 1), "mqtt tls key");
 
     // Command-topic security (Phase A). Default for command_enabled is true
     // so existing installations keep working after the upgrade. The token
     // is optional; if empty no token check is applied.
-    nvs_set_u8(nvs_handle, NVS_MQTT_CMD_EN, config->mqtt.command_enabled ? 1 : 0);
-    nvs_set_str(nvs_handle, NVS_MQTT_CMD_TOK, config->mqtt.command_token);
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_CMD_EN, config->mqtt.command_enabled ? 1 : 0), "mqtt cmd en");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_CMD_TOK, config->mqtt.command_token), "mqtt cmd tok");
+
+#undef NVS_CHECK
 
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
