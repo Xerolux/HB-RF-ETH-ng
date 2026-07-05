@@ -54,6 +54,14 @@
 
 static const char *TAG = "WebUI";
 
+// Safe cJSON number accessor: returns the integer value only when the item
+// exists and is actually a number. Prevents undefined behaviour when the
+// frontend sends an unexpected type.
+static inline int cJSON_GetIntValueSafe(cJSON *item, int defaultValue)
+{
+    return (item && cJSON_IsNumber(item)) ? item->valueint : defaultValue;
+}
+
 #define EMBED_HANDLER(_uri, _resource, _contentType)                   \
     extern const char _resource[] asm("_binary_" #_resource "_start"); \
     extern const size_t _resource##_length asm(#_resource "_length");  \
@@ -469,12 +477,7 @@ ip4_addr_t cJSON_GetIPAddrValue(const cJSON *item)
 
 bool cJSON_GetBoolValue(const cJSON *item)
 {
-    if (item && cJSON_IsBool(item))
-    {
-        return item->type == cJSON_True;
-    }
-
-    return false;
+    return (item && cJSON_IsBool(item)) ? cJSON_IsTrue(item) : false;
 }
 
 void delayed_restart_task(void *pvParameter) {
@@ -522,60 +525,68 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
     ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-    timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
+    timesource_t timesource = (timesource_t)cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "timesource"), (int)_settings->getTimesource());
 
-    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-    int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
+    int dcfOffset = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "dcfOffset"), _settings->getDcfOffset());
 
-    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-    int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
+    int gpsBaudrate = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "gpsBaudrate"), _settings->getGpsBaudrate());
 
     char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-    int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
-    if (ledBrightnessItem) {
+    int ledBrightness = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "ledBrightness"), _settings->getLEDBrightness());
+    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
         LED::setBrightness(ledBrightness);
     }
 
     cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
     if (ledPrograms) {
         cJSON *item;
+        int value;
         item = cJSON_GetObjectItem(ledPrograms, "idle");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
-            LED::setProgram(LED_PROG_IDLE, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_IDLE, value);
+            LED::setProgram(LED_PROG_IDLE, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
-            LED::setProgram(LED_PROG_CCU_DISCONNECTED, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, value);
+            LED::setProgram(LED_PROG_CCU_DISCONNECTED, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
-            LED::setProgram(LED_PROG_CCU_CONNECTED, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_CCU_CONNECTED, value);
+            LED::setProgram(LED_PROG_CCU_CONNECTED, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "update_available");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
-            LED::setProgram(LED_PROG_UPDATE_AVAILABLE, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, value);
+            LED::setProgram(LED_PROG_UPDATE_AVAILABLE, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "error");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
-            LED::setProgram(LED_PROG_ERROR, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_ERROR, value);
+            LED::setProgram(LED_PROG_ERROR, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "booting");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
-            LED::setProgram(LED_PROG_BOOTING, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_BOOTING, value);
+            LED::setProgram(LED_PROG_BOOTING, (led_state_t)value);
         }
         item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
-        if (item) {
-            _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
-            LED::setProgram(LED_PROG_UPDATE_IN_PROGRESS, (led_state_t)item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) {
+            _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, value);
+            LED::setProgram(LED_PROG_UPDATE_IN_PROGRESS, (led_state_t)value);
         }
     }
 
@@ -583,8 +594,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
     char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
     char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-    cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-    int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
+    int ipv6PrefixLength = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "ipv6PrefixLength"), 64);
     char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -624,16 +635,23 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     }
     _settings->setLEDBrightness(ledBrightness);
 
-    // Handle IPv6 (checking for nulls)
-    if (ipv6Mode) {
+    // Handle IPv6 when any IPv6-related field is present so toggling
+    // enableIPv6 to false without sending ipv6Mode still persists.
+    if (cJSON_GetObjectItem(root, "enableIPv6") ||
+        cJSON_GetObjectItem(root, "ipv6Mode") ||
+        cJSON_GetObjectItem(root, "ipv6Address") ||
+        cJSON_GetObjectItem(root, "ipv6PrefixLength") ||
+        cJSON_GetObjectItem(root, "ipv6Gateway") ||
+        cJSON_GetObjectItem(root, "ipv6Dns1") ||
+        cJSON_GetObjectItem(root, "ipv6Dns2")) {
         _settings->setIPv6Settings(
-            enableIPv6,
-            ipv6Mode,
-            ipv6Address ? ipv6Address : "",
-            ipv6PrefixLength,
-            ipv6Gateway ? ipv6Gateway : "",
-            ipv6Dns1 ? ipv6Dns1 : "",
-            ipv6Dns2 ? ipv6Dns2 : ""
+            cJSON_GetObjectItem(root, "enableIPv6") ? enableIPv6 : _settings->getEnableIPv6(),
+            ipv6Mode ? ipv6Mode : _settings->getIPv6Mode(),
+            ipv6Address ? ipv6Address : _settings->getIPv6Address(),
+            cJSON_GetObjectItem(root, "ipv6PrefixLength") ? ipv6PrefixLength : _settings->getIPv6PrefixLength(),
+            ipv6Gateway ? ipv6Gateway : _settings->getIPv6Gateway(),
+            ipv6Dns1 ? ipv6Dns1 : _settings->getIPv6Dns1(),
+            ipv6Dns2 ? ipv6Dns2 : _settings->getIPv6Dns2()
         );
     }
 
@@ -644,13 +662,13 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     // Beta update channel toggle. Optional - omitted when not changed.
     cJSON *betaChannelItem = cJSON_GetObjectItem(root, "betaChannel");
     if (betaChannelItem && cJSON_IsBool(betaChannelItem)) {
-        _settings->setBetaChannel(betaChannelItem->type == cJSON_True);
+        _settings->setBetaChannel(cJSON_IsTrue(betaChannelItem));
     }
 
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
-        _settings->setSystemLogEnabled(systemLogEnabledItem->type == cJSON_True);
-        if (systemLogEnabledItem->type == cJSON_True) {
+        _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
+        if (cJSON_IsTrue(systemLogEnabledItem)) {
             LogManager::begin(8192);
             if (LogManager::instance().isEnabled()) {
                 emit_log_enable_snapshot();
@@ -776,48 +794,56 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     ip4_addr_t dns1 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns1"));
     ip4_addr_t dns2 = cJSON_GetIPAddrValue(cJSON_GetObjectItem(root, "dns2"));
 
-    cJSON *timesourceItem = cJSON_GetObjectItem(root, "timesource");
-    timesource_t timesource = timesourceItem ? (timesource_t)timesourceItem->valueint : _settings->getTimesource();
+    timesource_t timesource = (timesource_t)cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "timesource"), (int)_settings->getTimesource());
 
-    cJSON *dcfOffsetItem = cJSON_GetObjectItem(root, "dcfOffset");
-    int dcfOffset = dcfOffsetItem ? dcfOffsetItem->valueint : _settings->getDcfOffset();
+    int dcfOffset = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "dcfOffset"), _settings->getDcfOffset());
 
-    cJSON *gpsBaudrateItem = cJSON_GetObjectItem(root, "gpsBaudrate");
-    int gpsBaudrate = gpsBaudrateItem ? gpsBaudrateItem->valueint : _settings->getGpsBaudrate();
+    int gpsBaudrate = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "gpsBaudrate"), _settings->getGpsBaudrate());
 
     char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
 
-    cJSON *ledBrightnessItem = cJSON_GetObjectItem(root, "ledBrightness");
-    int ledBrightness = ledBrightnessItem ? ledBrightnessItem->valueint : _settings->getLEDBrightness();
-    if (ledBrightnessItem) {
+    int ledBrightness = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "ledBrightness"), _settings->getLEDBrightness());
+    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
         LED::setBrightness(ledBrightness);
     }
 
     cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
     if (ledPrograms) {
         cJSON *item;
+        int value;
         item = cJSON_GetObjectItem(ledPrograms, "idle");
-        if (item) _settings->setLedProgram(LED_PROG_IDLE, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_IDLE, value);
         item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
-        if (item) _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, value);
         item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
-        if (item) _settings->setLedProgram(LED_PROG_CCU_CONNECTED, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_CCU_CONNECTED, value);
         item = cJSON_GetObjectItem(ledPrograms, "update_available");
-        if (item) _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, value);
         item = cJSON_GetObjectItem(ledPrograms, "error");
-        if (item) _settings->setLedProgram(LED_PROG_ERROR, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_ERROR, value);
         item = cJSON_GetObjectItem(ledPrograms, "booting");
-        if (item) _settings->setLedProgram(LED_PROG_BOOTING, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_BOOTING, value);
         item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
-        if (item) _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, item->valueint);
+        value = cJSON_GetIntValueSafe(item, -1);
+        if (value >= 0) _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, value);
     }
 
     // IPv6
     bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
     char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
     char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
-    cJSON *ipv6PrefixItem = cJSON_GetObjectItem(root, "ipv6PrefixLength");
-    int ipv6PrefixLength = ipv6PrefixItem ? ipv6PrefixItem->valueint : 64;
+    int ipv6PrefixLength = cJSON_GetIntValueSafe(
+        cJSON_GetObjectItem(root, "ipv6PrefixLength"), 64);
     char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
@@ -852,15 +878,21 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     }
     _settings->setLEDBrightness(ledBrightness);
 
-    if (ipv6Mode) {
+    if (cJSON_GetObjectItem(root, "enableIPv6") ||
+        cJSON_GetObjectItem(root, "ipv6Mode") ||
+        cJSON_GetObjectItem(root, "ipv6Address") ||
+        cJSON_GetObjectItem(root, "ipv6PrefixLength") ||
+        cJSON_GetObjectItem(root, "ipv6Gateway") ||
+        cJSON_GetObjectItem(root, "ipv6Dns1") ||
+        cJSON_GetObjectItem(root, "ipv6Dns2")) {
          _settings->setIPv6Settings(
-            enableIPv6,
-            ipv6Mode,
-            ipv6Address ? ipv6Address : "",
-            ipv6PrefixLength,
-            ipv6Gateway ? ipv6Gateway : "",
-            ipv6Dns1 ? ipv6Dns1 : "",
-            ipv6Dns2 ? ipv6Dns2 : ""
+            cJSON_GetObjectItem(root, "enableIPv6") ? enableIPv6 : _settings->getEnableIPv6(),
+            ipv6Mode ? ipv6Mode : _settings->getIPv6Mode(),
+            ipv6Address ? ipv6Address : _settings->getIPv6Address(),
+            cJSON_GetObjectItem(root, "ipv6PrefixLength") ? ipv6PrefixLength : _settings->getIPv6PrefixLength(),
+            ipv6Gateway ? ipv6Gateway : _settings->getIPv6Gateway(),
+            ipv6Dns1 ? ipv6Dns1 : _settings->getIPv6Dns1(),
+            ipv6Dns2 ? ipv6Dns2 : _settings->getIPv6Dns2()
         );
     }
 
@@ -872,12 +904,12 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     // Beta update channel toggle (optional in backup payload).
     cJSON *betaChannelItem = cJSON_GetObjectItem(root, "betaChannel");
     if (betaChannelItem && cJSON_IsBool(betaChannelItem)) {
-        _settings->setBetaChannel(betaChannelItem->type == cJSON_True);
+        _settings->setBetaChannel(cJSON_IsTrue(betaChannelItem));
     }
 
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
-        _settings->setSystemLogEnabled(systemLogEnabledItem->type == cJSON_True);
+        _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
     }
 
     _settings->save();
