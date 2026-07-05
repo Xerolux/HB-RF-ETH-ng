@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.3-Beta.11] - 2026-07-05
 
 ### Changes
-- No new commits since last release
+- feat: Beta.11 — i18n overhaul, flash pause persistence, restart UX
 
 ## [2.2.3-Beta.10] - 2026-07-05
 
