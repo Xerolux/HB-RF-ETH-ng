@@ -64,6 +64,7 @@ private:
   };
   static dns_cache_entry _dns_cache[DNS_CACHE_SIZE];
   static uint64_t _current_time;
+  static SemaphoreHandle_t _dns_cache_mutex;
 
 public:
   Ethernet(Settings *settings);

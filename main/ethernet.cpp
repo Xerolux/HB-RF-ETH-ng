@@ -33,21 +33,33 @@ static const char *TAG = "Ethernet";
 // DNS Cache Implementierung
 Ethernet::dns_cache_entry Ethernet::_dns_cache[Ethernet::DNS_CACHE_SIZE] = {};
 uint64_t Ethernet::_current_time = 0;
+SemaphoreHandle_t Ethernet::_dns_cache_mutex = NULL;
 
 void Ethernet::dnsCacheInit()
 {
+    if (_dns_cache_mutex == NULL) {
+        _dns_cache_mutex = xSemaphoreCreateMutex();
+    }
+    if (_dns_cache_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create DNS cache mutex");
+        return;
+    }
+    xSemaphoreTake(_dns_cache_mutex, portMAX_DELAY);
     // Initialisiere DNS Cache
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         _dns_cache[i].valid = false;
         _dns_cache[i].hostname[0] = '\0';
     }
+    xSemaphoreGive(_dns_cache_mutex);
     ESP_LOGI(TAG, "DNS Cache initialized (%d entries)", Ethernet::DNS_CACHE_SIZE);
 }
 
 bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
 {
     if (!hostname || !ip_addr) return false;
+    if (_dns_cache_mutex == NULL) return false;
 
+    xSemaphoreTake(_dns_cache_mutex, portMAX_DELAY);
     _current_time = (uint64_t)xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
@@ -58,6 +70,7 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
             if (_current_time < _dns_cache[i].expiry_time) {
                 *ip_addr = _dns_cache[i].ip_addr;
                 ESP_LOGD(TAG, "DNS Cache hit: %s -> " IPSTR, hostname, IP2STR(ip_addr));
+                xSemaphoreGive(_dns_cache_mutex);
                 return true;
             } else {
                 // TTL abgelaufen
@@ -66,16 +79,22 @@ bool Ethernet::dnsCacheLookup(const char* hostname, ip4_addr_t* ip_addr)
             }
         }
     }
+    xSemaphoreGive(_dns_cache_mutex);
     return false;
 }
 
 void Ethernet::dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint32_t ttl)
 {
     if (!hostname || !ip_addr) return;
+    if (_dns_cache_mutex == NULL) return;
+
+    xSemaphoreTake(_dns_cache_mutex, portMAX_DELAY);
 
     // Suche nach freiem Slot oder abgelaufenem Eintrag
     int oldest_idx = -1;
     uint32_t oldest_time = UINT32_MAX;
+
+    _current_time = (uint64_t)xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         if (!_dns_cache[i].valid) {
@@ -97,14 +116,18 @@ void Ethernet::dnsCacheAdd(const char* hostname, const ip4_addr_t* ip_addr, uint
         ESP_LOGD(TAG, "DNS Cache added: %s -> " IPSTR " (TTL: %lu)",
                  hostname, IP2STR(ip_addr), ttl);
     }
+    xSemaphoreGive(_dns_cache_mutex);
 }
 
 void Ethernet::dnsCacheClear()
 {
+    if (_dns_cache_mutex == NULL) return;
+    xSemaphoreTake(_dns_cache_mutex, portMAX_DELAY);
     for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
         _dns_cache[i].valid = false;
         _dns_cache[i].hostname[0] = '\0';
     }
+    xSemaphoreGive(_dns_cache_mutex);
     ESP_LOGI(TAG, "DNS Cache cleared");
 }
 
@@ -113,6 +136,8 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
     // Task zum Aufräumen abgelaufener DNS-Einträge (jede Minute)
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(60000)); // 1 Minute
+        if (_dns_cache_mutex == NULL) continue;
+        xSemaphoreTake(_dns_cache_mutex, portMAX_DELAY);
         _current_time = (uint64_t)xTaskGetTickCount() * 1000 / configTICK_RATE_HZ;
 
         for (int i = 0; i < Ethernet::DNS_CACHE_SIZE; i++) {
@@ -121,6 +146,7 @@ void Ethernet::dnsCleanupTask(void* pvParameters)
                 ESP_LOGD(TAG, "DNS Cache entry expired: %s", _dns_cache[i].hostname);
             }
         }
+        xSemaphoreGive(_dns_cache_mutex);
     }
 }
 
@@ -137,6 +163,10 @@ void _handleIPEvent(void *arg, esp_event_base_t event_base, int32_t event_id, vo
 Ethernet::Ethernet(Settings *settings) : _eth_netif(NULL), _eth_handle(NULL), _mac(NULL), _phy(NULL),
                                          _settings(settings), _isConnected(false), _linkSpeed(ETH_SPEED_10M), _duplexMode(ETH_DUPLEX_HALF)
 {
+    // Initialize the DNS cache and its mutex early so lookups/adds are safe
+    // even if called before start().
+    dnsCacheInit();
+
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_loop_create_default());
