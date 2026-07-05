@@ -280,6 +280,7 @@ static bool send_tls(const char *host, uint16_t port, const char *buf, size_t le
         mbedtls_ssl_context ssl;
         mbedtls_ssl_config  conf;
         mbedtls_net_context server_fd;
+        size_t written = 0;
         mbedtls_ssl_init(&ssl);
         mbedtls_ssl_config_init(&conf);
         mbedtls_net_init(&server_fd);
@@ -295,16 +296,13 @@ static bool send_tls(const char *host, uint16_t port, const char *buf, size_t le
         mbedtls_ssl_set_bio(&ssl, &server_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
 
         // hostname check
-        char hostbuf[64];
-        snprintf(hostbuf, sizeof(hostbuf), "%s", host);
-        mbedtls_ssl_set_hostname(&ssl, hostbuf);
+        mbedtls_ssl_set_hostname(&ssl, host);
 
         int r;
         while ((r = mbedtls_ssl_handshake(&ssl)) != 0) {
             if (r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) goto teardown;
         }
 
-        size_t written = 0;
         while (written < len) {
             int w = mbedtls_ssl_write(&ssl, (const unsigned char *)buf + written, len - written);
             if (w == MBEDTLS_ERR_SSL_WANT_READ || w == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
