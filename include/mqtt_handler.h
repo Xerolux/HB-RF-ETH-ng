@@ -36,6 +36,12 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config);
 // Stop MQTT client
 esp_err_t mqtt_handler_stop(void);
 
+// True when the MQTT client is logged in to the broker. Used by the
+// Prometheus exporter (`hbrfeth_mqtt_connected`) and by event/notification
+// sinks to avoid emitting a "disconnected" notification on every transient
+// reconnect attempt.
+bool mqtt_handler_is_connected(void);
+
 // Publish status update (status sensors + LWT "online" marker)
 void mqtt_handler_publish_status(void);
 

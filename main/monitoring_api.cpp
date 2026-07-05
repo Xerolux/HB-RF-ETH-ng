@@ -181,6 +181,57 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(checkmk, "allowedHosts", config.checkmk.allowed_hosts);
     cJSON_AddItemToObject(root, "checkmk", checkmk);
 
+    // Prometheus config (Phase A)
+    cJSON *prom = cJSON_CreateObject();
+    if (!prom)
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    }
+    cJSON_AddBoolToObject(prom, "enabled", config.prometheus.enabled);
+    cJSON_AddNumberToObject(prom, "port", config.prometheus.port);
+    cJSON_AddStringToObject(prom, "allowedHosts", config.prometheus.allowed_hosts);
+    cJSON_AddItemToObject(root, "prometheus", prom);
+
+    // Syslog config (Phase B)
+    cJSON *syslog = cJSON_CreateObject();
+    if (!syslog)
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    }
+    cJSON_AddBoolToObject(syslog, "enabled", config.syslog.enabled);
+    cJSON_AddStringToObject(syslog, "server", config.syslog.server);
+    cJSON_AddNumberToObject(syslog, "port", config.syslog.port);
+    cJSON_AddNumberToObject(syslog, "transport", config.syslog.transport);
+    cJSON_AddNumberToObject(syslog, "minSeverity", config.syslog.min_severity);
+    cJSON_AddStringToObject(syslog, "hostname", config.syslog.hostname);
+    cJSON_AddItemToObject(root, "syslog", syslog);
+
+    // Notify config (Phase C/D) — secrets are echoed back only as "is set"
+    // booleans, matching the MQTT password pattern.
+    cJSON *notify = cJSON_CreateObject();
+    if (!notify)
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    }
+    cJSON_AddBoolToObject(notify, "enabled", config.notify.enabled);
+    cJSON_AddNumberToObject(notify, "channels", config.notify.channels);
+    cJSON_AddStringToObject(notify, "webhookUrl", config.notify.webhook_url);
+    cJSON_AddBoolToObject(notify, "webhookSecretSet", strlen(config.notify.webhook_secret) > 0);
+    cJSON_AddStringToObject(notify, "telegramChatId", config.notify.telegram_chatid);
+    cJSON_AddBoolToObject(notify, "telegramTokenSet", strlen(config.notify.telegram_token) > 0);
+    cJSON_AddStringToObject(notify, "smtpServer", config.notify.smtp_server);
+    cJSON_AddNumberToObject(notify, "smtpPort", config.notify.smtp_port);
+    cJSON_AddNumberToObject(notify, "smtpTls", config.notify.smtp_tls);
+    cJSON_AddStringToObject(notify, "smtpUser", config.notify.smtp_user);
+    cJSON_AddStringToObject(notify, "smtpFrom", config.notify.smtp_from);
+    cJSON_AddStringToObject(notify, "smtpTo", config.notify.smtp_to);
+    cJSON_AddBoolToObject(notify, "smtpPasswordSet", strlen(config.notify.smtp_password) > 0);
+    cJSON_AddNumberToObject(notify, "cooldownSeconds", config.notify.cooldown_seconds);
+    cJSON_AddItemToObject(root, "notify", notify);
+
     char *json_string = cJSON_Print(root);
     cJSON_Delete(root);
 
@@ -451,6 +502,173 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                               sizeof(config.mqtt.command_token),
                               commandToken->valuestring);
         }
+    }
+
+    // Parse Prometheus config (Phase A)
+    cJSON *prom = cJSON_GetObjectItem(root, "prometheus");
+    if (prom != NULL)
+    {
+        cJSON *pen = cJSON_GetObjectItem(prom, "enabled");
+        if (pen && cJSON_IsBool(pen)) config.prometheus.enabled = cJSON_IsTrue(pen);
+
+        cJSON *pport = cJSON_GetObjectItem(prom, "port");
+        if (pport && cJSON_IsNumber(pport)) {
+            if (!validatePort(pport->valueint)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Invalid Prometheus port");
+            }
+            config.prometheus.port = pport->valueint;
+        }
+        cJSON *phosts = cJSON_GetObjectItem(prom, "allowedHosts");
+        if (phosts && cJSON_IsString(phosts)) {
+            if (!validateStringLength(phosts->valuestring, sizeof(config.prometheus.allowed_hosts) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Prometheus allowed hosts too long");
+            }
+            copy_string_field(config.prometheus.allowed_hosts,
+                              sizeof(config.prometheus.allowed_hosts),
+                              phosts->valuestring);
+        }
+    }
+
+    // Parse Syslog config (Phase B)
+    cJSON *syslog = cJSON_GetObjectItem(root, "syslog");
+    if (syslog != NULL)
+    {
+        cJSON *sen = cJSON_GetObjectItem(syslog, "enabled");
+        if (sen && cJSON_IsBool(sen)) config.syslog.enabled = cJSON_IsTrue(sen);
+
+        cJSON *ssrv = cJSON_GetObjectItem(syslog, "server");
+        if (ssrv && cJSON_IsString(ssrv)) {
+            if (config.syslog.enabled || strlen(ssrv->valuestring) > 0) {
+                if (!validateServerAddress(ssrv->valuestring, sizeof(config.syslog.server) - 1)) {
+                    cJSON_Delete(root);
+                    return send_json_error(req, "Syslog server is empty or invalid");
+                }
+            }
+            copy_string_field(config.syslog.server, sizeof(config.syslog.server), ssrv->valuestring);
+        }
+        cJSON *sport = cJSON_GetObjectItem(syslog, "port");
+        if (sport && cJSON_IsNumber(sport)) {
+            if (!validatePort(sport->valueint)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Invalid syslog port");
+            }
+            config.syslog.port = sport->valueint;
+        }
+        cJSON *sxp = cJSON_GetObjectItem(syslog, "transport");
+        if (sxp && cJSON_IsNumber(sxp)) config.syslog.transport = (uint8_t)sxp->valueint;
+        cJSON *ssev = cJSON_GetObjectItem(syslog, "minSeverity");
+        if (ssev && cJSON_IsNumber(ssev)) config.syslog.min_severity = (uint8_t)ssev->valueint;
+        cJSON *shost = cJSON_GetObjectItem(syslog, "hostname");
+        if (shost && cJSON_IsString(shost)) {
+            if (!validateStringLength(shost->valuestring, sizeof(config.syslog.hostname) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Syslog hostname override too long");
+            }
+            copy_string_field(config.syslog.hostname, sizeof(config.syslog.hostname), shost->valuestring);
+        }
+    }
+
+    // Parse Notify config (Phase C/D)
+    cJSON *notify = cJSON_GetObjectItem(root, "notify");
+    if (notify != NULL)
+    {
+        cJSON *nen = cJSON_GetObjectItem(notify, "enabled");
+        if (nen && cJSON_IsBool(nen)) config.notify.enabled = cJSON_IsTrue(nen);
+        cJSON *nch = cJSON_GetObjectItem(notify, "channels");
+        if (nch && cJSON_IsNumber(nch)) config.notify.channels = (uint8_t)nch->valueint;
+
+        cJSON *nurl = cJSON_GetObjectItem(notify, "webhookUrl");
+        if (nurl && cJSON_IsString(nurl)) {
+            if (!validateStringLength(nurl->valuestring, sizeof(config.notify.webhook_url) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Webhook URL too long");
+            }
+            copy_string_field(config.notify.webhook_url, sizeof(config.notify.webhook_url), nurl->valuestring);
+        }
+        cJSON *nwsc = cJSON_GetObjectItem(notify, "webhookSecretClear");
+        if (nwsc && cJSON_IsTrue(nwsc)) config.notify.webhook_secret[0] = '\0';
+        cJSON *nws = cJSON_GetObjectItem(notify, "webhookSecret");
+        if (nws && cJSON_IsString(nws) && strlen(nws->valuestring) > 0) {
+            if (!validateStringLength(nws->valuestring, sizeof(config.notify.webhook_secret) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Webhook secret too long");
+            }
+            copy_string_field(config.notify.webhook_secret, sizeof(config.notify.webhook_secret), nws->valuestring);
+        }
+        cJSON *ntgtok = cJSON_GetObjectItem(notify, "telegramTokenClear");
+        if (ntgtok && cJSON_IsTrue(ntgtok)) config.notify.telegram_token[0] = '\0';
+        cJSON *ntg = cJSON_GetObjectItem(notify, "telegramToken");
+        if (ntg && cJSON_IsString(ntg) && strlen(ntg->valuestring) > 0) {
+            if (!validateStringLength(ntg->valuestring, sizeof(config.notify.telegram_token) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Telegram token too long");
+            }
+            copy_string_field(config.notify.telegram_token, sizeof(config.notify.telegram_token), ntg->valuestring);
+        }
+        cJSON *ntc = cJSON_GetObjectItem(notify, "telegramChatId");
+        if (ntc && cJSON_IsString(ntc)) {
+            if (!validateStringLength(ntc->valuestring, sizeof(config.notify.telegram_chatid) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Telegram chat id too long");
+            }
+            copy_string_field(config.notify.telegram_chatid, sizeof(config.notify.telegram_chatid), ntc->valuestring);
+        }
+        cJSON *nsrv = cJSON_GetObjectItem(notify, "smtpServer");
+        if (nsrv && cJSON_IsString(nsrv)) {
+            if (!validateStringLength(nsrv->valuestring, sizeof(config.notify.smtp_server) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP server too long");
+            }
+            copy_string_field(config.notify.smtp_server, sizeof(config.notify.smtp_server), nsrv->valuestring);
+        }
+        cJSON *nsp = cJSON_GetObjectItem(notify, "smtpPort");
+        if (nsp && cJSON_IsNumber(nsp)) {
+            if (!validatePort(nsp->valueint)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Invalid SMTP port");
+            }
+            config.notify.smtp_port = nsp->valueint;
+        }
+        cJSON *nstls = cJSON_GetObjectItem(notify, "smtpTls");
+        if (nstls && cJSON_IsNumber(nstls)) config.notify.smtp_tls = (uint8_t)nstls->valueint;
+        cJSON *nsu = cJSON_GetObjectItem(notify, "smtpUser");
+        if (nsu && cJSON_IsString(nsu)) {
+            if (!validateStringLength(nsu->valuestring, sizeof(config.notify.smtp_user) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP user too long");
+            }
+            copy_string_field(config.notify.smtp_user, sizeof(config.notify.smtp_user), nsu->valuestring);
+        }
+        cJSON *nspwclear = cJSON_GetObjectItem(notify, "smtpPasswordClear");
+        if (nspwclear && cJSON_IsTrue(nspwclear)) config.notify.smtp_password[0] = '\0';
+        cJSON *nspw = cJSON_GetObjectItem(notify, "smtpPassword");
+        if (nspw && cJSON_IsString(nspw) && strlen(nspw->valuestring) > 0) {
+            if (!validateStringLength(nspw->valuestring, sizeof(config.notify.smtp_password) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP password too long");
+            }
+            copy_string_field(config.notify.smtp_password, sizeof(config.notify.smtp_password), nspw->valuestring);
+        }
+        cJSON *nsf = cJSON_GetObjectItem(notify, "smtpFrom");
+        if (nsf && cJSON_IsString(nsf)) {
+            if (!validateStringLength(nsf->valuestring, sizeof(config.notify.smtp_from) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP from too long");
+            }
+            copy_string_field(config.notify.smtp_from, sizeof(config.notify.smtp_from), nsf->valuestring);
+        }
+        cJSON *nsto = cJSON_GetObjectItem(notify, "smtpTo");
+        if (nsto && cJSON_IsString(nsto)) {
+            if (!validateStringLength(nsto->valuestring, sizeof(config.notify.smtp_to) - 1)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP to too long");
+            }
+            copy_string_field(config.notify.smtp_to, sizeof(config.notify.smtp_to), nsto->valuestring);
+        }
+        cJSON *ncd = cJSON_GetObjectItem(notify, "cooldownSeconds");
+        if (ncd && cJSON_IsNumber(ncd)) config.notify.cooldown_seconds = ncd->valueint;
     }
 
     cJSON_Delete(root);

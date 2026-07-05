@@ -28,6 +28,7 @@
 #include "settings.h"
 #include "reset_info.h"
 #include "system_reset.h"
+#include "events.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
@@ -48,6 +49,9 @@ static const char *TAG = "MQTT";
 
 static esp_mqtt_client_handle_t client = NULL;
 static std::atomic<bool> mqtt_running{false};
+// Tracks the broker login state. Set in MQTT_EVENT_CONNECTED and cleared in
+// MQTT_EVENT_DISCONNECTED / stop(). Read by prometheus.cpp and events.cpp.
+static std::atomic<bool> mqtt_connected{false};
 static std::atomic<TaskHandle_t> mqtt_publish_task_handle{NULL};
 static std::atomic<bool> mqtt_publish_request{false};
 static mqtt_config_t current_mqtt_config;
@@ -220,6 +224,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+        mqtt_connected.store(true);
+        // Notify subscribers. Suppressed by the cooldown window if this is a
+        // rapid reconnect flap.
+        events_emit(EVENT_MQTT_RECONNECTED, nullptr);
         // Birth message: announce we are online (retained so subscribers see
         // it immediately, even before the next status cycle). The matching
         // LWT below flips this to "offline" if the connection drops
@@ -242,6 +250,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        mqtt_connected.store(false);
+        events_emit(EVENT_MQTT_DISCONNECTED, nullptr);
         break;
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
@@ -968,6 +978,7 @@ esp_err_t mqtt_handler_stop(void)
 
     ESP_LOGI(TAG, "Stopping MQTT client");
     mqtt_running.store(false);
+    mqtt_connected.store(false);
 
     if (client) {
         esp_mqtt_client_stop(client);
@@ -991,4 +1002,9 @@ esp_err_t mqtt_handler_stop(void)
 
     xSemaphoreGive(mqtt_lifecycle_mutex);
     return ESP_OK;
+}
+
+bool mqtt_handler_is_connected(void)
+{
+    return mqtt_connected.load();
 }

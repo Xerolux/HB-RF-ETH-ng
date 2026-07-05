@@ -280,6 +280,214 @@
       </Transition>
     </div>
 
+    <!-- Prometheus exporter card (Phase A) -->
+    <div class="settings-card card-glass">
+      <div class="card-header">
+        <div class="header-content">
+          <div class="header-icon bg-info-light text-info"><AppIcon name="activity" /></div>
+          <h3>{{ t('monitoring.prometheus.title') }}</h3>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" v-model="prometheusConfig.enabled">
+        </div>
+      </div>
+      <Transition name="expand">
+        <div v-if="prometheusConfig.enabled" class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ t('monitoring.prometheus.port') }}</label>
+              <BFormInput v-model.number="prometheusConfig.port" type="number" min="1" max="65535" />
+              <div class="form-text">{{ t('monitoring.prometheus.portHelp') }}</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ t('monitoring.prometheus.allowedHosts') }}</label>
+              <BFormInput v-model="prometheusConfig.allowedHosts" />
+              <div class="form-text">{{ t('monitoring.prometheus.allowedHostsHelp') }}</div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Syslog forwarder card (Phase B) -->
+    <div class="settings-card card-glass">
+      <div class="card-header">
+        <div class="header-content">
+          <div class="header-icon bg-info-light text-info"><AppIcon name="logs" /></div>
+          <h3>{{ t('monitoring.syslog.title') }}</h3>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" v-model="syslogConfig.enabled">
+        </div>
+      </div>
+      <Transition name="expand">
+        <div v-if="syslogConfig.enabled" class="card-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">{{ t('monitoring.syslog.server') }}</label>
+              <BFormInput v-model="syslogConfig.server" />
+              <div class="form-text">{{ t('monitoring.syslog.serverHelp') }}</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ t('monitoring.syslog.port') }}</label>
+              <BFormInput v-model.number="syslogConfig.port" type="number" min="1" max="65535" />
+              <div class="form-text">{{ t('monitoring.syslog.portHelp') }}</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ t('monitoring.syslog.transport') }}</label>
+              <select class="form-select" v-model.number="syslogConfig.transport">
+                <option :value="0">UDP</option>
+                <option :value="1">TCP</option>
+                <option :value="2">TLS</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ t('monitoring.syslog.minSeverity') }}</label>
+              <select class="form-select" v-model.number="syslogConfig.minSeverity">
+                <option :value="0">EMERG</option>
+                <option :value="1">ALERT</option>
+                <option :value="2">CRIT</option>
+                <option :value="3">ERR</option>
+                <option :value="4">WARNING</option>
+                <option :value="5">NOTICE</option>
+                <option :value="6">INFO</option>
+                <option :value="7">DEBUG</option>
+              </select>
+              <div class="form-text">{{ t('monitoring.syslog.minSeverityHelp') }}</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">{{ t('monitoring.syslog.hostname') }}</label>
+              <BFormInput v-model="syslogConfig.hostname" />
+              <div class="form-text">{{ t('monitoring.syslog.hostnameHelp') }}</div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </div>
+
+    <!-- Event notifications card (Phase C/D) -->
+    <div class="settings-card card-glass">
+      <div class="card-header">
+        <div class="header-content">
+          <div class="header-icon bg-info-light text-info"><AppIcon name="activity" /></div>
+          <h3>{{ t('monitoring.notify.title') }}</h3>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" v-model="notifyConfig.enabled">
+        </div>
+      </div>
+      <Transition name="expand">
+        <div v-if="notifyConfig.enabled" class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ t('monitoring.notify.channels') }}</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" :value="1"
+                  :checked="!!(notifyConfig.channels & 1)"
+                  @change="notifyConfig.channels = $event.target.checked ? (notifyConfig.channels | 1) : (notifyConfig.channels & ~1)">
+                <label class="form-check-label">{{ t('monitoring.notify.channelWebhook') }}</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" :value="2"
+                  :checked="!!(notifyConfig.channels & 2)"
+                  @change="notifyConfig.channels = $event.target.checked ? (notifyConfig.channels | 2) : (notifyConfig.channels & ~2)">
+                <label class="form-check-label">{{ t('monitoring.notify.channelTelegram') }}</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" :value="4"
+                  :checked="!!(notifyConfig.channels & 4)"
+                  @change="notifyConfig.channels = $event.target.checked ? (notifyConfig.channels | 4) : (notifyConfig.channels & ~4)">
+                <label class="form-check-label">{{ t('monitoring.notify.channelEmail') }}</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ t('monitoring.notify.cooldown') }}</label>
+              <BFormInput v-model.number="notifyConfig.cooldownSeconds" type="number" min="0" max="86400" />
+              <div class="form-text">{{ t('monitoring.notify.cooldownHelp') }}</div>
+            </div>
+
+            <div v-if="notifyConfig.channels & 1" class="col-12 mt-3">
+              <h4>{{ t('monitoring.notify.webhookSection') }}</h4>
+              <label class="form-label">{{ t('monitoring.notify.webhookUrl') }}</label>
+              <BFormInput v-model="notifyConfig.webhookUrl" />
+              <label class="form-label mt-2">{{ t('monitoring.notify.webhookSecret') }}</label>
+              <div class="d-flex gap-2 align-items-center">
+                <BFormInput v-model="notifyConfig.webhookSecret" type="password"
+                            :placeholder="notifyConfig.webhookSecretSet ? t('monitoring.notify.secretPresent') : ''" />
+                <button v-if="notifyConfig.webhookSecretSet && !notifyConfig.webhookSecret"
+                        type="button" class="btn-link-danger"
+                        @click="clearNotifySecret('webhookSecret', 'webhookSecretClear', 'webhookSecretSet')">
+                  {{ t('common.clear') }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="notifyConfig.channels & 2" class="col-12 mt-3">
+              <h4>{{ t('monitoring.notify.telegramSection') }}</h4>
+              <label class="form-label">{{ t('monitoring.notify.telegramToken') }}</label>
+              <div class="d-flex gap-2 align-items-center">
+                <BFormInput v-model="notifyConfig.telegramToken" type="password"
+                            :placeholder="notifyConfig.telegramTokenSet ? t('monitoring.notify.secretPresent') : ''" />
+                <button v-if="notifyConfig.telegramTokenSet && !notifyConfig.telegramToken"
+                        type="button" class="btn-link-danger"
+                        @click="clearNotifySecret('telegramToken', 'telegramTokenClear', 'telegramTokenSet')">
+                  {{ t('common.clear') }}
+                </button>
+              </div>
+              <label class="form-label mt-2">{{ t('monitoring.notify.telegramChatId') }}</label>
+              <BFormInput v-model="notifyConfig.telegramChatId" />
+            </div>
+
+            <div v-if="notifyConfig.channels & 4" class="col-12 mt-3">
+              <h4>{{ t('monitoring.notify.smtpSection') }}</h4>
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label">{{ t('monitoring.notify.smtpServer') }}</label>
+                  <BFormInput v-model="notifyConfig.smtpServer" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ t('monitoring.notify.smtpPort') }}</label>
+                  <BFormInput v-model.number="notifyConfig.smtpPort" type="number" min="1" max="65535" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('monitoring.notify.smtpTls') }}</label>
+                  <select class="form-select" v-model.number="notifyConfig.smtpTls">
+                    <option :value="0">{{ t('monitoring.notify.smtpTlsNone') }}</option>
+                    <option :value="1">{{ t('monitoring.notify.smtpTlsStarttls') }}</option>
+                    <option :value="2">{{ t('monitoring.notify.smtpTlsImplicit') }}</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('monitoring.notify.smtpUser') }}</label>
+                  <BFormInput v-model="notifyConfig.smtpUser" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('monitoring.notify.smtpPassword') }}</label>
+                  <div class="d-flex gap-2 align-items-center">
+                    <BFormInput v-model="notifyConfig.smtpPassword" type="password"
+                                :placeholder="notifyConfig.smtpPasswordSet ? t('monitoring.notify.secretPresent') : ''" />
+                    <button v-if="notifyConfig.smtpPasswordSet && !notifyConfig.smtpPassword"
+                            type="button" class="btn-link-danger"
+                            @click="clearNotifySecret('smtpPassword', 'smtpPasswordClear', 'smtpPasswordSet')">
+                      {{ t('common.clear') }}
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('monitoring.notify.smtpFrom') }}</label>
+                  <BFormInput v-model="notifyConfig.smtpFrom" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('monitoring.notify.smtpTo') }}</label>
+                  <BFormInput v-model="notifyConfig.smtpTo" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </div>
+
     <Transition name="slide-up">
       <div v-if="hasChanges" class="floating-footer">
         <div class="footer-container">
@@ -298,7 +506,6 @@
     </Transition>
   </div>
 </template>
-
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -309,14 +516,17 @@ const { t, te } = useI18n()
 
 const monitoringStore = useMonitoringStore()
 const uiStore = useUiStore()
-const { checkmk: checkmkConfig, mqtt: mqttConfig } = storeToRefs(monitoringStore)
+const { checkmk: checkmkConfig, mqtt: mqttConfig,
+        prometheus: prometheusConfig, syslog: syslogConfig,
+        notify: notifyConfig } = storeToRefs(monitoringStore)
 
 const saving = ref(false)
-const diagnosticBusy = ref({ checkmk: false, mqtt: false })
+const diagnosticBusy = ref({ checkmk: false, mqtt: false, prometheus: false, syslog: false, notify: false })
 const hasChanges = ref(false)
 const originalConfig = ref('')
 
-const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false })
+const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false,
+                            webhookSecretClear: false, telegramTokenClear: false, smtpPasswordClear: false })
 const pemFeedback = ref({ tlsCaCerts: null, tlsCertfile: null, tlsKeyfile: null })
 
 const MAX_PEM_BYTES = 8 * 1024
@@ -405,6 +615,12 @@ function clearCommandToken() {
   tlsClearFlags.value.commandTokenClear = true
 }
 
+function clearNotifySecret(field, clearFlag, setFlag) {
+  notifyConfig.value[field] = ''
+  notifyConfig.value[setFlag] = false
+  tlsClearFlags.value[clearFlag] = true
+}
+
 const mtlsInconsistent = computed(() => {
   const hasCert = !!(mqttConfig.value.tlsCertfile || mqttConfig.value.tlsCertfileSet)
   const hasKey  = !!(mqttConfig.value.tlsKeyfile  || mqttConfig.value.tlsKeyfileSet)
@@ -413,7 +629,10 @@ const mtlsInconsistent = computed(() => {
 
 const diagnosticCards = computed(() => [
   { key: 'checkmk', title: t('monitoring.chipLabelCheckmk'), icon: 'logs', tone: 'warning' },
-  { key: 'mqtt', title: t('monitoring.chipLabelMqtt'), icon: 'activity', tone: 'success' }
+  { key: 'mqtt', title: t('monitoring.chipLabelMqtt'), icon: 'activity', tone: 'success' },
+  { key: 'prometheus', title: t('monitoring.chipLabelPrometheus'), icon: 'activity', tone: 'info' },
+  { key: 'syslog', title: t('monitoring.chipLabelSyslog'), icon: 'logs', tone: 'info' },
+  { key: 'notify', title: t('monitoring.chipLabelNotify'), icon: 'activity', tone: 'info' }
 ])
 
 const diagnosticState = (target) => {
@@ -441,6 +660,12 @@ function formatDiagnosticMessage(result) {
     const params = {}
     if (result.host) params.host = result.host
     if (result.port !== undefined && result.port !== null) params.port = result.port
+    // The notify diagnostic embeds the channel bitmask in its message;
+    // expose it as {mask} for translation.
+    if (code === 'monitoring.diag.notify.queued' && result.message) {
+      const m = result.message.match(/0x([0-9a-fA-F]+)/)
+      if (m) params.mask = m[1]
+    }
     let msg = t(code, params)
     if (result.tlsEnabled && TLS_AWARE_CODES.has(code) && te('monitoring.diag.mqtt.tls_note')) {
       msg += t('monitoring.diag.mqtt.tls_note')
@@ -454,13 +679,25 @@ function formatDiagnosticMessage(result) {
 onMounted(async () => {
   try {
     await monitoringStore.load()
-    originalConfig.value = JSON.stringify({ checkmk: { ...checkmkConfig.value }, mqtt: { ...mqttConfig.value } })
+    originalConfig.value = JSON.stringify({
+      checkmk: { ...checkmkConfig.value },
+      mqtt: { ...mqttConfig.value },
+      prometheus: { ...prometheusConfig.value },
+      syslog: { ...syslogConfig.value },
+      notify: { ...notifyConfig.value }
+    })
   } catch (error) {}
 })
 
-watch([checkmkConfig, mqttConfig], () => {
+watch([checkmkConfig, mqttConfig, prometheusConfig, syslogConfig, notifyConfig], () => {
   if (originalConfig.value) {
-    hasChanges.value = JSON.stringify({ checkmk: { ...checkmkConfig.value }, mqtt: { ...mqttConfig.value } }) !== originalConfig.value
+    hasChanges.value = JSON.stringify({
+      checkmk: { ...checkmkConfig.value },
+      mqtt: { ...mqttConfig.value },
+      prometheus: { ...prometheusConfig.value },
+      syslog: { ...syslogConfig.value },
+      notify: { ...notifyConfig.value }
+    }) !== originalConfig.value
   }
 }, { deep: true })
 
@@ -492,7 +729,20 @@ const saveConfig = async () => {
     mqttPayload.tlsKeyfileClear  = tlsClearFlags.value.tlsKeyfileClear
     mqttPayload.commandTokenClear = tlsClearFlags.value.commandTokenClear
 
-    await monitoringStore.save({ checkmk: checkmkConfig.value, mqtt: mqttPayload })
+    // Strip the read-only *Set sentinels from the notify payload — the
+    // backend reports them as booleans but does not accept them on write.
+    const { webhookSecretSet, telegramTokenSet, smtpPasswordSet, ...notifyPayload } = notifyConfig.value
+    notifyPayload.webhookSecretClear  = tlsClearFlags.value.webhookSecretClear
+    notifyPayload.telegramTokenClear  = tlsClearFlags.value.telegramTokenClear
+    notifyPayload.smtpPasswordClear   = tlsClearFlags.value.smtpPasswordClear
+
+    await monitoringStore.save({
+      checkmk: checkmkConfig.value,
+      mqtt: mqttPayload,
+      prometheus: prometheusConfig.value,
+      syslog: syslogConfig.value,
+      notify: notifyPayload
+    })
 
     // The backend applies config changes asynchronously (MQTT stop/restart
     // can take several seconds). Calling load() here would read stale data
@@ -511,6 +761,13 @@ const saveConfig = async () => {
     if (mqttPayload.commandTokenClear) mqttConfig.value.commandTokenSet = false
     else if (mqttPayload.commandToken) mqttConfig.value.commandTokenSet = true
 
+    if (notifyPayload.webhookSecretClear) notifyConfig.value.webhookSecretSet = false
+    else if (notifyPayload.webhookSecret) notifyConfig.value.webhookSecretSet = true
+    if (notifyPayload.telegramTokenClear) notifyConfig.value.telegramTokenSet = false
+    else if (notifyPayload.telegramToken) notifyConfig.value.telegramTokenSet = true
+    if (notifyPayload.smtpPasswordClear)  notifyConfig.value.smtpPasswordSet = false
+    else if (notifyPayload.smtpPassword)  notifyConfig.value.smtpPasswordSet = true
+
     // Sensitive fields are never echoed back by the backend — clear them
     // from the UI so they do not linger in browser memory.
     mqttConfig.value.tlsCaCerts  = ''
@@ -518,13 +775,23 @@ const saveConfig = async () => {
     mqttConfig.value.tlsKeyfile  = ''
     mqttConfig.value.commandToken = ''
     mqttConfig.value.password    = ''
+    notifyConfig.value.webhookSecret  = ''
+    notifyConfig.value.telegramToken = ''
+    notifyConfig.value.smtpPassword   = ''
 
-    tlsClearFlags.value = { tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false }
+    tlsClearFlags.value = { tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false,
+                            webhookSecretClear: false, telegramTokenClear: false, smtpPasswordClear: false }
     pemFeedback.value = { tlsCaCerts: null, tlsCertfile: null, tlsKeyfile: null }
 
     uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('monitoring.saveSuccess') })
     hasChanges.value = false
-    originalConfig.value = JSON.stringify({ checkmk: { ...checkmkConfig.value }, mqtt: { ...mqttConfig.value } })
+    originalConfig.value = JSON.stringify({
+      checkmk: { ...checkmkConfig.value },
+      mqtt: { ...mqttConfig.value },
+      prometheus: { ...prometheusConfig.value },
+      syslog: { ...syslogConfig.value },
+      notify: { ...notifyConfig.value }
+    })
   } catch (error) {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || t('monitoring.saveError') })
   } finally {
@@ -701,8 +968,10 @@ const runDiagnostic = async (target) => {
 
 .bg-danger-light { background-color: var(--color-danger-light); }
 .bg-success-light { background-color: var(--color-success-light); }
+.bg-info-light { background-color: var(--color-info-light, var(--color-info-soft, #e7f1ff)); }
 .text-danger { color: var(--color-danger); }
 .text-success { color: var(--color-success); }
+.text-info { color: var(--color-info, #0d6efd); }
 
 .form-text {
   font-size: 0.8125rem;

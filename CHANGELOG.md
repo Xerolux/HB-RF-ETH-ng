@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.12] - 2026-07-05
+
+### Added — Monitoring & Notifications Expansion (Phases A–E)
+
+- **feat: Prometheus `/metrics` exporter** (Phase A) — pull model on dedicated port (default 9100), source-IP allowlist; exposes uptime, heap, CPU, eth/mqtt link, RF module and process-wide counters (UDP frames, drops, keepalives, notification delivery stats) in Prometheus text format. New central `metrics.h` registry; counters increment lock-free.
+- **feat: Syslog forwarding (RFC 5424)** (Phase B) — optional UDP/TCP/TLS forwarding of every captured log line, severity-filtered. Reuses the same LogManager hook as the WebSocket stream. TLS handshakes serialise on `g_net_fetch_mutex`.
+- **feat: WebSocket live log stream** (Phase E) — `GET /api/log/stream` pushes new lines to up to 4 browser tabs in real time, replacing 5 s polling in `systemlog.vue`. Falls back to polling on older firmware. Auth via `?token=` query string.
+- **feat: Event notifications (Webhook / Telegram / Email)** (Phase C+D) — emit `eth_link_down/up`, `rf_module_detected`, `ota_started/succeeded/failed`, `mqtt_disconnected/reconnected` to Webhook (JSON POST + shared-secret header), Telegram Bot API, or SMTP (plaintext / STARTTLS / implicit TLS, AUTH LOGIN). Per-event-type cooldown window; metric counters for delivered / failed / suppressed.
+- **refactor: LogManager always installs its capture hook at boot** — subscribers register/unregister at runtime; ring buffer stays optional.
+- **feat: `mqtt_handler_is_connected()`** exposes broker login state.
+- **docs:** API.md documents `/metrics`, `/api/log/stream`, and the new `prometheus` / `syslog` / `notify` blocks in `GET/POST /api/monitoring`.
+
 ## [2.2.3-Beta.11] - 2026-07-05
 
 ### Changes

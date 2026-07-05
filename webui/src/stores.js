@@ -440,9 +440,44 @@ export const useMonitoringStore = defineStore('monitoring', {
       commandToken: '',
       commandTokenSet: false
     },
+    prometheus: {
+      enabled: false,
+      port: 9100,
+      allowedHosts: '*'
+    },
+    syslog: {
+      enabled: false,
+      server: '',
+      port: 514,
+      transport: 0,
+      minSeverity: 6,
+      hostname: ''
+    },
+    notify: {
+      enabled: false,
+      channels: 0,
+      webhookUrl: '',
+      webhookSecret: '',
+      webhookSecretSet: false,
+      telegramToken: '',
+      telegramTokenSet: false,
+      telegramChatId: '',
+      smtpServer: '',
+      smtpPort: 587,
+      smtpTls: 1,
+      smtpUser: '',
+      smtpPassword: '',
+      smtpPasswordSet: false,
+      smtpFrom: '',
+      smtpTo: '',
+      cooldownSeconds: 300
+    },
     diagnostics: {
       checkmk: null,
-      mqtt: null
+      mqtt: null,
+      prometheus: null,
+      syslog: null,
+      notify: null
     }
   }),
   actions: {

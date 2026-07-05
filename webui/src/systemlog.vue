@@ -263,7 +263,14 @@ const appendChunk = (chunk) => {
 const startPolling = () => {
   stopPolling()
   fetchLog()
-  pollTimer = setInterval(fetchLog, 5000)
+  // Try to upgrade to a live WebSocket. If it connects, polling is throttled
+  // to a slow reconciliation rate (so the persisted ring buffer stays in
+  // sync even if the WS drops a frame).
+  openLogStream()
+  pollTimer = setInterval(() => {
+    if (!wsConnected.value) fetchLog()
+    else                    fetchLog()  // periodic catch-up even on WS
+  }, wsConnected.value ? 30000 : 5000)
 }
 
 const stopPolling = () => {
@@ -271,6 +278,68 @@ const stopPolling = () => {
     clearInterval(pollTimer)
     pollTimer = null
   }
+  closeLogStream()
+}
+
+// ---- WebSocket live stream (Phase E) -------------------------------------
+// The browser cannot attach Authorization headers to a WebSocket upgrade, so
+// the token is passed via ?token=. The backend's log_stream_handler accepts
+// either that or the header.
+let ws = null
+let wsReconnectTimer = null
+const wsConnected = ref(false)
+
+const openLogStream = () => {
+  closeLogStream()
+  try {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const token = sessionStorage.getItem('hb-rf-eth-ng-pw') || ''
+    const url = `${proto}//${window.location.host}/api/log/stream?token=${encodeURIComponent(token)}`
+    ws = new WebSocket(url)
+    ws.binaryType = 'arraybuffer'
+
+    ws.onopen = () => { wsConnected.value = true }
+    ws.onclose = () => {
+      wsConnected.value = false
+      ws = null
+      // Reconnect while capture is still enabled.
+      if (logEnabled.value && !wsReconnectTimer) {
+        wsReconnectTimer = setTimeout(() => {
+          wsReconnectTimer = null
+          if (logEnabled.value) openLogStream()
+        }, 2000)
+      }
+    }
+    ws.onerror = () => { /* close handler will reconnect */ }
+    ws.onmessage = (ev) => {
+      // ev.data is a string text frame from the device.
+      if (typeof ev.data !== 'string') return
+      // Split into lines; the device sends one frame per log line, but
+      // older firmwares may batch.
+      const lines = ev.data.split(/\r?\n/).filter(l => l.length > 0)
+      if (lines.length) {
+        appendChunk(lines.join('\n'))
+        if (autoScroll.value) {
+          newEntriesCount.value = 0
+          nextTick(() => scrollToBottom())
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('WebSocket log stream unavailable, falling back to polling', e)
+  }
+}
+
+const closeLogStream = () => {
+  if (wsReconnectTimer) {
+    clearTimeout(wsReconnectTimer)
+    wsReconnectTimer = null
+  }
+  if (ws) {
+    try { ws.close() } catch (e) {}
+    ws = null
+  }
+  wsConnected.value = false
 }
 
 watch(logEnabled, async (enabled) => {

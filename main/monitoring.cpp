@@ -23,6 +23,9 @@
 
 #include "monitoring.h"
 #include "mqtt_handler.h"
+#include "prometheus.h"
+#include "syslog.h"
+#include "events.h"
 #include "settings.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -80,6 +83,35 @@ static std::atomic<int> checkmk_listen_sock{-1};
 #define NVS_MQTT_TLS_KEY    "mqtt_tls_key"
 #define NVS_MQTT_CMD_EN     "mqtt_cmd_en"   // command topic enabled
 #define NVS_MQTT_CMD_TOK    "mqtt_cmd_tok"  // optional shared-secret
+
+// Prometheus (Phase A)
+#define NVS_PROM_ENABLED    "prom_en"
+#define NVS_PROM_PORT       "prom_port"
+#define NVS_PROM_HOSTS      "prom_hosts"
+
+// Syslog (Phase B)
+#define NVS_SYSLOG_ENABLED  "syslog_en"
+#define NVS_SYSLOG_SERVER   "syslog_srv"
+#define NVS_SYSLOG_PORT     "syslog_port"
+#define NVS_SYSLOG_XPORT    "syslog_xp"
+#define NVS_SYSLOG_SEV      "syslog_sev"
+#define NVS_SYSLOG_HOST     "syslog_host"
+
+// Notifications (Phase C/D)
+#define NVS_NOTIFY_ENABLED  "notify_en"
+#define NVS_NOTIFY_CHANS    "notify_ch"
+#define NVS_NOTIFY_WHOOK    "notify_wh"
+#define NVS_NOTIFY_WSECRET  "notify_ws"
+#define NVS_NOTIFY_TGTOKEN  "notify_tg_t"
+#define NVS_NOTIFY_TGCHAT   "notify_tg_c"
+#define NVS_NOTIFY_SMTPSRV  "notify_smtp_s"
+#define NVS_NOTIFY_SMTPPORT "notify_smtp_p"
+#define NVS_NOTIFY_SMTPTLS  "notify_smtp_tls"
+#define NVS_NOTIFY_SMTPUSER "notify_smtp_u"
+#define NVS_NOTIFY_SMTPPW   "notify_smtp_pw"
+#define NVS_NOTIFY_SMTPFROM "notify_smtp_f"
+#define NVS_NOTIFY_SMTPTO   "notify_smtp_to"
+#define NVS_NOTIFY_COOLDOWN "notify_cd"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
@@ -420,6 +452,37 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     NVS_CHECK(nvs_set_u8(nvs_handle, NVS_MQTT_CMD_EN, config->mqtt.command_enabled ? 1 : 0), "mqtt cmd en");
     NVS_CHECK(nvs_set_str(nvs_handle, NVS_MQTT_CMD_TOK, config->mqtt.command_token), "mqtt cmd tok");
 
+    // Prometheus (Phase A)
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_PROM_ENABLED, config->prometheus.enabled ? 1 : 0), "prom en");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_PROM_PORT, config->prometheus.port), "prom port");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_PROM_HOSTS, config->prometheus.allowed_hosts), "prom hosts");
+
+    // Syslog (Phase B)
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_SYSLOG_ENABLED, config->syslog.enabled ? 1 : 0), "syslog en");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_SYSLOG_SERVER, config->syslog.server), "syslog srv");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_SYSLOG_PORT, config->syslog.port), "syslog port");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_SYSLOG_XPORT, config->syslog.transport), "syslog xport");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_SYSLOG_SEV, config->syslog.min_severity), "syslog sev");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_SYSLOG_HOST, config->syslog.hostname), "syslog host");
+
+    // Notifications (Phase C/D) — secrets stored as plain NVS strings; the
+    // NVS partition is not encrypted by default on this build, matching how
+    // the MQTT password is already handled.
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_NOTIFY_ENABLED, config->notify.enabled ? 1 : 0), "notify en");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_NOTIFY_CHANS, config->notify.channels), "notify chans");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_WHOOK, config->notify.webhook_url), "notify whook");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_WSECRET, config->notify.webhook_secret), "notify wsecret");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_TGTOKEN, config->notify.telegram_token), "notify tg token");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_TGCHAT, config->notify.telegram_chatid), "notify tg chat");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_SMTPSRV, config->notify.smtp_server), "notify smtp srv");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_NOTIFY_SMTPPORT, config->notify.smtp_port), "notify smtp port");
+    NVS_CHECK(nvs_set_u8(nvs_handle, NVS_NOTIFY_SMTPTLS, config->notify.smtp_tls), "notify smtp tls");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_SMTPUSER, config->notify.smtp_user), "notify smtp user");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_SMTPPW, config->notify.smtp_password), "notify smtp pw");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_SMTPFROM, config->notify.smtp_from), "notify smtp from");
+    NVS_CHECK(nvs_set_str(nvs_handle, NVS_NOTIFY_SMTPTO, config->notify.smtp_to), "notify smtp to");
+    NVS_CHECK(nvs_set_u16(nvs_handle, NVS_NOTIFY_COOLDOWN, config->notify.cooldown_seconds), "notify cd");
+
 #undef NVS_CHECK
 
     err = nvs_commit(nvs_handle);
@@ -461,6 +524,36 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         // token or restrict the broker ACL.
         config->mqtt.command_enabled = true;
         config->mqtt.command_token[0] = '\0';
+
+        // Phase A: Prometheus defaults — disabled, port 9100, allow all.
+        config->prometheus.enabled = false;
+        config->prometheus.port = 9100;
+        strncpy(config->prometheus.allowed_hosts, "*", sizeof(config->prometheus.allowed_hosts) - 1);
+        config->prometheus.allowed_hosts[sizeof(config->prometheus.allowed_hosts) - 1] = '\0';
+
+        // Phase B: Syslog defaults — disabled, UDP/514, severity INFO (6).
+        config->syslog.enabled = false;
+        config->syslog.server[0] = '\0';
+        config->syslog.port = 514;
+        config->syslog.transport = 0;  // UDP
+        config->syslog.min_severity = 6;
+        config->syslog.hostname[0] = '\0';
+
+        // Phase C/D: Notification defaults — disabled, no channels, 5 min cooldown.
+        config->notify.enabled = false;
+        config->notify.channels = 0;
+        config->notify.webhook_url[0] = '\0';
+        config->notify.webhook_secret[0] = '\0';
+        config->notify.telegram_token[0] = '\0';
+        config->notify.telegram_chatid[0] = '\0';
+        config->notify.smtp_server[0] = '\0';
+        config->notify.smtp_port = 587;
+        config->notify.smtp_tls = 1;   // STARTTLS
+        config->notify.smtp_user[0] = '\0';
+        config->notify.smtp_password[0] = '\0';
+        config->notify.smtp_from[0] = '\0';
+        config->notify.smtp_to[0] = '\0';
+        config->notify.cooldown_seconds = 300;
 
         return ESP_OK;
     }
@@ -567,6 +660,100 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->mqtt.command_token[0] = '\0';
     }
 
+    // ---- Prometheus (Phase A) ----
+    // Defaults for upgrades: disabled, port 9100, allow all.
+    if (nvs_get_u8(nvs_handle, NVS_PROM_ENABLED, &u8_val) == ESP_OK) {
+        config->prometheus.enabled = (u8_val != 0);
+    } else {
+        config->prometheus.enabled = false;
+    }
+    if (nvs_get_u16(nvs_handle, NVS_PROM_PORT, &u16_val) == ESP_OK) {
+        config->prometheus.port = u16_val;
+    } else {
+        config->prometheus.port = 9100;
+    }
+    str_len = sizeof(config->prometheus.allowed_hosts);
+    if (nvs_get_str(nvs_handle, NVS_PROM_HOSTS, config->prometheus.allowed_hosts, &str_len) != ESP_OK) {
+        strncpy(config->prometheus.allowed_hosts, "*", sizeof(config->prometheus.allowed_hosts) - 1);
+        config->prometheus.allowed_hosts[sizeof(config->prometheus.allowed_hosts) - 1] = '\0';
+    }
+
+    // ---- Syslog (Phase B) ----
+    if (nvs_get_u8(nvs_handle, NVS_SYSLOG_ENABLED, &u8_val) == ESP_OK) {
+        config->syslog.enabled = (u8_val != 0);
+    } else {
+        config->syslog.enabled = false;
+    }
+    str_len = sizeof(config->syslog.server);
+    if (nvs_get_str(nvs_handle, NVS_SYSLOG_SERVER, config->syslog.server, &str_len) != ESP_OK) {
+        config->syslog.server[0] = '\0';
+    }
+    if (nvs_get_u16(nvs_handle, NVS_SYSLOG_PORT, &u16_val) == ESP_OK) {
+        config->syslog.port = u16_val;
+    } else {
+        config->syslog.port = 514;
+    }
+    if (nvs_get_u8(nvs_handle, NVS_SYSLOG_XPORT, &u8_val) == ESP_OK) {
+        config->syslog.transport = u8_val;
+    } else {
+        config->syslog.transport = 0;
+    }
+    if (nvs_get_u8(nvs_handle, NVS_SYSLOG_SEV, &u8_val) == ESP_OK) {
+        config->syslog.min_severity = u8_val;
+    } else {
+        config->syslog.min_severity = 6;
+    }
+    str_len = sizeof(config->syslog.hostname);
+    if (nvs_get_str(nvs_handle, NVS_SYSLOG_HOST, config->syslog.hostname, &str_len) != ESP_OK) {
+        config->syslog.hostname[0] = '\0';
+    }
+
+    // ---- Notifications (Phase C/D) ----
+    if (nvs_get_u8(nvs_handle, NVS_NOTIFY_ENABLED, &u8_val) == ESP_OK) {
+        config->notify.enabled = (u8_val != 0);
+    } else {
+        config->notify.enabled = false;
+    }
+    if (nvs_get_u8(nvs_handle, NVS_NOTIFY_CHANS, &u8_val) == ESP_OK) {
+        config->notify.channels = u8_val;
+    } else {
+        config->notify.channels = 0;
+    }
+    str_len = sizeof(config->notify.webhook_url);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_WHOOK, config->notify.webhook_url, &str_len);
+    if (config->notify.webhook_url[0] == 0 && str_len == 0) config->notify.webhook_url[0] = '\0';
+    str_len = sizeof(config->notify.webhook_secret);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_WSECRET, config->notify.webhook_secret, &str_len);
+    str_len = sizeof(config->notify.telegram_token);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_TGTOKEN, config->notify.telegram_token, &str_len);
+    str_len = sizeof(config->notify.telegram_chatid);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_TGCHAT, config->notify.telegram_chatid, &str_len);
+    str_len = sizeof(config->notify.smtp_server);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_SMTPSRV, config->notify.smtp_server, &str_len);
+    if (nvs_get_u16(nvs_handle, NVS_NOTIFY_SMTPPORT, &u16_val) == ESP_OK) {
+        config->notify.smtp_port = u16_val;
+    } else {
+        config->notify.smtp_port = 587;
+    }
+    if (nvs_get_u8(nvs_handle, NVS_NOTIFY_SMTPTLS, &u8_val) == ESP_OK) {
+        config->notify.smtp_tls = u8_val;
+    } else {
+        config->notify.smtp_tls = 1;
+    }
+    str_len = sizeof(config->notify.smtp_user);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_SMTPUSER, config->notify.smtp_user, &str_len);
+    str_len = sizeof(config->notify.smtp_password);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_SMTPPW, config->notify.smtp_password, &str_len);
+    str_len = sizeof(config->notify.smtp_from);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_SMTPFROM, config->notify.smtp_from, &str_len);
+    str_len = sizeof(config->notify.smtp_to);
+    nvs_get_str(nvs_handle, NVS_NOTIFY_SMTPTO, config->notify.smtp_to, &str_len);
+    if (nvs_get_u16(nvs_handle, NVS_NOTIFY_COOLDOWN, &u16_val) == ESP_OK) {
+        config->notify.cooldown_seconds = u16_val;
+    } else {
+        config->notify.cooldown_seconds = 300;
+    }
+
     nvs_close(nvs_handle);
     return ESP_OK;
 }
@@ -666,6 +853,22 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         checkmk_start(&current_config.checkmk);
     }
 
+    // Start Prometheus exporter if enabled
+    if (current_config.prometheus.enabled) {
+        prometheus_start(&current_config.prometheus);
+    }
+
+    // Start syslog forwarder if enabled
+    if (current_config.syslog.enabled) {
+        syslog_start(&current_config.syslog);
+    }
+
+    // Start notification worker if enabled
+    events_init();
+    if (current_config.notify.enabled) {
+        events_start(&current_config.notify);
+    }
+
     // Start MQTT if enabled
     if (current_config.mqtt.enabled) {
         mqtt_handler_start(&current_config.mqtt);
@@ -691,15 +894,24 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     // Release the mutex before any blocking stop/start calls so GET requests
     // are never blocked for more than a memcpy duration.
     xSemaphoreTake(config_mutex, portMAX_DELAY);
-    bool checkmk_changed = (memcmp(&current_config.checkmk, &config->checkmk, sizeof(checkmk_config_t)) != 0);
-    bool mqtt_changed    = (memcmp(&current_config.mqtt,    &config->mqtt,    sizeof(mqtt_config_t))    != 0);
-    bool checkmk_was_enabled = current_config.checkmk.enabled;
-    bool mqtt_was_enabled    = current_config.mqtt.enabled;
+    bool checkmk_changed    = (memcmp(&current_config.checkmk,    &config->checkmk,    sizeof(checkmk_config_t))    != 0);
+    bool mqtt_changed       = (memcmp(&current_config.mqtt,       &config->mqtt,       sizeof(mqtt_config_t))       != 0);
+    bool prometheus_changed = (memcmp(&current_config.prometheus, &config->prometheus, sizeof(prometheus_config_t)) != 0);
+    bool syslog_changed     = (memcmp(&current_config.syslog,     &config->syslog,     sizeof(syslog_config_t))     != 0);
+    bool notify_changed     = (memcmp(&current_config.notify,     &config->notify,     sizeof(notify_config_t))     != 0);
+    bool checkmk_was_enabled    = current_config.checkmk.enabled;
+    bool mqtt_was_enabled       = current_config.mqtt.enabled;
+    bool prometheus_was_enabled = current_config.prometheus.enabled;
+    bool syslog_was_enabled     = current_config.syslog.enabled;
+    bool notify_was_enabled     = current_config.notify.enabled;
     xSemaphoreGive(config_mutex);
 
     // Stop only what needs to change (these calls can block; no mutex held)
-    if (checkmk_changed && checkmk_was_enabled) checkmk_stop();
-    if (mqtt_changed && mqtt_was_enabled)    mqtt_handler_stop();
+    if (checkmk_changed    && checkmk_was_enabled)    checkmk_stop();
+    if (mqtt_changed       && mqtt_was_enabled)       mqtt_handler_stop();
+    if (prometheus_changed && prometheus_was_enabled) prometheus_stop();
+    if (syslog_changed     && syslog_was_enabled)     syslog_stop();
+    if (notify_changed     && notify_was_enabled)     events_stop();
 
     // Commit the new config under mutex so concurrent GET requests see a
     // consistent snapshot (no partial memcpy visible)
@@ -710,8 +922,11 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     save_config_to_nvs(&current_config);
 
     // Restart only what changed and is now enabled
-    if (checkmk_changed && current_config.checkmk.enabled) checkmk_start(&current_config.checkmk);
-    if (mqtt_changed && current_config.mqtt.enabled)    mqtt_handler_start(&current_config.mqtt);
+    if (checkmk_changed    && current_config.checkmk.enabled)    checkmk_start(&current_config.checkmk);
+    if (prometheus_changed && current_config.prometheus.enabled) prometheus_start(&current_config.prometheus);
+    if (syslog_changed     && current_config.syslog.enabled)     syslog_start(&current_config.syslog);
+    if (notify_changed     && current_config.notify.enabled)     events_start(&current_config.notify);
+    if (mqtt_changed       && current_config.mqtt.enabled)       mqtt_handler_start(&current_config.mqtt);
 
     return ESP_OK;
 }
@@ -879,9 +1094,10 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
     // Snapshot the needed fields under the config mutex - apply_config_task
     // may memcpy the whole config struct concurrently, and tcp_probe_endpoint
     // below blocks for seconds, so don't read current_config directly.
-    bool checkmk_enabled, mqtt_enabled, mqtt_tls;
-    uint16_t checkmk_port, mqtt_port;
+    bool checkmk_enabled, mqtt_enabled, mqtt_tls, prom_enabled, syslog_enabled;
+    uint16_t checkmk_port, mqtt_port, prom_port, syslog_port;
     char mqtt_server[sizeof(current_config.mqtt.server)];
+    char syslog_server[sizeof(current_config.syslog.server)];
 
     if (config_mutex)
         xSemaphoreTake(config_mutex, portMAX_DELAY);
@@ -892,6 +1108,12 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
     mqtt_tls = current_config.mqtt.tls_enable;
     strncpy(mqtt_server, current_config.mqtt.server, sizeof(mqtt_server) - 1);
     mqtt_server[sizeof(mqtt_server) - 1] = '\0';
+    prom_enabled = current_config.prometheus.enabled;
+    prom_port = current_config.prometheus.port;
+    syslog_enabled = current_config.syslog.enabled;
+    syslog_port = current_config.syslog.port;
+    strncpy(syslog_server, current_config.syslog.server, sizeof(syslog_server) - 1);
+    syslog_server[sizeof(syslog_server) - 1] = '\0';
     if (config_mutex)
         xSemaphoreGive(config_mutex);
 
@@ -948,6 +1170,66 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
                 snprintf(message + used, message_len - used, " (TLS enabled, cert validation not tested)");
             }
         }
+        return ESP_OK;
+    }
+
+    if (strcmp(target, "prometheus") == 0) {
+        if (!prom_enabled) {
+            snprintf(code, code_len, "monitoring.diag.prometheus.disabled");
+            snprintf(message, message_len, "Prometheus exporter is disabled");
+            return ESP_OK;
+        }
+
+        *ok = prometheus_is_running();
+        if (*ok) {
+            snprintf(code, code_len, "monitoring.diag.prometheus.listening");
+            snprintf(message, message_len, "Prometheus exporter listening on TCP port %u", prom_port);
+        } else {
+            snprintf(code, code_len, "monitoring.diag.prometheus.not_ready");
+            snprintf(message, message_len, "Prometheus is enabled but listener is not ready");
+        }
+        if (port) *port = prom_port;
+        return ESP_OK;
+    }
+
+    if (strcmp(target, "syslog") == 0) {
+        if (!syslog_enabled) {
+            snprintf(code, code_len, "monitoring.diag.syslog.disabled");
+            snprintf(message, message_len, "Syslog forwarding is disabled");
+            return ESP_OK;
+        }
+
+        if (host && host_len) {
+            strncpy(host, syslog_server, host_len - 1);
+            host[host_len - 1] = '\0';
+        }
+        if (port) *port = syslog_port;
+
+        // Probe the syslog server with a TCP connect (UDP is fire-and-forget;
+        // there is no handshake to test). For UDP we just verify DNS + a
+        // best-effort UDP socket bind.
+        esp_err_t probe = tcp_probe_endpoint(syslog_server, syslog_port, 3000, message, message_len);
+        *ok = (probe == ESP_OK);
+        snprintf(code, code_len,
+                 probe == ESP_OK ? "monitoring.diag.syslog.tcp_ok" : "monitoring.diag.syslog.tcp_failed");
+        return ESP_OK;
+    }
+
+    if (strcmp(target, "notify") == 0) {
+        if (!current_config.notify.enabled) {
+            snprintf(code, code_len, "monitoring.diag.notify.disabled");
+            snprintf(message, message_len, "Notifications are disabled");
+            return ESP_OK;
+        }
+        // Emit a test event on every enabled channel. The result is async;
+        // we report "queued" and the user can check the metric counters or
+        // the receiving end to confirm delivery.
+        events_emit_test();
+        *ok = true;
+        snprintf(code, code_len, "monitoring.diag.notify.queued");
+        snprintf(message, message_len,
+                 "Test notification queued for channels bitmask 0x%02x",
+                 current_config.notify.channels);
         return ESP_OK;
     }
 

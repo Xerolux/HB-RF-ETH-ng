@@ -71,10 +71,52 @@ typedef struct {
     char command_token[65];
 } mqtt_config_t;
 
+// Prometheus exporter configuration (Phase A). Pull model — Prometheus
+// scrapes /metrics, so we cannot rely on a token; restrict by source IP.
+typedef struct {
+    bool enabled;
+    uint16_t port;            // default 9100
+    char allowed_hosts[256];  // comma-separated list of IPs, "*" = allow all
+} prometheus_config_t;
+
+// Syslog forwarding configuration (Phase B). When enabled, every line written
+// to the LogManager ring buffer is also forwarded to the configured remote
+// syslog server using RFC 5424 framing.
+typedef struct {
+    bool enabled;
+    char server[65];        // host or IP
+    uint16_t port;          // default 514
+    uint8_t transport;      // 0 = UDP, 1 = TCP, 2 = TLS (TCP+TLS)
+    uint8_t min_severity;   // 0=EMERG .. 7=DEBUG (default 6 = INFO)
+    char hostname[32];      // override; empty = Settings::getHostname()
+} syslog_config_t;
+
+// Event notification configuration (Phase C/D). Multi-channel: any subset of
+// webhook / telegram / email can be enabled via the `channels` bitmask.
+typedef struct {
+    bool enabled;
+    uint8_t channels;          // bitmask: 1=webhook, 2=telegram, 4=email
+    char webhook_url[193];     // https://... (192 + NUL)
+    char webhook_secret[65];   // sent as X-HB-RF-ETH-Secret header
+    char telegram_token[65];   // botXXXXXXX:YYYYYYYY
+    char telegram_chatid[33];  // numeric chat id
+    char smtp_server[65];
+    uint16_t smtp_port;        // default 587
+    uint8_t smtp_tls;          // 0 = plaintext, 1 = STARTTLS, 2 = implicit TLS
+    char smtp_user[49];
+    char smtp_password[49];
+    char smtp_from[49];
+    char smtp_to[49];
+    uint16_t cooldown_seconds; // per-event-type debounce window (default 300)
+} notify_config_t;
+
 // Monitoring configuration
 typedef struct {
     checkmk_config_t checkmk;
     mqtt_config_t mqtt;
+    prometheus_config_t prometheus;
+    syslog_config_t syslog;
+    notify_config_t notify;
 } monitoring_config_t;
 
 // Initialize monitoring subsystem

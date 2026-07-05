@@ -27,6 +27,7 @@
 #include "lwip/ip6_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "events.h"
 
 static const char *TAG = "Ethernet";
 
@@ -340,6 +341,7 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
     case ETHERNET_EVENT_DISCONNECTED:
         _isConnected.store(false);
         ESP_LOGI(TAG, "Link Down");
+        events_emit(EVENT_ETH_LINK_DOWN, nullptr);
         break;
     case ETHERNET_EVENT_START:
         ESP_LOGI(TAG, "Started");
@@ -361,6 +363,7 @@ void Ethernet::_handleIPEvent(esp_event_base_t event_base, int32_t event_id, voi
 
     _isConnected.store(true);
     ESP_LOGI(TAG, "IPv4: " IPSTR, IP2STR(&ip_info->ip));
+    events_emit(EVENT_ETH_LINK_UP, nullptr);
 }
 
 int Ethernet::getLinkSpeedMbps()

@@ -26,9 +26,25 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include <string.h>
-#include "udphelper.h"
+#include "udphelpers.h"
+#include "metrics.h"
 
 static const char *TAG = "RawUartUdpListener";
+
+// Process-wide counters exposed via the Prometheus exporter.
+//   hbrfeth_udp_rx_frames_total    — frames received from the CCU
+//   hbrfeth_udp_tx_frames_total    — frames sent to the CCU
+//   hbrfeth_udp_keepalive_total    — keepalive probes sent
+//   hbrfeth_udp_drop_total         — received frames dropped (queue / parse)
+// Defined once at file scope so registration happens on first use.
+static MetricsCounter g_rx_frames("hbrfeth_udp_rx_frames_total",
+                                  "Total UDP frames received from CCU");
+static MetricsCounter g_tx_frames("hbrfeth_udp_tx_frames_total",
+                                  "Total UDP frames sent to CCU");
+static MetricsCounter g_keepalives("hbrfeth_udp_keepalive_total",
+                                   "Keepalive probes sent");
+static MetricsCounter g_rx_drops("hbrfeth_udp_drop_total",
+                                 "Received UDP frames dropped (queue full / parse error)");
 
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
@@ -63,16 +79,19 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     if (length < 4 || length > sizeof(data))
     {
         ESP_LOGE(TAG, "Received invalid raw-uart packet, length %d", length);
+        g_rx_drops.inc();
         return;
     }
     if (pbuf_copy_partial(pb, data, length, 0) != length) {
         ESP_LOGE(TAG, "Could not linearize raw-uart packet, length %d", length);
+        g_rx_drops.inc();
         return;
     }
 
     if (data[0] != 0 && (addr.addr != atomic_load(&_remoteAddress) || port != atomic_load(&_remotePort)))
     {
         ESP_LOGE(TAG, "Received raw-uart packet from invalid address.");
+        g_rx_drops.inc();
         return;
     }
 
@@ -84,8 +103,12 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     if (received_crc != htons(HMFrame::crc(data, length - 2)))
     {
         ESP_LOGE(TAG, "Received raw-uart packet with invalid crc.");
+        g_rx_drops.inc();
         return;
     }
+
+    // Valid frame received from the CCU.
+    g_rx_frames.inc();
 
     atomic_store(&_lastReceivedKeepAlive, (int64_t)esp_timer_get_time());
 
@@ -236,6 +259,9 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     if (!port)
         return;
 
+    // Every command type is also a downstream frame to the CCU.
+    g_tx_frames.inc();
+
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
     if (!pb) {
         ESP_LOGE(TAG, "Failed to allocate pbuf for sendMessage");
@@ -367,6 +393,7 @@ void RawUartUdpListener::_udpQueueHandler()
             else if (now > nextKeepAliveSentOut)
             {
                 nextKeepAliveSentOut = now + 1000000; // 1sec
+                g_keepalives.inc();
                 sendMessage(2, NULL, 0);
             }
         }
@@ -391,6 +418,7 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
     if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
     {
         ESP_LOGW(TAG, "UDP queue full, dropping packet");
+        g_rx_drops.inc();
         free((void *)(e));
         return false;
     }

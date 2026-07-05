@@ -297,7 +297,7 @@ export default {
     otaSuccess: 'Download erfolgreich. Installation...',
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
-    versionInfo: 'Modernisierte Fork v2.2.3-Beta.11 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
+    versionInfo: 'Modernisierte Fork v2.2.3-Beta.12 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailableMessage: 'Ein Update auf Version {latestVersion} ist verfügbar.',
     newVersionAvailable: 'Neue Version {version} ist verfügbar!',
     viewUpdate: 'Ansehen',
@@ -359,8 +359,11 @@ export default {
     diagnosticFailed: 'Diagnoseanfrage fehlgeschlagen',
     chipLabelCheckmk: 'CheckMK',
     chipLabelMqtt: 'MQTT',
+    chipLabelPrometheus: 'Prometheus',
+    chipLabelSyslog: 'Syslog',
+    chipLabelNotify: 'Benachrichtigungen',
     title: 'Monitoring',
-    description: 'CheckMK und MQTT Monitoring für das HB-RF-ETH Gateway konfigurieren.',
+    description: 'Monitoring und Benachrichtigungen für das HB-RF-ETH Gateway konfigurieren.',
     save: 'Speichern',
     saving: 'Speichern...',
     saveSuccess: 'Konfiguration erfolgreich gespeichert!',
@@ -431,6 +434,52 @@ export default {
     },
     enable: 'Aktivieren',
     allowedHosts: 'Erlaubte Hosts',
+    prometheus: {
+      title: 'Prometheus Exporter',
+      port: 'Port',
+      portHelp: 'Standard: 9100',
+      allowedHosts: 'Erlaubte Client-IPs',
+      allowedHostsHelp: 'Komma-getrennte IP-Adressen oder "*" für alle'
+    },
+    syslog: {
+      title: 'Syslog-Weiterleitung',
+      server: 'Server',
+      serverHelp: 'Hostname oder IP des Syslog-Servers',
+      port: 'Port',
+      portHelp: 'Standard: 514',
+      transport: 'Transport',
+      minSeverity: 'Min. Schweregrad',
+      minSeverityHelp: 'Nur Meldungen ab diesem Schweregrad weiterleiten',
+      hostname: 'Hostname-Override',
+      hostnameHelp: 'Leer = Geräte-Hostname verwenden'
+    },
+    notify: {
+      title: 'Ereignis-Benachrichtigungen',
+      channels: 'Aktive Kanäle',
+      channelWebhook: 'Webhook',
+      channelTelegram: 'Telegram',
+      channelEmail: 'E-Mail',
+      cooldown: 'Cooldown (Sekunden)',
+      cooldownHelp: 'Pro Ereignistyp wird innerhalb dieses Fensters nur einmal benachrichtigt',
+      webhookSection: 'Webhook',
+      webhookUrl: 'URL',
+      webhookSecret: 'Secret',
+      telegramSection: 'Telegram',
+      telegramToken: 'Bot-Token',
+      telegramChatId: 'Chat-ID',
+      smtpSection: 'E-Mail (SMTP)',
+      smtpServer: 'Server',
+      smtpPort: 'Port',
+      smtpTls: 'Verschlüsselung',
+      smtpTlsNone: 'Keine',
+      smtpTlsStarttls: 'STARTTLS',
+      smtpTlsImplicit: 'TLS (implicit)',
+      smtpUser: 'Benutzer',
+      smtpPassword: 'Passwort',
+      smtpFrom: 'Absender',
+      smtpTo: 'Empfänger',
+      secretPresent: '✓ Gespeichert – neu eingeben zum Ersetzen'
+    },
     diag: {
       unsupported: 'Unbekanntes Diagnose-Ziel',
       checkmk: {
@@ -443,6 +492,20 @@ export default {
         tcp_ok: 'TCP-Verbindung zu {host}:{port} erfolgreich',
         tcp_failed: 'TCP-Verbindung zu {host}:{port} fehlgeschlagen',
         tls_note: ' (TLS aktiviert, Zertifikatsprüfung nicht getestet)'
+      },
+      prometheus: {
+        disabled: 'Prometheus ist deaktiviert',
+        listening: 'Prometheus-Exporter lauscht auf TCP-Port {port}',
+        not_ready: 'Prometheus ist aktiviert, aber der Listener ist nicht bereit'
+      },
+      syslog: {
+        disabled: 'Syslog-Weiterleitung ist deaktiviert',
+        tcp_ok: 'TCP-Verbindung zu {host}:{port} erfolgreich',
+        tcp_failed: 'TCP-Verbindung zu {host}:{port} fehlgeschlagen'
+      },
+      notify: {
+        disabled: 'Benachrichtigungen sind deaktiviert',
+        queued: 'Test-Benachrichtigung für Kanäle 0x{mask} eingereiht'
       }
     }
   },

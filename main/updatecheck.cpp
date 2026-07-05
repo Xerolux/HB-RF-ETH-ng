@@ -33,6 +33,7 @@
 #include "semver.h"
 #include "ota_config.h"
 #include "monitoring.h"
+#include "events.h"
 #include "esp_heap_caps.h"
 #include "cJSON.h"
 
@@ -348,11 +349,25 @@ bool UpdateCheck::isFetchInProgress()
 
 void UpdateCheck::_setOtaStateLocked(ota_state_t state)
 {
+    ota_state_t prev = _otaState;
     _otaState = state;
     if (state == OTA_STATE_IDLE) {
         _otaProgress = -1;
         _otaErrorText[0] = '\0';
         _otaErrorCode = 0;
+    }
+
+    // Emit user-visible transitions. events_emit is non-blocking and
+    // internally debounced, so calling it from this locked context is safe.
+    // Only emit on actual transitions to avoid duplicate notifications.
+    if (prev != state) {
+        if (state == OTA_STATE_STARTING) {
+            events_emit(EVENT_OTA_STARTED, nullptr);
+        } else if (state == OTA_STATE_SUCCESS) {
+            events_emit(EVENT_OTA_SUCCEEDED, nullptr);
+        } else if (state == OTA_STATE_FAILED) {
+            events_emit(EVENT_OTA_FAILED, _otaErrorText[0] ? _otaErrorText : nullptr);
+        }
     }
 }
 

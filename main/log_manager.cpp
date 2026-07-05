@@ -106,6 +106,60 @@ void LogManager::clear() {
     instance()._clear();
 }
 
+// Install the capture hook permanently at boot. Called from main.cpp before
+// any subsystem that might want to subscribe (syslog, log_stream) starts.
+// Idempotent: safe to call repeatedly.
+void LogManager::init() {
+    LogManager &m = instance();
+    if (!m._mutex) {
+        m._mutex = xSemaphoreCreateMutex();
+    }
+    if (m._hook_installed) return;
+    xSemaphoreTake(m._mutex, portMAX_DELAY);
+    if (!m._hook_installed && m._orig_vprintf == nullptr) {
+        m._orig_vprintf = esp_log_set_vprintf(log_vprintf);
+        m._hook_installed = true;
+    }
+    xSemaphoreGive(m._mutex);
+}
+
+void LogManager::addSubscriber(log_line_subscriber_t sub) {
+    if (!sub) return;
+    LogManager &m = instance();
+    // Ensure the capture hook is installed so log_vprintf actually runs.
+    init();
+    xSemaphoreTake(m._mutex, portMAX_DELAY);
+    bool found = false;
+    for (int i = 0; i < m._subscriber_count; i++) {
+        if (m._subscribers[i] == sub) { found = true; break; }
+    }
+    if (!found && m._subscriber_count < LOG_MAX_SUBSCRIBERS) {
+        m._subscribers[m._subscriber_count++] = sub;
+    }
+    xSemaphoreGive(m._mutex);
+}
+
+void LogManager::removeSubscriber(log_line_subscriber_t sub) {
+    if (!sub) return;
+    LogManager &m = instance();
+    xSemaphoreTake(m._mutex, portMAX_DELAY);
+    for (int i = 0; i < m._subscriber_count; i++) {
+        if (m._subscribers[i] == sub) {
+            // Shift-down compact; order is not significant.
+            for (int j = i + 1; j < m._subscriber_count; j++) {
+                m._subscribers[j - 1] = m._subscribers[j];
+            }
+            m._subscriber_count--;
+            break;
+        }
+    }
+    xSemaphoreGive(m._mutex);
+}
+
+int LogManager::subscriberCount() const {
+    return _subscriber_count;
+}
+
 void LogManager::_begin(size_t size) {
     if (!_mutex) {
         _mutex = xSemaphoreCreateMutex();
@@ -118,9 +172,11 @@ void LogManager::_begin(size_t size) {
     bool enabled = false;
     xSemaphoreTake(_mutex, portMAX_DELAY);
 
-    if (_orig_vprintf) {
-        esp_log_set_vprintf(_orig_vprintf);
-        _orig_vprintf = nullptr;
+    // The capture hook is installed unconditionally at boot via init().
+    // _begin() only manages the ring buffer from here on.
+    if (!_hook_installed && _orig_vprintf == nullptr) {
+        _orig_vprintf = esp_log_set_vprintf(log_vprintf);
+        _hook_installed = true;
     }
 
     if (log_buffer) {
@@ -133,12 +189,6 @@ void LogManager::_begin(size_t size) {
     if (log_buffer) {
         // Zero out for cleanliness, though not strictly required for ring buffer
         memset(log_buffer, 0, log_buffer_size);
-        // Install our capture hook; remember the previous sink so stop() can
-        // restore it (avoids the per-line double-format overhead of log_vprintf
-        // when logging is disabled).
-        if (_orig_vprintf == nullptr) {
-            _orig_vprintf = esp_log_set_vprintf(log_vprintf);
-        }
         enabled = true;
     }
 
@@ -155,12 +205,8 @@ void LogManager::_stop() {
     if (!_mutex) return;
     xSemaphoreTake(_mutex, portMAX_DELAY);
 
-    // Restore the original log sink first so no new log line enters the
-    // capture path while we tear the buffer down.
-    if (_orig_vprintf) {
-        esp_log_set_vprintf(_orig_vprintf);
-        _orig_vprintf = nullptr;
-    }
+    // Only free the ring buffer. The capture hook stays installed so any
+    // registered subscribers (syslog, log_stream) keep receiving lines.
     if (log_buffer) {
         free(log_buffer);
         log_buffer = nullptr;
@@ -169,7 +215,7 @@ void LogManager::_stop() {
     total_written = 0;
 
     xSemaphoreGive(_mutex);
-    // Logged through the restored default sink (UART).
+    // Logged through the still-installed hook (UART passthrough).
     ESP_LOGI(TAG, "log buffering disabled (buffer freed)");
 }
 
@@ -189,34 +235,49 @@ void LogManager::_clear() {
 }
 
 void LogManager::write(const char* data, size_t len) {
-    if (!log_buffer || log_buffer_size == 0 || len == 0) return;
+    if (len == 0 || !_mutex) return;
 
-    if (_mutex) {
-        // Use timeout to avoid blocking logging if something is stuck
-        if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            // Only the tail of an oversized log entry can fit in the ring.
-            // Advance total_written for the skipped bytes so client offsets
-            // still reflect the full stream of log data that passed through.
-            if (len > log_buffer_size) {
-                size_t skipped = len - log_buffer_size;
-                data += skipped;
-                len = log_buffer_size;
-                total_written += skipped;
-            }
+    // Snapshot the subscriber list under the lock, then call them unlocked.
+    // Subscribers are expected to be non-blocking (they enqueue internally),
+    // but a snapshot avoids holding the lock during their execution so a
+    // slow subscriber cannot stall the ring-buffer write below.
+    log_line_subscriber_t snap[LOG_MAX_SUBSCRIBERS];
+    int snap_count = 0;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
+        snap_count = _subscriber_count;
+        for (int i = 0; i < snap_count; i++) snap[i] = _subscribers[i];
+        xSemaphoreGive(_mutex);
+    }
+    for (int i = 0; i < snap_count; i++) {
+        snap[i](data, len);
+    }
 
-            size_t current_idx = total_written % log_buffer_size;
-            size_t space_at_end = log_buffer_size - current_idx;
+    if (!log_buffer || log_buffer_size == 0) return;
 
-            if (len <= space_at_end) {
-                memcpy(log_buffer + current_idx, data, len);
-            } else {
-                // Wrap around
-                memcpy(log_buffer + current_idx, data, space_at_end);
-                memcpy(log_buffer, data + space_at_end, len - space_at_end);
-            }
-            total_written += len;
-            xSemaphoreGive(_mutex);
+    // Use timeout to avoid blocking logging if something is stuck
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        // Only the tail of an oversized log entry can fit in the ring.
+        // Advance total_written for the skipped bytes so client offsets
+        // still reflect the full stream of log data that passed through.
+        if (len > log_buffer_size) {
+            size_t skipped = len - log_buffer_size;
+            data += skipped;
+            len = log_buffer_size;
+            total_written += skipped;
         }
+
+        size_t current_idx = total_written % log_buffer_size;
+        size_t space_at_end = log_buffer_size - current_idx;
+
+        if (len <= space_at_end) {
+            memcpy(log_buffer + current_idx, data, len);
+        } else {
+            // Wrap around
+            memcpy(log_buffer + current_idx, data, space_at_end);
+            memcpy(log_buffer, data + space_at_end, len - space_at_end);
+        }
+        total_written += len;
+        xSemaphoreGive(_mutex);
     }
 }
 

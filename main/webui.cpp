@@ -50,7 +50,7 @@
 #include "ota_config.h"
 #include "semver.h"
 #include "validation.h"
-// #include "prometheus.h"
+#include "log_stream.h"
 
 static const char *TAG = "WebUI";
 
@@ -176,6 +176,16 @@ esp_err_t validate_auth(httpd_req_t *req)
         return ESP_FAIL;
 
     return ESP_OK;
+}
+
+// Bearer-token check for callers that do not have an httpd_req_t — most
+// notably the WebSocket upgrade handler, which cannot rely on the
+// Authorization header because browsers do not let the WebSocket client
+// API set custom headers. The token is compared in constant time.
+bool check_admin_token(const char *token)
+{
+    if (!token || !token[0]) return false;
+    return secure_strcmp(token, _token) == 0;
 }
 
 // Receive the complete request body into buf (NUL-terminated).
@@ -2315,6 +2325,41 @@ static void _share_log_task(void *arg)
                 report += "CheckMK Port: "; report += ckPort; report += "\n";
                 report += "CheckMK Allowed Hosts: "; report += monCfg.checkmk.allowed_hosts; report += "\n";
             }
+            report += "Prometheus Enabled: "; report += monCfg.prometheus.enabled ? "Yes" : "No"; report += "\n";
+            if (monCfg.prometheus.enabled) {
+                char pPort[8];
+                snprintf(pPort, sizeof(pPort), "%u", monCfg.prometheus.port);
+                report += "Prometheus Port: "; report += pPort; report += "\n";
+                report += "Prometheus Allowed Hosts: "; report += monCfg.prometheus.allowed_hosts; report += "\n";
+            }
+            report += "Syslog Enabled: "; report += monCfg.syslog.enabled ? "Yes" : "No"; report += "\n";
+            if (monCfg.syslog.enabled) {
+                report += "Syslog Server: "; report += monCfg.syslog.server; report += "\n";
+                char sPort[8], sXp[8], sSev[8];
+                snprintf(sPort, sizeof(sPort), "%u", monCfg.syslog.port);
+                snprintf(sXp, sizeof(sXp), "%u", monCfg.syslog.transport);
+                snprintf(sSev, sizeof(sSev), "%u", monCfg.syslog.min_severity);
+                report += "Syslog Port: "; report += sPort; report += "\n";
+                report += "Syslog Transport: "; report += sXp; report += " (0=UDP,1=TCP,2=TLS)\n";
+                report += "Syslog Min Severity: "; report += sSev; report += "\n";
+            }
+            report += "Notify Enabled: "; report += monCfg.notify.enabled ? "Yes" : "No"; report += "\n";
+            if (monCfg.notify.enabled) {
+                char nCh[8], nCd[8];
+                snprintf(nCh, sizeof(nCh), "0x%02x", monCfg.notify.channels);
+                snprintf(nCd, sizeof(nCd), "%u", monCfg.notify.cooldown_seconds);
+                report += "Notify Channels: "; report += nCh; report += "\n";
+                report += "Notify Cooldown: "; report += nCd; report += "s\n";
+                if (monCfg.notify.webhook_url[0]) {
+                    report += "Webhook URL: "; report += monCfg.notify.webhook_url; report += "\n";
+                }
+                if (monCfg.notify.telegram_chatid[0]) {
+                    report += "Telegram Chat: "; report += monCfg.notify.telegram_chatid; report += "\n";
+                }
+                if (monCfg.notify.smtp_server[0]) {
+                    report += "SMTP Server: "; report += monCfg.notify.smtp_server; report += "\n";
+                }
+            }
         } else {
             report += "(monitoring config unavailable)\n";
         }
@@ -2572,6 +2617,11 @@ void WebUI::start()
 
     if (httpd_start(&_httpd_handle, &config) == ESP_OK)
     {
+        // Make the WebSocket log stream available as soon as the server starts
+        // so subscribers can connect before any monitoring backend is enabled.
+        log_stream_init();
+        httpd_register_uri_handler(_httpd_handle, &log_stream_ws_uri);
+
         httpd_register_uri_handler(_httpd_handle, &post_login_json_handler);
         httpd_register_uri_handler(_httpd_handle, &get_sysinfo_json_handler);
         httpd_register_uri_handler(_httpd_handle, &get_settings_json_handler);

@@ -51,6 +51,8 @@
 #include "updatecheck.h"
 #include "monitoring.h"
 #include "log_manager.h"
+#include "metrics.h"
+#include "events.h"
 #include "reset_info.h"
 #include "system_reset.h"
 
@@ -121,6 +123,17 @@ void app_main()
     // pushed the main task close to its stack limit, which caused a silent
     // boot hang via stack overflow into adjacent heap allocations.
     static Settings settings;
+
+    // Install the log capture hook unconditionally at boot. The hook itself
+    // is a no-op for the ring buffer when it is not allocated, but it allows
+    // subscribers (syslog forwarder, WebSocket log stream) to receive lines
+    // without each having to install their own hook.
+    LogManager::init();
+
+    // Initialise the metrics registry so counters can be registered by any
+    // subsystem from this point on. The Prometheus exporter (Phase A) reads
+    // them on demand.
+    metrics_init();
 
     // Default: disabled to save 8 KB heap. If the user enabled system log
     // capture in the WebUI, persist that choice and resume capture early on
@@ -280,6 +293,13 @@ void app_main()
     if (monitoringResult != ESP_OK)
     {
         ESP_LOGE(TAG, "Monitoring initialization failed: %s", esp_err_to_name(monitoringResult));
+    }
+
+    // Emit a one-shot "radio module detected" event now that the notification
+    // worker is running. Boots without a module stay silent.
+    if (radioModuleType != RADIO_MODULE_NONE) {
+        events_emit(EVENT_RF_MODULE_DETECTED,
+                    radioModuleType == RADIO_MODULE_RPI_RF_MOD ? "RPI-RF-MOD" : "HM-MOD-RPI-PCB");
     }
 
     // Open HTTP endpoints only after the shared HTTPS mutex exists. This

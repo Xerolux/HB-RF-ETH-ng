@@ -18,6 +18,11 @@ The HB-RF-ETH firmware provides a RESTful HTTP API for configuration and monitor
 | Token Persistence | 2.2.0-Beta.7 | All endpoints (token survives reboots) |
 | OTA Success Feedback | 2.2.0-Beta.9 | GET/POST `/api/check_update`, `POST /api/ota_url` |
 | Enhanced TLS Support | 2.2.0-Beta.10 | All HTTPS endpoints (Mozilla CA bundle) |
+| Prometheus Exporter | 2.3.0 | `GET /metrics` on configurable port (default 9100) |
+| Syslog Forwarding | 2.3.0 | Configured via `GET/POST /api/monitoring` (`syslog` block) |
+| Event Notifications | 2.3.0 | Webhook / Telegram / Email via `notify` block |
+| WebSocket Live Log | 2.3.0 | `GET /api/log/stream` (WS upgrade, `?token=…`) |
+| Expanded Monitoring Config | 2.3.0 | `GET/POST /api/monitoring` now carries `prometheus`, `syslog`, `notify` blocks |
 
 ## Authentication
 
@@ -824,9 +829,44 @@ curl -X POST http://192.168.1.100/api/monitoring \
 
 ---
 
-## WebSocket/Real-time Updates
+## WebSocket / Real-time Updates
 
-Currently, the API does not support WebSocket connections or real-time updates. Clients must poll endpoints to retrieve updated information.
+### GET /api/log/stream (WebSocket upgrade)
+
+Live log stream pushed from the device to one or more browser tabs. Each
+log line that enters the on-device ring buffer is sent immediately as a
+WebSocket TEXT frame. Up to 4 concurrent subscribers are supported.
+
+The browser cannot attach `Authorization` headers to a WebSocket upgrade,
+so the auth token is passed in the query string:
+
+```
+ws://<device>/api/log/stream?token=<token>
+```
+
+Frame format: plain text, one log line per frame (may include trailing `\n`).
+Older firmware versions do not have this endpoint — clients should fall
+back to polling `GET /api/log` if the upgrade fails.
+
+### GET /metrics (Prometheus exporter, separate port)
+
+Plain-text Prometheus exposition served on a dedicated HTTP listener
+configured via `monitoring.prometheus.port` (default 9100). Auth is via
+source-IP allowlist (`monitoring.prometheus.allowedHosts`) since Prometheus
+cannot send bearer tokens.
+
+Exposed metrics (non-exhaustive):
+- `hbrfeth_info{version,project}` (gauge, =1)
+- `hbrfeth_uptime_seconds` (counter)
+- `hbrfeth_heap_free_bytes{type="internal|default"}` (gauge)
+- `hbrfeth_heap_largest_free_block` (gauge)
+- `hbrfeth_cpu_usage_percent`, `hbrfeth_memory_usage_percent` (gauge)
+- `hbrfeth_eth_link_up`, `hbrfeth_mqtt_connected` (gauge)
+- `hbrfeth_rf_module{type="..."}` (gauge)
+- `hbrfeth_udp_rx_frames_total`, `hbrfeth_udp_tx_frames_total`,
+  `hbrfeth_udp_keepalive_total`, `hbrfeth_udp_drop_total` (counter)
+- `hbrfeth_notify_sent_total`, `hbrfeth_notify_failed_total`,
+  `hbrfeth_notify_suppressed_total` (counter)
 
 ## Rate Limiting
 

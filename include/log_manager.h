@@ -29,11 +29,19 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
+// Subscriber hook signature. Called for every formatted log line that passes
+// through LogManager::write(). `line` is NUL-terminated, `len` excludes the
+// terminator. Subscribers must not block — they should enqueue and defer I/O
+// to a worker task (this is how syslog.cpp and log_stream.cpp implement
+// their forwarders).
+typedef void (*log_line_subscriber_t)(const char *line, size_t len);
+
 class LogManager {
 public:
     static LogManager& instance();
 
     // Static wrappers for initialization (called from main.cpp / WebUI)
+    static void init();  // install the capture hook at boot (idempotent)
     static void begin(size_t size = 8192);
     // Frees the ring buffer and restores the default log sink. The buffer is
     // NOT allocated at boot (saves ~8 KB heap needed for the TLS handshake
@@ -45,6 +53,13 @@ public:
     // and stop() has not freed it since). Read by the WebUI to show whether
     // log capture is running.
     bool isEnabled() const;
+
+    // Subscriber registry. add/remove are idempotent and safe to call from
+    // any task. At most LOG_MAX_SUBSCRIBERS may be registered concurrently.
+    static constexpr int LOG_MAX_SUBSCRIBERS = 4;
+    void addSubscriber(log_line_subscriber_t sub);
+    void removeSubscriber(log_line_subscriber_t sub);
+    int subscriberCount() const;
 
     // Instance methods
     std::string getLogContent(size_t offset = 0);
@@ -63,6 +78,11 @@ private:
     size_t log_buffer_size = 0;
     uint64_t total_written = 0;
     mutable SemaphoreHandle_t _mutex = nullptr;
+
+    // Subscriber list. Iterated under _mutex on every write(); keep it small.
+    log_line_subscriber_t _subscribers[LOG_MAX_SUBSCRIBERS] = {};
+    int _subscriber_count = 0;
+    bool _hook_installed = false;
 
     // Original esp_log vprintf handler saved by begin() and restored by
     // stop(); typed as a plain function pointer to avoid pulling esp_log.h
