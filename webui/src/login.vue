@@ -77,9 +77,9 @@
       <div class="login-footer">
         <small class="version-text">v{{ sysInfoStore.currentVersion || t('common.loading') }}</small>
         <div class="links">
-          <span>&copy; Xerolux 2026</span>
+          <span>{{ t('login.footerCopyright') }}</span>
           <span class="separator">•</span>
-          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank" rel="noopener noreferrer">{{ t('login.githubLink') }}</a>
         </div>
       </div>
     </div>

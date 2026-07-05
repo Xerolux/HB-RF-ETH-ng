@@ -25,10 +25,10 @@
         <p>{{ t('about.forkDescription') }}</p>
         <a href="https://github.com/Xerolux/HB-RF-ETH-ng" target="_blank" rel="noopener noreferrer" class="github-link">
           <AppIcon name="link" class="link-icon" />
-          GitHub Repository
+          {{ t('about.githubRepository') }}
         </a>
         <div class="license-info">
-          <p>Copyright (c) 2025, Xerolux</p>
+          <p>{{ t('about.copyrightXerolux') }}</p>
           <p>
             {{ t('about.firmwareLicense') }} HB-RF-ETH-ng {{ t('about.under') }}
             <a href="https://github.com/Xerolux/HB-RF-ETH-ng/blob/main/LICENSE.md" target="_blank" rel="noopener noreferrer">CC BY-NC-SA 4.0</a>
@@ -45,7 +45,7 @@
         <h3 class="section-title">{{ t('about.original') }}</h3>
       </div>
       <div class="info-card">
-        <p>Copyright (c) 2022, Alexander Reinert</p>
+        <p>{{ t('about.copyrightOriginal') }}</p>
         <div class="license-info">
           <p>
             {{ t('about.firmwareLicense') }}

@@ -858,14 +858,23 @@ static esp_err_t tcp_probe_endpoint(const char *host, uint16_t port, int timeout
     return probe_result;
 }
 
-esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message, size_t message_len)
+esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
+                                    char *code, size_t code_len,
+                                    char *message, size_t message_len,
+                                    char *host, size_t host_len,
+                                    uint16_t *port,
+                                    bool *tls_enabled)
 {
-    if (target == NULL || ok == NULL || message == NULL || message_len == 0) {
+    if (target == NULL || ok == NULL || code == NULL || message == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
     *ok = false;
+    code[0] = '\0';
     message[0] = '\0';
+    if (host && host_len) host[0] = '\0';
+    if (port) *port = 0;
+    if (tls_enabled) *tls_enabled = false;
 
     // Snapshot the needed fields under the config mutex - apply_config_task
     // may memcpy the whole config struct concurrently, and tcp_probe_endpoint
@@ -888,28 +897,52 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message,
 
     if (strcmp(target, "checkmk") == 0) {
         if (!checkmk_enabled) {
+            snprintf(code, code_len, "monitoring.diag.checkmk.disabled");
             snprintf(message, message_len, "CheckMK is disabled");
             return ESP_OK;
         }
 
         *ok = checkmk_running.load() && checkmk_listen_sock.load() >= 0;
-        snprintf(message, message_len, *ok
-            ? "CheckMK agent listening on TCP port %u"
-            : "CheckMK is enabled but listener is not ready",
-            checkmk_port);
+        if (*ok) {
+            snprintf(code, code_len, "monitoring.diag.checkmk.listening");
+            snprintf(message, message_len, "CheckMK agent listening on TCP port %u", checkmk_port);
+        } else {
+            snprintf(code, code_len, "monitoring.diag.checkmk.not_ready");
+            snprintf(message, message_len, "CheckMK is enabled but listener is not ready");
+        }
+        if (port) *port = checkmk_port;
         return ESP_OK;
     }
 
     if (strcmp(target, "mqtt") == 0) {
+        if (tls_enabled) *tls_enabled = mqtt_tls;
+
         if (!mqtt_enabled) {
+            snprintf(code, code_len, "monitoring.diag.mqtt.disabled");
             snprintf(message, message_len, "MQTT is disabled");
+            if (host && host_len) {
+                strncpy(host, mqtt_server, host_len - 1);
+                host[host_len - 1] = '\0';
+            }
+            if (port) *port = mqtt_port;
             return ESP_OK;
         }
 
+        if (host && host_len) {
+            strncpy(host, mqtt_server, host_len - 1);
+            host[host_len - 1] = '\0';
+        }
+        if (port) *port = mqtt_port;
+
         esp_err_t probe = tcp_probe_endpoint(mqtt_server, mqtt_port, 3000, message, message_len);
         *ok = (probe == ESP_OK);
+        snprintf(code, code_len,
+                 probe == ESP_OK ? "monitoring.diag.mqtt.tcp_ok" : "monitoring.diag.mqtt.tcp_failed");
+
         if (mqtt_tls) {
-            // Append TLS note; TCP probe only, TLS handshake is not tested here.
+            // Append TLS note to the English fallback; the WebUI has its own
+            // localized suffix and decides whether to append it based on the
+            // tlsEnabled flag in the JSON response.
             size_t used = strlen(message);
             if (used < message_len) {
                 snprintf(message + used, message_len - used, " (TLS enabled, cert validation not tested)");
@@ -918,6 +951,7 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message,
         return ESP_OK;
     }
 
+    snprintf(code, code_len, "monitoring.diag.unsupported");
     snprintf(message, message_len, "Unknown diagnostic target");
     return ESP_ERR_NOT_SUPPORTED;
 }

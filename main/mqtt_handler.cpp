@@ -27,6 +27,7 @@
 #include "updatecheck.h"
 #include "settings.h"
 #include "reset_info.h"
+#include "system_reset.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
@@ -92,6 +93,10 @@ static void log_error_if_nonzero(const char *message, int error_code)
 }
 
 // Forward declarations for system commands
+// esp_restart() is declared in esp_system.h; we keep the extern here for
+// backward compatibility but route restarts through full_system_restart()
+// (declared in system_reset.h) so the optional flash-pause honoured by all
+// other restart paths also applies to MQTT-triggered restarts.
 extern "C" void esp_restart(void);
 
 static void perform_factory_reset()
@@ -155,13 +160,18 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         mqtt_handler_publish_event("event/restart", "requested");
         // Give the broker a moment to flush the publish before we tear down TCP.
         vTaskDelay(pdMS_TO_TICKS(300));
-        esp_restart();
+        // Route through full_system_restart() so the optional flash pause
+        // (35 s Ethernet link drop) also applies when the device is rebooted
+        // via MQTT, matching the behaviour of the WebUI restart button.
+        full_system_restart();
     } else if (strcmp(command, "factory_reset") == 0) {
         ESP_LOGI(TAG, "Factory reset command received via MQTT");
         mqtt_handler_publish_event("event/factory_reset", "requested");
         vTaskDelay(pdMS_TO_TICKS(300));
         perform_factory_reset();
-        esp_restart();
+        // After factory reset, the flash-pause setting has just been wiped
+        // from NVS — full_system_restart() will skip the 35 s wait naturally.
+        full_system_restart();
     } else if (strcmp(command, "update") == 0) {
         ESP_LOGI(TAG, "Update command received via MQTT");
         UpdateCheck* updateCheck = monitoring_get_updatecheck();

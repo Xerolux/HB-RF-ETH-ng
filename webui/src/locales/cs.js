@@ -12,7 +12,24 @@ export default {
     success: 'Úspěch',
     yes: 'Ano',
     no: 'Ne',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Neznámá chyba',
+    copyFailed: 'Kopírování selhalo',
+    network: {
+      serverErrorTitle: 'Chyba serveru',
+      serverError: 'Chyba serveru: {status}',
+      timeoutTitle: 'Časový limit požadavku',
+      timeout: 'Požadavek trval příliš dlouho. Zkuste to znovu.',
+      connectionErrorTitle: 'Chyba připojení',
+      connectionError: 'Nelze se připojit k zařízení. Zkontrolujte síť.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Sponzor',
+    followOnX: 'Sledovat na X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'Přihlášení nebylo úspěšné.',
     usernameRequired: 'Uživatelské jméno je vyžadováno',
     passwordRequired: 'Heslo je vyžadováno',
-    loggingIn: 'Přihlašování...'
+    loggingIn: 'Přihlašování...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'Po aktualizaci firmware odpojí Ethernet na 35 s před restartem, aby watchdog CCU detekoval odpojení a provedl čistý restart.',
     restoreSuccess: 'Nastavení úspěšně obnoveno. Restartování systému...',
     restoreError: 'Chyba při obnově nastavení',
-    backupError: 'Chyba při stahování zálohy'
+    backupError: 'Chyba při stahování zálohy',
+    validation: {
+      invalidIpv4OrIpv6: 'Neplatná IPv4 nebo IPv6 adresa',
+      invalidIpv6: 'Neplatná IPv6 adresa',
+      minPrefix: 'Min 1',
+      maxPrefix: 'Max 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'Online',
     offline: 'Offline',
     dashboardTitle: 'Stav systému',
-    monitoringSummary: 'MQTT a CheckMK'
+    monitoringSummary: 'MQTT a CheckMK',
+    updateAvailableShort: 'Aktualizace {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Hodnota ADC ze vstupu board-revision. Srovnáním se čtyřmi referenčními napětími lze určit revizi desky: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -262,7 +290,7 @@ export default {
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.2.3-Beta.10 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.2.3-Beta.11 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Aktualizace k dispozici!',
     updateAvailableMessage: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     upToDate: 'Firmware je aktuální',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Nainstalováno',
     archiveInstall: 'Nainstalovat',
     archiveInstallConfirm: 'Nainstalovat firmware verze {version}? Zařízení jej stáhne online a automaticky se restartuje. Nejprve vytvořte zálohu.',
-    archiveReleaseNotes: 'Changelog / poznámky k vydání'
+    archiveReleaseNotes: 'Changelog / poznámky k vydání',
+    otaFailed: 'Aktualizace OTA selhala',
+    lostConnection: 'Během aktualizace bylo ztraceno spojení se zařízením',
+    restartFlashPauseHint: 'Pauza Flash je aktivní — ethernetové spojení bude přerušeno na cca 35 s, než se zařízení skutečně restartuje. Načtení stránky proto bude trvat o něco déle než obvykle.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Povolit',
-    allowedHosts: 'Povolené hostitelé'
+    allowedHosts: 'Povolené hostitelé',
+    diag: {
+      unsupported: 'Neznámý cíl diagnostiky',
+      checkmk: {
+        disabled: 'CheckMK je zakázán',
+        listening: 'Agent CheckMK naslouchá na TCP portu {port}',
+        not_ready: 'CheckMK je povolen, ale naslouchač není připraven'
+      },
+      mqtt: {
+        disabled: 'MQTT je zakázán',
+        tcp_ok: 'TCP připojení k {host}:{port} úspěšné',
+        tcp_failed: 'TCP připojení k {host}:{port} selhalo',
+        tls_note: ' (TLS povoleno, ověřování certifikátů není testováno)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'Licence',
     website: 'Webová stránka',
     documentation: 'Dokumentace',
-    support: 'Podpora'
+    support: 'Podpora',
+    githubRepository: 'Repozitář GitHub',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -480,7 +528,8 @@ export default {
   sponsor: {
     title: 'Podpořit tento projekt',
     description: 'Pokud se vám tento projekt líbí a chcete podpořit jeho vývoj, můžete využít jednu z níže uvedených možností.',
-    thanks: 'Děkujeme za vaši podporu!'
+    thanks: 'Děkujeme za vaši podporu!',
+    teslaReferral: 'Tesla Referral'
   },
 
   // System Log

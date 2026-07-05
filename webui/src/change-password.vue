@@ -156,12 +156,12 @@ const handleSubmit = async () => {
       // Redirect to home
       router.push('/')
     } else {
-      error.value = response.data.error || 'Unknown error'
+      error.value = response.data.error || t('common.unknownError')
     }
   } catch (e) {
     // The firmware sends validation errors as a plain-text body, not JSON
     const data = e.response?.data
-    error.value = (typeof data === 'string' && data) || data?.message || e.message || 'Failed to change password'
+    error.value = (typeof data === 'string' && data) || data?.message || e.message || t('changePassword.changeError')
   } finally {
     loading.value = false
   }

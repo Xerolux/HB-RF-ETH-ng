@@ -11,10 +11,23 @@
       </main>
       <footer class="app-footer">
         <div class="footer-content">
-          <small class="text-muted">HB-RF-ETH-ng {{ sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }} &copy; 2025-2026 Xerolux</small>
-          <button class="sponsor-btn" @click="showSponsorModal = true">
-            <AppIcon name="support" /> Sponsor
-          </button>
+          <small class="text-muted">{{ t('app.footerCopyright', { version: sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }) }}</small>
+          <div class="footer-actions">
+            <a
+              class="follow-x-btn"
+              href="https://x.com/Xerolux"
+              target="_blank"
+              rel="noopener noreferrer"
+              :aria-label="t('app.followOnX')"
+              :title="t('app.followOnX')"
+            >
+              <AppIcon name="xSocial" />
+              <span>{{ t('app.followOnX') }}</span>
+            </a>
+            <button class="sponsor-btn" @click="showSponsorModal = true">
+              <AppIcon name="support" /> {{ t('app.sponsor') }}
+            </button>
+          </div>
         </div>
       </footer>
     </div>
@@ -225,6 +238,63 @@ onUnmounted(() => {
 .newdesign-shell .sponsor-btn {
   border-radius: var(--radius-sm);
   background: transparent;
+  box-shadow: none;
+}
+
+/* Action row: holds the X follow link + sponsor button side-by-side */
+.footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+/* X / Twitter follow button — visually distinct from the sponsor button
+ * (dark, neutral chip) so users immediately recognise it as an outgoing
+ * social link instead of an in-app action. */
+.follow-x-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.follow-x-btn:hover {
+  background: #1a1a1a;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.follow-x-btn .app-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.newdesign-shell .follow-x-btn {
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-light);
+  box-shadow: none;
+}
+
+.newdesign-shell .follow-x-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  transform: none;
   box-shadow: none;
 }
 

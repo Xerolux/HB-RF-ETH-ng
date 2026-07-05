@@ -12,7 +12,24 @@ export default {
     success: 'Suksess',
     yes: 'Ja',
     no: 'Nei',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Ukjent feil',
+    copyFailed: 'Kopiering mislyktes',
+    network: {
+      serverErrorTitle: 'Serverfeil',
+      serverError: 'Serverfeil: {status}',
+      timeoutTitle: 'Tidsavbrudd for forespørsel',
+      timeout: 'Forespørselen tok for lang tid. Prøv igjen.',
+      connectionErrorTitle: 'Tilkoblingsfeil',
+      connectionError: 'Kan ikke koble til enheten. Sjekk nettverket.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Spons',
+    followOnX: 'Følg på X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'Innlogging var ikke vellykket.',
     usernameRequired: 'Brukernavn er påkrevd',
     passwordRequired: 'Passord er påkrevd',
-    loggingIn: 'Logger inn...'
+    loggingIn: 'Logger inn...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'Etter en fastvareoppdatering kobles Ethernet-lenken ned i 35 s før omstart, slik at CCU-watchdogen oppdager frakoblingen og starter CCU rent på nytt.',
     restoreSuccess: 'Innstillinger gjenopprettet. Starter systemet på nytt...',
     restoreError: 'Feil ved gjenoppretting av innstillinger',
-    backupError: 'Feil ved nedlasting av sikkerhetskopi'
+    backupError: 'Feil ved nedlasting av sikkerhetskopi',
+    validation: {
+      invalidIpv4OrIpv6: 'Ugyldig IPv4- eller IPv6-adresse',
+      invalidIpv6: 'Ugyldig IPv6-adresse',
+      minPrefix: 'Min 1',
+      maxPrefix: 'Maks 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'På nett',
     offline: 'Frakoblet',
     dashboardTitle: 'Systemstatus',
-    monitoringSummary: 'MQTT og CheckMK'
+    monitoringSummary: 'MQTT og CheckMK',
+    updateAvailableShort: 'Oppdater {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Rå ADC-avlesning fra board-revision-sensepinnen. Sammenligning med de fire nominale spenningsdeler-verdiene identifiserer kortrevisjonen: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -262,7 +290,7 @@ export default {
     otaSuccess: 'Nedlasting vellykket. Installerer...',
     currentVersion: 'Nåværende Versjon',
     installedVersion: 'Installert versjon',
-    versionInfo: 'Modernisert fork v2.2.3-Beta.10 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
+    versionInfo: 'Modernisert fork v2.2.3-Beta.11 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'Oppdatering tilgjengelig!',
     updateAvailableMessage: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
     upToDate: 'Fastvaren er oppdatert',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Installert',
     archiveInstall: 'Installer',
     archiveInstallConfirm: 'Installere fastvareversjon {version}? Enheten laster den ned online og starter automatisk på nytt. Lag en sikkerhetskopi først.',
-    archiveReleaseNotes: 'Changelog / utgivelsesnotater'
+    archiveReleaseNotes: 'Changelog / utgivelsesnotater',
+    otaFailed: 'OTA-oppdatering mislyktes',
+    lostConnection: 'Mistet forbindelsen til enheten under oppdateringen',
+    restartFlashPauseHint: 'Flash-pause er aktiv: Ethernet-lenken holdes nede i ca. 35 s før enheten faktisk starter på nytt. Sideoppdateringen vil derfor ta litt lenger tid enn vanlig.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Aktiver',
-    allowedHosts: 'Tillatte verter'
+    allowedHosts: 'Tillatte verter',
+    diag: {
+      unsupported: 'Ukjent diagnosemål',
+      checkmk: {
+        disabled: 'CheckMK er deaktivert',
+        listening: 'CheckMK-agent lytter på TCP-port {port}',
+        not_ready: 'CheckMK er aktivert, men lytteren er ikke klar'
+      },
+      mqtt: {
+        disabled: 'MQTT er deaktivert',
+        tcp_ok: 'TCP-tilkobling til {host}:{port} lyktes',
+        tcp_failed: 'TCP-tilkobling til {host}:{port} mislyktes',
+        tls_note: ' (TLS aktivert, sertifikatvalidering ikke testet)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'Lisens',
     website: 'Nettsted',
     documentation: 'Dokumentasjon',
-    support: 'Støtte'
+    support: 'Støtte',
+    githubRepository: 'GitHub-arkiv',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -480,7 +528,8 @@ export default {
   sponsor: {
     title: 'Støtt dette prosjektet',
     description: 'Hvis du liker dette prosjektet og ønsker å støtte utviklingen, kan du bruke ett av alternativene nedenfor.',
-    thanks: 'Takk for støtten!'
+    thanks: 'Takk for støtten!',
+    teslaReferral: 'Tesla-henvisning'
   },
 
   // System Log

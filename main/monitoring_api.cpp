@@ -65,7 +65,9 @@ static esp_err_t send_json_error(httpd_req_t *req, const char *message)
     return ESP_OK;
 }
 
-static esp_err_t send_monitoring_test_response(httpd_req_t *req, const char *target, bool ok, const char *message)
+static esp_err_t send_monitoring_test_response(httpd_req_t *req, const char *target, bool ok,
+                                               const char *code, const char *message,
+                                               const char *host, uint16_t port, bool tls_enabled)
 {
     cJSON *root = cJSON_CreateObject();
     if (!root)
@@ -75,7 +77,21 @@ static esp_err_t send_monitoring_test_response(httpd_req_t *req, const char *tar
 
     cJSON_AddStringToObject(root, "target", target);
     cJSON_AddBoolToObject(root, "ok", ok);
-    cJSON_AddStringToObject(root, "message", message);
+    // `code` is the stable, machine-readable key the WebUI translates.
+    // `message` is an English fallback kept for older frontends / curl users.
+    if (code && code[0]) {
+        cJSON_AddStringToObject(root, "code", code);
+    } else {
+        cJSON_AddNullToObject(root, "code");
+    }
+    cJSON_AddStringToObject(root, "message", message ? message : "");
+    if (host && host[0]) {
+        cJSON_AddStringToObject(root, "host", host);
+    }
+    if (port) {
+        cJSON_AddNumberToObject(root, "port", port);
+    }
+    cJSON_AddBoolToObject(root, "tlsEnabled", tls_enabled);
 
     char *json_string = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -493,16 +509,27 @@ static void _monitoring_diag_task(void *arg)
 {
     DiagnosticJob *job = (DiagnosticJob *)arg;
     bool ok = false;
+    char code[80];
     char message[160];
+    char host[128];
+    uint16_t port = 0;
+    bool tls_enabled = false;
+    code[0] = '\0';
     message[0] = '\0';
+    host[0] = '\0';
 
-    esp_err_t result = monitoring_run_diagnostic(job->target, &ok, message, sizeof(message));
+    esp_err_t result = monitoring_run_diagnostic(job->target, &ok,
+                                                 code, sizeof(code),
+                                                 message, sizeof(message),
+                                                 host, sizeof(host),
+                                                 &port, &tls_enabled);
     if (result == ESP_ERR_NOT_SUPPORTED) {
         send_json_error(job->req, "Unsupported diagnostic target");
     } else if (result != ESP_OK && message[0] == '\0') {
         send_json_error(job->req, "Diagnostic failed");
     } else {
-        send_monitoring_test_response(job->req, job->target, ok, message);
+        send_monitoring_test_response(job->req, job->target, ok,
+                                      code, message, host, port, tls_enabled);
     }
 
     httpd_req_async_handler_complete(job->req);

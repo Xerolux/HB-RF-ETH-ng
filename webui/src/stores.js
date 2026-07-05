@@ -144,6 +144,7 @@ export const useSysInfoStore = defineStore('sysInfo', {
     temperature: null,
     uptimeSeconds: 0,
     boardRevision: "",
+    boardSenseVoltage: 0,
     resetReason: "",
     ethernetConnected: false,
     ethernetSpeed: 0,

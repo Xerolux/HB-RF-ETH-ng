@@ -36,6 +36,8 @@
 #include "reset_info.h"
 #include "pins.h"
 #include <atomic>
+#include <stdio.h>
+#include <inttypes.h>
 
 #define DEFAULT_VREF 1100
 
@@ -180,28 +182,53 @@ uint32_t get_voltage(adc_unit_t adc_unit, adc_channel_t adc_channel, adc_atten_t
     return voltage_mv;
 }
 
+// Last voltage reading from the board-revision sense pin, kept for diagnostic
+// output. detectBoard() updates it on every call; getBoardSenseVoltage() and
+// getBoardRevisionString() surface it to the WebUI / MQTT / log-share endpoints
+// so a user running into "Unknown" can see what the ADC actually measured
+// (instead of having to attach a serial console).
+static uint32_t _lastBoardSenseVoltage = 0;
+
 board_type_t detectBoard()
 {
     uint32_t voltage = get_voltage(BOARD_REV_SENSE_UNIT, BOARD_REV_SENSE_CHANNEL, ADC_ATTEN_DB_12);
+    _lastBoardSenseVoltage = voltage;
 
-    switch (voltage) // R31/R32
-    {
-    case 400 ... 700: // 10K/2K (Rev 1.10 and 1.11 share the same divider)
-        return BOARD_TYPE_REV_1_10_PUB;
+    // Voltage divider values per board revision:
+    //   Rev 1.10/1.11 PUB  → 10K/2K   ≈ 550 mV   (3V3 × 2/(10+2))
+    //   Rev 1.8 SK         → 10K/10K  ≈ 1650 mV  (3V3 × 10/20)
+    //   Rev 1.8 PUB        → 2K/10K   ≈ 2750 mV  (3V3 × 10/12)
+    //   Rev 1.10/1.11 SK   → 1K/12K   ≈ 3050 mV  (3V3 × 12/13)
+    //
+    // ESP32 ADC1 with ADC_ATTEN_DB_12 has a usable range of roughly 150 mV to
+    // ~3100 mV (depending on the calibration eFuse / Vref). The ranges below
+    // intentionally leave wide gaps between the nominal divider voltages so
+    // that 5-10% ADC error — common with uncalibrated chips — does not flip a
+    // board into the wrong bucket, and so that the uppermost band (Rev 1.10/1.11
+    // SK) keeps working even when the ADC saturates near its ceiling.
 
-    case 1500 ... 1800: // 10K/10K
-        return BOARD_TYPE_REV_1_8_SK;
-
-    case 2600 ... 2900: // 2K/10K
-        return BOARD_TYPE_REV_1_8_PUB;
-
-    case 2901 ... 3200: // 1K/12K
-        return BOARD_TYPE_REV_1_10_SK;
-
-    default:
-        ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32, voltage);
+    if (voltage < 250) {
+        ESP_LOGW(TAG, "Board-revision ADC reading very low (%" PRIu32 " mV) — assuming no divider / open pin", voltage);
         return BOARD_TYPE_UNKNOWN;
     }
+    if (voltage <= 950) {
+        return BOARD_TYPE_REV_1_10_PUB;        // 10K/2K  ~550 mV
+    }
+    if (voltage >= 1200 && voltage <= 2050) {
+        return BOARD_TYPE_REV_1_8_SK;          // 10K/10K ~1650 mV
+    }
+    if (voltage >= 2350 && voltage <= 2850) {
+        return BOARD_TYPE_REV_1_8_PUB;         // 2K/10K  ~2750 mV
+    }
+    if (voltage >= 2851) {
+        // Upper bound intentionally open: ADC_ATTEN_DB_12 saturates around
+        // 3100–3300 mV, and Rev 1.10/1.11 SK sits at ~3050 mV — any reading
+        // 2851+ is far enough from the Rev 1.8 PUB band (2350–2850) to be SK.
+        return BOARD_TYPE_REV_1_10_SK;         // 1K/12K  ~3050 mV
+    }
+
+    ESP_LOGW(TAG, "Could not determine board, voltage: %" PRIu32 " mV (falls into a gap between known divider values)", voltage);
+    return BOARD_TYPE_UNKNOWN;
 }
 
 SysInfo::SysInfo()
@@ -266,8 +293,18 @@ const char* SysInfo::getBoardRevisionString()
     case BOARD_TYPE_REV_1_10_SK:
         return "REV 1.10/1.11 (SK)";
     default:
-        return "Unknown";
+        // Include the raw ADC reading so a user looking at the WebUI / log
+        // share can immediately see what the divider produced — usually one
+        // of: open pin, unsupported board rev, or ADC calibration drift.
+        static char unknown_buf[40];
+        snprintf(unknown_buf, sizeof(unknown_buf), "Unknown (%" PRIu32 " mV)", _lastBoardSenseVoltage);
+        return unknown_buf;
     }
+}
+
+uint32_t SysInfo::getBoardSenseVoltage()
+{
+    return _lastBoardSenseVoltage;
 }
 
 uint64_t SysInfo::getUptimeSeconds()

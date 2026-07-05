@@ -106,7 +106,24 @@ esp_err_t monitoring_get_config(monitoring_config_t *config);
 
 // Run a lightweight connectivity/self-test for a configured monitoring target.
 // Supported targets: "checkmk", "mqtt"
-esp_err_t monitoring_run_diagnostic(const char *target, bool *ok, char *message, size_t message_len);
+//
+// On success the function fills:
+//   * ok       – whether the probe succeeded
+//   * code     – a stable, machine-readable key (e.g. "monitoring.diag.mqtt.tcp_failed")
+//                that the WebUI maps to a translated string. Always set when ESP_OK
+//                is returned. Backwards compatibility: older frontends still read
+//                the English `message` fallback.
+//   * message  – English human-readable fallback text
+//   * host     – optional target host (empty when not applicable), exposed so the
+//   * port     – optional target port,       frontend can interpolate translations
+//                with the exact server/port the probe used.
+//   * tls_enabled – mirror of the MQTT TLS flag so the UI can append a TLS note.
+esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
+                                    char *code, size_t code_len,
+                                    char *message, size_t message_len,
+                                    char *host, size_t host_len,
+                                    uint16_t *port,
+                                    bool *tls_enabled);
 // CheckMK Agent functions
 esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);

@@ -329,6 +329,11 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     cJSON_AddNullToObject(sysInfo, "temperature");
     cJSON_AddNumberToObject(sysInfo, "uptimeSeconds", _sysInfo->getUptimeSeconds());
     cJSON_AddStringToObject(sysInfo, "boardRevision", _sysInfo->getBoardRevisionString());
+    // Raw board-revision ADC voltage in millivolts. Surfaced for diagnostics:
+    // when `boardRevision` resolves to "Unknown (...)" the user can read the
+    // measured divider voltage directly off the WebUI and compare it against
+    // the four known nominal values (≈ 550 / 1650 / 2750 / 3050 mV).
+    cJSON_AddNumberToObject(sysInfo, "boardSenseVoltage", _sysInfo->getBoardSenseVoltage());
     cJSON_AddStringToObject(sysInfo, "resetReason", _sysInfo->getResetReason());
     cJSON_AddBoolToObject(sysInfo, "ethernetConnected", _ethernet->isConnected());
     cJSON_AddNumberToObject(sysInfo, "ethernetSpeed", _ethernet->getLinkSpeedMbps());

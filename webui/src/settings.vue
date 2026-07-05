@@ -435,8 +435,7 @@
                   <input
                     class="form-check-input"
                     type="checkbox"
-                    :checked="settingsStore.flashPause"
-                    @change="settingsStore.flashPause = $event.target.checked"
+                    v-model="flashPause"
                   />
                 </div>
               </div>
@@ -493,6 +492,15 @@
       no-fade
     >
       <p>{{ t('settings.restartMessage') }}</p>
+      <BAlert
+        v-if="settingsStore.flashPause"
+        variant="info"
+        :model-value="true"
+        fade
+        class="mt-2 mb-0"
+      >
+        {{ t('firmware.restartFlashPauseHint') }}
+      </BAlert>
       <template #footer>
         <BButton variant="secondary" @click="showRestartModal = false">
           {{ t('settings.restartLater') }}
@@ -593,6 +601,7 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
+const flashPause = ref(false)
 
 // LED Programs
 const ledPrograms = computed(() => [
@@ -665,8 +674,10 @@ const ccuIPValidator = (value) => {
   return false
 }
 
-// Validation rules
-const rules = {
+// Validation rules — wrapped in computed() so the localized validator
+// messages (helpers.withMessage) follow locale changes at runtime instead of
+// being frozen to whatever language was active when the component mounted.
+const rules = computed(() => ({
   adminUsername: {
     required,
     username_validator,
@@ -697,28 +708,28 @@ const rules = {
     ipAddress
   },
   ccuIP: {
-    ccuIPValidator: helpers.withMessage('Invalid IPv4 or IPv6 address', ccuIPValidator)
+    ccuIPValidator: helpers.withMessage(t('settings.validation.invalidIpv4OrIpv6'), ccuIPValidator)
   },
   ipv6Address: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ipv6PrefixLength: {
     required: requiredIf(isIPv6Static),
     numeric,
-    minValue: helpers.withMessage('Min 1', val => val >= 1),
-    maxValue: helpers.withMessage('Max 128', val => val <= 128)
+    minValue: helpers.withMessage(t('settings.validation.minPrefix'), val => val >= 1),
+    maxValue: helpers.withMessage(t('settings.validation.maxPrefix'), val => val <= 128)
   },
   ipv6Gateway: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ipv6Dns1: {
     required: requiredIf(isIPv6Static),
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ipv6Dns2: {
-    ipv6_validator: helpers.withMessage('Invalid IPv6 address', ipv6_validator)
+    ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ntpServer: {
     required: requiredIf(isNtpActivated),
@@ -729,7 +740,7 @@ const rules = {
     required: requiredIf(isDcfActivated),
     numeric
   }
-}
+}))
 
 const v$ = useVuelidate(rules, {
   adminUsername,
@@ -771,7 +782,8 @@ const buildSettingsPayload = () => ({
   ipv6PrefixLength: ipv6PrefixLength.value,
   ipv6Gateway: ipv6Gateway.value,
   ipv6Dns1: ipv6Dns1.value,
-  ipv6Dns2: ipv6Dns2.value
+  ipv6Dns2: ipv6Dns2.value,
+  flashPause: flashPause.value
 })
 
 const serializeSettings = () => JSON.stringify(buildSettingsPayload())
@@ -785,7 +797,7 @@ const updateDirtyState = () => {
   }, 300)
 }
 
-watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2], updateDirtyState, { deep: true })
+watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause], updateDirtyState, { deep: true })
 
 const hasUnsavedChanges = computed(() => loadedSnapshot.value !== '' && serializedCurrent.value !== '' && serializedCurrent.value !== loadedSnapshot.value)
 const adminUsernameChanged = computed(() => adminUsername.value !== (settingsStore.adminUsername || 'admin'))
@@ -821,6 +833,13 @@ const loadSettings = () => {
     ipv6Gateway.value = settingsStore.ipv6Gateway || ''
     ipv6Dns1.value = settingsStore.ipv6Dns1 || ''
     ipv6Dns2.value = settingsStore.ipv6Dns2 || ''
+  }
+
+  // Flash pause (experimental) - keep the toggle in sync with the persisted
+  // store value. Without this the local ref stays at its default and the
+  // dirty-tracker / save-payload would silently rewrite the stored flag.
+  if (settingsStore.flashPause !== undefined) {
+    flashPause.value = settingsStore.flashPause
   }
 
   loadedSnapshot.value = serializeSettings()

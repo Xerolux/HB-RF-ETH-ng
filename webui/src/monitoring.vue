@@ -305,7 +305,7 @@ import { useI18n } from 'vue-i18n'
 import { useMonitoringStore, useUiStore } from './stores.js'
 import { storeToRefs } from 'pinia'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const monitoringStore = useMonitoringStore()
 const uiStore = useUiStore()
@@ -419,7 +419,36 @@ const diagnosticCards = computed(() => [
 const diagnosticState = (target) => {
   const result = monitoringStore.diagnostics[target]
   if (!result) return { ok: null, message: t('monitoring.selfTestHint') }
-  return result
+  return { ok: !!result.ok, message: formatDiagnosticMessage(result) }
+}
+
+// Maps a backend diagnostic response to a translated message.
+//
+// The backend returns a stable machine-readable `code` (e.g.
+// "monitoring.diag.mqtt.tcp_failed") plus optional interpolation params
+// (host, port, tlsEnabled). We translate the code when the current locale
+// has a matching key, otherwise we fall back to the English `message` the
+// backend sends alongside the code — this keeps older translations working
+// until the new keys are filled in.
+const TLS_AWARE_CODES = new Set([
+  'monitoring.diag.mqtt.tcp_ok',
+  'monitoring.diag.mqtt.tcp_failed'
+])
+function formatDiagnosticMessage(result) {
+  if (!result) return ''
+  const code = result.code
+  if (code && te(code)) {
+    const params = {}
+    if (result.host) params.host = result.host
+    if (result.port !== undefined && result.port !== null) params.port = result.port
+    let msg = t(code, params)
+    if (result.tlsEnabled && TLS_AWARE_CODES.has(code) && te('monitoring.diag.mqtt.tls_note')) {
+      msg += t('monitoring.diag.mqtt.tls_note')
+    }
+    return msg
+  }
+  // Fallback for older backends / untranslated codes.
+  return result.message || ''
 }
 
 onMounted(async () => {
@@ -510,7 +539,7 @@ const runDiagnostic = async (target) => {
     uiStore.pushToast({
       type: result.ok ? 'success' : 'warning',
       title: result.ok ? t('common.success') : t('monitoring.checkFinished'),
-      message: result.message,
+      message: formatDiagnosticMessage(result),
       duration: 2800
     })
   } catch (error) {

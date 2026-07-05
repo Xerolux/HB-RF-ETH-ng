@@ -245,6 +245,17 @@ const icons = {
       { type: 'path', d: 'M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1' }
     ]
   },
+  // Logout: door frame on the left + arrow pointing out to the right.
+  // Visually distinct from the "power" symbol so users no longer confuse
+  // logout with reboot (see feedback from the field tester).
+  logout: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' },
+      { type: 'path', d: 'M16 17l5-5-5-5' },
+      { type: 'line', x1: 21, y1: 12, x2: 9, y2: 12 }
+    ]
+  },
   list: {
     viewBox: '0 0 24 24',
     nodes: [
@@ -348,6 +359,16 @@ const icons = {
     nodes: [
       { type: 'path', d: 'M3 12a9 9 0 1 0 3-6.7' },
       { type: 'path', d: 'M3 4v5h5' }
+    ]
+  },
+  // Restart / reboot: a near-full clockwise circle (gap at the top-right)
+  // with an arrow head. Reads as "rotate / reboot" rather than "power off",
+  // which is the ambiguity the old power-icon button had.
+  restart: {
+    viewBox: '0 0 24 24',
+    nodes: [
+      { type: 'path', d: 'M21 12a9 9 0 1 1-3-6.7' },
+      { type: 'path', d: 'M21 3v5h-5' }
     ]
   },
   router: {

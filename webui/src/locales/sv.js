@@ -12,7 +12,24 @@ export default {
     success: 'Framgång',
     yes: 'Ja',
     no: 'Nej',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Okänt fel',
+    copyFailed: 'Kopiering misslyckades',
+    network: {
+      serverErrorTitle: 'Serverfel',
+      serverError: 'Serverfel: {status}',
+      timeoutTitle: 'Tidsgräns överskriden',
+      timeout: 'Begäran tog för lång tid. Försök igen.',
+      connectionErrorTitle: 'Anslutningsfel',
+      connectionError: 'Kan inte ansluta till enheten. Kontrollera nätverket.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Sponsra',
+    followOnX: 'Följ på X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'Inloggningen lyckades inte.',
     usernameRequired: 'Användarnamn krävs',
     passwordRequired: 'Lösenord krävs',
-    loggingIn: 'Loggar in...'
+    loggingIn: 'Loggar in...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'Efter en firmware-uppdatering kopplas Ethernet-länken ner i 35 s före omstart, så att CCU-watchdogen upptäcker frånkopplingen och startar om rent.',
     restoreSuccess: 'Inställningar återställda framgångsrikt. Startar om systemet...',
     restoreError: 'Fel vid återställning av inställningar',
-    backupError: 'Fel vid nedladdning av säkerhetskopia'
+    backupError: 'Fel vid nedladdning av säkerhetskopia',
+    validation: {
+      invalidIpv4OrIpv6: 'Ogiltig IPv4- eller IPv6-adress',
+      invalidIpv6: 'Ogiltig IPv6-adress',
+      minPrefix: 'Min 1',
+      maxPrefix: 'Max 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'Online',
     offline: 'Offline',
     dashboardTitle: 'Systemstatus',
-    monitoringSummary: 'MQTT och CheckMK'
+    monitoringSummary: 'MQTT och CheckMK',
+    updateAvailableShort: 'Uppdatera {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Rå ADC-avläsning från board-revision sensens-pin. Jämförelse med de fyra nominella spänningsdelarvärdena identifierar kortrevisionen: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -262,7 +290,7 @@ export default {
     otaSuccess: 'Nedladdning lyckades. Installerar...',
     currentVersion: 'Nuvarande Version',
     installedVersion: 'Installerad version',
-    versionInfo: 'Moderniserad fork v2.2.3-Beta.10 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
+    versionInfo: 'Moderniserad fork v2.2.3-Beta.11 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
     updateAvailable: 'Uppdatering tillgänglig!',
     updateAvailableMessage: 'En uppdatering till version {latestVersion} finns tillgänglig.',
     upToDate: 'Den fasta programvaran är uppdaterad',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Installerad',
     archiveInstall: 'Installera',
     archiveInstallConfirm: 'Installera firmwareversion {version}? Enheten laddar ned den online och startar om automatiskt. Skapa en säkerhetskopia först.',
-    archiveReleaseNotes: 'Changelog / versionsinformation'
+    archiveReleaseNotes: 'Changelog / versionsinformation',
+    otaFailed: 'OTA-uppdatering misslyckades',
+    lostConnection: 'Förlorade anslutningen till enheten under uppdateringen',
+    restartFlashPauseHint: 'Flash-paus är aktiv: Ethernet-länken hålls nere i ca 35 s innan enheten faktiskt startar om. Omladdningen av sidan kommer därför att ta lite längre tid än vanligt.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Aktivera',
-    allowedHosts: 'Tillåtna Värdar'
+    allowedHosts: 'Tillåtna Värdar',
+    diag: {
+      unsupported: 'Okänt diagnostikmål',
+      checkmk: {
+        disabled: 'CheckMK är inaktiverat',
+        listening: 'CheckMK-agenten lyssnar på TCP-port {port}',
+        not_ready: 'CheckMK är aktiverat, men lyssnaren är inte redo'
+      },
+      mqtt: {
+        disabled: 'MQTT är inaktiverat',
+        tcp_ok: 'TCP-anslutning till {host}:{port} lyckades',
+        tcp_failed: 'TCP-anslutning till {host}:{port} misslyckades',
+        tls_note: ' (TLS aktiverat, certifikatvalidering inte testad)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'Licens',
     website: 'Webbplats',
     documentation: 'Dokumentation',
-    support: 'Support'
+    support: 'Support',
+    githubRepository: 'GitHub-arkiv',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -480,7 +528,8 @@ export default {
   sponsor: {
     title: 'Stöd detta Projekt',
     description: 'Om du gillar detta projekt och vill stödja dess utveckling kan du använda ett av alternativen nedan.',
-    thanks: 'Tack för ditt stöd!'
+    thanks: 'Tack för ditt stöd!',
+    teslaReferral: 'Tesla-hänvisning'
   },
 
   // System Log

@@ -11,7 +11,7 @@
     footer-class="changelog-footer"
   >
     <template #header-close>
-      <button type="button" class="close-icon" aria-label="Close">
+      <button type="button" class="close-icon" :aria-label="t('common.close')">
         ×
       </button>
     </template>

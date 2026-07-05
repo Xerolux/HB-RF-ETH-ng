@@ -212,7 +212,7 @@ const copyToClipboard = async (text) => {
   document.body.removeChild(span)
 
   if (ok) return
-  throw new Error('copy failed')
+  throw new Error(t('common.copyFailed'))
 }
 
 const getEntryLevel = (line) => {

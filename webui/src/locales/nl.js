@@ -12,7 +12,24 @@ export default {
     success: 'Succes',
     yes: 'Ja',
     no: 'Nee',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Onbekende fout',
+    copyFailed: 'Kopiëren mislukt',
+    network: {
+      serverErrorTitle: 'Serverfout',
+      serverError: 'Serverfout: {status}',
+      timeoutTitle: 'Time-out van verzoek',
+      timeout: 'Het verzoek duurde te lang. Probeer het opnieuw.',
+      connectionErrorTitle: 'Verbindingsfout',
+      connectionError: 'Kan geen verbinding maken met het apparaat. Controleer uw netwerk.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Sponsoren',
+    followOnX: 'Volgen op X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'Inloggen was niet succesvol.',
     usernameRequired: 'Gebruikersnaam is vereist',
     passwordRequired: 'Wachtwoord is vereist',
-    loggingIn: 'Inloggen...'
+    loggingIn: 'Inloggen...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'Na een firmware-update wordt de Ethernet-link 35 s verbroken vóór de herstart, zodat de CCU-watchdog de onderbreking detecteert en de CCU schoon opnieuw opstart.',
     restoreSuccess: 'Instellingen succesvol hersteld. Systeem herstart...',
     restoreError: 'Fout bij het herstellen van instellingen',
-    backupError: 'Fout bij het downloaden van back-up'
+    backupError: 'Fout bij het downloaden van back-up',
+    validation: {
+      invalidIpv4OrIpv6: 'Ongeldig IPv4- of IPv6-adres',
+      invalidIpv6: 'Ongeldig IPv6-adres',
+      minPrefix: 'Min 1',
+      maxPrefix: 'Max 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'Online',
     offline: 'Offline',
     dashboardTitle: 'Systeemstatus',
-    monitoringSummary: 'MQTT en CheckMK'
+    monitoringSummary: 'MQTT en CheckMK',
+    updateAvailableShort: 'Update {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Ruwe ADC-waarde van de board-revision detectiepin. Vergelijking met de vier nominale spanningsdeler-waarden identificeert de board-revisie: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -262,7 +290,7 @@ export default {
     otaSuccess: 'Download succesvol. Installeren...',
     currentVersion: 'Huidige Versie',
     installedVersion: 'Geïnstalleerde versie',
-    versionInfo: 'Gemoderniseerde fork v2.2.3-Beta.10 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
+    versionInfo: 'Gemoderniseerde fork v2.2.3-Beta.11 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Update beschikbaar!',
     updateAvailableMessage: 'Een update naar versie {latestVersion} is beschikbaar.',
     upToDate: 'Firmware is up-to-date',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Geïnstalleerd',
     archiveInstall: 'Installeren',
     archiveInstallConfirm: 'Firmwareversie {version} installeren? Het apparaat downloadt deze online en start daarna automatisch opnieuw op. Maak eerst een back-up.',
-    archiveReleaseNotes: 'Changelog / releasenotes'
+    archiveReleaseNotes: 'Changelog / releasenotes',
+    otaFailed: 'OTA-update mislukt',
+    lostConnection: 'Verbinding met apparaat verloren tijdens update',
+    restartFlashPauseHint: 'Flash Pauze is actief: de Ethernet-link wordt circa 35 s verbroken voordat het apparaat daadwerkelijk herstart. Het herladen van de pagina duurt dus iets langer dan normaal.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Inschakelen',
-    allowedHosts: 'Toegestane Hosts'
+    allowedHosts: 'Toegestane Hosts',
+    diag: {
+      unsupported: 'Onbekend diagnose-doel',
+      checkmk: {
+        disabled: 'CheckMK is uitgeschakeld',
+        listening: 'CheckMK-agent luistert op TCP-poort {port}',
+        not_ready: 'CheckMK is ingeschakeld, maar listener is niet klaar'
+      },
+      mqtt: {
+        disabled: 'MQTT is uitgeschakeld',
+        tcp_ok: 'TCP-verbinding naar {host}:{port} geslaagd',
+        tcp_failed: 'TCP-verbinding naar {host}:{port} mislukt',
+        tls_note: ' (TLS ingeschakeld, certificaatverificatie niet getest)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'Licentie',
     website: 'Website',
     documentation: 'Documentatie',
-    support: 'Ondersteuning'
+    support: 'Ondersteuning',
+    githubRepository: 'GitHub-repository',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -480,7 +528,8 @@ export default {
   sponsor: {
     title: 'Steun dit Project',
     description: 'Als u dit project leuk vindt en de ontwikkeling ervan wilt steunen, kunt u een van de onderstaande opties gebruiken.',
-    thanks: 'Bedankt voor uw steun!'
+    thanks: 'Bedankt voor uw steun!',
+    teslaReferral: 'Tesla-verwijzing'
   },
 
   // System Log

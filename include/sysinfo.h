@@ -44,6 +44,10 @@ public:
     const char *getSerialNumber();
     board_type_t getBoardType();
     const char* getBoardRevisionString();
+    // Raw ADC voltage (in millivolts) from the board-revision sense pin, captured
+    // during detectBoard(). Useful for support / diagnostics when the revision
+    // resolves to "Unknown" — exposes what the divider actually produced.
+    uint32_t getBoardSenseVoltage();
     uint64_t getUptimeSeconds();
     const char* getResetReason();
 };

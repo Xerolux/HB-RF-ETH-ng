@@ -73,10 +73,16 @@
           <span>{{ t('nav.toggleTheme') }}</span>
         </button>
         <router-link v-if="!loginStore.isLoggedIn" to="/login" class="utility-row">{{ t('nav.login') }}</router-link>
-        <button v-else class="utility-row" type="button" @click="logout">
-          <AppIcon name="power" />
-          <span>{{ t('nav.logout') }}</span>
-        </button>
+        <template v-else>
+          <button class="utility-row restart-row" type="button" :disabled="isRestarting" @click="showRestartModal = true">
+            <AppIcon name="restart" />
+            <span>{{ t('firmware.restart') }}</span>
+          </button>
+          <button class="utility-row logout-row" type="button" @click="logout">
+            <AppIcon name="logout" />
+            <span>{{ t('nav.logout') }}</span>
+          </button>
+        </template>
       </div>
     </aside>
 
@@ -91,7 +97,7 @@
       <div class="top-status">
         <span class="connection-label">{{ t('sysinfo.ethernetStatus') }}</span>
         <span class="status-pill" :class="sysInfoStore.ethernetConnected ? 'online' : 'offline'">
-          {{ sysInfoStore.ethernetConnected ? 'LAN' : t('sysinfo.offline') }}
+          {{ sysInfoStore.ethernetConnected ? t('sysinfo.lan') : t('sysinfo.offline') }}
         </span>
         <span class="top-separator"></span>
         <span>{{ t('sysinfo.uptime') }}: <strong>{{ uptimeShort }}</strong></span>
@@ -153,16 +159,49 @@
             </div>
           </div>
 
-          <router-link v-if="!loginStore.isLoggedIn" to="/login" class="auth-button mobile-auth" @click="closeMobileMenu">
+          <template v-if="loginStore.isLoggedIn">
+            <button class="mobile-restart" :disabled="isRestarting" @click="showRestartModal = true">
+              <AppIcon name="restart" />
+              {{ t('firmware.restart') }}
+            </button>
+            <button class="mobile-logout" @click="logout">
+              <AppIcon name="logout" />
+              {{ t('nav.logout') }}
+            </button>
+          </template>
+          <router-link v-else to="/login" class="auth-button mobile-auth" @click="closeMobileMenu">
             {{ t('nav.login') }}
           </router-link>
-          <button v-else class="mobile-logout" @click="logout">
-            <AppIcon name="power" />
-            {{ t('nav.logout') }}
-          </button>
         </div>
       </div>
     </Transition>
+
+    <!-- Restart confirmation modal -->
+    <BModal
+      v-model="showRestartModal"
+      :title="t('firmware.restart')"
+      centered
+      no-fade
+      :ok-title="t('firmware.restart')"
+      ok-variant="danger"
+      :cancel-title="t('common.cancel')"
+      @ok.prevent="performRestart"
+      :ok-disabled="isRestarting"
+      :cancel-disabled="isRestarting"
+      no-close-on-backdrop
+      no-close-on-esc
+    >
+      <p>{{ t('firmware.restartConfirm') }}</p>
+      <BAlert
+        v-if="settingsStore.flashPause"
+        variant="info"
+        :model-value="true"
+        fade
+        class="mt-2 mb-0"
+      >
+        {{ t('firmware.restartFlashPauseHint') }}
+      </BAlert>
+    </BModal>
   </header>
 </template>
 
@@ -170,7 +209,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from '../stores.js'
+import axios from 'axios'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore } from '../stores.js'
 import { availableLocales } from '../locales/index.js'
 import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 
@@ -180,10 +220,14 @@ const loginStore = useLoginStore()
 const themeStore = useThemeStore()
 const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
+const uiStore = useUiStore()
+const settingsStore = useSettingsStore()
 
 const showBanner = ref(true)
 const localeOpen = ref(false)
 const mobileMenuOpen = ref(false)
+const showRestartModal = ref(false)
+const isRestarting = ref(false)
 const now = ref(new Date())
 let updateCheckTimer = null
 let clockTimer = null
@@ -220,6 +264,25 @@ const logout = () => {
   closeMobileMenu()
   loginStore.logout()
   router.push('/login')
+}
+
+// Same restart contract as header.vue / settings.vue. Defined inline because
+// pulling this into a shared composable would require teaching it the modal
+// state, the toast store and router — more wiring than the 12 lines are worth.
+const performRestart = async () => {
+  if (isRestarting.value) return
+  isRestarting.value = true
+  try {
+    await axios.post('/api/restart')
+    showRestartModal.value = false
+    closeMobileMenu()
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 18000 })
+    setTimeout(() => window.location.reload(), 20000)
+  } catch (e) {
+    console.error('Restart request failed', e)
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })
+    isRestarting.value = false
+  }
 }
 
 const dismissUpdate = () => {
@@ -438,7 +501,8 @@ onUnmounted(() => {
 
 .utility-row,
 .auth-button,
-.mobile-logout {
+.mobile-logout,
+.mobile-restart {
   min-height: 40px;
   width: 100%;
   border: 1px solid var(--color-border-strong);
@@ -456,9 +520,35 @@ onUnmounted(() => {
 
 .utility-row:hover,
 .auth-button:hover,
-.mobile-logout:hover {
+.mobile-logout:hover,
+.mobile-restart:hover {
   color: var(--color-text);
   background: var(--color-surface);
+}
+
+/* Restart button wears the brand primary colour so it doesn't get
+ * confused with the red logout button next to it. */
+.utility-row.restart-row,
+.mobile-restart {
+  color: var(--color-primary);
+  border-color: var(--color-primary-soft);
+}
+
+.utility-row.restart-row:hover,
+.mobile-restart:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+
+.utility-row.restart-row:disabled,
+.mobile-restart:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.utility-row.logout-row,
+.mobile-logout {
+  color: var(--color-danger);
 }
 
 .icon-button {
@@ -707,7 +797,8 @@ onUnmounted(() => {
 }
 
 .mobile-auth,
-.mobile-logout {
+.mobile-logout,
+.mobile-restart {
   width: 100%;
 }
 

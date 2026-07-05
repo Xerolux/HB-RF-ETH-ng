@@ -12,7 +12,24 @@ export default {
     success: 'Success',
     yes: 'Yes',
     no: 'No',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Unknown error',
+    copyFailed: 'Copy failed',
+    network: {
+      serverErrorTitle: 'Server Error',
+      serverError: 'Server error: {status}',
+      timeoutTitle: 'Request Timeout',
+      timeout: 'The request took too long. Please try again.',
+      connectionErrorTitle: 'Connection Error',
+      connectionError: 'Unable to connect to the device. Check your network.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Sponsor',
+    followOnX: 'Follow on X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'Login was not successful.',
     usernameRequired: 'Username is required',
     passwordRequired: 'Password is required',
-    loggingIn: 'Logging in...'
+    loggingIn: 'Logging in...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'After a firmware update, hold the Ethernet link down for 35 seconds before restarting. This ensures the CCU watchdog (30 s timeout) detects the disconnection and triggers a clean CCU reboot, preventing stale connections after the update.',
     restoreSuccess: 'Settings successfully restored. System restarting...',
     restoreError: 'Error restoring settings',
-    backupError: 'Error downloading backup'
+    backupError: 'Error downloading backup',
+    validation: {
+      invalidIpv4OrIpv6: 'Invalid IPv4 or IPv6 address',
+      invalidIpv6: 'Invalid IPv6 address',
+      minPrefix: 'Min 1',
+      maxPrefix: 'Max 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'Online',
     offline: 'Offline',
     dashboardTitle: 'System Status',
-    monitoringSummary: 'MQTT and CheckMK'
+    monitoringSummary: 'MQTT and CheckMK',
+    updateAvailableShort: 'Update {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Raw ADC reading from the board-revision sense pin. Compare against the four nominal divider voltages to identify the board revision: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -269,7 +297,7 @@ export default {
     otaSuccess: 'Download successful. Installing...',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
-    versionInfo: 'Modernized fork v2.2.3-Beta.10 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    versionInfo: 'Modernized fork v2.2.3-Beta.11 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailableMessage: 'An update to version {latestVersion} is available.',
     newVersionAvailable: 'New version {version} is available!',
     viewUpdate: 'View',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Installed',
     archiveInstall: 'Install',
     archiveInstallConfirm: 'Install firmware version {version}? The device will download it online and restart automatically. Please create a backup first.',
-    archiveReleaseNotes: 'Changelog / release notes'
+    archiveReleaseNotes: 'Changelog / release notes',
+    otaFailed: 'OTA update failed',
+    lostConnection: 'Lost connection to the device during the update',
+    restartFlashPauseHint: 'Flash Pause is active — the Ethernet link will be held down for ~35 s before the device actually reboots, so the page reload will take a bit longer than usual.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Enable',
-    allowedHosts: 'Allowed Hosts'
+    allowedHosts: 'Allowed Hosts',
+    diag: {
+      unsupported: 'Unknown diagnostic target',
+      checkmk: {
+        disabled: 'CheckMK is disabled',
+        listening: 'CheckMK agent listening on TCP port {port}',
+        not_ready: 'CheckMK is enabled but listener is not ready'
+      },
+      mqtt: {
+        disabled: 'MQTT is disabled',
+        tcp_ok: 'TCP connection to {host}:{port} succeeded',
+        tcp_failed: 'TCP connection to {host}:{port} failed',
+        tls_note: ' (TLS enabled, cert validation not tested)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'License',
     website: 'Website',
     documentation: 'Documentation',
-    support: 'Support'
+    support: 'Support',
+    githubRepository: 'GitHub Repository',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -461,6 +509,8 @@ export default {
     otaPasswordPlaceholder: 'Enter OTA password',
     confirmPassword: 'Confirm Password',
     confirmPasswordPlaceholder: 'Confirm OTA password',
+    currentPasswordPlaceholder: 'Enter current password',
+    currentPasswordRequired: 'Current password is required',
     passwordTooShort: 'Password must be at least 8 characters long',
     passwordRequirements: 'Must contain uppercase, lowercase, and numbers',
     passwordsDoNotMatch: 'Passwords do not match',
@@ -478,7 +528,8 @@ export default {
   sponsor: {
     title: 'Support this Project',
     description: 'If you like this project and want to support its development, you can use one of the options below.',
-    thanks: 'Thank you for your support!'
+    thanks: 'Thank you for your support!',
+    teslaReferral: 'Tesla Referral'
   },
 
   // System Log

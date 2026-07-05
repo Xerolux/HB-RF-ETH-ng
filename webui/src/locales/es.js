@@ -12,7 +12,24 @@ export default {
     success: 'Éxito',
     yes: 'Sí',
     no: 'No',
-    ok: 'OK'
+    ok: 'OK',
+    unknownError: 'Error desconocido',
+    copyFailed: 'Error al copiar',
+    network: {
+      serverErrorTitle: 'Error del servidor',
+      serverError: 'Error del servidor: {status}',
+      timeoutTitle: 'Tiempo de espera agotado',
+      timeout: 'La solicitud tardó demasiado. Inténtelo de nuevo.',
+      connectionErrorTitle: 'Error de conexión',
+      connectionError: 'No se puede conectar al dispositivo. Compruebe la red.'
+    }
+  },
+
+  // App-level chrome (footer copyright, sponsor button)
+  app: {
+    footerCopyright: 'HB-RF-ETH-ng {version} © 2025-2026 Xerolux',
+    sponsor: 'Patrocinar',
+    followOnX: 'Seguir en X'
   },
 
   updateSuccess: {
@@ -48,7 +65,9 @@ export default {
     loginError: 'El inicio de sesión no fue exitoso.',
     usernameRequired: 'El nombre de usuario es obligatorio',
     passwordRequired: 'Se requiere contraseña',
-    loggingIn: 'Iniciando sesión...'
+    loggingIn: 'Iniciando sesión...',
+    footerCopyright: '© Xerolux 2026',
+    githubLink: 'GitHub'
   },
 
   // Settings Page
@@ -174,7 +193,13 @@ export default {
     flashPauseHint: 'Tras una actualización de firmware, desconecta el enlace Ethernet durante 35 s antes de reiniciar, para que el watchdog de la CCU detecte la desconexión y reinicie limpiamente.',
     restoreSuccess: 'Configuración restaurada correctamente. Reiniciando el sistema...',
     restoreError: 'Error al restaurar la configuración',
-    backupError: 'Error al descargar la copia de seguridad'
+    backupError: 'Error al descargar la copia de seguridad',
+    validation: {
+      invalidIpv4OrIpv6: 'Dirección IPv4 o IPv6 no válida',
+      invalidIpv6: 'Dirección IPv6 no válida',
+      minPrefix: 'Mín 1',
+      maxPrefix: 'Máx 128'
+    }
   },
 
   // System Info
@@ -230,7 +255,10 @@ export default {
     online: 'En línea',
     offline: 'Fuera de línea',
     dashboardTitle: 'Estado del sistema',
-    monitoringSummary: 'MQTT y CheckMK'
+    monitoringSummary: 'MQTT y CheckMK',
+    updateAvailableShort: 'Actualizar {version}',
+    lan: 'LAN',
+    boardSenseHint: 'Lectura bruta del ADC del pin de detección de revisión de placa. Comparar con las cuatro tensiones nominales del divisor identifica la revisión: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
   // Update
@@ -262,7 +290,7 @@ export default {
     otaSuccess: 'Descarga exitosa. Instalando...',
     currentVersion: 'Versión actual',
     installedVersion: 'Versión instalada',
-    versionInfo: 'Fork modernizado v2.2.3-Beta.10 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    versionInfo: 'Fork modernizado v2.2.3-Beta.11 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: '¡Actualización disponible!',
     updateAvailableMessage: 'Hay una actualización disponible para la versión {latestVersion}.',
     upToDate: 'El firmware está actualizado',
@@ -317,7 +345,10 @@ export default {
     archiveInstalled: 'Instalada',
     archiveInstall: 'Instalar',
     archiveInstallConfirm: '¿Instalar la versión de firmware {version}? El dispositivo la descargará en línea y se reiniciará automáticamente. Cree antes una copia de seguridad.',
-    archiveReleaseNotes: 'Changelog / notas de la versión'
+    archiveReleaseNotes: 'Changelog / notas de la versión',
+    otaFailed: 'Error en la actualización OTA',
+    lostConnection: 'Se perdió la conexión con el dispositivo durante la actualización',
+    restartFlashPauseHint: 'La pausa de Flash está activa: el enlace Ethernet se mantendrá desconectado unos 35 s antes de que el dispositivo se reinicie realmente. La recarga de la página tardará un poco más de lo habitual.'
   },
 
   // Monitoring
@@ -399,7 +430,21 @@ export default {
       }
     },
     enable: 'Habilitar',
-    allowedHosts: 'Hosts permitidos'
+    allowedHosts: 'Hosts permitidos',
+    diag: {
+      unsupported: 'Destino de diagnóstico desconocido',
+      checkmk: {
+        disabled: 'CheckMK está desactivado',
+        listening: 'El agente CheckMK escucha en el puerto TCP {port}',
+        not_ready: 'CheckMK está activado, pero el listener no está listo'
+      },
+      mqtt: {
+        disabled: 'MQTT está desactivado',
+        tcp_ok: 'Conexión TCP a {host}:{port} correcta',
+        tcp_failed: 'Error en la conexión TCP a {host}:{port}',
+        tls_note: ' (TLS activado, validación de certificados no comprobada)'
+      }
+    }
   },
 
   // About Page
@@ -417,7 +462,10 @@ export default {
     license: 'Licencia',
     website: 'Sitio web',
     documentation: 'Documentación',
-    support: 'Soporte'
+    support: 'Soporte',
+    githubRepository: 'Repositorio de GitHub',
+    copyrightXerolux: 'Copyright (c) 2025, Xerolux',
+    copyrightOriginal: 'Copyright (c) 2022, Alexander Reinert'
   },
 
   // Third Party
@@ -480,7 +528,8 @@ export default {
   sponsor: {
     title: 'Apoyar este proyecto',
     description: 'Si le gusta este proyecto y desea apoyar su desarrollo, puede utilizar una de las siguientes opciones.',
-    thanks: '¡Gracias por su apoyo!'
+    thanks: '¡Gracias por su apoyo!',
+    teslaReferral: 'Referencia Tesla'
   },
 
   // System Log

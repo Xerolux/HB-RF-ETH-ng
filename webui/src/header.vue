@@ -84,9 +84,14 @@
         </button>
 
         <router-link v-if="!loginStore.isLoggedIn" to="/login" class="auth-button">{{ t('nav.login') }}</router-link>
-        <button v-else class="icon-button logout-button desktop-only" :title="t('nav.logout')" @click="logout">
-          <AppIcon name="power" />
-        </button>
+        <template v-else>
+          <button class="icon-button restart-button desktop-only" :title="t('firmware.restart')" :disabled="isRestarting" @click="showRestartModal = true">
+            <AppIcon name="restart" />
+          </button>
+          <button class="icon-button logout-button desktop-only" :title="t('nav.logout')" @click="logout">
+            <AppIcon name="logout" />
+          </button>
+        </template>
 
         <button class="icon-button mobile-menu-toggle mobile-only" @click="mobileMenuOpen = !mobileMenuOpen">
           <AppIcon :name="mobileMenuOpen ? 'close' : 'menu'" />
@@ -136,16 +141,49 @@
             </div>
           </div>
 
-          <router-link v-if="!loginStore.isLoggedIn" to="/login" class="auth-button mobile-auth" @click="closeMobileMenu">
+          <template v-if="loginStore.isLoggedIn">
+            <button class="mobile-restart" :disabled="isRestarting" @click="showRestartModal = true">
+              <AppIcon name="restart" />
+              {{ t('firmware.restart') }}
+            </button>
+            <button class="mobile-logout" @click="logout">
+              <AppIcon name="logout" />
+              {{ t('nav.logout') }}
+            </button>
+          </template>
+          <router-link v-else to="/login" class="auth-button mobile-auth" @click="closeMobileMenu">
             {{ t('nav.login') }}
           </router-link>
-          <button v-else class="mobile-logout" @click="logout">
-            <AppIcon name="power" />
-            {{ t('nav.logout') }}
-          </button>
         </div>
       </div>
     </Transition>
+
+    <!-- Restart confirmation modal -->
+    <BModal
+      v-model="showRestartModal"
+      :title="t('firmware.restart')"
+      centered
+      no-fade
+      :ok-title="t('firmware.restart')"
+      ok-variant="danger"
+      :cancel-title="t('common.cancel')"
+      @ok.prevent="performRestart"
+      :ok-disabled="isRestarting"
+      :cancel-disabled="isRestarting"
+      no-close-on-backdrop
+      no-close-on-esc
+    >
+      <p>{{ t('firmware.restartConfirm') }}</p>
+      <BAlert
+        v-if="settingsStore.flashPause"
+        variant="info"
+        :model-value="true"
+        fade
+        class="mt-2 mb-0"
+      >
+        {{ t('firmware.restartFlashPauseHint') }}
+      </BAlert>
+    </BModal>
   </header>
 </template>
 
@@ -153,7 +191,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore } from './stores.js'
+import axios from 'axios'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 import { useHeaderNavigation } from './composables/useHeaderNavigation.js'
 
@@ -163,10 +202,14 @@ const loginStore = useLoginStore()
 const themeStore = useThemeStore()
 const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
+const uiStore = useUiStore()
+const settingsStore = useSettingsStore()
 
 const showBanner = ref(true)
 const localeOpen = ref(false)
 const mobileMenuOpen = ref(false)
+const showRestartModal = ref(false)
+const isRestarting = ref(false)
 let updateCheckTimer = null
 
 const currentLocale = computed(() => locale.value)
@@ -191,6 +234,26 @@ const logout = () => {
   closeMobileMenu()
   loginStore.logout()
   router.push('/login')
+}
+
+// Restart flow shared with the settings page: confirm, POST /api/restart,
+// toast, then reload once the device has had time to reboot. The restart
+// button lives next to logout in the header — but unlike logout it always
+// asks for confirmation first so users don't reboot by accident.
+const performRestart = async () => {
+  if (isRestarting.value) return
+  isRestarting.value = true
+  try {
+    await axios.post('/api/restart')
+    showRestartModal.value = false
+    closeMobileMenu()
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 18000 })
+    setTimeout(() => window.location.reload(), 20000)
+  } catch (e) {
+    console.error('Restart request failed', e)
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })
+    isRestarting.value = false
+  }
 }
 
 const dismissUpdate = () => {
@@ -452,6 +515,18 @@ onUnmounted(() => {
   color: var(--color-danger);
 }
 
+/* Restart icon-button uses the brand primary colour so users immediately see
+ * it as "reboot" rather than the red "power off" it replaced. The red danger
+ * colour stays reserved for the actual logout button next to it. */
+.restart-button {
+  color: var(--color-primary);
+}
+
+.restart-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .locale-picker {
   position: relative;
 }
@@ -616,13 +691,35 @@ onUnmounted(() => {
 }
 
 .mobile-auth,
-.mobile-logout {
+.mobile-logout,
+.mobile-restart {
   width: 100%;
 }
 
 .mobile-logout {
   background: var(--color-danger-soft);
   color: var(--color-danger);
+}
+
+/* Mobile restart mirrors the logout styling but uses the primary colour so
+ * the two actions stay visually distinct. */
+.mobile-restart {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-weight: 700;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+
+.mobile-restart:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .dropdown-fade-enter-active,

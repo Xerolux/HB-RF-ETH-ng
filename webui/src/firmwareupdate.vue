@@ -629,11 +629,11 @@ const startOtaFromUrl = async (updateUrl, version) => {
       // legitimate conditions (already-in-progress, invalid URL, ...). Surface
       // it instead of silently doing nothing.
       localStorage.removeItem('otaUpdateVersion')
-      uiStore.pushToast({ type: 'error', title: t('common.error'), message: response.data.error || 'OTA update failed' })
+      uiStore.pushToast({ type: 'error', title: t('common.error'), message: response.data.error || t('firmware.otaFailed') })
     }
   } catch (error) {
     localStorage.removeItem('otaUpdateVersion')
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message || 'OTA update failed' })
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message || t('firmware.otaFailed') })
   } finally {
     otaUpdating.value = false
   }
@@ -670,14 +670,14 @@ const pollOtaStatus = () => {
           otaProgress.value = 100
           resolve()
         } else if (status === 'failed') {
-          reject(new Error(otaError || 'OTA update failed'))
+          reject(new Error(otaError || t('firmware.otaFailed')))
         } else {
           resolve()
         }
       } catch (err) {
         consecutiveErrors++
         if (consecutiveErrors >= 10) {
-          reject(new Error('Lost connection to the device during the update'))
+          reject(new Error(t('firmware.lostConnection')))
         } else {
           otaPollTimer = setTimeout(poll, 2000)
         }

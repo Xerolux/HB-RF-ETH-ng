@@ -32,7 +32,7 @@
           <span class="icon-badge warning"><AppIcon name="firmware" /></span>
           <div>
             <strong>{{ t('nav.firmware') }}</strong>
-            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? `Update ${sysInfoStore.latestVersion}` : t('sysinfo.updatesRecovery') }}</p>
+            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? t('sysinfo.updateAvailableShort', { version: sysInfoStore.latestVersion }) : t('sysinfo.updatesRecovery') }}</p>
           </div>
         </router-link>
 
@@ -146,7 +146,16 @@
             </div>
             <div class="kv-row">
               <span class="kv-label">{{ t('sysinfo.boardRevision') }}</span>
-              <span class="kv-value">{{ sysInfoStore.boardRevision || '-' }}</span>
+              <span class="kv-value">
+                {{ sysInfoStore.boardRevision || '-' }}
+                <span
+                  v-if="sysInfoStore.boardRevision && sysInfoStore.boardRevision.startsWith('Unknown')"
+                  class="board-sense-hint"
+                  :title="t('sysinfo.boardSenseHint')"
+                >
+                  {{ sysInfoStore.boardSenseVoltage }} mV
+                </span>
+              </span>
             </div>
             <div class="kv-row">
               <span class="kv-label">{{ t('sysinfo.uptime') }}</span>
@@ -329,7 +338,7 @@ const copyValue = async (value, label) => {
     if (navigator.clipboard) {
       await navigator.clipboard.writeText(value)
     } else {
-      throw new Error('copy failed')
+      throw new Error(t('common.copyFailed'))
     }
   }
   uiStore.pushToast({
@@ -385,6 +394,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .dashboard {
   gap: var(--spacing-xl);
+}
+
+/* Inline badge showing the raw board-revision ADC voltage. Only renders when
+ * boardRevision starts with "Unknown" so a clean detection stays visually
+ * quiet. */
+.board-sense-hint {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-warning-soft, #fff3cd);
+  color: var(--color-warning, #856404);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  cursor: help;
 }
 
 .quick-actions {

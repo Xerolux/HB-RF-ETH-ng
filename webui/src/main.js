@@ -37,6 +37,25 @@ const router = createRouter({
   ]
 })
 
+// Create I18n instance
+import { createI18n } from 'vue-i18n'
+import { messages, getBrowserLocale } from './locales/index.js'
+
+// Get stored locale or use browser locale
+const storedLocale = localStorage.getItem('locale') || getBrowserLocale()
+
+const i18n = createI18n({
+  legacy: false,
+  locale: storedLocale,
+  fallbackLocale: 'en',
+  messages: messages
+})
+
+// Network-error toasts fired from the axios interceptor run *outside* a Vue
+// component, so useI18n() is not available. Reach for the global instance
+// instead and translate through it so the messages honour the active locale.
+const translate = (key, params) => i18n.global.t(key, params)
+
 // Axios interceptors
 axios.interceptors.request.use(
   request => {
@@ -78,8 +97,8 @@ axios.interceptors.response.use(
       else if (error.response.status >= 500 && !silent) {
         uiStore.pushToast({
           type: 'error',
-          title: 'Server Error',
-          message: `Server error: ${error.response.status}`,
+          title: translate('common.network.serverErrorTitle'),
+          message: translate('common.network.serverError', { status: error.response.status }),
           duration: 5000
         })
       }
@@ -87,8 +106,8 @@ axios.interceptors.response.use(
       if (!silent) {
         uiStore.pushToast({
           type: 'warning',
-          title: 'Request Timeout',
-          message: 'The request took too long. Please try again.',
+          title: translate('common.network.timeoutTitle'),
+          message: translate('common.network.timeout'),
           duration: 4000
         })
       }
@@ -96,8 +115,8 @@ axios.interceptors.response.use(
       if (!silent) {
         uiStore.pushToast({
           type: 'error',
-          title: 'Connection Error',
-          message: 'Unable to connect to the device. Check your network.',
+          title: translate('common.network.connectionErrorTitle'),
+          message: translate('common.network.connectionError'),
           duration: 5000
         })
       }
@@ -138,20 +157,6 @@ router.beforeEach((to, from, next) => {
     }
   }
   next()
-})
-
-// Create I18n instance
-import { createI18n } from 'vue-i18n'
-import { messages, getBrowserLocale } from './locales/index.js'
-
-// Get stored locale or use browser locale
-const storedLocale = localStorage.getItem('locale') || getBrowserLocale()
-
-const i18n = createI18n({
-  legacy: false,
-  locale: storedLocale,
-  fallbackLocale: 'en',
-  messages: messages
 })
 
 // Create Bootstrap Vue Next
