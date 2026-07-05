@@ -36,6 +36,12 @@ void serialQueueHandlerTask(void *parameter)
     ((RadioModuleConnector *)parameter)->_serialQueueHandler();
 }
 
+RadioModuleConnector::~RadioModuleConnector()
+{
+    delete _streamParser;
+    _streamParser = nullptr;
+}
+
 RadioModuleConnector::RadioModuleConnector(LED *redLED, LED *greenLed, LED *blueLed) : _redLED(redLED), _greenLED(greenLed), _blueLED(blueLed)
 {
     gpio_config_t io_conf;

@@ -324,7 +324,7 @@ char *Settings::getAdminUsername()
 
 bool Settings::setAdminPassword(const char *adminPassword)
 {
-  if (adminPassword == nullptr || adminPassword[0] == '\0' || strlen(adminPassword) >= sizeof(_adminPassword))
+  if (adminPassword == nullptr || adminPassword[0] == '\0' || strlen(adminPassword) >= sizeof(_adminPassword) - 1)
   {
     ESP_LOGE(TAG, "Invalid admin password length, keeping current password");
     return false;
@@ -338,7 +338,7 @@ bool Settings::setAdminPassword(const char *adminPassword)
 
 bool Settings::setAdminUsername(const char *adminUsername)
 {
-  if (adminUsername == nullptr || adminUsername[0] == '\0' || strlen(adminUsername) >= sizeof(_adminUsername))
+  if (adminUsername == nullptr || adminUsername[0] == '\0' || strlen(adminUsername) >= sizeof(_adminUsername) - 1)
   {
     ESP_LOGE(TAG, "Invalid admin username length, keeping current username");
     return false;

@@ -33,6 +33,12 @@ void gpsSerialQueueHandlerTask(void *parameter)
     ((GPS *)parameter)->_gpsSerialQueueHandler();
 }
 
+GPS::~GPS()
+{
+    delete _lineReader;
+    _lineReader = nullptr;
+}
+
 GPS::GPS(Settings *settings, SystemClock *clk) : _settings(settings), _clk(clk)
 {
     uart_config_t uart_config = {
