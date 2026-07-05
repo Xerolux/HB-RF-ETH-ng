@@ -1,8 +1,24 @@
 /*
  *  mqtt_handler.cpp is part of the HB-RF-ETH firmware v2.0
  *
- *  Copyright 2025 Xerolux
- *  MQTT support
+ *  Original work Copyright 2022 Alexander Reinert
+ *  https://github.com/alexreinert/HB-RF-ETH
+ *
+ *  Modified work Copyright 2025 Xerolux
+ *  Modernized fork - Updated to ESP-IDF 6.0 and modern toolchains
+ *
+ *  The HB-RF-ETH firmware is licensed under a
+ *  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+ *
+ *  You should have received a copy of the license along with this
+ *  work.  If not, see <http://creativecommons.org/licenses/by-nc-sa/4.0/>.
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
  */
 
 #include "mqtt_handler.h"
@@ -391,10 +407,18 @@ void mqtt_handler_publish_status(void)
     // ---- Update info ------------------------------------------------------
     if (updateCheck) {
         VersionSnapshot rel = updateCheck->getVersionSnapshot();
-        const char* latest = rel.valid ? rel.version : "n/a";
+        const char* currentVersion = sysInfo->getCurrentVersion();
+        // Always publish a valid version string on latest_version so the HA
+        // MQTT update entity can compare it against installed_version. If no
+        // newer release is known, fall back to the current version so the
+        // entity state stays "up to date" instead of "unknown".
+        const char* latest = rel.valid ? rel.version : currentVersion;
+        if (rel.valid && compareVersions(latest, currentVersion) <= 0) {
+            latest = currentVersion;
+        }
         PUBLISH_STR("status/latest_version", latest);
         bool updateAvailable = rel.valid &&
-            compareVersions(latest, sysInfo->getCurrentVersion()) > 0;
+            compareVersions(rel.version, currentVersion) > 0;
         PUBLISH_STR("status/update_available", updateAvailable ? "true" : "false");
     }
 
@@ -722,6 +746,12 @@ void mqtt_handler_publish_ha_discovery(void)
     // Combines "current vs latest version" with an Install button that
     // triggers OTA via MQTT. Uses latest_version as state so the entity shows
     // the version number directly. enabled_by_default follows command_enabled.
+    //
+    // Home Assistant MQTT update semantics:
+    //   - state_topic receives the *latest* available version (plain text).
+    //   - installed_version_topic receives the *currently installed* version.
+    //   - Templates must use {{ value }} because the payloads are plain
+    //     strings, not JSON objects.
     {
         cJSON *root = cJSON_CreateObject();
         cJSON_AddStringToObject(root, "name", "Firmware Update");
@@ -733,6 +763,16 @@ void mqtt_handler_publish_ha_discovery(void)
         snprintf(state_topic, sizeof(state_topic), "%s/status/latest_version", current_mqtt_config.topic_prefix);
         cJSON_AddStringToObject(root, "state_topic", state_topic);
 
+        char installed_topic[160];
+        snprintf(installed_topic, sizeof(installed_topic), "%s/status/version", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "installed_version_topic", installed_topic);
+        cJSON_AddStringToObject(root, "installed_version_template", "{{ value }}");
+
+        char latest_topic[160];
+        snprintf(latest_topic, sizeof(latest_topic), "%s/status/latest_version", current_mqtt_config.topic_prefix);
+        cJSON_AddStringToObject(root, "latest_version_topic", latest_topic);
+        cJSON_AddStringToObject(root, "latest_version_template", "{{ value }}");
+
         char command_topic[160];
         snprintf(command_topic, sizeof(command_topic), "%s/command/update", current_mqtt_config.topic_prefix);
         cJSON_AddStringToObject(root, "command_topic", command_topic);
@@ -740,8 +780,7 @@ void mqtt_handler_publish_ha_discovery(void)
 
         cJSON_AddStringToObject(root, "entity_category", "config");
         cJSON_AddStringToObject(root, "device_class", "firmware");
-        cJSON_AddStringToObject(root, "value_template", "{{ value_json }}");
-        cJSON_AddStringToObject(root, "latest_version_template", "{{ value_json }}");
+        cJSON_AddStringToObject(root, "value_template", "{{ value }}");
         if (!current_mqtt_config.command_enabled) {
             cJSON_AddBoolToObject(root, "enabled_by_default", false);
         }
