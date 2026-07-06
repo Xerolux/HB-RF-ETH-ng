@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.13] - 2026-07-06
+
+### Changes
+- fix: clean up WebUI session and visual test flow
+- fix-flashpause-ota-archive-responsive-i18n
+- fix: OTA stability, archive slimming, responsive sidebar, i18n parity
+- beheben-von-flashpausenproblemen
+- Fix settings persistence and responsive monitoring
+- Merge pull request #356 from Xerolux/dependabot/github_actions/actions/setup-node-6
+- Merge pull request #357 from Xerolux/dependabot/npm_and_yarn/webui/vite-8.1.3
+- Merge pull request #355 from Xerolux/dependabot/github_actions/actions/labeler-6
+- Merge pull request #354 from Xerolux/dependabot/github_actions/github/codeql-action-4
+- chore(deps)(deps-dev): bump vite from 8.1.0 to 8.1.3 in /webui
+- chore(ci)(deps): bump actions/setup-node from 4 to 6
+- chore(ci)(deps): bump actions/labeler from 5 to 6
+- chore(ci)(deps): bump github/codeql-action from 3 to 4
+- fix: raise http uri handler limit
+- chore: update manifests for v2.2.3-Beta.12
+
 ## [2.2.3-Beta.12] - 2026-07-05
 
 ### Added — Monitoring & Notifications Expansion (Phases A–E)
