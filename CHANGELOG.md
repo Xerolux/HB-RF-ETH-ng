@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.17] - 2026-07-06
+
+### Changes
+- fix: supporter CRL SHA via PSA crypto, dedupe dashboard nav, expired-key login prompt
+
 ## [2.2.3-Beta.16] - 2026-07-06
 
 ### Changes
