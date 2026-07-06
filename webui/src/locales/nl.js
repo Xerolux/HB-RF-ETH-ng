@@ -681,6 +681,9 @@ export default {
     chipActive: 'Supporter',
     chipInactive: 'Steun',
     chipTooltip: 'Supporter — geldig tot {date}',
-    chipInactiveTooltip: 'Word supporter'
+    chipInactiveTooltip: 'Word supporter',
+    expiredPromptTitle: 'Je supporter-sleutel is verlopen',
+    expiredPromptSupport: 'Opnieuw steunen',
+    expiredPromptBody: 'Je supporter-sleutel is verlopen. Met een kleine bijdrage (bijv. een koffie) steun je de doorontwikkeling van dit project en ontvang je een nieuwe supporter-sleutel als dank. Bedankt! ❤'
   }
 }

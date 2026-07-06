@@ -681,6 +681,9 @@ export default {
     chipActive: 'Supporter',
     chipInactive: 'Stöd',
     chipTooltip: 'Supporter — giltig till {date}',
-    chipInactiveTooltip: 'Bli supporter'
+    chipInactiveTooltip: 'Bli supporter',
+    expiredPromptTitle: 'Din supporternyckel har löpt ut',
+    expiredPromptSupport: 'Stöd igen',
+    expiredPromptBody: 'Din supporternyckel har löpt ut. Med ett litet bidrag (t.ex. en kaffe) stöder du den fortsatta utvecklingen av detta projekt och får en ny supporternyckel som tack. Tack! ❤'
   }
 }

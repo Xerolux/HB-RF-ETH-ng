@@ -681,6 +681,9 @@ export default {
     chipActive: 'Wspierający',
     chipInactive: 'Wesprzyj',
     chipTooltip: 'Wspierający — ważny do {date}',
-    chipInactiveTooltip: 'Zostań wspierającym'
+    chipInactiveTooltip: 'Zostań wspierającym',
+    expiredPromptTitle: 'Twój klucz wspierającego wygasł',
+    expiredPromptSupport: 'Wesprzyj ponownie',
+    expiredPromptBody: 'Twój klucz wspierającego wygasł. Małym wkładem (np. kawą) wspierasz dalszy rozwój tego projektu i otrzymujesz nowy klucz w ramach podziękowania. Dziękujemy! ❤'
   }
 }

@@ -681,6 +681,9 @@ export default {
     chipActive: 'Příznivce',
     chipInactive: 'Podpořit',
     chipTooltip: 'Příznivce — platný do {date}',
-    chipInactiveTooltip: 'Staňte se příznivcem'
+    chipInactiveTooltip: 'Staňte se příznivcem',
+    expiredPromptTitle: 'Váš klíč příznivce vypršel',
+    expiredPromptSupport: 'Podpořit znovu',
+    expiredPromptBody: 'Váš klíč příznivce vypršel. Malým příspěvkem (např. kávou) podpoříte další vývoj tohoto projektu a jako díky získáte nový klíč příznivce. Děkujeme! ❤'
   }
 }

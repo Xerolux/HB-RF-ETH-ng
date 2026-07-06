@@ -681,6 +681,9 @@ export default {
     chipActive: 'Soutien',
     chipInactive: 'Soutenir',
     chipTooltip: 'Soutien — valide jusqu’au {date}',
-    chipInactiveTooltip: 'Devenir soutien'
+    chipInactiveTooltip: 'Devenir soutien',
+    expiredPromptTitle: 'Votre clé de soutien a expiré',
+    expiredPromptSupport: 'Soutenir à nouveau',
+    expiredPromptBody: 'Votre clé de soutien a expiré. Avec une petite contribution (par ex. un café), vous soutenez le développement continu de ce projet et recevez une nouvelle clé de soutien en remerciement. Merci ! ❤'
   }
 }

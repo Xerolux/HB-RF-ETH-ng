@@ -18,7 +18,7 @@
 #include "nvs_flash.h"
 #include "ota_config.h"
 #include "cJSON.h"
-#include "mbedtls/sha256.h"
+#include "psa/crypto.h"
 
 #include <string.h>
 
@@ -80,8 +80,19 @@ static size_t normalise_key(const char *key, char *out, size_t outSize)
 
 static void compute_fingerprint(const char *normalised, uint8_t out[CRL_FP_BYTES])
 {
+    // mbedTLS 4.x (ESP-IDF 6.0) dropped the standalone mbedtls/sha256.h in
+    // favour of the PSA Crypto one-shot API. PSA uses the ESP32 hardware SHA
+    // accelerator when available, so this stays cheap.
+    static bool psa_ready = false;
+    if (!psa_ready) {
+        psa_crypto_init();
+        psa_ready = true;
+    }
     unsigned char full[32];
-    mbedtls_sha256((const unsigned char *)normalised, strlen(normalised), full, 0);
+    size_t out_len = 0;
+    psa_hash_compute(PSA_ALG_SHA_256,
+                     (const uint8_t *)normalised, strlen(normalised),
+                     full, sizeof(full), &out_len);
     memcpy(out, full, CRL_FP_BYTES);
 }
 

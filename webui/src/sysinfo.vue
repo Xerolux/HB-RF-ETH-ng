@@ -38,40 +38,6 @@
     </div>
 
     <template v-else>
-      <section class="quick-actions">
-        <router-link class="quick-action card-glass card-hover" to="/firmware">
-          <span class="icon-badge warning"><AppIcon name="firmware" /></span>
-          <div>
-            <strong>{{ t('nav.firmware') }}</strong>
-            <p>{{ sysInfoStore.latestVersion && sysInfoStore.latestVersion !== 'n/a' && updateStore.compareVersions(sysInfoStore.currentVersion, sysInfoStore.latestVersion) < 0 ? t('sysinfo.updateAvailableShort', { version: sysInfoStore.latestVersion }) : t('sysinfo.updatesRecovery') }}</p>
-          </div>
-        </router-link>
-
-        <router-link class="quick-action card-glass card-hover" to="/systemlog">
-          <span class="icon-badge soft"><AppIcon name="logs" /></span>
-          <div>
-            <strong>{{ t('nav.systemlog') }}</strong>
-            <p>{{ t('sysinfo.liveStreamExport') }}</p>
-          </div>
-        </router-link>
-
-        <router-link class="quick-action card-glass card-hover" to="/monitoring">
-          <span class="icon-badge info"><AppIcon name="monitoring" /></span>
-          <div>
-            <strong>{{ t('nav.monitoring') }}</strong>
-            <p>{{ t('sysinfo.monitoringSummary') }}</p>
-          </div>
-        </router-link>
-
-        <router-link class="quick-action card-glass card-hover" to="/settings">
-          <span class="icon-badge success"><AppIcon name="settings" /></span>
-          <div>
-            <strong>{{ t('nav.settings') }}</strong>
-            <p>{{ t('sysinfo.networkTimeSetup') }}</p>
-          </div>
-        </router-link>
-      </section>
-
       <section class="stats-grid">
         <article class="card-glass metric-card card-hover">
           <div class="metric-top">

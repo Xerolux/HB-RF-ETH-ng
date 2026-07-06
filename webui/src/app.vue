@@ -32,6 +32,21 @@
       </footer>
     </div>
 
+    <BModal
+      v-model="showSupporterExpiredPrompt"
+      :title="t('supporter.expiredPromptTitle')"
+      :ok-title="t('supporter.expiredPromptSupport')"
+      ok-variant="primary"
+      cancel-title-class="d-none"
+      no-close-on-backdrop
+      @ok="showSponsorModal = true"
+    >
+      <div class="expired-prompt-body">
+        <div class="expired-prompt-icon"><AppIcon name="heart" /></div>
+        <p class="expired-prompt-text">{{ t('supporter.expiredPromptBody') }}</p>
+      </div>
+    </BModal>
+
     <AppToastContainer />
     <SponsorModal v-model="showSponsorModal" />
 
@@ -71,10 +86,24 @@ const sysInfoStore = useSysInfoStore()
 const experimentalStore = useExperimentalStore()
 const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)
+const showSupporterExpiredPrompt = ref(false)
 const otaUpdateVersion = ref('')
 let updateSuccessTimer = null
 const pageTitle = computed(() => `${sysInfoStore.hostname || 'HB-RF-ETH-ng'} - HB-RF-ETH-ng`)
 const testDesignEnabled = computed(() => experimentalStore.testDesignEnabled)
+
+// Remind a returning supporter whose key has expired to renew — shown once
+// per browser session, right after login / first sysinfo load. A gentle
+// nudge toward re-supporting rather than a hard gate (no functionality is
+// ever locked). Dismissing or opening the sponsor modal sets a sessionStorage
+// flag so it won't pester again until the next real login session.
+watch(() => [sysInfoStore.supporterExpired, loginStore.isLoggedIn], ([expired, loggedIn]) => {
+  if (!expired || !loggedIn) return
+  if (sysInfoStore.supporterActive) return
+  if (sessionStorage.getItem('supporterPromptShown') === '1') return
+  sessionStorage.setItem('supporterPromptShown', '1')
+  showSupporterExpiredPrompt.value = true
+})
 
 // Idle timeout is handled globally in main.js via the login store's
 // activity tracking (5-minute timeout with cross-tab sync via localStorage).
@@ -327,5 +356,31 @@ onUnmounted(() => {
   margin: 0;
   font-size: 1rem;
   color: var(--color-text);
+}
+
+.expired-prompt-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.expired-prompt-icon {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f26a3d, #ec4899);
+  color: #fff;
+}
+
+.expired-prompt-text {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
 }
 </style>

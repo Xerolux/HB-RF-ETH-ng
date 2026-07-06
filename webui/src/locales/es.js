@@ -681,6 +681,9 @@ export default {
     chipActive: 'Patrocinador',
     chipInactive: 'Apoyar',
     chipTooltip: 'Patrocinador — válido hasta {date}',
-    chipInactiveTooltip: 'Hazte patrocinador'
+    chipInactiveTooltip: 'Hazte patrocinador',
+    expiredPromptTitle: 'Tu clave de apoyo ha expirado',
+    expiredPromptSupport: 'Apoyar de nuevo',
+    expiredPromptBody: 'Tu clave de apoyo ha expirado. Con una pequeña aportación (p. ej. un café) apoyas el desarrollo continuo de este proyecto y recibes una nueva clave como agradecimiento. ¡Gracias! ❤'
   }
 }

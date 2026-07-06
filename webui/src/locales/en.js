@@ -681,6 +681,9 @@ export default {
     chipActive: 'Supporter',
     chipInactive: 'Support',
     chipTooltip: 'Supporter — valid until {date}',
-    chipInactiveTooltip: 'Become a supporter'
+    chipInactiveTooltip: 'Become a supporter',
+    expiredPromptTitle: 'Your supporter key has expired',
+    expiredPromptSupport: 'Support again',
+    expiredPromptBody: 'Your supporter key has expired. With a small contribution (e.g. a coffee) you support the ongoing development of this project and receive a fresh supporter key as a thank you. Thank you! ❤'
   }
 }
