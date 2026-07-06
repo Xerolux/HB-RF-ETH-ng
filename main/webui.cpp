@@ -692,12 +692,12 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         } else {
             LogManager::stop();
         }
+    }
 
     cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
         set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
-    }
     }
 
     _settings->save();

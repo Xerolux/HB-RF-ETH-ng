@@ -820,7 +820,7 @@ const runDiagnostic = async (target) => {
 <style scoped>
 .monitoring-page {
   padding-bottom: 80px;
-  max-width: 800px;
+  width: min(100%, 1120px);
   margin: 0 auto;
 }
 
@@ -1081,9 +1081,23 @@ const runDiagnostic = async (target) => {
     grid-template-columns: 1fr;
   }
 
-  .diagnostic-card {
+  .diagnostic-card,
+  .card-header,
+  .tls-section > .d-flex,
+  .command-section > .d-flex {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .tool-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .card-header .form-check,
+  .tls-section .form-check,
+  .command-section .form-check {
+    align-self: flex-start;
   }
 
   .card-header {
@@ -1097,8 +1111,13 @@ const runDiagnostic = async (target) => {
     font-size: 1rem;
   }
 
+  .header-content {
+    align-items: flex-start;
+  }
+
   .card-header h3 {
     font-size: 1rem;
+    overflow-wrap: anywhere;
   }
 
   .card-body {
@@ -1115,14 +1134,27 @@ const runDiagnostic = async (target) => {
     padding: 0.875rem;
   }
 
-  .cert-status-row {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
+  .cert-status-row,
   .pem-label-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .monitoring-page {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .diagnostic-copy {
+    align-items: flex-start;
+  }
+
+  .diagnostic-copy p,
+  .form-text,
+  .alert-warning-soft {
+    overflow-wrap: anywhere;
   }
 }
 </style>

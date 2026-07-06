@@ -372,6 +372,7 @@ const archiveInstallingVersion = ref('')
 const selectedArchiveVersion = ref('')
 
 const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
+const ARCHIVE_MANIFEST_FALLBACK_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
 
 const archiveFilters = computed(() => [
   { value: 'stable', label: t('firmware.archiveStable') },
@@ -495,13 +496,8 @@ const normalizeArchiveEntry = (entry, index = 0) => {
   }
 }
 
-const loadArchiveManifest = async () => {
-  const response = await axios.get(ARCHIVE_MANIFEST_URL, {
-    headers: { Accept: 'application/json' },
-    silent: true
-  })
-  const data = response.data
-  const entries = Array.isArray(data) ? data : data.releases
+const parseArchiveManifest = (data) => {
+  const entries = Array.isArray(data) ? data : data?.releases
   if (!Array.isArray(entries)) {
     throw new Error(t('firmware.archiveLoadError'))
   }
@@ -509,6 +505,26 @@ const loadArchiveManifest = async () => {
   return entries
     .map(normalizeArchiveEntry)
     .filter((release) => release?.version && release.downloadUrl)
+}
+
+const fetchArchiveManifest = (url) => axios.get(url, {
+  headers: { Accept: 'application/json' },
+  params: { _: Date.now() },
+  timeout: 15000,
+  silent: true
+})
+
+const loadArchiveManifest = async () => {
+  try {
+    const response = await fetchArchiveManifest(ARCHIVE_MANIFEST_URL)
+    return parseArchiveManifest(response.data)
+  } catch (primaryError) {
+    // Some firmware builds run the GitHub proxy with very little free heap.
+    // Fall back to the static raw manifest directly from the browser so the
+    // archive remains usable even when the device-side proxy cannot fetch it.
+    const response = await fetchArchiveManifest(ARCHIVE_MANIFEST_FALLBACK_URL)
+    return parseArchiveManifest(response.data)
+  }
 }
 
 const loadFirmwareArchive = async () => {
