@@ -67,3 +67,5 @@ webui/playwright-report/
 # mint their own supporter keys and the whole point of the badge is gone.
 # Only the maintainer keeps a local copy to issue keys to supporters.
 tools/generate_supporter_key.py
+tools/supporter_key_manager.py
+tools/supporter_registry.json
