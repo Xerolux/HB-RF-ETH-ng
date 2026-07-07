@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.26] - 2026-07-07
+
+### Changes
+- fix: harden webui layout and restart sync
+- chore: update manifests for v2.2.3-Beta.25
+- chore: bump version to 2.2.3-Beta.25
+- fix: remove hardcoded admin username from login form
+- chore: update manifests for v2.2.3-Beta.24
+
 ## [2.2.3-Beta.20] - 2026-07-07
 
 ### Changes

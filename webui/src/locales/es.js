@@ -291,7 +291,7 @@ export default {
     otaSuccess: 'Descarga exitosa. Instalando...',
     currentVersion: 'Versión actual',
     installedVersion: 'Versión instalada',
-    versionInfo: 'Fork modernizado v2.2.3-Beta.25 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    versionInfo: 'Fork modernizado v2.2.3-Beta.26 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: '¡Actualización disponible!',
     updateAvailableMessage: 'Hay una actualización disponible para la versión {latestVersion}.',
     upToDate: 'El firmware está actualizado',
