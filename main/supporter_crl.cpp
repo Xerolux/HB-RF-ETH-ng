@@ -216,7 +216,19 @@ bool supporter_crl_refresh()
             goto done;
         }
 
-        uint8_t tmp[CRL_MAX_ENTRIES][CRL_FP_BYTES];
+        // Heap-allocate the staging matrix (CRL_MAX_ENTRIES * CRL_FP_BYTES =
+        // 128 * 16 = 2048 bytes). With this array on the stack, the combined
+        // demand of the parse frame + esp_http_client + mbedTLS handshake
+        // overflowed the task stack at the first 60-second refresh and
+        // panicked the CPU (reset reason "Exception/Panic", no log output
+        // because panic_print bypasses the LogManager vprintf hook). The
+        // allocation is bounded and freed below before returning.
+        uint8_t *tmp = (uint8_t *)malloc((size_t)CRL_MAX_ENTRIES * CRL_FP_BYTES);
+        if (!tmp) {
+            ESP_LOGE(TAG, "Could not allocate CRL parse buffer");
+            cJSON_Delete(root);
+            goto done;
+        }
         int cnt = 0;
         cJSON *item;
         cJSON_ArrayForEach(item, root) {
@@ -228,7 +240,7 @@ bool supporter_crl_refresh()
             for (int b = 0; b < CRL_FP_BYTES; b++) {
                 int v = hex_pair(hex[b * 2], hex[b * 2 + 1]);
                 if (v < 0) { valid = false; break; }
-                tmp[cnt][b] = (uint8_t)v;
+                tmp[cnt * CRL_FP_BYTES + b] = (uint8_t)v;
             }
             if (valid) cnt++;
         }
@@ -238,6 +250,8 @@ bool supporter_crl_refresh()
         s_count = cnt;
         if (cnt > 0) memcpy(s_fp, tmp, (size_t)cnt * CRL_FP_BYTES);
         xSemaphoreGive(s_mutex);
+        free(tmp);
+        tmp = NULL;
         save_to_nvs();
 
         ESP_LOGI(TAG, "CRL refreshed: %d revoked fingerprint(s)", cnt);
@@ -268,5 +282,9 @@ void supporter_crl_init()
 {
     if (!s_mutex) s_mutex = xSemaphoreCreateMutex();
     load_from_nvs();
-    xTaskCreate(crl_refresh_task, "crl_refresh", 4096, NULL, 2, NULL);
+    // 8 KB matches the other TLS-doing tasks (events, syslog, ext_proxy) and
+    // leaves comfortable headroom for the mbedTLS handshake inside
+    // esp_http_client_open. 4 KB was too tight and crashed at the first
+    // 60-second refresh once heap was loaded with the boot-time handshake.
+    xTaskCreate(crl_refresh_task, "crl_refresh", 8192, NULL, 2, NULL);
 }
