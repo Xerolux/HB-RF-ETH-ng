@@ -1380,6 +1380,14 @@ static void prepare_ota_heap()
     ESP_LOGI(TAG, "CRL task stopped for OTA (free heap now %u KB)",
              (unsigned)(esp_get_free_heap_size() / 1024));
 
+    // Stop UpdateCheck background task — frees 12 KB task stack.
+    // Safe: it only sleeps in a 24h loop; OTA state is tracked separately.
+    if (_updateCheck) {
+        _updateCheck->stop();
+        ESP_LOGI(TAG, "UpdateCheck task stopped for OTA (free heap now %u KB)",
+                 (unsigned)(esp_get_free_heap_size() / 1024));
+    }
+
     // Brief settle for heap de-fragmentation
     vTaskDelay(pdMS_TO_TICKS(200));
 }

@@ -291,7 +291,7 @@ export default {
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.2.3-Beta.22 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.2.3-Beta.23 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Aktualizace k dispozici!',
     updateAvailableMessage: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     upToDate: 'Firmware je aktuální',

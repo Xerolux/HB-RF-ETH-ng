@@ -723,6 +723,9 @@ void UpdateCheck::performOnlineUpdate()
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
     mqtt_handler_stop();
     supporter_crl_stop_refresh_task();
+    // Stop our own background task (12 KB stack) — it only sleeps in a 24h
+    // loop and would just waste heap during the download.
+    stop();
     vTaskDelay(pdMS_TO_TICKS(200));
     ESP_LOGI(TAG, "Heap after OTA prep: %u KB",
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
