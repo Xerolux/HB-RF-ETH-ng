@@ -138,6 +138,17 @@ void app_main()
     // without each having to install their own hook.
     LogManager::init();
     supporter_crl_init();
+    // Only spin up the CRL refresh task when a supporter key is actually
+    // configured. Without a key there is nothing to revoke, but the task
+    // still costs 8 KB of task stack and a 30-50 KB TLS heap spike every
+    // refresh cycle — costs most key-less devices never benefit from.
+    {
+        const char *sk = settings.getSupporterKey();
+        if (sk && sk[0] != '\0')
+        {
+            supporter_crl_start_refresh_task();
+        }
+    }
 
     // Initialise the metrics registry so counters can be registered by any
     // subsystem from this point on. The Prometheus exporter (Phase A) reads

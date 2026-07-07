@@ -17,9 +17,19 @@
 // keys themselves, so publishing it reveals nothing) and cached locally so
 // revocation also works offline and right after boot.
 
-// Loads the last cached revocation list from NVS and starts a background
-// refresh task (~6 h interval). Call once at boot.
+// Loads the last cached revocation list from NVS. Call once at boot.
+// Does NOT start the background refresh task — call
+// supporter_crl_start_refresh_task() afterwards when (and only when) a
+// supporter key is configured. Skipping the task on key-less devices saves
+// 8 KB of task stack and avoids a TLS heap spike (30-50 KB) every refresh
+// cycle for a list that nothing on the device consumes.
 void supporter_crl_init(void);
+
+// Starts the background refresh task (~6 h interval, first fetch after 60 s)
+// if it is not already running. Idempotent — safe to call repeatedly, e.g.
+// from the settings-save handler when a supporter key is added at runtime.
+// No-op when the task is already running.
+void supporter_crl_start_refresh_task(void);
 
 // Re-fetches revoked_keys.json from GitHub and refreshes the in-RAM + NVS
 // cache. Network call — serialised on g_net_fetch_mutex like every other

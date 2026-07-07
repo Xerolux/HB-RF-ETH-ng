@@ -736,6 +736,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
             SupporterKeyStatus skStatus;
             if (supporter_key_validate(sk, skStatus)) {
                 _settings->setSupporterKey(sk);
+                // A supporter key is now configured — make sure the CRL
+                // refresh task is running so revocations are picked up.
+                // Idempotent: no-op if the task was already started at boot.
+                supporter_crl_start_refresh_task();
             }
         }
     }

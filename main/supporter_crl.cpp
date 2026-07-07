@@ -43,6 +43,8 @@ extern SemaphoreHandle_t g_net_fetch_mutex;
 static uint8_t s_fp[CRL_MAX_ENTRIES][CRL_FP_BYTES];
 static int s_count = 0;
 static SemaphoreHandle_t s_mutex = NULL;
+static TaskHandle_t s_refresh_task = NULL;
+static SemaphoreHandle_t s_start_mutex = NULL;
 
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
 static const char *NVS_KEY = "supCrl"; // 6 chars — within NVS 15-char limit
@@ -282,9 +284,26 @@ void supporter_crl_init()
 {
     if (!s_mutex) s_mutex = xSemaphoreCreateMutex();
     load_from_nvs();
-    // 8 KB matches the other TLS-doing tasks (events, syslog, ext_proxy) and
-    // leaves comfortable headroom for the mbedTLS handshake inside
-    // esp_http_client_open. 4 KB was too tight and crashed at the first
-    // 60-second refresh once heap was loaded with the boot-time handshake.
-    xTaskCreate(crl_refresh_task, "crl_refresh", 8192, NULL, 2, NULL);
+}
+
+void supporter_crl_start_refresh_task()
+{
+    if (!s_start_mutex) s_start_mutex = xSemaphoreCreateMutex();
+    xSemaphoreTake(s_start_mutex, portMAX_DELAY);
+    if (s_refresh_task == NULL)
+    {
+        // 8 KB matches the other TLS-doing tasks (events, syslog, ext_proxy)
+        // and leaves comfortable headroom for the mbedTLS handshake inside
+        // esp_http_client_open. 4 KB was too tight and crashed at the first
+        // 60-second refresh once heap was loaded with the boot-time handshake.
+        if (xTaskCreate(crl_refresh_task, "crl_refresh", 8192, NULL, 2, &s_refresh_task) != pdPASS)
+        {
+            ESP_LOGE(TAG, "Failed to create CRL refresh task");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "CRL refresh task started");
+        }
+    }
+    xSemaphoreGive(s_start_mutex);
 }
