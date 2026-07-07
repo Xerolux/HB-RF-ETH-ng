@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.20] - 2026-07-07
+
+### Changes
+- perf(crl): skip refresh task on devices without a supporter key
+- chore: update manifests for v2.2.3-Beta.19
+
 ## [2.2.3-Beta.19] - 2026-07-07
 
 ### Changes
