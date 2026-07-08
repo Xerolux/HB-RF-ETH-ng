@@ -15,6 +15,14 @@
       </div>
     </section>
 
+    <div v-if="showResourceWarning" class="monitoring-resource-warning">
+      <AppIcon name="alert" />
+      <div>
+        <strong>{{ t('monitoring.resourceWarningTitle') }}</strong>
+        <p>{{ t('monitoring.resourceWarningText', { count: activeMonitoringServiceCount }) }}</p>
+      </div>
+    </div>
+
     <section class="diagnostics-panel settings-card card-glass">
       <div class="card-header">
         <div class="header-content">
@@ -640,6 +648,16 @@ const mtlsInconsistent = computed(() => {
   return (hasCert || hasKey) && !(hasCert && hasKey)
 })
 
+const activeMonitoringServiceCount = computed(() => [
+  checkmkConfig.value.enabled,
+  mqttConfig.value.enabled,
+  prometheusConfig.value.enabled,
+  syslogConfig.value.enabled,
+  notifyConfig.value.enabled && Number(notifyConfig.value.channels || 0) !== 0
+].filter(Boolean).length)
+
+const showResourceWarning = computed(() => activeMonitoringServiceCount.value >= 4)
+
 const diagnosticCards = computed(() => [
   { key: 'checkmk', title: t('monitoring.chipLabelCheckmk'), icon: 'logs', tone: 'warning' },
   { key: 'mqtt', title: t('monitoring.chipLabelMqtt'), icon: 'activity', tone: 'success' },
@@ -847,6 +865,22 @@ const runDiagnostic = async (target) => {
 
 .diagnostics-panel {
   margin-bottom: var(--spacing-lg);
+}
+
+.monitoring-resource-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warning-dark, #92400e);
+}
+
+.monitoring-resource-warning p {
+  margin: 0.25rem 0 0;
 }
 
 .diagnostics-subtitle {

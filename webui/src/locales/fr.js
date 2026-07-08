@@ -371,6 +371,8 @@ export default {
     chipLabelNotify: 'Notifications',
     title: 'Surveillance',
     description: 'Configurez la surveillance et les notifications pour la passerelle HB-RF-ETH.',
+    resourceWarningTitle: 'Keep resources in mind',
+    resourceWarningText: '{count} monitoring services are enabled. The ESP32 can usually handle this, but concurrent TLS connections, firmware checks/archive fetches, and OTA share heap and CPU; if problems occur, disable individual services or stagger tests.',
     save: 'Enregistrer',
     saving: 'Enregistrement...',
     saveSuccess: 'Configuration enregistrée avec succès !',

@@ -371,6 +371,8 @@ export default {
     chipLabelNotify: 'Oznámení',
     title: 'Monitorování',
     description: 'Nakonfigurujte monitorování a oznámení pro bránu HB-RF-ETH.',
+    resourceWarningTitle: 'Keep resources in mind',
+    resourceWarningText: '{count} monitoring services are enabled. The ESP32 can usually handle this, but concurrent TLS connections, firmware checks/archive fetches, and OTA share heap and CPU; if problems occur, disable individual services or stagger tests.',
     save: 'Uložit',
     saving: 'Ukládání...',
     saveSuccess: 'Konfigurace úspěšně uložena!',
