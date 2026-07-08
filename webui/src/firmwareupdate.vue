@@ -393,8 +393,12 @@ const firmwareArchive = ref([])
 const archiveInstallingVersion = ref('')
 const selectedArchiveVersion = ref('')
 
-const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
-const ARCHIVE_MANIFEST_FALLBACK_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
+// Load the archive directly in the browser first. The device-side proxy needs
+// an additional HTTPS/TLS client and task stack on the ESP32; on systems that
+// already run MQTT and other monitoring services this can temporarily exhaust
+// heap and show up as 500 errors while opening/searching the archive.
+const ARCHIVE_MANIFEST_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
+const ARCHIVE_MANIFEST_FALLBACK_URL = '/api/firmware_archive'
 const ARCHIVE_CACHE_KEY = 'hb-rf-eth-ng-firmware-archive-cache-v1'
 const ARCHIVE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -618,9 +622,9 @@ const loadArchiveManifest = async () => {
     return { releases, fromCache: false }
   } catch (primaryError) {
     lastError = primaryError
-    // Some firmware builds run the GitHub proxy with very little free heap.
-    // Fall back to the static raw manifest directly from the browser so the
-    // archive remains usable even when the device-side proxy cannot fetch it.
+    // Fall back to the device-side proxy for networks/browsers that cannot
+    // reach raw.githubusercontent.com directly. This keeps the archive usable
+    // without making the ESP32 proxy the common path.
     try {
       const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
       const releases = parseArchiveManifest(response.data)

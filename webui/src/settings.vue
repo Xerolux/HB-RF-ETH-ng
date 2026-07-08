@@ -610,7 +610,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useExperimentalStore, useSettingsStore, useLoginStore, useUiStore, useSysInfoStore } from './stores.js'
+import { useExperimentalStore, useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 import { validateSupporterKey, normalizeSupporterKey } from './composables/supporterKey.js'
 
@@ -622,6 +622,7 @@ const loginStore = useLoginStore()
 const uiStore = useUiStore()
 const experimentalStore = useExperimentalStore()
 const sysInfoStore = useSysInfoStore()
+const restartUiStore = useRestartUiStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -929,7 +930,8 @@ const buildSettingsPayload = () => ({
   ipv6Gateway: ipv6Gateway.value,
   ipv6Dns1: ipv6Dns1.value,
   ipv6Dns2: ipv6Dns2.value,
-  flashPause: flashPause.value
+  flashPause: flashPause.value,
+  testDesignEnabled: experimentalStore.testDesignEnabled
 })
 
 const serializeSettings = () => JSON.stringify(buildSettingsPayload())
@@ -943,7 +945,7 @@ const updateDirtyState = () => {
   }, 300)
 }
 
-watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause], updateDirtyState, { deep: true })
+watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause, () => experimentalStore.testDesignEnabled], updateDirtyState, { deep: true })
 
 const hasUnsavedChanges = computed(() => loadedSnapshot.value !== '' && serializedCurrent.value !== '' && serializedCurrent.value !== loadedSnapshot.value)
 const adminUsernameChanged = computed(() => adminUsername.value !== (settingsStore.adminUsername || 'admin'))
@@ -986,6 +988,9 @@ const loadSettings = () => {
   // dirty-tracker / save-payload would silently rewrite the stored flag.
   if (settingsStore.flashPause !== undefined) {
     flashPause.value = settingsStore.flashPause
+  }
+  if (settingsStore.testDesignEnabled !== undefined) {
+    experimentalStore.setTestDesignEnabled(settingsStore.testDesignEnabled)
   }
 
   // Pre-fill the supporter key input from the stored value (formatted), and
@@ -1074,10 +1079,8 @@ const performRestart = async () => {
   try {
     await axios.post('/api/restart')
     showRestartModal.value = false
-    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 18000 })
-    // The device needs a moment to actually restart plus boot time - an
-    // immediate reload just lands on a dead socket.
-    setTimeout(() => window.location.reload(), 20000)
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
+    restartUiStore.start({ includeFlashPause: settingsStore.flashPause })
   } catch (e) {
     console.error("Restart request failed", e)
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })

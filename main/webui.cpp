@@ -32,6 +32,8 @@
 #include "webui.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_timer.h"
+#include "driver/gpio.h"
 #include "cJSON.h"
 #include "esp_ota_ops.h"
 #include "mbedtls/md.h"
@@ -53,7 +55,7 @@
 #include "log_stream.h"
 #include "supporter_key.h"
 #include "supporter_crl.h"
-#include "mqtt_handler.h"
+#include "pins.h"
 
 static const char *TAG = "WebUI";
 
@@ -98,6 +100,95 @@ static RadioModuleDetector *_radioModuleDetector;
 static char _token[46];
 
 static void emit_log_enable_snapshot();
+int recv_full_body(httpd_req_t *req, char *buf, size_t buf_size);
+
+static constexpr int64_t PASSWORD_RESET_WINDOW_US = 90LL * 1000LL * 1000LL;
+static bool s_password_reset_active = false;
+static bool s_password_reset_confirmed = false;
+static bool s_password_reset_wait_release = false;
+static int64_t s_password_reset_deadline_us = 0;
+static char s_password_reset_token[17] = {0};
+
+static bool board_button_pressed()
+{
+    return gpio_get_level(HM_BTN_PIN) == 0;
+}
+
+static void reset_password_reset_state()
+{
+    s_password_reset_active = false;
+    s_password_reset_confirmed = false;
+    s_password_reset_wait_release = false;
+    s_password_reset_deadline_us = 0;
+    memset(s_password_reset_token, 0, sizeof(s_password_reset_token));
+}
+
+static int password_reset_remaining_seconds()
+{
+    if (!s_password_reset_active) return 0;
+    int64_t remaining_us = s_password_reset_deadline_us - esp_timer_get_time();
+    if (remaining_us <= 0) return 0;
+    return (int)((remaining_us + 999999) / 1000000);
+}
+
+static void generate_password_reset_token()
+{
+    uint32_t rnd[2] = {esp_random(), esp_random()};
+    snprintf(s_password_reset_token, sizeof(s_password_reset_token), "%08" PRIx32 "%08" PRIx32, rnd[0], rnd[1]);
+}
+
+static bool password_reset_token_matches(const char *token)
+{
+    return token && s_password_reset_token[0] && secure_strcmp(token, s_password_reset_token) == 0;
+}
+
+static bool password_reset_refresh_state()
+{
+    if (!s_password_reset_active) return false;
+
+    if (esp_timer_get_time() >= s_password_reset_deadline_us)
+    {
+        reset_password_reset_state();
+        return false;
+    }
+
+    if (!s_password_reset_confirmed)
+    {
+        const bool pressed = board_button_pressed();
+        if (s_password_reset_wait_release)
+        {
+            s_password_reset_wait_release = pressed;
+        }
+        else if (pressed)
+        {
+            s_password_reset_confirmed = true;
+            ESP_LOGW(TAG, "Password reset confirmed by physical board button");
+        }
+    }
+
+    return true;
+}
+
+static bool read_password_reset_token(httpd_req_t *req, char *token, size_t token_size)
+{
+    char buffer[128];
+    int len = recv_full_body(req, buffer, sizeof(buffer));
+    if (len <= 0) return false;
+
+    cJSON *root = cJSON_Parse(buffer);
+    if (!root) return false;
+
+    const char *token_value = cJSON_GetStringValue(cJSON_GetObjectItem(root, "token"));
+    bool ok = token_value && token_value[0] && strlen(token_value) < token_size;
+    if (ok)
+    {
+        strncpy(token, token_value, token_size);
+        token[token_size - 1] = '\0';
+    }
+    cJSON_Delete(root);
+    return ok;
+}
+
 
 void generateToken()
 {
@@ -295,6 +386,145 @@ httpd_uri_t post_login_json_handler = {
     .handler = post_login_json_handler_func,
     .user_ctx = NULL};
 
+esp_err_t post_password_reset_start_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    generate_password_reset_token();
+    s_password_reset_active = true;
+    s_password_reset_confirmed = false;
+    s_password_reset_wait_release = board_button_pressed();
+    s_password_reset_deadline_us = esp_timer_get_time() + PASSWORD_RESET_WINDOW_US;
+
+    ESP_LOGW(TAG, "Password reset armed; waiting for physical board button confirmation");
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddBoolToObject(response, "success", true);
+    cJSON_AddStringToObject(response, "token", s_password_reset_token);
+    cJSON_AddNumberToObject(response, "expiresIn", password_reset_remaining_seconds());
+    cJSON_AddStringToObject(response, "button", "HM button (GPIO34)");
+
+    httpd_resp_set_type(req, "application/json");
+    const char *json = cJSON_PrintUnformatted(response);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
+    }
+    cJSON_Delete(response);
+    return ESP_OK;
+}
+
+httpd_uri_t post_password_reset_start_handler = {
+    .uri = "/api/password-reset/start",
+    .method = HTTP_POST,
+    .handler = post_password_reset_start_handler_func,
+    .user_ctx = NULL};
+
+esp_err_t post_password_reset_status_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    char token[sizeof(s_password_reset_token)] = {0};
+    if (!read_password_reset_token(req, token, sizeof(token)) || !password_reset_token_matches(token))
+    {
+        return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Invalid reset token");
+    }
+
+    const bool active = password_reset_refresh_state();
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddBoolToObject(response, "active", active);
+    cJSON_AddBoolToObject(response, "confirmed", active && s_password_reset_confirmed);
+    cJSON_AddNumberToObject(response, "expiresIn", password_reset_remaining_seconds());
+
+    httpd_resp_set_type(req, "application/json");
+    const char *json = cJSON_PrintUnformatted(response);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
+    }
+    cJSON_Delete(response);
+    return ESP_OK;
+}
+
+httpd_uri_t post_password_reset_status_handler = {
+    .uri = "/api/password-reset/status",
+    .method = HTTP_POST,
+    .handler = post_password_reset_status_handler_func,
+    .user_ctx = NULL};
+
+esp_err_t post_password_reset_complete_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    char buffer[512];
+    int len = recv_full_body(req, buffer, sizeof(buffer));
+    if (len <= 0)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+    }
+
+    cJSON *root = cJSON_Parse(buffer);
+    if (!root)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    }
+
+    const char *token = cJSON_GetStringValue(cJSON_GetObjectItem(root, "token"));
+    const char *newPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "newPassword"));
+
+    if (!password_reset_token_matches(token) || !password_reset_refresh_state() || !s_password_reset_confirmed)
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Physical confirmation required");
+    }
+
+    if (!validateAdminPassword(newPassword))
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+    }
+
+    if (!_settings->setAdminPassword(newPassword))
+    {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid password");
+    }
+    _settings->save();
+    cJSON_Delete(root);
+
+    _settings->clearAdminToken();
+    generateToken();
+    reset_password_reset_state();
+
+    cJSON *response = cJSON_CreateObject();
+    cJSON_AddBoolToObject(response, "success", true);
+    cJSON_AddStringToObject(response, "token", _token);
+
+    httpd_resp_set_type(req, "application/json");
+    const char *json = cJSON_PrintUnformatted(response);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
+    }
+    cJSON_Delete(response);
+
+    ESP_LOGW(TAG, "Admin password reset via physical board button");
+    return ESP_OK;
+}
+
+httpd_uri_t post_password_reset_complete_handler = {
+    .uri = "/api/password-reset/complete",
+    .method = HTTP_POST,
+    .handler = post_password_reset_complete_handler_func,
+    .user_ctx = NULL};
+
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -465,6 +695,7 @@ void add_settings(cJSON *root)
     cJSON_AddBoolToObject(settings, "betaChannel", _settings->getBetaChannel());
     cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
     cJSON_AddBoolToObject(settings, "flashPause", _settings->getFlashPause());
+    cJSON_AddBoolToObject(settings, "testDesignEnabled", _settings->getTestDesignEnabled());
     cJSON_AddStringToObject(settings, "supporterKey", _settings->getSupporterKey());
 }
 
@@ -731,6 +962,10 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
         set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
     }
+    cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
+    if (testDesignItem && cJSON_IsBool(testDesignItem)) {
+        _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
+    }
 
     // Supporter key (cosmetic). Only a checksum-valid key is stored; an
     // invalid one is silently ignored so the rest of the settings payload
@@ -991,6 +1226,10 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
         set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
+    }
+    cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
+    if (testDesignItem && cJSON_IsBool(testDesignItem)) {
+        _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
     }
 
     // Restore supporter key if present in the backup payload.
@@ -1370,22 +1609,20 @@ httpd_uri_t get_ota_status_handler = {
     .handler = get_ota_status_handler_func,
     .user_ctx = NULL};
 
-// Free heap for URL-based OTA by shutting down heap-heavy TLS subsystems.
-// The ESP32-WROOM-32 has no PSRAM; with MQTT (TLS broker) + CRL running,
-// only ~60 KB heap remains — not enough for the GitHub TLS handshake +
-// download (~50 KB). Stopping MQTT + CRL before the download frees ~40 KB.
-// On OTA success the device restarts and everything comes back; on failure
-// a manual restart restores them.
-static void prepare_ota_heap()
+// Free heap for URL-based OTA by shutting down heap-heavy subsystems.
+// The ESP32-WROOM-32 has no PSRAM; with MQTT/monitoring/CRL running, only
+// ~60 KB heap can remain — not enough for the GitHub TLS handshake + download
+// (~50 KB plus fragmentation headroom). On OTA success the device restarts and
+// everything comes back; on failure the returned mask is used to resume the
+// paused monitoring workers without requiring a manual restart.
+static uint32_t prepare_ota_heap()
 {
     ESP_LOGI(TAG, "Preparing heap for OTA download (current free: %u KB)",
              (unsigned)(esp_get_free_heap_size() / 1024));
 
-    // Stop MQTT client — frees TLS context + 10 KB publish task stack (~30 KB)
-    esp_err_t mqtt_ret = mqtt_handler_stop();
-    ESP_LOGI(TAG, "MQTT stopped for OTA: %s (free heap now %u KB)",
-             esp_err_to_name(mqtt_ret),
-             (unsigned)(esp_get_free_heap_size() / 1024));
+    // Stop MQTT, CheckMK, Prometheus, Syslog and notification workers. Besides
+    // TLS state, this can free several task stacks (6-8 KB each) before OTA.
+    uint32_t paused_monitoring = monitoring_pause_for_ota();
 
     // Stop CRL refresh task — frees 8 KB task stack
     supporter_crl_stop_refresh_task();
@@ -1402,6 +1639,7 @@ static void prepare_ota_heap()
 
     // Brief settle for heap de-fragmentation
     vTaskDelay(pdMS_TO_TICKS(200));
+    return paused_monitoring;
 }
 
 // OTA update from URL handler
@@ -1542,9 +1780,9 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         // don't contend for g_net_fetch_mutex or the limited TLS heap.
         net_fetch_set_ota_active(true);
 
-        // Free ~40 KB heap by stopping MQTT + CRL so the GitHub TLS handshake
-        // + download has enough room (~50 KB needed, was OOMing at 61 KB free).
-        prepare_ota_heap();
+        // Free heap by stopping monitoring workers + CRL so the GitHub TLS
+        // handshake + download has enough room (~50 KB plus fragmentation).
+        uint32_t paused_monitoring = prepare_ota_heap();
 
         // Use advanced OTA API for progress tracking. Retry the begin+download
         // a couple of times — the GitHub asset redirect forces a second TLS
@@ -1572,6 +1810,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             a->statusLED->setState(LED_STATE_ON);
             net_fetch_set_ota_active(false);
             if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+            monitoring_resume_after_ota(paused_monitoring);
             free(a->url);
             delete a;
             _updateCheck->finishOtaOperation();
@@ -1634,6 +1873,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             a->statusLED->setState(LED_STATE_ON);
             net_fetch_set_ota_active(false);
             if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+            monitoring_resume_after_ota(paused_monitoring);
             free(a->url);
             delete a;
             _updateCheck->finishOtaOperation();
@@ -2777,6 +3017,9 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &log_stream_ws_uri);
 
         httpd_register_uri_handler(_httpd_handle, &post_login_json_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_password_reset_start_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_password_reset_status_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_password_reset_complete_handler);
         httpd_register_uri_handler(_httpd_handle, &get_sysinfo_json_handler);
         httpd_register_uri_handler(_httpd_handle, &get_settings_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_settings_json_handler);

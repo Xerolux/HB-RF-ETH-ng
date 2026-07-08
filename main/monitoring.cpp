@@ -76,6 +76,14 @@ static std::atomic<bool> update_in_progress{false};
 static std::atomic<TaskHandle_t> checkmk_task_handle{NULL};
 static std::atomic<int> checkmk_listen_sock{-1};
 
+enum OtaPausedService : uint32_t {
+    OTA_PAUSED_CHECKMK    = 1u << 0,
+    OTA_PAUSED_PROMETHEUS = 1u << 1,
+    OTA_PAUSED_SYSLOG     = 1u << 2,
+    OTA_PAUSED_NOTIFY     = 1u << 3,
+    OTA_PAUSED_MQTT       = 1u << 4,
+};
+
 // NVS keys
 #define NVS_NAMESPACE "monitoring"
 #define NVS_CHECKMK_ENABLED "cmk_en"
@@ -942,6 +950,78 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     if (mqtt_changed       && current_config.mqtt.enabled)       mqtt_handler_start(&current_config.mqtt);
 
     return ESP_OK;
+}
+
+uint32_t monitoring_pause_for_ota(void)
+{
+    if (config_mutex == NULL) return 0;
+
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
+    bool checkmk_enabled    = current_config.checkmk.enabled;
+    bool prometheus_enabled = current_config.prometheus.enabled;
+    bool syslog_enabled     = current_config.syslog.enabled;
+    bool notify_enabled     = current_config.notify.enabled;
+    bool mqtt_enabled       = current_config.mqtt.enabled;
+    xSemaphoreGive(config_mutex);
+
+    uint32_t paused = 0;
+    ESP_LOGI(TAG, "Pausing monitoring for OTA (free heap: %u KB)",
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+
+    if (mqtt_enabled) {
+        mqtt_handler_stop();
+        paused |= OTA_PAUSED_MQTT;
+    }
+    if (notify_enabled) {
+        events_stop();
+        paused |= OTA_PAUSED_NOTIFY;
+    }
+    if (syslog_enabled) {
+        syslog_stop();
+        paused |= OTA_PAUSED_SYSLOG;
+    }
+    if (prometheus_enabled) {
+        prometheus_stop();
+        paused |= OTA_PAUSED_PROMETHEUS;
+    }
+    if (checkmk_enabled) {
+        checkmk_stop();
+        paused |= OTA_PAUSED_CHECKMK;
+    }
+
+    ESP_LOGI(TAG, "Monitoring paused for OTA (mask=0x%02x, free heap: %u KB)",
+             (unsigned)paused,
+             (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+    return paused;
+}
+
+void monitoring_resume_after_ota(uint32_t paused_mask)
+{
+    if (paused_mask == 0 || config_mutex == NULL) return;
+
+    monitoring_config_t cfg;
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
+    memcpy(&cfg, &current_config, sizeof(cfg));
+    xSemaphoreGive(config_mutex);
+
+    ESP_LOGI(TAG, "Resuming monitoring after failed OTA (mask=0x%02x)",
+             (unsigned)paused_mask);
+
+    if ((paused_mask & OTA_PAUSED_CHECKMK) && cfg.checkmk.enabled) {
+        checkmk_start(&cfg.checkmk);
+    }
+    if ((paused_mask & OTA_PAUSED_PROMETHEUS) && cfg.prometheus.enabled) {
+        prometheus_start(&cfg.prometheus);
+    }
+    if ((paused_mask & OTA_PAUSED_SYSLOG) && cfg.syslog.enabled) {
+        syslog_start(&cfg.syslog);
+    }
+    if ((paused_mask & OTA_PAUSED_NOTIFY) && cfg.notify.enabled) {
+        events_start(&cfg.notify);
+    }
+    if ((paused_mask & OTA_PAUSED_MQTT) && cfg.mqtt.enabled) {
+        mqtt_handler_start(&cfg.mqtt);
+    }
 }
 
 // Task that applies a pending config update asynchronously

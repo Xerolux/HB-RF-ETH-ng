@@ -136,6 +136,13 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config);
 // Schedule configuration update asynchronously (returns immediately, applies in background task)
 esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config);
 
+// Temporarily stop heap-heavy monitoring workers before OTA. Returns an
+// opaque bitmask that must be passed to monitoring_resume_after_ota() when the
+// OTA fails and the device stays online. On OTA success the device reboots, so
+// resuming is unnecessary.
+uint32_t monitoring_pause_for_ota(void);
+void monitoring_resume_after_ota(uint32_t paused_mask);
+
 // Get current configuration
 esp_err_t monitoring_get_config(monitoring_config_t *config);
 

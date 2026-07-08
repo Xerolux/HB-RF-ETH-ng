@@ -40,6 +40,34 @@ Settings::Settings()
 
 static const char *TAG = "Settings";
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
+static const char *MONITORING_NVS_NAMESPACE = "monitoring";
+
+static esp_err_t erase_nvs_namespace(const char *ns)
+{
+  nvs_handle_t handle = 0;
+  esp_err_t err = nvs_open(ns, NVS_READWRITE, &handle);
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    ESP_LOGI(TAG, "NVS namespace '%s' not present during factory reset", ns);
+    return ESP_OK;
+  }
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "nvs_open('%s') failed in clear(): %s", ns, esp_err_to_name(err));
+    return err;
+  }
+
+  err = nvs_erase_all(handle);
+  if (err == ESP_OK) {
+    err = nvs_commit(handle);
+  }
+  nvs_close(handle);
+
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to erase NVS namespace '%s': %s", ns, esp_err_to_name(err));
+  } else {
+    ESP_LOGI(TAG, "Erased NVS namespace '%s'", ns);
+  }
+  return err;
+}
 
 #define GET_IP_ADDR(handle, name, var, defaultValue)  \
   if (nvs_get_u32(handle, name, &var.addr) != ESP_OK) \
@@ -242,6 +270,7 @@ void Settings::load()
   // silently fails with ESP_ERR_NVS_KEY_TOO_LONG and the toggle won't persist.
   GET_BOOL(handle, "sysLogEnabled", _systemLogEnabled, false);
   GET_BOOL(handle, "flashPause", _flashPause, false);
+  GET_BOOL(handle, "testDesign", _testDesignEnabled, false);
 
   // Supporter key (optional, cosmetic). Stored verbatim — validation happens
   // on read so an expired or malformed key is harmless.
@@ -313,6 +342,7 @@ void Settings::save()
   SET_BOOL(handle, "betaChannel", _betaChannel);
   SET_BOOL(handle, "sysLogEnabled", _systemLogEnabled);
   SET_BOOL(handle, "flashPause", _flashPause);
+  SET_BOOL(handle, "testDesign", _testDesignEnabled);
 
   SET_STR(handle, "supporterKey", _supporterKey);
 
@@ -326,23 +356,21 @@ void Settings::clear()
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
 
-  uint32_t handle;
-
-  esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-  if (err != ESP_OK)
-  {
-    ESP_LOGE(TAG, "nvs_open failed in clear(): %s", esp_err_to_name(err));
-    if (_mutex) xSemaphoreGive(_mutex);
-    return;
-  }
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_erase_all(handle));
-  ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
-  nvs_close(handle);
+  // Factory reset must wipe all user-configurable namespaces, not only the
+  // base settings namespace. Monitoring keeps MQTT/CheckMK/Prometheus/Syslog
+  // and notification settings in its own namespace; leaving it intact made
+  // those integrations come back after a "factory" reset.
+  esp_err_t settings_err = erase_nvs_namespace(NVS_NAMESPACE);
+  esp_err_t monitoring_err = erase_nvs_namespace(MONITORING_NVS_NAMESPACE);
 
   if (_mutex) xSemaphoreGive(_mutex);
 
-  // reload defaults (load acquires the mutex again, which is fine because
-  // FreeRTOS mutexes are recursive-safe on ESP-IDF)
+  if (settings_err != ESP_OK || monitoring_err != ESP_OK) {
+    ESP_LOGW(TAG, "Factory reset completed with NVS erase errors (settings=%s, monitoring=%s)",
+             esp_err_to_name(settings_err), esp_err_to_name(monitoring_err));
+  }
+
+  // Reload defaults into RAM after releasing the mutex; load() takes it again.
   load();
 }
 
@@ -853,6 +881,21 @@ void Settings::setFlashPause(bool enabled)
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
   _flashPause = enabled;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+bool Settings::getTestDesignEnabled()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _testDesignEnabled;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setTestDesignEnabled(bool enabled)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  _testDesignEnabled = enabled;
   if (_mutex) xSemaphoreGive(_mutex);
 }
 

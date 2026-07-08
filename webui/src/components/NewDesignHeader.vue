@@ -238,7 +238,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore } from '../stores.js'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore } from '../stores.js'
 import { availableLocales } from '../locales/index.js'
 import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 
@@ -250,6 +250,7 @@ const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
 const settingsStore = useSettingsStore()
+const restartUiStore = useRestartUiStore()
 
 const showBanner = ref(true)
 const localeOpen = ref(false)
@@ -304,9 +305,8 @@ const performRestart = async () => {
     await axios.post('/api/restart')
     showRestartModal.value = false
     closeMobileMenu()
-    const reloadDelay = settingsStore.flashPause ? 70000 : 20000
-    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: Math.min(reloadDelay - 2000, 30000) })
-    setTimeout(() => window.location.reload(), reloadDelay)
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
+    restartUiStore.start({ includeFlashPause: settingsStore.flashPause })
   } catch (e) {
     console.error('Restart request failed', e)
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })
@@ -862,7 +862,7 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.36);
   display: flex;
   justify-content: flex-end;
-  padding: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   pointer-events: auto;
 }
 
@@ -1014,7 +1014,7 @@ onUnmounted(() => {
   .header-nav {
     left: 0;
     height: 72px;
-    padding: 0 16px;
+    padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   }
 
   .mobile-brand,
@@ -1027,11 +1027,9 @@ onUnmounted(() => {
   }
 
   .update-banner {
-    left: 8px;
-    right: 8px;
     top: 84px;
-    left: 8px;
-    right: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
     flex-direction: column;
     align-items: flex-start;
     max-height: min(45vh, 320px);
@@ -1040,6 +1038,38 @@ onUnmounted(() => {
 
   .update-banner-actions {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-overlay {
+    padding: 0;
+  }
+
+  .mobile-panel {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+
+  .mobile-title {
+    max-width: 58vw;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .update-banner {
+    top: 76px;
   }
 }
 

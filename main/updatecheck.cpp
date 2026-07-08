@@ -36,7 +36,6 @@
 #include "events.h"
 #include "esp_heap_caps.h"
 #include "cJSON.h"
-#include "mqtt_handler.h"
 #include "supporter_crl.h"
 
 static const char *TAG = "UpdateCheck";
@@ -699,11 +698,15 @@ void UpdateCheck::performOnlineUpdate()
         net_locked = true;
     }
 
-    auto releaseOperation = [&]() {
+    uint32_t paused_monitoring = 0;
+    auto releaseOperation = [&](bool resume_monitoring) {
         net_fetch_set_ota_active(false);
         if (net_locked) {
             xSemaphoreGive(g_net_fetch_mutex);
             net_locked = false;
+        }
+        if (resume_monitoring) {
+            monitoring_resume_after_ota(paused_monitoring);
         }
         finishOtaOperation();
     };
@@ -716,12 +719,12 @@ void UpdateCheck::performOnlineUpdate()
     // don't contend for g_net_fetch_mutex or the limited TLS heap.
     net_fetch_set_ota_active(true);
 
-    // Free ~40 KB heap by stopping MQTT + CRL so the GitHub TLS handshake
-    // + download has enough room. Without this, the WROOM-32 (no PSRAM)
-    // OOMs at ~60 KB free heap during the TLS download.
+    // Free heap by stopping monitoring workers + CRL so the GitHub TLS
+    // handshake + download has enough room. Without this, the WROOM-32
+    // (no PSRAM) OOMs at ~60 KB free heap during the TLS download.
     ESP_LOGI(TAG, "Freeing heap for OTA (current: %u KB)...",
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
-    mqtt_handler_stop();
+    paused_monitoring = monitoring_pause_for_ota();
     supporter_crl_stop_refresh_task();
     // Stop our own background task (12 KB stack) — it only sleeps in a 24h
     // loop and would just waste heap during the download.
@@ -759,7 +762,7 @@ void UpdateCheck::performOnlineUpdate()
         }
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         _statusLED->setState(LED_STATE_ON);
-        releaseOperation();
+        releaseOperation(true);
         return;
     }
 
@@ -810,7 +813,7 @@ void UpdateCheck::performOnlineUpdate()
         esp_https_ota_abort(ota_handle);
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         _statusLED->setState(LED_STATE_ON);
-        releaseOperation();
+        releaseOperation(true);
         return;
     }
 
@@ -829,7 +832,7 @@ void UpdateCheck::performOnlineUpdate()
             xSemaphoreGive(_stateMutex);
         }
         ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
-        releaseOperation();
+        releaseOperation(false);
         full_system_restart();
     } else {
         ESP_LOGE(TAG, "esp_https_ota_finish failed: %s", esp_err_to_name(ret));
@@ -840,6 +843,6 @@ void UpdateCheck::performOnlineUpdate()
         }
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         _statusLED->setState(LED_STATE_ON);
-        releaseOperation();
+        releaseOperation(true);
     }
 }

@@ -58,6 +58,64 @@ export const useUiStore = defineStore('ui', {
   }
 })
 
+export const useRestartUiStore = defineStore('restartUi', {
+  state: () => ({
+    visible: false,
+    countdown: 30,
+    phase: 'restart',
+    phaseIndex: 1,
+    phaseTotal: 1,
+    phaseDuration: 30,
+    timer: null
+  }),
+  actions: {
+    setPhase(phase, seconds, index, total) {
+      this.phase = phase
+      this.countdown = seconds
+      this.phaseDuration = seconds
+      this.phaseIndex = index
+      this.phaseTotal = total
+    },
+    start(options = {}) {
+      const includeFlashPause = !!options.includeFlashPause
+      const restartSeconds = options.restartSeconds || 30
+      const syncSeconds = options.syncSeconds || 40
+
+      if (this.timer) {
+        clearInterval(this.timer)
+        this.timer = null
+      }
+
+      this.visible = true
+      if (includeFlashPause) {
+        this.setPhase('sync', syncSeconds, 1, 2)
+      } else {
+        this.setPhase('restart', restartSeconds, 1, 1)
+      }
+
+      this.timer = setInterval(() => {
+        this.countdown -= 1
+        if (this.countdown <= 0) {
+          if (this.phase === 'sync') {
+            this.setPhase('restart', restartSeconds, 2, 2)
+          } else {
+            clearInterval(this.timer)
+            this.timer = null
+            window.location.reload()
+          }
+        }
+      }, 1000)
+    },
+    stop() {
+      if (this.timer) {
+        clearInterval(this.timer)
+        this.timer = null
+      }
+      this.visible = false
+    }
+  }
+})
+
 export const useExperimentalStore = defineStore('experimental', {
   state: () => ({
     testDesignEnabled: localStorage.getItem("hb-rf-eth-ng-test-design") === "1"
@@ -225,6 +283,7 @@ export const useSettingsStore = defineStore('settings', {
     adminUsername: "admin",
     systemLogEnabled: false,
     flashPause: false,
+    testDesignEnabled: false,
     supporterKey: "",
     useDHCP: true,
     localIP: "",
@@ -262,6 +321,9 @@ export const useSettingsStore = defineStore('settings', {
         const response = await axios.get("/settings.json", { timeout: 5000 })
         if (response.data?.settings) {
           Object.assign(this.$state, response.data.settings)
+          if (response.data.settings.testDesignEnabled !== undefined) {
+            useExperimentalStore().setTestDesignEnabled(!!response.data.settings.testDesignEnabled)
+          }
         } else {
           throw new Error('Invalid response format: missing settings')
         }
@@ -275,6 +337,9 @@ export const useSettingsStore = defineStore('settings', {
         const response = await axios.post("/settings.json", settings, { timeout: 10000 })
         if (response.data?.success !== false) {
           Object.assign(this.$state, settings)
+          if (settings.testDesignEnabled !== undefined) {
+            useExperimentalStore().setTestDesignEnabled(!!settings.testDesignEnabled)
+          }
         } else {
           throw new Error('Server rejected settings save')
         }

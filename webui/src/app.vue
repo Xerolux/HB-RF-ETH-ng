@@ -1,7 +1,7 @@
 <template>
-  <div id="app" :class="{ 'newdesign-shell': experimentalStore.testDesignEnabled }">
+  <div id="app" :class="{ 'newdesign-shell': experimentalStore.testDesignEnabled, 'auth-screen': isLoginScreen }">
     <div class="app-container">
-      <component :is="experimentalStore.testDesignEnabled ? NewDesignHeader : Header" />
+      <component v-if="!isLoginScreen" :is="experimentalStore.testDesignEnabled ? NewDesignHeader : Header" />
       <main class="main-content">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
@@ -9,7 +9,7 @@
           </Transition>
         </RouterView>
       </main>
-      <footer class="app-footer">
+      <footer v-if="!isLoginScreen" class="app-footer">
         <div class="footer-content">
           <small class="text-muted">{{ t('app.footerCopyright', { version: sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }) }}</small>
           <div class="footer-actions">
@@ -30,6 +30,24 @@
           </div>
         </div>
       </footer>
+    </div>
+
+    <div v-if="restartUiStore.visible" class="countdown-overlay restart-countdown-overlay">
+      <div class="countdown-card">
+        <div class="spinner-container">
+          <div class="spinner-ring"></div>
+          <div class="spinner-icon"><AppIcon name="refresh" /></div>
+        </div>
+        <div v-if="restartUiStore.phaseTotal > 1" class="countdown-phase">
+          <span>{{ restartUiStore.phaseIndex }}/{{ restartUiStore.phaseTotal }}</span>
+        </div>
+        <h2 class="countdown-title">{{ restartCountdownTitle }}</h2>
+        <div class="countdown-value">{{ restartUiStore.countdown }}</div>
+        <p class="countdown-text">{{ restartCountdownText }}</p>
+        <div class="progress-track">
+          <div class="progress-fill" :style="{ width: restartCountdownProgress + '%' }"></div>
+        </div>
+      </div>
     </div>
 
     <BModal
@@ -74,16 +92,19 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useExperimentalStore, useLoginStore, useSysInfoStore } from './stores.js'
+import { useRoute } from 'vue-router'
+import { useExperimentalStore, useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
 import Header from './header.vue'
 import NewDesignHeader from './components/NewDesignHeader.vue'
 import SponsorModal from './components/SponsorModal.vue'
 import AppToastContainer from './components/AppToastContainer.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
 const experimentalStore = useExperimentalStore()
+const restartUiStore = useRestartUiStore()
 const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)
 const showSupporterExpiredPrompt = ref(false)
@@ -91,6 +112,21 @@ const otaUpdateVersion = ref('')
 let updateSuccessTimer = null
 const pageTitle = computed(() => `${sysInfoStore.hostname || 'HB-RF-ETH-ng'} - HB-RF-ETH-ng`)
 const testDesignEnabled = computed(() => experimentalStore.testDesignEnabled)
+const isLoginScreen = computed(() => route.path === '/login')
+const restartCountdownTitle = computed(() => (
+  restartUiStore.phase === 'sync'
+    ? t('settings.flashPause')
+    : t('firmware.restarting')
+))
+const restartCountdownText = computed(() => (
+  restartUiStore.phase === 'sync'
+    ? t('firmware.restartFlashPauseHint')
+    : t('firmware.restartingText')
+))
+const restartCountdownProgress = computed(() => {
+  const duration = Math.max(restartUiStore.phaseDuration, 1)
+  return Math.min(100, Math.max(0, ((duration - restartUiStore.countdown) / duration) * 100))
+})
 
 // Remind a returning supporter whose key has expired to renew — shown once
 // per browser session, right after login / first sysinfo load. A gentle
@@ -396,6 +432,111 @@ onUnmounted(() => {
   line-height: 1.5;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+}
+
+.countdown-card {
+  text-align: center;
+  color: white;
+  width: min(92vw, 420px);
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.spinner-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-lg);
+}
+
+.spinner-ring {
+  position: absolute;
+  inset: 0;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.spinner-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: white;
+  display: inline-flex;
+}
+
+.countdown-value {
+  font-size: 4rem;
+  line-height: 1;
+  font-weight: 800;
+  margin: var(--spacing-md) 0;
+}
+
+.countdown-phase {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  font-weight: 700;
+  margin-bottom: var(--spacing-sm);
+}
+
+.countdown-title {
+  margin: 0;
+  color: white;
+}
+
+.countdown-text {
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: var(--spacing-lg);
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: white;
+  transition: width 0.3s ease;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.newdesign-shell .restart-countdown-overlay .spinner-container {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 @media (max-width: 480px) {

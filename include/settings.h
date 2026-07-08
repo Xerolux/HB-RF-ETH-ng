@@ -81,6 +81,10 @@ private:
   // Extend Ethernet drop during restart to >30s so the CCU watchdog triggers.
   bool _flashPause;
 
+  // Experimental WebUI layout. Persisted on the device so the selection
+  // survives device restarts and browser reloads after login.
+  bool _testDesignEnabled;
+
   // Optional supporter key (cosmetic "Supporter" badge). Stored raw; validity
   // (CRC + expiry) is evaluated on read by supporter_key_validate(). Empty on
   // first boot. 24 bytes is enough for "XXXX-XXXX-XXXX-XXXX" (19 chars) + NUL.
@@ -153,6 +157,9 @@ public:
 
   bool getFlashPause();
   void setFlashPause(bool enabled);
+
+  bool getTestDesignEnabled();
+  void setTestDesignEnabled(bool enabled);
 
   // Supporter key persistence (cosmetic badge, no functional gating).
   char *getSupporterKey();

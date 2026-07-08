@@ -201,7 +201,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore } from './stores.js'
+import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore } from './stores.js'
 import { availableLocales } from './locales/index.js'
 import { useHeaderNavigation } from './composables/useHeaderNavigation.js'
 
@@ -213,6 +213,7 @@ const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
 const settingsStore = useSettingsStore()
+const restartUiStore = useRestartUiStore()
 
 const showBanner = ref(true)
 const localeOpen = ref(false)
@@ -256,9 +257,8 @@ const performRestart = async () => {
     await axios.post('/api/restart')
     showRestartModal.value = false
     closeMobileMenu()
-    const reloadDelay = settingsStore.flashPause ? 70000 : 20000
-    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: Math.min(reloadDelay - 2000, 30000) })
-    setTimeout(() => window.location.reload(), reloadDelay)
+    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
+    restartUiStore.start({ includeFlashPause: settingsStore.flashPause })
   } catch (e) {
     console.error('Restart request failed', e)
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })

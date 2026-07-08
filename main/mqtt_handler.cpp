@@ -949,9 +949,10 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     mqtt_running.store(true);
 
     // The publish task formats several JSON/status payloads and performs MQTT
-    // client calls. Keep conservative headroom for TLS-enabled brokers.
+    // client calls. 8 KB keeps TLS-enabled brokers stable while returning
+    // ~2 KB heap to firmware-update/archive HTTPS operations on WROOM-32.
     TaskHandle_t pub_handle = NULL;
-    if (xTaskCreate(mqtt_publish_task, "mqtt_publish", 10240,
+    if (xTaskCreate(mqtt_publish_task, "mqtt_publish", 8192,
                     NULL, 4, &pub_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create MQTT publish task");
         mqtt_running.store(false);

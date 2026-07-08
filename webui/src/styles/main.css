@@ -1023,8 +1023,7 @@ body.newdesign-active .newdesign-shell .restore-confirm,
 body.newdesign-active .newdesign-shell .manual-network-settings,
 body.newdesign-active .newdesign-shell .ipv6-list,
 body.newdesign-active .newdesign-shell .password-requirements,
-body.newdesign-active .newdesign-shell .warning-alert,
-body.newdesign-active .newdesign-shell .spinner-container {
+body.newdesign-active .newdesign-shell .warning-alert {
   border-radius: 8px !important;
   border: 1px solid var(--newdesign-border) !important;
   background: var(--newdesign-panel-soft) !important;
@@ -1388,6 +1387,58 @@ body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled) {
   transform: translateY(-1px) !important;
 }
 
+body.newdesign-active .newdesign-shell .btn-primary,
+body.newdesign-active .newdesign-shell .btn-load-file,
+body.newdesign-active .newdesign-shell .save-btn,
+body.newdesign-active .newdesign-shell .security-save-btn,
+body.newdesign-active .newdesign-shell .submit-btn,
+body.newdesign-active .newdesign-shell .archive-install-btn {
+  border-color: var(--color-primary) !important;
+  background: var(--color-primary) !important;
+  color: #ffffff !important;
+}
+
+body.newdesign-active .newdesign-shell .btn-primary:hover:not(:disabled),
+body.newdesign-active .newdesign-shell .btn-load-file:hover:not(:disabled),
+body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled),
+body.newdesign-active .newdesign-shell .security-save-btn:hover:not(:disabled),
+body.newdesign-active .newdesign-shell .submit-btn:hover:not(:disabled),
+body.newdesign-active .newdesign-shell .archive-install-btn:hover:not(:disabled) {
+  border-color: var(--color-primary-hover) !important;
+  background: var(--color-primary-hover) !important;
+}
+
+body.newdesign-active .newdesign-shell .btn-secondary,
+body.newdesign-active .newdesign-shell .discard-btn,
+body.newdesign-active .newdesign-shell .cancel-btn {
+  border-color: var(--newdesign-border) !important;
+  background: var(--newdesign-panel-soft) !important;
+  color: var(--color-text) !important;
+}
+
+body.newdesign-active .newdesign-shell .btn-danger,
+body.newdesign-active .newdesign-shell .btn-link-danger {
+  border-color: var(--color-danger) !important;
+  background: var(--color-danger) !important;
+  color: #ffffff !important;
+}
+
+body.newdesign-active .newdesign-shell .btn-warning {
+  border-color: var(--color-warning) !important;
+  background: var(--color-warning) !important;
+  color: #ffffff !important;
+}
+
+body.newdesign-active .newdesign-shell .form-switch .form-check-input:checked {
+  border-color: var(--color-primary) !important;
+  background-color: var(--color-primary) !important;
+}
+
+body.newdesign-active .newdesign-shell .form-check-input:focus {
+  border-color: rgba(242, 106, 61, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(242, 106, 61, 0.12) !important;
+}
+
 body.newdesign-active .newdesign-shell .chip-btn {
   border-radius: 6px !important;
   border: 1px solid var(--newdesign-border) !important;
@@ -1449,6 +1500,12 @@ body.newdesign-active .newdesign-shell .countdown-card {
   border-color: rgba(255, 255, 255, 0.22) !important;
   background: rgba(15, 23, 42, 0.62) !important;
   box-shadow: var(--newdesign-shadow-lg) !important;
+}
+
+body.newdesign-active .newdesign-shell .countdown-card .spinner-container {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 body.newdesign-active .newdesign-shell .countdown-card .countdown-title,
@@ -1681,6 +1738,91 @@ body.newdesign-active .newdesign-shell .skeleton-block {
 
 @media (max-width: 480px) {
   body.newdesign-active .newdesign-shell .login-card {
+    padding: 24px 18px !important;
+  }
+}
+
+/* ---- NewDesign auth and dialog surfaces ---- */
+body.newdesign-active .newdesign-shell.auth-screen {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(242, 106, 61, 0.14), transparent 28%),
+    radial-gradient(circle at 86% 18%, rgba(15, 23, 42, 0.08), transparent 30%),
+    var(--color-bg);
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .app-container,
+body.newdesign-active .newdesign-shell.auth-screen .main-content {
+  min-height: 100vh;
+  padding: 0 !important;
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .login-page {
+  position: relative;
+  inset: auto;
+  z-index: 1;
+  min-height: 100vh;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)) !important;
+  background: transparent !important;
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .login-container {
+  max-width: 440px;
+  gap: 18px;
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .login-card {
+  border: 1px solid var(--newdesign-border) !important;
+  border-radius: 10px !important;
+  background: var(--newdesign-panel) !important;
+  box-shadow: var(--newdesign-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px !important;
+  background: var(--color-primary) !important;
+  box-shadow: none !important;
+}
+
+body.newdesign-active .newdesign-shell.auth-screen .login-footer,
+body.newdesign-active .newdesign-shell.auth-screen .login-footer a {
+  color: var(--newdesign-text-soft) !important;
+}
+
+body.newdesign-active .newdesign-shell .password-reset-panel {
+  border-radius: 8px !important;
+  border: 1px solid var(--newdesign-border) !important;
+  background: var(--newdesign-panel-soft) !important;
+  box-shadow: none !important;
+}
+
+body.newdesign-active .newdesign-shell .forgot-link {
+  color: var(--color-primary) !important;
+}
+
+body.newdesign-active .modal-content {
+  border: 1px solid var(--newdesign-border, #dbe3ee) !important;
+  border-radius: 10px !important;
+  background: var(--newdesign-panel, #ffffff) !important;
+  color: var(--color-text) !important;
+  box-shadow: var(--newdesign-shadow-lg, 0 18px 50px rgba(15, 23, 42, 0.14)) !important;
+}
+
+body.newdesign-active .modal-header,
+body.newdesign-active .modal-footer {
+  border-color: var(--newdesign-border, #dbe3ee) !important;
+}
+
+body.newdesign-active .modal-backdrop.show {
+  opacity: 0.42 !important;
+}
+
+@media (max-width: 480px) {
+  body.newdesign-active .newdesign-shell.auth-screen .login-card {
     padding: 24px 18px !important;
   }
 }
