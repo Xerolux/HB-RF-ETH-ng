@@ -929,9 +929,7 @@ body.newdesign-active {
 
 [data-bs-theme="dark"] body.newdesign-active,
 body.newdesign-active[data-bs-theme="dark"] {
-  /* Dark background aligned to the SMLIGHT-style neutral-grey palette
-     (replacing the previous bluish #111722). */
-  background: #1e1e1e;
+  background: #111722;
 }
 
 /* New-design tokens are declared on body.newdesign-active (NOT just on
@@ -998,13 +996,11 @@ body.newdesign-active:has(.update-banner) .newdesign-shell .main-content {
 
 [data-bs-theme="dark"] body.newdesign-active .newdesign-shell,
 body.newdesign-active[data-bs-theme="dark"] .newdesign-shell {
-  /* Dark tokens aligned to the SMLIGHT neutral-grey palette:
-     panels ~#252525 (sidebar), soft ~#1e1e1e (main bg), borders #374151. */
-  --newdesign-panel: #252525;
-  --newdesign-panel-soft: #1e1e1e;
-  --newdesign-border: #374151;
-  --newdesign-border-strong: #4b5563;
-  --newdesign-text-soft: #9ca3af;
+  --newdesign-panel: #182131;
+  --newdesign-panel-soft: #121a27;
+  --newdesign-border: rgba(148, 163, 184, 0.22);
+  --newdesign-border-strong: rgba(148, 163, 184, 0.34);
+  --newdesign-text-soft: #a8b3c5;
   --newdesign-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
   --newdesign-shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.5);
 }
@@ -1013,11 +1009,11 @@ body.newdesign-active[data-bs-theme="dark"] .newdesign-shell {
    so bare-layout pages (login) also resolve them in dark mode. */
 [data-bs-theme="dark"] body.newdesign-active,
 body.newdesign-active[data-bs-theme="dark"] {
-  --newdesign-panel: #252525;
-  --newdesign-panel-soft: #1e1e1e;
-  --newdesign-border: #374151;
-  --newdesign-border-strong: #4b5563;
-  --newdesign-text-soft: #9ca3af;
+  --newdesign-panel: #182131;
+  --newdesign-panel-soft: #121a27;
+  --newdesign-border: rgba(148, 163, 184, 0.22);
+  --newdesign-border-strong: rgba(148, 163, 184, 0.34);
+  --newdesign-text-soft: #a8b3c5;
   --newdesign-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
   --newdesign-shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.5);
 }

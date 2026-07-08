@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.33] - 2026-07-08
+
+### Changes
+- chore(webui): revert the new-design dark-mode palette to the Beta.28 bluish tones (background #111722, panels #182131, panel-soft #121a27, borders rgba(148,163,184,...), text-soft #a8b3c5). The neutral-grey SMLIGHT-aligned scheme from Beta.29–32 was harder to read in the dark; the previous blue-tinted scheme is restored. Light mode is unchanged.
+
 ## [2.2.3-Beta.32] - 2026-07-08
 
 ### Changes
