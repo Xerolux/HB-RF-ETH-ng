@@ -119,7 +119,16 @@ export const useRestartUiStore = defineStore('restartUi', {
 
 export const useExperimentalStore = defineStore('experimental', {
   state: () => ({
-    testDesignEnabled: safeLocal.get("hb-rf-eth-ng-test-design") === "1"
+    // Boot value comes from localStorage so the very first paint (before any
+    // server round-trip) is correct. Once /settings.json is loaded, the value
+    // is reconciled with the server (see syncFromServer) and localStorage
+    // becomes a mirror of the authoritative device setting.
+    testDesignEnabled: safeLocal.get("hb-rf-eth-ng-test-design") === "1",
+    // Wall-clock time (ms) of the last user-initiated flip. Used by
+    // syncFromServer to ignore stale server values that arrive while the
+    // flip's own persist POST is still in flight (see the race note below).
+    // 0 means "no recent local flip — trust the server unconditionally".
+    _lastFlipAt: 0
   }),
   actions: {
     applyDesignClass() {
@@ -133,8 +142,57 @@ export const useExperimentalStore = defineStore('experimental', {
       document.body.classList.toggle('newdesign-active', this.testDesignEnabled)
     },
     setTestDesignEnabled(enabled) {
-      this.testDesignEnabled = !!enabled
-      safeLocal.set("hb-rf-eth-ng-test-design", this.testDesignEnabled ? "1" : "0")
+      const next = !!enabled
+      if (next === this.testDesignEnabled) return
+      this.testDesignEnabled = next
+      this._lastFlipAt = Date.now()
+      // Mirror to localStorage so a reload / new tab gets the right value
+      // before the server round-trip completes (prevents a one-frame flash of
+      // the wrong design on navigation).
+      safeLocal.set("hb-rf-eth-ng-test-design", next ? "1" : "0")
+      this.applyDesignClass()
+      // Persist device-wide immediately. The server accepts a partial payload
+      // ({testDesignEnabled: bool}) and saves to NVS, so the choice survives
+      // reboots and is shared across every browser that opens the WebUI.
+      // silent:true prevents the global axios interceptor from surfacing
+      // error toasts (and from force-redirecting to /login on a 401) — a
+      // failed experimental-toggle persist must NOT disturb the session.
+      // Fire-and-forget: a network failure does NOT roll back the local
+      // toggle; the device value stays stale until the next successful save.
+      axios.post("/settings.json", { testDesignEnabled: next }, { timeout: 5000, silent: true })
+        .catch((e) => console.warn("Failed to persist test-design toggle to device:", e?.message || e))
+    },
+    // Called by useSettingsStore.load() after /settings.json returns, so the
+    // device-wide persisted value wins over the localStorage boot guess.
+    //
+    // RACE GUARD: flipping the toggle swaps the header component (app.vue
+    // switches between <Header> and <NewDesignHeader>), and the newly-mounted
+    // header calls settingsStore.load() in its onMounted. That load() can
+    // resolve BEFORE this flip's persist POST has been written to NVS — in
+    // which case the server still reports the OLD value, and naively applying
+    // it would flip the toggle straight back (the exact "spring-back" bug).
+    // We therefore ignore any server value that arrives within a short grace
+    // window after a local flip; once the window passes, the POST has had
+    // enough time to land and the server is authoritative again.
+    syncFromServer(serverValue) {
+      if (typeof serverValue !== 'boolean') return
+      if (serverValue === this.testDesignEnabled) {
+        // Converged — clear the flip marker so a later genuine change is
+        // honoured immediately.
+        this._lastFlipAt = 0
+        return
+      }
+      // Within the post-flip grace window, trust the local user choice over
+      // the (likely stale) server value. 4 s comfortably covers the persist
+      // POST + ESP32 NVS write + the header's checkForUpdate round-trip that
+      // precedes its settingsStore.load().
+      if (this._lastFlipAt && (Date.now() - this._lastFlipAt) < 4000) {
+        return
+      }
+      // Outside the window: the server is authoritative. Apply and clear.
+      this._lastFlipAt = 0
+      this.testDesignEnabled = serverValue
+      safeLocal.set("hb-rf-eth-ng-test-design", serverValue ? "1" : "0")
       this.applyDesignClass()
     },
     init() {
@@ -312,7 +370,11 @@ export const useSettingsStore = defineStore('settings', {
     adminUsername: "admin",
     systemLogEnabled: false,
     flashPause: false,
-    testDesignEnabled: false,
+    // NOTE: testDesignEnabled is intentionally NOT in this store. It lives in
+    // useExperimentalStore (single source of truth) and is persisted device-
+    // wide via that store's setTestDesignEnabled(). Keeping it out of here
+    // prevents the "toggle springs back" bug where a settings reload pushed
+    // the server value back into the experimental store on every watcher fire.
     supporterKey: "",
     useDHCP: true,
     localIP: "",
@@ -349,9 +411,16 @@ export const useSettingsStore = defineStore('settings', {
       try {
         const response = await axios.get("/settings.json", { timeout: 5000 })
         if (response.data?.settings) {
-          Object.assign(this.$state, response.data.settings)
-          if (response.data.settings.testDesignEnabled !== undefined) {
-            useExperimentalStore().setTestDesignEnabled(!!response.data.settings.testDesignEnabled)
+          const incoming = { ...response.data.settings }
+          // The test-design toggle is owned by useExperimentalStore. Pull it
+          // out of the incoming settings payload and forward it there as a
+          // ONE-TIME server→client sync (never push it back later). Then drop
+          // it so it cannot leak into this store's state.
+          const serverTestDesign = incoming.testDesignEnabled
+          delete incoming.testDesignEnabled
+          Object.assign(this.$state, incoming)
+          if (serverTestDesign !== undefined) {
+            useExperimentalStore().syncFromServer(!!serverTestDesign)
           }
         } else {
           throw new Error('Invalid response format: missing settings')
@@ -365,10 +434,12 @@ export const useSettingsStore = defineStore('settings', {
       try {
         const response = await axios.post("/settings.json", settings, { timeout: 10000 })
         if (response.data?.success !== false) {
-          Object.assign(this.$state, settings)
-          if (settings.testDesignEnabled !== undefined) {
-            useExperimentalStore().setTestDesignEnabled(!!settings.testDesignEnabled)
-          }
+          // testDesignEnabled is not part of this store — drop it before
+          // assigning so it cannot sneak into state. The experimental store
+          // persists the toggle on its own (immediate POST on flip).
+          const safe = { ...settings }
+          delete safe.testDesignEnabled
+          Object.assign(this.$state, safe)
         } else {
           throw new Error('Server rejected settings save')
         }

@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.31] - 2026-07-08
+
 ### Changes
+- fix(webui): test-design toggle no longer springs back. The toggle is now persisted device-wide (survives reboots, shared across browsers) via an immediate silent POST on every flip, with a race-guard that prevents a header-remount-triggered settings reload from clobbering a just-flipped value before its POST lands. Replaces the previous two-fighting-truth-sources design (localStorage vs server) that caused the spring-back.
 - feat: make the WebUI installable as a Progressive Web App (manifest + theme-color + apple-touch-icon; "Install app" on Android Chrome/Edge, "Zum Home-Bildschirm" on iOS Safari). Single embedded 256px icon serves any/maskable/apple-touch to keep flash usage minimal.
 - feat: serve the firmware release archive from flash instead of fetching it live from GitHub on every archive view — removes a TLS handshake + GitHub round-trip per view (a heap-pressure source on the WROOM-32) and makes the archive viewable offline. The "newest release available" check stays live.
 - feat: cache-busting for the embedded WebUI assets via content-hashed query params + no-cache HTML shell, so the browser always pulls the new bundle after a firmware update without a manual cache clear.
-- fix(webui): new-design toggle now reliably applies on toggle and on cold boot — the class lived on `<html>` (which no CSS rule reads) and only worked by accident via a duplicate watcher; the store is now the single source of truth on `<body>`, and an inline script prevents a pre-paint flash of the old UI.
 - fix(webui): login page renders standalone (no sidebar header / footer) via a bare layout, replacing the brittle position:fixed hack.
 - fix(webui): harden the new design for iOS Safari / private-browsing mode — guarded storage writes so an accepted login no longer rolls back, iOS-safe clipboard copy, body scroll lock, locale dismiss-on-outside-click, autocomplete hints, dynamic-viewport (dvh) sizing.
 - fix(webui): close new-design whitelist gaps — flatten Bootstrap button/alert variants, spinners, diagnostics list, supporter-card internals, changelog modal, and tone down the supporter medallion to match the flat theme.

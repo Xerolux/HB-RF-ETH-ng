@@ -931,8 +931,13 @@ const buildSettingsPayload = () => ({
   ipv6Gateway: ipv6Gateway.value,
   ipv6Dns1: ipv6Dns1.value,
   ipv6Dns2: ipv6Dns2.value,
-  flashPause: flashPause.value,
-  testDesignEnabled: experimentalStore.testDesignEnabled
+  flashPause: flashPause.value
+  // NOTE: testDesignEnabled is deliberately omitted. It is persisted device-
+  // wide the moment the user flips the toggle (useExperimentalStore posts it
+  // immediately), so it must never travel in the bulk "save settings" payload
+  // — otherwise a save could overwrite a newer toggle choice with a stale
+  // snapshot value, and the dirty-tracker would falsely flag "unsaved
+  // changes" right after a flip.
 })
 
 const serializeSettings = () => JSON.stringify(buildSettingsPayload())
@@ -946,7 +951,7 @@ const updateDirtyState = () => {
   }, 300)
 }
 
-watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause, () => experimentalStore.testDesignEnabled], updateDirtyState, { deep: true })
+watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause], updateDirtyState, { deep: true })
 
 const hasUnsavedChanges = computed(() => loadedSnapshot.value !== '' && serializedCurrent.value !== '' && serializedCurrent.value !== loadedSnapshot.value)
 const adminUsernameChanged = computed(() => adminUsername.value !== (settingsStore.adminUsername || 'admin'))
@@ -990,9 +995,11 @@ const loadSettings = () => {
   if (settingsStore.flashPause !== undefined) {
     flashPause.value = settingsStore.flashPause
   }
-  if (settingsStore.testDesignEnabled !== undefined) {
-    experimentalStore.setTestDesignEnabled(settingsStore.testDesignEnabled)
-  }
+  // NOTE: testDesignEnabled is intentionally NOT synced here. It is owned by
+  // useExperimentalStore (single source of truth) and persisted device-wide on
+  // every flip via that store. Re-syncing it on every settingsStore watcher
+  // fire was the "toggle springs back" bug. The initial device value reaches
+  // the experimental store via syncFromServer() inside settingsStore.load().
 
   // Pre-fill the supporter key input from the stored value (formatted), and
   // make sure the header badge reflects the current device state.
