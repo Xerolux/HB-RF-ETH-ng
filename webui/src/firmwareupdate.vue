@@ -37,7 +37,7 @@
     </div>
 
     <div class="quick-actions">
-      <button class="chip-btn" type="button" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+      <button class="chip-btn" type="button" @click="manualCheckForUpdate" :disabled="firmwareLookupBusy">
         <AppIcon name="refresh" />
         {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.checkNow') }}
       </button>
@@ -146,7 +146,7 @@
               <span class="check-icon"><AppIcon name="alert" /></span>
               <span>{{ t('firmware.checkFailed') }}: {{ updateStore.checkError }}</span>
             </div>
-            <button class="check-btn" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+            <button class="check-btn" @click="manualCheckForUpdate" :disabled="firmwareLookupBusy">
               <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm"></span>
               {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.retry') }}
             </button>
@@ -159,7 +159,7 @@
               <span class="check-icon"><AppIcon name="check" /></span>
               <span>{{ t('firmware.upToDate') }}</span>
             </div>
-            <button class="check-btn" @click="manualCheckForUpdate" :disabled="updateStore.isChecking">
+            <button class="check-btn" @click="manualCheckForUpdate" :disabled="firmwareLookupBusy">
               <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm"></span>
               {{ updateStore.isChecking ? t('firmware.checking') : t('firmware.checkNow') }}
             </button>
@@ -235,7 +235,7 @@
               {{ filter.label }}
             </button>
           </div>
-          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive" :disabled="archiveLoading">
+          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive" :disabled="firmwareLookupBusy" :title="archiveRefreshTitle">
             <span v-if="archiveLoading" class="spinner-border spinner-border-sm"></span>
             <AppIcon v-else name="refresh" />
             {{ archiveLoading ? t('firmware.archiveLoading') : t('firmware.archiveRefresh') }}
@@ -255,6 +255,11 @@
         <div v-if="archiveLoading && firmwareArchive.length === 0" class="archive-empty">
           <span class="spinner-border spinner-border-sm"></span>
           {{ t('firmware.archiveLoading') }}
+        </div>
+
+        <div v-else-if="!archiveLoaded" class="archive-empty">
+          <AppIcon name="info" />
+          {{ t('firmware.archiveHint') }}
         </div>
 
         <div v-else-if="filteredFirmwareArchive.length === 0" class="archive-empty">
@@ -388,6 +393,7 @@ const showChangelogModal = ref(false)
 const betaToggleSaving = ref(false)
 const archiveFilter = ref('stable')
 const archiveLoading = ref(false)
+const archiveLoaded = ref(false)
 const archiveError = ref('')
 const firmwareArchive = ref([])
 const archiveInstallingVersion = ref('')
@@ -401,6 +407,14 @@ const ARCHIVE_MANIFEST_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ET
 const ARCHIVE_MANIFEST_FALLBACK_URL = '/api/firmware_archive'
 const ARCHIVE_CACHE_KEY = 'hb-rf-eth-ng-firmware-archive-cache-v1'
 const ARCHIVE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+const firmwareLookupBusy = computed(() => archiveLoading.value || updateStore.isChecking || updateStore.fetchInProgress)
+
+const archiveRefreshTitle = computed(() => (
+  updateStore.isChecking || updateStore.fetchInProgress
+    ? t('firmware.checking')
+    : ''
+))
 
 const archiveFilters = computed(() => [
   { value: 'stable', label: t('firmware.archiveStable') },
@@ -644,12 +658,15 @@ const loadArchiveManifest = async () => {
 }
 
 const loadFirmwareArchive = async () => {
+  if (archiveLoading.value || updateStore.isChecking || updateStore.fetchInProgress) return
+
   archiveLoading.value = true
   archiveError.value = ''
 
   try {
     const archiveResult = await loadArchiveManifest()
     firmwareArchive.value = archiveResult.releases
+    archiveLoaded.value = true
     selectDefaultArchiveRelease()
     if (archiveResult.fromCache) {
       const savedAt = new Date(archiveResult.savedAt).toLocaleString()
@@ -661,6 +678,7 @@ const loadFirmwareArchive = async () => {
     archiveError.value = details
       ? `${t('firmware.archiveLoadError')} (${details})`
       : t('firmware.archiveLoadError')
+    archiveLoaded.value = firmwareArchive.value.length > 0
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
   } finally {
     archiveLoading.value = false
@@ -890,6 +908,8 @@ const factoryResetClick = async () => {
 }
 
 const manualCheckForUpdate = async () => {
+  if (archiveLoading.value) return
+
   if (!sysInfoStore.currentVersion) {
     await sysInfoStore.update()
   }
@@ -939,7 +959,11 @@ onMounted(async () => {
     console.warn('Initial cached update read failed:', e.response?.status || e.message)
   }
   syncArchiveFilterWithUpdateChannel()
-  loadFirmwareArchive()
+  // Do not load the archive automatically when opening the Firmware page.
+  // The archive may need an external HTTPS request (browser direct, then ESP32
+  // proxy fallback) and users reported UI freezes / high device CPU load when
+  // this work was started just by visiting the page. Keep normal update status
+  // cheap and only fetch the archive after the explicit "Refresh list" action.
   // Periodically re-read the cache while the page is open so the
   // "last check" indicator and download URL stay fresh (cached read only,
   // no GitHub call).

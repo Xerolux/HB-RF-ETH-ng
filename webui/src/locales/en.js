@@ -384,6 +384,8 @@ export default {
     chipLabelNotify: 'Notifications',
     title: 'Monitoring',
     description: 'Configure monitoring and notifications for the HB-RF-ETH gateway.',
+    resourceWarningTitle: 'Keep resources in mind',
+    resourceWarningText: '{count} monitoring services are enabled. The ESP32 can usually handle this, but concurrent TLS connections, firmware checks/archive fetches, and OTA share heap and CPU; if problems occur, disable individual services or stagger tests.',
     save: 'Save',
     saving: 'Saving...',
     saveSuccess: 'Configuration saved successfully!',

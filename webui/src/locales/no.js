@@ -371,6 +371,8 @@ export default {
     chipLabelNotify: 'Varsler',
     title: 'Overvåking',
     description: 'Konfigurer overvåking og varsler for HB-RF-ETH-gatewayen.',
+    resourceWarningTitle: 'Keep resources in mind',
+    resourceWarningText: '{count} monitoring services are enabled. The ESP32 can usually handle this, but concurrent TLS connections, firmware checks/archive fetches, and OTA share heap and CPU; if problems occur, disable individual services or stagger tests.',
     save: 'Lagre',
     saving: 'Lagrer...',
     saveSuccess: 'Konfigurasjon lagret!',
