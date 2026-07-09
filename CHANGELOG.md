@@ -7,258 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.2.3-Beta.35] - 2026-07-09
-
-### Changes
-- fix(webui): active sidebar nav items now reliably show white text on the green bar. A CSS-specificity collision with the legacy `header.vue` rule (`.nav-item.exact-active`) was overriding the NewDesign active state, leaving the active item as a solid green bar with no readable text. Forced with `!important`.
-- fix(webui): dark mode now colours the sidebar (`#24272B`) and top bar (`#25282C`) correctly. The `--color-sidebar` / `--newdesign-header` / surface / text tokens were only defined on the `body` dark scope, but the desktop sidebar lives inside `#app.newdesign-shell`, where the body-scope tokens were shadowed by the `:root` light defaults. Mirrored the dark tokens into the `.newdesign-shell` dark block.
-- fix(webui): favicon now cache-busts (`favicon.ico?v=<hash>`) after a firmware update, so the new brand icon actually replaces the old one in the browser tab. Previously favicon.ico was deliberately excluded from cache-busting on the assumption it never changes.
-- fix(webui): dashboard info cards (System / Network / Radio) are now wider (`minmax(360px, 1fr)`) so long values don't wrap or clip. Ethernet status chip ("100 Mbit/s · Full") no longer breaks across two lines, and long mono values (IPs, serials, MACs) use the full cell width with graceful word-break instead of being truncated.
-
-## [2.2.3-Beta.34] - 2026-07-09
-
-### Changes
-- feat(webui): NewDesign theme gets its own emerald-green industrial palette (Light + Dark) — Glass UI stays orange. Primary accent `#2F8B57`, proper sidebar/header backgrounds, flat 4px card radii, minimal shadows. Active nav items are full green rectangles with white text/icons.
-- feat(webui): new brand logo (three-leaf mark, fixed gradient `#D96A5A → #EAA08E`) inline-SVG component, used in sidebar, top bar, mobile panel and login page. Also replaced favicon.ico + icon-256.png (PWA/tab icon) and aligned manifest `theme_color` + `theme-color` meta to the brand.
-- feat(webui): mobile panel action buttons (Restart/Logout/Login) are now dark charcoal fills with white text, matching the industrial-dashboard reference. Active mobile nav links and locale buttons are green.
-- fix(ota): after a failed OTA the stopped background tasks (CRL refresh + UpdateCheck) are now restarted on the failure path, so a retry is no longer silently biased toward success by the extra heap freed by their absence. Fixes the "OTA needs two clicks" symptom on the WebUI and MQTT OTA paths.
-- feat(webui): firmware archive list now loads immediately on page open from the embedded `/api/firmware_archive` (served from flash, instant, offline) instead of requiring a manual refresh. The live GitHub URL is fallback only.
-- docs: added `docs/WEBUI_DESIGN_SYSTEM.md` as the normative design specification (two-theme system, palettes, tokens, contribution rules). Linked from CLAUDE.md and README so every contributor reads it first.
-
-## [2.2.3-Beta.33] - 2026-07-08
-
-### Changes
-- chore(webui): revert the new-design dark-mode palette to the Beta.28 bluish tones (background #111722, panels #182131, panel-soft #121a27, borders rgba(148,163,184,...), text-soft #a8b3c5). The neutral-grey scheme from Beta.29–32 was harder to read in the dark; the previous blue-tinted scheme is restored. Light mode is unchanged.
-
-## [2.2.3-Beta.32] - 2026-07-08
-
-### Changes
-- fix(webui): test-design toggle hardened against the last spring-back race. The previous wall-clock guard (Beta.31) was shorter than the persist POST's own 5 s timeout and could still let a stale server value through under load. Replaced with a POST-lifecycle-bound guard: a `_persistInFlight` flag cleared in the POST's `.finally()` plus a 3 s post-POST cooldown for the ESP32's NVS commit latency. The convergence-clear path that reopened a race when two settingsStore.load() calls overlapped is also removed.
-- fix(webui): settingsStore.load() now deduplicates concurrent callers (header mount + page mount) onto a single GET /settings.json via an in-flight promise, instead of firing two parallel requests that overwrite each other.
-- fix(webui): add missing i18n key `common.clear` (used by the three "Clear" secret-reset buttons on the monitoring page) to all 10 locales — previously rendered the literal key path as the button label.
-
-## [2.2.3-Beta.31] - 2026-07-08
-
-### Changes
-- fix(webui): test-design toggle no longer springs back. The toggle is now persisted device-wide (survives reboots, shared across browsers) via an immediate silent POST on every flip, with a race-guard that prevents a header-remount-triggered settings reload from clobbering a just-flipped value before its POST lands. Replaces the previous two-fighting-truth-sources design (localStorage vs server) that caused the spring-back.
-- feat: make the WebUI installable as a Progressive Web App (manifest + theme-color + apple-touch-icon; "Install app" on Android Chrome/Edge, "Zum Home-Bildschirm" on iOS Safari). Single embedded 256px icon serves any/maskable/apple-touch to keep flash usage minimal.
-- feat: serve the firmware release archive from flash instead of fetching it live from GitHub on every archive view — removes a TLS handshake + GitHub round-trip per view (a heap-pressure source on the WROOM-32) and makes the archive viewable offline. The "newest release available" check stays live.
-- feat: cache-busting for the embedded WebUI assets via content-hashed query params + no-cache HTML shell, so the browser always pulls the new bundle after a firmware update without a manual cache clear.
-- fix(webui): login page renders standalone (no sidebar header / footer) via a bare layout, replacing the brittle position:fixed hack.
-- fix(webui): harden the new design for iOS Safari / private-browsing mode — guarded storage writes so an accepted login no longer rolls back, iOS-safe clipboard copy, body scroll lock, locale dismiss-on-outside-click, autocomplete hints, dynamic-viewport (dvh) sizing.
-- fix(webui): close new-design whitelist gaps — flatten Bootstrap button/alert variants, spinners, diagnostics list, supporter-card internals, changelog modal, and tone down the supporter medallion to match the flat theme.
-- fix(firmware): start the UpdateCheck background task after monitoring_init() creates the shared HTTPS-fetch mutex, closing a boot-time race where the first manifest fetch could overlap a CRL/MQTT fetch and exhaust the TLS heap.
-- chore: dark-mode palette of the new design realigned to a neutral-grey scheme; new-design radii/shadows tightened to a more compact aesthetic.
-
-## [2.2.3-Beta.29] - 2026-07-08
-
-### Changes
-- fix-freezing-issue-in-firmware-search
-- Avoid competing firmware lookups
-- speichermanagement, design , password
-- Align auth and dialogs with new design
-- chore: update manifests for v2.2.3-Beta.28
-
-## [2.2.3-Beta.28] - 2026-07-07
-
-### Changes
-- fix: make firmware archive resilient to GitHub outages
-- feat: add activation server prototype
-- chore: update manifests for v2.2.3-Beta.27
-
-## [2.2.3-Beta.27] - 2026-07-07
-
-### Changes
-- fix: refine header navigation and switch controls
-- chore: update manifests for v2.2.3-Beta.26
-
-## [2.2.3-Beta.26] - 2026-07-07
-
-### Changes
-- fix: harden webui layout and restart sync
-- chore: update manifests for v2.2.3-Beta.25
-- chore: bump version to 2.2.3-Beta.25
-- fix: remove hardcoded admin username from login form
-- chore: update manifests for v2.2.3-Beta.24
-
-## [2.2.3-Beta.20] - 2026-07-07
-
-### Changes
-- perf(crl): skip refresh task on devices without a supporter key
-- chore: update manifests for v2.2.3-Beta.19
-
-## [2.2.3-Beta.19] - 2026-07-07
-
-### Changes
-- fix: stop CRL refresh task crash at uptime 60s (stack overflow)
-- fix: stop CRL refresh task crash at uptime 60s (stack overflow)
-- chore: update manifests for v2.2.3-Beta.18
-
-## [2.2.3-Beta.18] - 2026-07-07
-
-### Changes
-- fix: resolve IPv6 validation and syslog bugs; optimize log-viewer performance and stack-usage
-- fix: resolve OTA failure and bootloader rollback (socket exhaustion)
-- docs: declare feature freeze until stable release
-- chore: update manifests for v2.2.3-Beta.17
-
-## [2.2.3-Beta.17] - 2026-07-06
-
-### Changes
-- fix: supporter CRL SHA via PSA crypto, dedupe dashboard nav, expired-key login prompt
-
-## [2.2.3-Beta.16] - 2026-07-06
-
-### Changes
-- feat: supporter revocation (CRL), badge redesign, key-tool email
-- chore: gitignore PyInstaller artifacts for the private supporter-key tool
-- chore: update manifests for v2.2.3-Beta.15
-
-## [2.2.3-Beta.15] - 2026-07-06
-
-### Changes
-- feat: show supporter status on the dashboard system-status page
-- chore: update manifests for v2.2.3-Beta.14
-
-## [2.2.3-Beta.14] - 2026-07-06
-
-### Changes
-- feat: supporter key, on-demand changelog, log-buffer fallback, UI polish
-- chore: update manifests for v2.2.3-Beta.13
-
-## [2.2.3-Beta.13] - 2026-07-06
-
-### Changes
-- fix: clean up WebUI session and visual test flow
-- fix-flashpause-ota-archive-responsive-i18n
-- fix: OTA stability, archive slimming, responsive sidebar, i18n parity
-- beheben-von-flashpausenproblemen
-- Fix settings persistence and responsive monitoring
-- Merge pull request #356 from Xerolux/dependabot/github_actions/actions/setup-node-6
-- Merge pull request #357 from Xerolux/dependabot/npm_and_yarn/webui/vite-8.1.3
-- Merge pull request #355 from Xerolux/dependabot/github_actions/actions/labeler-6
-- Merge pull request #354 from Xerolux/dependabot/github_actions/github/codeql-action-4
-- chore(deps)(deps-dev): bump vite from 8.1.0 to 8.1.3 in /webui
-- chore(ci)(deps): bump actions/setup-node from 4 to 6
-- chore(ci)(deps): bump actions/labeler from 5 to 6
-- chore(ci)(deps): bump github/codeql-action from 3 to 4
-- fix: raise http uri handler limit
-- chore: update manifests for v2.2.3-Beta.12
-
-## [2.2.3-Beta.12] - 2026-07-05
-
-### Added — Monitoring & Notifications Expansion (Phases A–E)
-
-- **feat: Prometheus `/metrics` exporter** (Phase A) — pull model on dedicated port (default 9100), source-IP allowlist; exposes uptime, heap, CPU, eth/mqtt link, RF module and process-wide counters (UDP frames, drops, keepalives, notification delivery stats) in Prometheus text format. New central `metrics.h` registry; counters increment lock-free.
-- **feat: Syslog forwarding (RFC 5424)** (Phase B) — optional UDP/TCP/TLS forwarding of every captured log line, severity-filtered. Reuses the same LogManager hook as the WebSocket stream. TLS handshakes serialise on `g_net_fetch_mutex`.
-- **feat: WebSocket live log stream** (Phase E) — `GET /api/log/stream` pushes new lines to up to 4 browser tabs in real time, replacing 5 s polling in `systemlog.vue`. Falls back to polling on older firmware. Auth via `?token=` query string.
-- **feat: Event notifications (Webhook / Telegram / Email)** (Phase C+D) — emit `eth_link_down/up`, `rf_module_detected`, `ota_started/succeeded/failed`, `mqtt_disconnected/reconnected` to Webhook (JSON POST + shared-secret header), Telegram Bot API, or SMTP (plaintext / STARTTLS / implicit TLS, AUTH LOGIN). Per-event-type cooldown window; metric counters for delivered / failed / suppressed.
-- **refactor: LogManager always installs its capture hook at boot** — subscribers register/unregister at runtime; ring buffer stays optional.
-- **feat: `mqtt_handler_is_connected()`** exposes broker login state.
-- **docs:** API.md documents `/metrics`, `/api/log/stream`, and the new `prometheus` / `syslog` / `notify` blocks in `GET/POST /api/monitoring`.
-
-## [2.2.3-Beta.11] - 2026-07-05
-
-### Changes
-- feat: Beta.11 — i18n overhaul, flash pause persistence, restart UX
-
-## [2.2.3-Beta.10] - 2026-07-05
-
-### Changes
-- chore: update manifests for v2.2.3-Beta.9
-
-## [2.2.3-Beta.9] - 2026-07-05
-
-### Changes
-- fix: persist log toggle, German umlauts, Experimentell tab overflow
-- docs: correct REST API endpoint paths in CLAUDE.md
-- fix: require current password to change admin password
-- fix: update update_headers.py to scan main/ instead of non-existent src/
-- ci: fix GitHub Actions version pins to known existing versions
-- fix: disable deprecated ESP32_WIFI_ENABLED to reclaim ~30 KB RAM
-- fix: protect Settings with mutex and route factory-reset through settings
-- chore: sync openapi.yaml and CHANGELOG.md with version.txt
-- fix: repair version-update regexes and discover locales dynamically
-- fix: sanitize changelog markdown links and improve close button accessibility
-- fix: store auth token in sessionStorage instead of localStorage
-- fix: validate cJSON types before reading numeric/boolean values
-- fix: protect Ethernet DNS cache with mutex and initialize it
-- fix: serialize MQTT lifecycle and initial TLS handshake
-- fix: allow 32-character admin credentials and clean up class destructors
-- fix: reject over-long OTA URLs instead of silently truncating
-- fix: make secure_strcmp timing-safe and add missing include
-- chore: add missing or incomplete license headers to firmware sources
-- fix: correct HA MQTT update entity discovery config
-- feat: complete new design coverage for all pages, menus, and modals
-- chore: update manifests for v2.2.3-Beta.8
-
-## [2.2.3-Beta.8] - 2026-07-04
-
-### Fixed
-- fix: migrate legacy MQTT topic prefix `hb-rf-eth` to `hb-rf-eth-ng` and relabel CCU connection in the WebUI.
-
-## [2.2.3-Beta.7] - 2026-07-04
-
-### Fixed
-- fix: resolve `ethernet.cpp` compile errors related to IPv6 address constants and `ip6addr_ntoa_r` typing.
-- fix: cast `esp_ip6_addr_t` to `ip6_addr_t` for `ip6addr_ntoa_r` compatibility.
-- fix: monitoring save-twice bug, improve Home Assistant device name, and add live network details to system info.
-
-### Changed
-- i18n: refine Italian translations for natural phrasing and consistency.
-
-## [2.2.3-Beta.6] - 2026-07-04
-
-### Changes
-- fix: default archive filter to beta on beta devices
-- style: compact firmware archive selection
-- fix: avoid stale raw update manifests
-- chore: update manifests for v2.2.3-Beta.5
-
-## [2.2.3-Beta.5] - 2026-07-04
-
-### Changes
-- fix: proxy firmware archive through device
-- chore: update manifests for v2.2.3-Beta.4
-
-## [2.2.3-Beta.4] - 2026-07-04
-
-### Changes
-- style: align experimental and desktop navigation design
-- chore: rebuild firmware archive
-- fix: load firmware archive from manifest
-- chore: update manifests for v2.2.3-Beta.3
-
-## [2.2.3-Beta.3] - 2026-07-04
-
-### Changes
-- merge: newdesign experimental firmware UI
-- feat: add firmware archive rollback
-- i18n: translate experimental design settings
-- refactor: share header navigation items
-- feat: gate new design behind experimental setting
-- feat: add newdesign test layout
-- feat: persist system log and show hostname in chrome tab
-- chore: update manifests for v2.2.3-Beta.2
-
-### Added
-- System log activation now persists across reboots. When enabled, the log buffer is restored early during startup; when disabled, it stays disabled after the next reboot.
-- The configured hostname is now shown in the top navigation and browser tab title for easier identification of multiple HB-RF-ETH-ng devices.
-
-## [2.2.3-Beta.2] - 2026-07-04
-
-### Fixed
-- Added an inline save button next to the administrator username field so changing the login name no longer depends on the floating global save bar.
-
-## [2.2.3-Beta.1] - 2026-07-04
+## [2.2.3] - 2026-07-09
 
 ### Breaking Changes
-- **BREAKING CHANGE**: The WebUI login now requires a username and password. The standard username is `admin`; existing installations must log in once with username `admin` and their existing password after updating. The username can be changed later in Settings.
+- **Login erfordert jetzt Benutzername und Passwort:** Anmeldung mit dem Standard-Benutzernamen `admin` und dem bestehenden Administrator-Passwort. Der Benutzername ist unter *Einstellungen > Allgemein > Sicherheit* frei wählbar (z. B. für Passwortmanager oder Mehrgeräte-Setups). Alte Browser-Sessions verfallen aus Sicherheitsgründen einmalig. Backups enthalten den Benutzernamen (das Passwort wird weiterhin nicht exportiert).
 
 ### Added
-- Added configurable administrator username support for password managers.
-- Backup/restore now includes the administrator username while continuing to exclude the administrator password for security.
-- Dashboard now shows the configured hostname prominently in the system status header.
+- **WebUI NewDesign (experimentell):** umschaltbare emerald-grüne Industriepalette (Light + Dark) neben dem klassischen Glass-UI. Aktive Navigationspunkte als grüne Balken mit weißer Schrift/Icon, flache 4px-Kartenradien, korrekte Dark-Mode-Sidebar (`#24272B`) und Top-Bar (`#25282C`). Token-basiert (keine hartcodierten Farben in Komponenten).
+- **Neues Marken-Logo:** dreiblättriges Symbol mit festem Gradient (`#D96A5A → #EAA08E`) als Inline-SVG, verwendet in Sidebar, Top-Bar, Mobile-Panel und Login-Seite. Neues Favicon + PWA-Icon, Cache-Busting für das Favicon nach Firmware-Update. `docs/WEBUI_DESIGN_SYSTEM.md` als verbindliche Design-Spezifikation.
+- **Monitoring & Benachrichtigungen (Phasen A–E):**
+  - Prometheus `/metrics`-Exporter (Port 9100, Quell-IP-Allowlist, lock-freie Zähler).
+  - Syslog-Forwarding nach RFC 5424 (UDP/TCP/TLS, severity-gefiltert).
+  - WebSocket Live-Log-Stream (`GET /api/log/stream`, bis zu 4 parallele Tabs, ersetzt 5s-Polling).
+  - Event-Benachrichtigungen (Webhook / Telegram Bot / SMTP) für `eth_link_up/down`, `rf_module_detected`, `ota_started/succeeded/failed`, `mqtt_disconnected/reconnected`; pro-Event-Cooldown; Liefer-Metriken.
+  - Fünf dynamische Status-Chips im Monitoring-Hero (MQTT, CheckMK, Prometheus, Syslog, Benachrichtigungen) mit Aktiv-Highlight.
+- **Supporter-Key mit Sperrsystem (CRL):** Supporter-Keys mit revocation list (SHA-256-Fingerabdrücke via PSA Crypto), Dashboard-Badge, On-Demand-Changelog. CRL-Refresh-Task läuft nur, wenn ein Key konfiguriert ist.
+- **Firmware-Archiv aus Flash:** `archive.json` ist in die Firmware eingebettet und wird über `/api/firmware_archive` sofort aus dem Flash serviert (offline, kein TLS/GitHub-Roundtrip). Die Liste lädt beim Öffnen der Firmware-Seite sofort, GitHub ist nur noch Fallback.
+- **PWA:** WebUI als Progressive Web App installierbar (Manifest, theme-color, apple-touch-icon).
+- **Test-Design-Toggle persistent:** Geräteweit (survives Reboots, browserübergreifend) über silent POST in die NVS.
+- **Dashboard-Verbesserungen:** Hostname in Titel/Tab, breitere Info-Karten (`minmax(360px)`), Status-Chips ohne Zeilenumbruch, Mobile-Action-Buttons im dunklen Charcoal-Stil.
+
+### Fixed
+- **OTA braucht zwei Klicks:** nach einem fehlgeschlagenen OTA werden die zuvor gestoppten Hintergrund-Tasks (CRL-Refresh + UpdateCheck) auf dem Fehlerpfad wieder gestartet, sodass ein Retry nicht mehr durch den zusätzlich freigewordenen Heap bevorteilt wird. Betrifft WebUI- und MQTT-OTA-Pfade.
+- **OTA-Redirect/Heap-OOM:** interner 3-fach-Retry für `esp_https_ota_begin` (GitHub-302 → zweiter TLS-Handshake → transienter Heap-OOM auf dem WROOM-32), Rollback-Schutz bei Socket-Erschöpfung.
+- **CRL-Task-Stack-Overflow** bei Uptime 60s behoben (Stack 4 KB → 8 KB).
+- **Boot-Race:** UpdateCheck-Hintergrundtask startet jetzt erst nach `monitoring_init()` (teilt sich den HTTPS-Fetch-Mutex), schließt die Lücke wo der erste Manifest-Fetch einen CRL/MQTT-Fetch überlappte und den TLS-Heap erschöpfte.
+- **Dark-Mode NewDesign:** Sidebar/Top-Bar-Token in den `.newdesign-shell`-Scope gespiegelt (Body-Scope wurde von `:root`-Light überdeckt).
+- **WebUI Layout:** Ethernet-Status-Chip („100 Mbit/s · Full") bricht nicht mehr um; lange Werte (IPs, Seriennummern, MACs) werden nicht mehr abgeschnitten.
+
+### Security
+- Auth-Token in sessionStorage (statt localStorage).
+- Timing-sicherer `secure_strcmp` für Credentials.
+- cJSON-Typ-Validierung, URI-Handler-Limits, 32-Zeichen-Credentials, Überlängen-Prüfung für OTA-URLs.
+- Ethernet DNS-Cache mit Mutex + Initialisierung, MQTT-Lebenszyklus serialisiert.
+
+### Changed
+- WiFi dauerhaft deaktiviert (~30 KB RAM zurückgewonnen), da das Gerät über Ethernet läuft.
+- `update_headers.py` scannt jetzt `main/` (statt `src/`).
+- i18n: Übersetzungen in 10 Sprachen, dynamische Locale-Erkennung, fehlende Keys ergänzt.
+- Build/CI: Vite 8.1.3, Dependabot-Bumps (actions/setup-node 6, actions/labeler 6, github/codeql-action 4).
+- Mobile-Action-Buttons (Restart/Logout/Login) einheitlich dunkel mit weißer Schrift im NewDesign.
 
 ## [2.2.2] - 2026-07-04
 

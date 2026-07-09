@@ -10,8 +10,15 @@
         <p class="hero-subtitle">{{ t('monitoring.description') }}</p>
       </div>
       <div class="hero-meta">
-        <span class="meta-chip"><AppIcon name="activity" /> {{ t('monitoring.chipLabelMqtt') }}</span>
-        <span class="meta-chip"><AppIcon name="logs" /> {{ t('monitoring.chipLabelCheckmk') }}</span>
+        <span
+          v-for="service in monitoringChips"
+          :key="service.key"
+          class="meta-chip"
+          :class="{ active: service.active }"
+        >
+          <AppIcon :name="service.icon" />
+          {{ service.label }}
+        </span>
       </div>
     </section>
 
@@ -655,6 +662,17 @@ const activeMonitoringServiceCount = computed(() => [
   syslogConfig.value.enabled,
   notifyConfig.value.enabled && Number(notifyConfig.value.channels || 0) !== 0
 ].filter(Boolean).length)
+
+// Hero status chips — one per monitoring service, highlighted when active.
+// Keeps the hero consistent with the five config cards below instead of only
+// surfacing MQTT + CheckMK.
+const monitoringChips = computed(() => [
+  { key: 'mqtt', label: t('monitoring.chipLabelMqtt'), icon: 'activity', active: mqttConfig.value.enabled },
+  { key: 'checkmk', label: t('monitoring.chipLabelCheckmk'), icon: 'logs', active: checkmkConfig.value.enabled },
+  { key: 'prometheus', label: t('monitoring.chipLabelPrometheus'), icon: 'activity', active: prometheusConfig.value.enabled },
+  { key: 'syslog', label: t('monitoring.chipLabelSyslog'), icon: 'logs', active: syslogConfig.value.enabled },
+  { key: 'notify', label: t('monitoring.chipLabelNotify'), icon: 'activity', active: notifyConfig.value.enabled && Number(notifyConfig.value.channels || 0) !== 0 }
+])
 
 const showResourceWarning = computed(() => activeMonitoringServiceCount.value >= 4)
 

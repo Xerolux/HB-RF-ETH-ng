@@ -1377,6 +1377,16 @@ body.newdesign-active .newdesign-shell .current-badge {
   color: var(--color-success) !important;
 }
 
+/* Monitoring hero status chips: active services get the success-green tint so
+   the user sees at a glance which monitors are running. Inactive ones keep the
+   neutral soft-panel style. */
+body.newdesign-active .newdesign-shell .meta-chip.active {
+  background: var(--color-success-soft) !important;
+  border-color: var(--newdesign-hover-border) !important;
+  color: var(--color-success) !important;
+  font-weight: 700;
+}
+
 /* ---- Tabs & toolbars ---- */
 body.newdesign-active .newdesign-shell .tabs-container,
 body.newdesign-active .newdesign-shell .archive-toolbar,
