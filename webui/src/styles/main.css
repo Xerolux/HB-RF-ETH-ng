@@ -1546,7 +1546,6 @@ body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled) {
 }
 
 body.newdesign-active .newdesign-shell .btn-primary,
-body.newdesign-active .newdesign-shell .btn-load-file,
 body.newdesign-active .newdesign-shell .save-btn,
 body.newdesign-active .newdesign-shell .security-save-btn,
 body.newdesign-active .newdesign-shell .submit-btn,
@@ -1557,7 +1556,6 @@ body.newdesign-active .newdesign-shell .archive-install-btn {
 }
 
 body.newdesign-active .newdesign-shell .btn-primary:hover:not(:disabled),
-body.newdesign-active .newdesign-shell .btn-load-file:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .security-save-btn:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .submit-btn:hover:not(:disabled),
@@ -1568,7 +1566,8 @@ body.newdesign-active .newdesign-shell .archive-install-btn:hover:not(:disabled)
 
 body.newdesign-active .newdesign-shell .btn-secondary,
 body.newdesign-active .newdesign-shell .discard-btn,
-body.newdesign-active .newdesign-shell .cancel-btn {
+body.newdesign-active .newdesign-shell .cancel-btn,
+body.newdesign-active .newdesign-shell .btn-load-file {
   border-color: var(--newdesign-border) !important;
   background: var(--newdesign-panel-soft) !important;
   color: var(--color-text) !important;

@@ -171,11 +171,11 @@ const libs = ref([
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: var(--color-primary);
   color: white;
   padding: var(--spacing-sm) var(--spacing-lg);
   border-radius: var(--radius-full);
-  font-weight: 600;
+  font-weight: 700;
   width: fit-content;
   max-width: 100%;
   flex-wrap: wrap;

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Login erfordert jetzt Benutzername und Passwort:** Anmeldung mit dem Standard-Benutzernamen `admin` und dem bestehenden Administrator-Passwort. Der Benutzername ist unter *Einstellungen > Allgemein > Sicherheit* frei wählbar (z. B. für Passwortmanager oder Mehrgeräte-Setups). Alte Browser-Sessions verfallen aus Sicherheitsgründen einmalig. Backups enthalten den Benutzernamen (das Passwort wird weiterhin nicht exportiert).
 
 ### Added
+- **Passwort vergessen / Reset-Funktion:** über „Passwort vergessen?" auf der Login-Seite kann ein Einmal-Token generiert und per Status-Abfrage validiert werden (`/api/password-reset/start|status|complete`), mit dem ein vergessenes Administrator-Passwort direkt zurückgesetzt werden kann — kein Flashen mehr nötig.
+- **Neustart-Funktion mit Countdown-Overlay:** Neustart direkt aus der WebUI (Firmware-Seite + Mobile-Menü) mit Vollbild-Countdown, optionalem Flash-Pause-Sync und automatischem Reload. Bestätigungsdialog verhindert versehentliche Neustarts.
+- **Light/Dark-Theme-Toggle:** manuelle Umschaltung zwischen hellem und dunklem Theme in der Top-Bar (Sonne/Mond-Icon), persistent gespeichert.
 - **WebUI NewDesign (experimentell):** umschaltbare emerald-grüne Industriepalette (Light + Dark) neben dem klassischen Glass-UI. Aktive Navigationspunkte als grüne Balken mit weißer Schrift/Icon, flache 4px-Kartenradien, korrekte Dark-Mode-Sidebar (`#24272B`) und Top-Bar (`#25282C`). Token-basiert (keine hartcodierten Farben in Komponenten).
 - **Neues Marken-Logo:** dreiblättriges Symbol mit festem Gradient (`#D96A5A → #EAA08E`) als Inline-SVG, verwendet in Sidebar, Top-Bar, Mobile-Panel und Login-Seite. Neues Favicon + PWA-Icon, Cache-Busting für das Favicon nach Firmware-Update. `docs/WEBUI_DESIGN_SYSTEM.md` als verbindliche Design-Spezifikation.
 - **Monitoring & Benachrichtigungen (Phasen A–E):**
