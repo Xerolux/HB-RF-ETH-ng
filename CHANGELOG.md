@@ -7,10 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.34] - 2026-07-09
+
+### Changes
+- feat(webui): NewDesign theme gets its own emerald-green industrial palette (Light + Dark) — Glass UI stays orange. Primary accent `#2F8B57`, proper sidebar/header backgrounds, flat 4px card radii, minimal shadows. Active nav items are full green rectangles with white text/icons.
+- feat(webui): new brand logo (three-leaf mark, fixed gradient `#D96A5A → #EAA08E`) inline-SVG component, used in sidebar, top bar, mobile panel and login page. Also replaced favicon.ico + icon-256.png (PWA/tab icon) and aligned manifest `theme_color` + `theme-color` meta to the brand.
+- feat(webui): mobile panel action buttons (Restart/Logout/Login) are now dark charcoal fills with white text, matching the industrial-dashboard reference. Active mobile nav links and locale buttons are green.
+- fix(ota): after a failed OTA the stopped background tasks (CRL refresh + UpdateCheck) are now restarted on the failure path, so a retry is no longer silently biased toward success by the extra heap freed by their absence. Fixes the "OTA needs two clicks" symptom on the WebUI and MQTT OTA paths.
+- feat(webui): firmware archive list now loads immediately on page open from the embedded `/api/firmware_archive` (served from flash, instant, offline) instead of requiring a manual refresh. The live GitHub URL is fallback only.
+- docs: added `docs/WEBUI_DESIGN_SYSTEM.md` as the normative design specification (two-theme system, palettes, tokens, contribution rules). Linked from CLAUDE.md and README so every contributor reads it first.
+
 ## [2.2.3-Beta.33] - 2026-07-08
 
 ### Changes
-- chore(webui): revert the new-design dark-mode palette to the Beta.28 bluish tones (background #111722, panels #182131, panel-soft #121a27, borders rgba(148,163,184,...), text-soft #a8b3c5). The neutral-grey SMLIGHT-aligned scheme from Beta.29–32 was harder to read in the dark; the previous blue-tinted scheme is restored. Light mode is unchanged.
+- chore(webui): revert the new-design dark-mode palette to the Beta.28 bluish tones (background #111722, panels #182131, panel-soft #121a27, borders rgba(148,163,184,...), text-soft #a8b3c5). The neutral-grey scheme from Beta.29–32 was harder to read in the dark; the previous blue-tinted scheme is restored. Light mode is unchanged.
 
 ## [2.2.3-Beta.32] - 2026-07-08
 

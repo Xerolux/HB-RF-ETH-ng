@@ -3,7 +3,7 @@
     <div class="login-container">
       <div class="login-card glass-panel">
         <div class="brand-section">
-          <span class="brand-logo"><AppIcon name="router" /></span>
+          <span class="brand-logo"><BrandLogo :size="56" /></span>
           <h1 class="brand-name">HB-RF-ETH-ng</h1>
         </div>
 
@@ -161,6 +161,7 @@ import { useVuelidate } from '@vuelidate/core'
 import { required } from '@vuelidate/validators'
 import axios from 'axios'
 import { useLoginStore, useSysInfoStore } from './stores.js'
+import BrandLogo from './components/BrandLogo.vue'
 
 const { t } = useI18n()
 
@@ -362,11 +363,6 @@ const loginClick = async () => {
   width: 64px;
   height: 64px;
   margin: 0 auto 10px;
-  border-radius: var(--radius-lg);
-  color: white;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
-  box-shadow: var(--shadow-md);
-  font-size: 1.8rem;
 }
 
 .brand-name {

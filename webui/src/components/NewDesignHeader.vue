@@ -24,9 +24,7 @@
 
     <aside class="desktop-sidebar">
       <router-link to="/" class="brand" @click="closeMobileMenu">
-        <span class="brand-orbit" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
+        <BrandLogo :size="48" />
         <span class="brand-copy">
           <strong>HB-RF-ETH-ng</strong>
           <small>{{ deviceName }}</small>
@@ -93,9 +91,7 @@
 
     <nav class="header-nav">
       <router-link to="/" class="mobile-brand" @click="closeMobileMenu">
-        <span class="brand-orbit small" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </span>
+        <BrandLogo :size="34" />
         <span class="mobile-title">{{ deviceName }}</span>
       </router-link>
 
@@ -246,6 +242,7 @@ import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 import { safeLocal } from '../composables/useSafeStorage'
 import { setBodyScrollLock } from '../composables/useBodyScrollLock'
 import { useDismissable } from '../composables/useDismissable'
+import BrandLogo from './BrandLogo.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -452,8 +449,8 @@ onUnmounted(() => {
   gap: 18px;
   padding: 0 24px;
   color: var(--color-text);
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--newdesign-header, var(--color-surface));
+  border-bottom: 1px solid var(--newdesign-border, var(--color-border));
   pointer-events: auto;
   min-width: 0;
 }
@@ -466,47 +463,6 @@ onUnmounted(() => {
   color: var(--color-text);
   text-decoration: none;
   min-width: 0;
-}
-
-.brand-orbit {
-  position: relative;
-  width: 52px;
-  height: 52px;
-  flex: 0 0 auto;
-  display: inline-flex;
-}
-
-.brand-orbit.small {
-  width: 34px;
-  height: 34px;
-}
-
-.brand-orbit span {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: rgba(242, 106, 61, 0.72);
-}
-
-.brand-orbit.small span {
-  width: 20px;
-  height: 20px;
-}
-
-.brand-orbit span:nth-child(1) {
-  left: 3px;
-  top: 5px;
-}
-
-.brand-orbit span:nth-child(2) {
-  right: 4px;
-  top: 5px;
-}
-
-.brand-orbit span:nth-child(3) {
-  left: 12px;
-  bottom: 2px;
 }
 
 .brand-copy {
@@ -580,10 +536,10 @@ onUnmounted(() => {
 }
 
 .nav-item.active {
-  color: var(--color-primary-strong);
-  background: var(--color-primary-soft);
-  border-color: rgba(242, 106, 61, 0.28);
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  color: #fff;
+  background: var(--color-primary);
+  border-color: transparent;
+  border-radius: 6px;
 }
 
 .nav-item .app-icon {
@@ -847,14 +803,14 @@ onUnmounted(() => {
 
 .supporter-chip.active {
   color: #fff;
-  background: linear-gradient(135deg, #f26a3d 0%, #f59e0b 100%);
+  background: var(--color-primary);
   border-color: transparent;
-  box-shadow: 0 4px 12px rgba(242, 106, 61, 0.32);
+  box-shadow: 0 4px 12px var(--newdesign-primary-soft);
 }
 
 .supporter-chip.active:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(242, 106, 61, 0.42);
+  box-shadow: 0 6px 16px var(--newdesign-primary-soft);
 }
 
 .supporter-chip.inactive {
@@ -864,7 +820,7 @@ onUnmounted(() => {
 
 .supporter-chip.inactive:hover {
   color: var(--color-primary-strong);
-  border-color: rgba(242, 106, 61, 0.32);
+  border-color: var(--newdesign-hover-border);
   background: var(--color-primary-soft);
 }
 
@@ -960,7 +916,8 @@ onUnmounted(() => {
 
 .mobile-link.router-link-active {
   background: var(--color-primary);
-  color: white;
+  color: #fff;
+  border-radius: var(--newdesign-radius-button, 6px);
 }
 
 .mobile-section-title {
@@ -995,7 +952,8 @@ onUnmounted(() => {
 
 .mobile-locale.active {
   background: var(--color-primary);
-  color: white;
+  color: #fff;
+  border-radius: var(--newdesign-radius-button, 6px);
 }
 
 .mobile-auth,
@@ -1006,6 +964,40 @@ onUnmounted(() => {
 
 .mobile-logout {
   color: var(--color-danger);
+}
+
+/* Mobile action buttons (Restart / Logout / Login): dark charcoal fills with
+   white text, matching the industrial-dashboard reference. Overlays the outline
+   style defined further up. The green-restart tint and the red-logout tint are
+   dropped here so all three read as a consistent dark action row. */
+.mobile-restart,
+.mobile-logout,
+.mobile-auth {
+  border: 1px solid var(--newdesign-border-strong, #d2d4d7) !important;
+  border-radius: var(--newdesign-radius-button, 4px) !important;
+  background: #3a3f45 !important;
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: none !important;
+}
+
+.mobile-restart:hover:not(:disabled),
+.mobile-logout:hover,
+.mobile-auth:hover {
+  background: #2c2f33 !important;
+}
+
+.mobile-restart:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Dark mode: action buttons are nearly black per the dark-theme spec. */
+:global([data-bs-theme="dark"]) .mobile-restart,
+:global([data-bs-theme="dark"]) .mobile-logout,
+:global([data-bs-theme="dark"]) .mobile-auth {
+  background: #1a1c1f !important;
+  border-color: #474c51 !important;
 }
 
 .dropdown-fade-enter-active,

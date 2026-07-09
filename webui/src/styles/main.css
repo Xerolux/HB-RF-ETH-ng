@@ -922,14 +922,18 @@ textarea {
    selectors never reached teleported content.
    ============================================================ */
 
-/* ---- Theme tokens ---- */
+/* ---- Theme tokens ----
+   The new-design theme carries its own palette (emerald-green industrial
+   dashboard) that intentionally differs from the orange Glass UI brand. It is
+   defined entirely here, scoped to body.newdesign-active, so the default Glass
+   theme (orange --color-primary from :root) stays untouched. */
 body.newdesign-active {
-  background: #f5f7fb;
+  background: #f6f7f8;
 }
 
 [data-bs-theme="dark"] body.newdesign-active,
 body.newdesign-active[data-bs-theme="dark"] {
-  background: #111722;
+  background: #2e3136;
 }
 
 /* New-design tokens are declared on body.newdesign-active (NOT just on
@@ -938,9 +942,8 @@ body.newdesign-active[data-bs-theme="dark"] {
    can also resolve --newdesign-*. .newdesign-shell below repeats the same
    declarations for backwards compatibility with rules that read them there. */
 body.newdesign-active {
-  /* Semantic radii tuned to the SMLIGHT-style compact aesthetic: small,
-     tight corners rather than the old 22-30px glass curves. */
-  --newdesign-radius-card: 8px;
+  /* Semantic radii tuned to the compact flat aesthetic: small, tight corners. */
+  --newdesign-radius-card: 4px;
   --newdesign-radius-input: 4px;
   --newdesign-radius-chip: 4px;
   --newdesign-radius-button: 4px;
@@ -950,22 +953,43 @@ body.newdesign-active {
   --radius-xl: 10px;
   --radius-pill: 999px;
   --radius-full: 999px;
-  --newdesign-panel: #ffffff;
-  --newdesign-panel-soft: #f8fafc;
-  --newdesign-border: #dbe3ee;
-  --newdesign-border-strong: #c7d2e1;
-  --newdesign-text-soft: #667085;
-  --newdesign-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  --newdesign-shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
-  /* Brand accent, kept orange (HB-RF-ETH identity) but unified into a single
-     source of truth instead of ~10 hardcoded rgba(242,106,61,…) copies. The
-     --color-primary* tokens are defined in :root above; these aliases make the
-     new-design rules read with intent (focus ring, soft tint, hover border…). */
+
+  /* Surfaces (Light Mode) */
+  --newdesign-panel: #ffffff;            /* cards / sidebar / header */
+  --newdesign-panel-soft: #ecedee;       /* dividers / soft fills */
+  --newdesign-border: #e3e5e7;           /* 1px card borders */
+  --newdesign-border-strong: #d2d4d7;
+  --newdesign-text-soft: #666666;        /* secondary text */
+  --newdesign-sidebar: #ffffff;
+  --newdesign-header: #ffffff;
+  --newdesign-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --newdesign-shadow-lg: 0 10px 24px rgba(15, 23, 42, 0.08);
+
+  /* Emerald-green primary accent — overrides the orange --color-primary* for
+     everything rendered inside the new-design scope. */
+  --color-primary: #2f8b57;
+  --color-primary-hover: #3b9962;
+  --color-primary-soft: rgba(47, 139, 87, 0.12);
+  --color-primary-light: rgba(47, 139, 87, 0.12);
+  --color-primary-strong: #246b43;
+  --color-primary-dark: #246b43;
+  --color-success: #43a047;
+  --color-success-soft: rgba(67, 160, 71, 0.14);
+  --color-success-light: rgba(67, 160, 71, 0.14);
+
   --newdesign-primary: var(--color-primary);
   --newdesign-primary-soft: var(--color-primary-soft);
   --newdesign-primary-strong: var(--color-primary-strong);
   --newdesign-focus-ring: 0 0 0 3px var(--color-primary-soft);
-  --newdesign-hover-border: rgba(242, 106, 61, 0.25);
+  --newdesign-hover-border: rgba(47, 139, 87, 0.25);
+
+  /* Sidebar token referenced by NewDesignHeader (previously undefined). */
+  --color-sidebar: var(--newdesign-sidebar);
+  --color-bg: #f6f7f8;
+  --color-bg-alt: #f6f7f8;
+  --color-text: #222222;
+  --color-text-secondary: #666666;
+  --color-text-muted: #999999;
 }
 
 body.newdesign-active .newdesign-shell {
@@ -976,12 +1000,12 @@ body.newdesign-active .newdesign-shell {
   --radius-pill: 999px;
   --radius-full: 999px;
   --newdesign-panel: #ffffff;
-  --newdesign-panel-soft: #f8fafc;
-  --newdesign-border: #dbe3ee;
-  --newdesign-border-strong: #c7d2e1;
-  --newdesign-text-soft: #667085;
-  --newdesign-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  --newdesign-shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
+  --newdesign-panel-soft: #ecedee;
+  --newdesign-border: #e3e5e7;
+  --newdesign-border-strong: #d2d4d7;
+  --newdesign-text-soft: #666666;
+  --newdesign-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --newdesign-shadow-lg: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
 body.newdesign-active:has(.update-banner) .newdesign-shell .main-content {
@@ -996,26 +1020,45 @@ body.newdesign-active:has(.update-banner) .newdesign-shell .main-content {
 
 [data-bs-theme="dark"] body.newdesign-active .newdesign-shell,
 body.newdesign-active[data-bs-theme="dark"] .newdesign-shell {
-  --newdesign-panel: #182131;
-  --newdesign-panel-soft: #121a27;
-  --newdesign-border: rgba(148, 163, 184, 0.22);
-  --newdesign-border-strong: rgba(148, 163, 184, 0.34);
-  --newdesign-text-soft: #a8b3c5;
-  --newdesign-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
-  --newdesign-shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --newdesign-panel: #2c2f33;            /* cards */
+  --newdesign-panel-soft: #3a3f45;       /* dividers / soft fills */
+  --newdesign-border: #474c51;           /* card border */
+  --newdesign-border-strong: #565c62;
+  --newdesign-text-soft: #c5c8cc;        /* secondary text */
+  --newdesign-sidebar: #24272b;
+  --newdesign-header: #25282c;
+  --newdesign-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --newdesign-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* Mirror the dark tokens to body.newdesign-active (without .newdesign-shell)
    so bare-layout pages (login) also resolve them in dark mode. */
 [data-bs-theme="dark"] body.newdesign-active,
 body.newdesign-active[data-bs-theme="dark"] {
-  --newdesign-panel: #182131;
-  --newdesign-panel-soft: #121a27;
-  --newdesign-border: rgba(148, 163, 184, 0.22);
-  --newdesign-border-strong: rgba(148, 163, 184, 0.34);
-  --newdesign-text-soft: #a8b3c5;
-  --newdesign-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
-  --newdesign-shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --newdesign-panel: #2c2f33;
+  --newdesign-panel-soft: #3a3f45;
+  --newdesign-border: #474c51;
+  --newdesign-border-strong: #565c62;
+  --newdesign-text-soft: #c5c8cc;
+  --newdesign-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --newdesign-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.5);
+  /* Dark emerald accent + dark surface/text tokens. */
+  --color-primary: #2f8b57;
+  --color-primary-hover: #3d9966;
+  --color-primary-soft: rgba(47, 139, 87, 0.18);
+  --color-primary-light: rgba(47, 139, 87, 0.18);
+  --color-primary-strong: #3d9966;
+  --color-primary-dark: #3d9966;
+  --color-success: #55c271;
+  --color-success-soft: rgba(85, 194, 113, 0.16);
+  --color-success-light: rgba(85, 194, 113, 0.16);
+  --newdesign-hover-border: rgba(47, 139, 87, 0.4);
+  --color-sidebar: var(--newdesign-sidebar);
+  --color-bg: #2e3136;
+  --color-bg-alt: #2e3136;
+  --color-text: #f2f2f2;
+  --color-text-secondary: #c5c8cc;
+  --color-text-muted: #90959c;
 }
 
 /* Shared panel base used by many surfaces */
@@ -1488,8 +1531,8 @@ body.newdesign-active .newdesign-shell .form-switch .form-check-input:checked {
 }
 
 body.newdesign-active .newdesign-shell .form-check-input:focus {
-  border-color: rgba(242, 106, 61, 0.5) !important;
-  box-shadow: 0 0 0 3px rgba(242, 106, 61, 0.12) !important;
+  border-color: var(--newdesign-hover-border) !important;
+  box-shadow: var(--newdesign-focus-ring) !important;
 }
 
 body.newdesign-active .newdesign-shell .chip-btn {
@@ -1787,7 +1830,7 @@ body.newdesign-active .newdesign-shell.auth-screen,
 body.newdesign-active.bare-layout {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 14% 12%, rgba(242, 106, 61, 0.14), transparent 28%),
+    radial-gradient(circle at 14% 12%, rgba(47, 139, 87, 0.14), transparent 28%),
     radial-gradient(circle at 86% 18%, rgba(15, 23, 42, 0.08), transparent 30%),
     var(--color-bg);
 }

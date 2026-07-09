@@ -707,6 +707,17 @@ void UpdateCheck::performOnlineUpdate()
         }
         if (resume_monitoring) {
             monitoring_resume_after_ota(paused_monitoring);
+            // Restart the tasks stopped before the download so a retry is not
+            // silently biased toward success by the heap freed by their
+            // absence (see prepare_ota_heap() equivalent above). The success
+            // path ends in a full restart, so this only runs on failure.
+            start();
+            if (_settings) {
+                const char *sk = _settings->getSupporterKey();
+                if (sk && sk[0] != '\0') {
+                    supporter_crl_start_refresh_task();
+                }
+            }
         }
         finishOtaOperation();
     };

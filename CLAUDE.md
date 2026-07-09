@@ -15,6 +15,16 @@
 >
 > (Diese Sperre wird mit dem ersten `v2.x.0` Stable-Tag wieder aufgehoben.)
 >
+> ## 🎨 WebUI Design — BINDEND
+>
+> Vor **jeder** Styling-Änderung an `webui/src/styles/main.css` oder einer
+> `.vue`-Komponente **MUSS** [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md)
+> gelesen werden. Dieses Dokument ist die normative Spezifikation (Palmen,
+> Tokens, Zwei-Theme-System, Brand-Logo-Regeln) und hat Vorrang vor Code-Kommentaren.
+> Stichpunkte: Glass-UI = Orange (`:root`), NewDesign = Emerald-Grün
+> (`body.newdesign-active`), Brand-Logo = fixer Gradient `#D96A5A→#EAA08E`
+> (niemals an Theme-Token binden), keine Konkurrenten-Namen im Code.
+>
 
 ## Project Overview
 
@@ -201,6 +211,24 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 ## WebUI Architecture (`webui/src/`)
 
 Built with **Vue.js 3** + **Bootstrap 5** (via `bootstrap-vue-next`) + **Vite**.
+
+> **🎨 Design-Spezifikation:** [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) —
+> verbindlich für alle Styling-Änderungen. Beschreibt das Zwei-Theme-System
+> (Glass-UI = Orange `:root`, NewDesign = Emerald-Grün `body.newdesign-active`),
+> die kompletten Farbpaletten, Tokens und Beitragsregeln.
+
+### Two-Theme System (important for styling changes)
+
+The WebUI ships **two independent design systems**. Never blend them:
+
+- **Glass UI** (default): orange `#f26a3d` accent, defined in `:root` tokens in `main.css`. Header component: `components/header.vue`.
+- **NewDesign** (toggle via `body.newdesign-active`, persisted in `localStorage["hb-rf-eth-ng-test-design"]` + synced to device NVS): emerald-green `#2F8B57` industrial palette, overridden inside the `body.newdesign-active` block in `main.css` (~line 916+). Header component: `components/NewDesignHeader.vue` (only mounted when the toggle is on).
+
+The green palette works by overriding `--color-primary*` and surface/text tokens
+*inside* `body.newdesign-active`, so rules reading `var(--color-primary)` flip
+automatically. **Always prefer tokens over hardcoded hex values** — literals
+belong only in token definitions. See `docs/WEBUI_DESIGN_SYSTEM.md` for the
+full normative spec.
 
 | File/Dir | Purpose |
 |----------|---------|
@@ -449,4 +477,6 @@ python3 rename_webui_files.py
 | `sdkconfig.hb-rf-eth-ng` | ESP-IDF kernel/driver configuration |
 | `partitions.csv` | Flash layout — change with extreme caution |
 | `version.txt` | Single source of truth for version string |
+| `docs/WEBUI_DESIGN_SYSTEM.md` | **Normative** WebUI design spec — read before any styling change |
+| `webui/src/styles/main.css` | Glass-UI tokens (`:root`) + NewDesign overrides (`body.newdesign-active` ~line 916) |
 | `webui/package.json` | Frontend dependency versions (no PlatformIO involved) |

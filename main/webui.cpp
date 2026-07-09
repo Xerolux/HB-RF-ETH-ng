@@ -1649,6 +1649,31 @@ static uint32_t prepare_ota_heap()
     return paused_monitoring;
 }
 
+// Resume tasks stopped by prepare_ota_heap() after an OTA failure. The success
+// path ends in a full system restart, so this only matters on failure. Without
+// it the CRL + UpdateCheck tasks stay dead after the first failed attempt,
+// leaving the device with more free heap than before — which is exactly the
+// asymmetry that makes a second "Install" click succeed where the first one
+// failed. Restarting them restores the pre-OTA heap layout so retries are not
+// silently biased. Mirrors the same gating used at boot (main.cpp) and on
+// supporter-key save: the CRL task only runs when a key is configured.
+static void resume_tasks_after_ota_failure()
+{
+    if (_updateCheck) {
+        _updateCheck->start();
+        ESP_LOGI(TAG, "UpdateCheck task resumed after OTA failure (free heap %u KB)",
+                 (unsigned)(esp_get_free_heap_size() / 1024));
+    }
+    if (_settings) {
+        const char *sk = _settings->getSupporterKey();
+        if (sk && sk[0] != '\0') {
+            supporter_crl_start_refresh_task();
+            ESP_LOGI(TAG, "CRL refresh task resumed after OTA failure (free heap %u KB)",
+                     (unsigned)(esp_get_free_heap_size() / 1024));
+        }
+    }
+}
+
 // OTA update from URL handler
 static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
 {
@@ -1818,6 +1843,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             net_fetch_set_ota_active(false);
             if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
             monitoring_resume_after_ota(paused_monitoring);
+            resume_tasks_after_ota_failure();
             free(a->url);
             delete a;
             _updateCheck->finishOtaOperation();
@@ -1881,6 +1907,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             net_fetch_set_ota_active(false);
             if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
             monitoring_resume_after_ota(paused_monitoring);
+            resume_tasks_after_ota_failure();
             free(a->url);
             delete a;
             _updateCheck->finishOtaOperation();

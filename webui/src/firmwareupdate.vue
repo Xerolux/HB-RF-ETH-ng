@@ -400,12 +400,13 @@ const firmwareArchive = ref([])
 const archiveInstallingVersion = ref('')
 const selectedArchiveVersion = ref('')
 
-// Load the archive directly in the browser first. The device-side proxy needs
-// an additional HTTPS/TLS client and task stack on the ESP32; on systems that
-// already run MQTT and other monitoring services this can temporarily exhaust
-// heap and show up as 500 errors while opening/searching the archive.
-const ARCHIVE_MANIFEST_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
-const ARCHIVE_MANIFEST_FALLBACK_URL = '/api/firmware_archive'
+// The firmware embeds archive.json (gzipped) in flash and serves it via
+// /api/firmware_archive — instant, offline, no TLS/heap cost. That is the
+// primary source. The live GitHub raw URL is only a fallback for when a newer
+// release was published after the running firmware was built (the embedded copy
+// is frozen at build time).
+const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
+const ARCHIVE_MANIFEST_FALLBACK_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
 const ARCHIVE_CACHE_KEY = 'hb-rf-eth-ng-firmware-archive-cache-v1'
 const ARCHIVE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -637,9 +638,8 @@ const loadArchiveManifest = async () => {
     return { releases, fromCache: false }
   } catch (primaryError) {
     lastError = primaryError
-    // Fall back to the device-side proxy for networks/browsers that cannot
-    // reach raw.githubusercontent.com directly. This keeps the archive usable
-    // without making the ESP32 proxy the common path.
+    // Fall back to the live GitHub raw URL. The embedded copy is frozen at
+    // firmware build time, so only GitHub has releases published afterwards.
     try {
       const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
       const releases = parseArchiveManifest(response.data)
@@ -960,11 +960,12 @@ onMounted(async () => {
     console.warn('Initial cached update read failed:', e.response?.status || e.message)
   }
   syncArchiveFilterWithUpdateChannel()
-  // Do not load the archive automatically when opening the Firmware page.
-  // The archive may need an external HTTPS request (browser direct, then ESP32
-  // proxy fallback) and users reported UI freezes / high device CPU load when
-  // this work was started just by visiting the page. Keep normal update status
-  // cheap and only fetch the archive after the explicit "Refresh list" action.
+  // Load the archive immediately on page open. Since archive.json is embedded
+  // in the firmware flash and served from /api/firmware_archive, this is an
+  // instant local read — no GitHub round-trip, no TLS heap cost on the ESP32,
+  // no UI freeze. The "Refresh list" button remains for fetching the live
+  // GitHub copy (which may contain versions newer than the embedded one).
+  await loadFirmwareArchive()
   // Periodically re-read the cache while the page is open so the
   // "last check" indicator and download URL stay fresh (cached read only,
   // no GitHub call).

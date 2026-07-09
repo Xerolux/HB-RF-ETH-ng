@@ -66,6 +66,8 @@ python3 rename_webui_files.py
 ./idf.py build
 ```
 
+> Vor jeder Styling-Änderung an der WebUI bitte [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) lesen — die verbindliche Design-Spezifikation (Zwei-Theme-System, Farbpaletten, Tokens).
+
 ### Update- und Release-Hinweise
 - Die WebUI prüft neue Versionen standardmäßig über den gehosteten Update-Dienst unter `https://xerolux.de/firmware/HB-RF-ETH-ng/`.
 - Releases auf GitHub bleiben die zentrale Quelle für Release Notes, Artefakte und Historie.
