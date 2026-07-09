@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "updatedAt": "2026-07-09T08:10:56Z",
+  "updatedAt": "2026-07-09T08:32:40Z",
   "releases": [
     {
       "version": "2.2.3",
       "channel": "stable",
       "isPrerelease": false,
-      "publishedAt": "2026-07-09T08:10:56Z",
+      "publishedAt": "2026-07-09T08:32:40Z",
       "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.3/firmware_2.2.3.bin",
-      "sha256": "bb7a51a0f688958ae96f9ddeccdcda2ba88c57042ba4174ccb4eb8e7651c4ab8",
+      "sha256": "fb5e0f739f6010228a2d455424a696eefbdafab6d5ab1cc793d4628d2908c6fc",
       "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.3",
       "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.3",
       "tagName": "v2.2.3",
