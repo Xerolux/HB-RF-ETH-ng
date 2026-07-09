@@ -35,9 +35,12 @@ function cacheBustingPlugin() {
       let html = readFileSync(indexPath, 'utf8')
 
       // Compute a short content hash for each asset and rewrite its reference.
-      // favicon.ico is left alone (it essentially never changes and is tiny).
-      // icon-256.png serves as any/maskable/apple-touch (single embedded file).
-      for (const file of ['main.js', 'main.css', 'manifest.webmanifest', 'icon-256.png']) {
+      // Cache-bust every embedded asset. favicon.ico used to be skipped, but
+      // a favicon change (new logo) was then stuck behind the browser's
+      // aggressive favicon cache. Busting it too guarantees the new icon is
+      // fetched after a firmware update. icon-256.png serves as
+      // any/maskable/apple-touch (single embedded file).
+      for (const file of ['main.js', 'main.css', 'manifest.webmanifest', 'icon-256.png', 'favicon.ico']) {
         const assetPath = join(outDir, file)
         if (!existsSync(assetPath)) continue
         const buf = readFileSync(assetPath)

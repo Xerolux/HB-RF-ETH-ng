@@ -1029,6 +1029,27 @@ body.newdesign-active[data-bs-theme="dark"] .newdesign-shell {
   --newdesign-header: #25282c;
   --newdesign-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --newdesign-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.5);
+  /* Sidebar/header tokens must resolve here too — the desktop sidebar and top
+     bar live inside #app.newdesign-shell, so a token defined only on the body
+     scope is shadowed. Mirror the overrides the body block declares. */
+  --color-sidebar: var(--newdesign-sidebar);
+  --color-primary: #2f8b57;
+  --color-primary-hover: #3d9966;
+  --color-primary-soft: rgba(47, 139, 87, 0.18);
+  --color-primary-light: rgba(47, 139, 87, 0.18);
+  --color-primary-strong: #3d9966;
+  --color-primary-dark: #3d9966;
+  --color-success: #55c271;
+  --color-success-soft: rgba(85, 194, 113, 0.16);
+  --color-success-light: rgba(85, 194, 113, 0.16);
+  --color-bg: #2e3136;
+  --color-bg-alt: #2e3136;
+  --color-surface: #2c2f33;
+  --color-text: #f2f2f2;
+  --color-text-secondary: #c5c8cc;
+  --color-text-muted: #90959c;
+  --color-border: #474c51;
+  --color-border-strong: #565c62;
 }
 
 /* Mirror the dark tokens to body.newdesign-active (without .newdesign-shell)
@@ -1150,6 +1171,37 @@ body.newdesign-active .newdesign-shell .led-programs-grid,
 body.newdesign-active .newdesign-shell .radio-grid,
 body.newdesign-active .newdesign-shell .system-actions {
   gap: 14px !important;
+}
+
+/* Dashboard info cards: give each card more breathing room so long values
+   (IP addresses, serials, "100 Mbit/s · Full") don't wrap or get clipped.
+   The default 280px min was too tight for the industrial two-column layout. */
+body.newdesign-active .newdesign-shell .info-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)) !important;
+}
+
+/* Status chips must not wrap their text onto a second line (e.g. the Ethernet
+   "100 Mbit/s · Full" status). Keep them on one line; if the card is very
+   narrow the whole chip shrinks but the text stays intact. */
+body.newdesign-active .newdesign-shell .status-chip {
+  white-space: nowrap !important;
+  flex-shrink: 0;
+}
+
+/* kv-value cells: allow long mono values (IPs, serials, MACs) to use the
+   available width without forcing the label to wrap or the value to clip.
+   Keep right-aligned but break long tokens gracefully. */
+body.newdesign-active .newdesign-shell .kv-value,
+body.newdesign-active .newdesign-shell .kv-value.mono {
+  white-space: normal !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+/* copy-value buttons (IPs, serials) should align right and not overflow. */
+body.newdesign-active .newdesign-shell .copy-value {
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 /* ---- Login page (bare layout: standalone full-screen, no app shell) ----

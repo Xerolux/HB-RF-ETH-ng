@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3-Beta.35] - 2026-07-09
+
+### Changes
+- fix(webui): active sidebar nav items now reliably show white text on the green bar. A CSS-specificity collision with the legacy `header.vue` rule (`.nav-item.exact-active`) was overriding the NewDesign active state, leaving the active item as a solid green bar with no readable text. Forced with `!important`.
+- fix(webui): dark mode now colours the sidebar (`#24272B`) and top bar (`#25282C`) correctly. The `--color-sidebar` / `--newdesign-header` / surface / text tokens were only defined on the `body` dark scope, but the desktop sidebar lives inside `#app.newdesign-shell`, where the body-scope tokens were shadowed by the `:root` light defaults. Mirrored the dark tokens into the `.newdesign-shell` dark block.
+- fix(webui): favicon now cache-busts (`favicon.ico?v=<hash>`) after a firmware update, so the new brand icon actually replaces the old one in the browser tab. Previously favicon.ico was deliberately excluded from cache-busting on the assumption it never changes.
+- fix(webui): dashboard info cards (System / Network / Radio) are now wider (`minmax(360px, 1fr)`) so long values don't wrap or clip. Ethernet status chip ("100 Mbit/s · Full") no longer breaks across two lines, and long mono values (IPs, serials, MACs) use the full cell width with graceful word-break instead of being truncated.
+
 ## [2.2.3-Beta.34] - 2026-07-09
 
 ### Changes

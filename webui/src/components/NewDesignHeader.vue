@@ -536,10 +536,16 @@ onUnmounted(() => {
 }
 
 .nav-item.active {
-  color: #fff;
-  background: var(--color-primary);
-  border-color: transparent;
+  color: #fff !important;
+  background: var(--color-primary) !important;
+  border-color: transparent !important;
   border-radius: 6px;
+  box-shadow: none !important;
+}
+
+.nav-item.active .app-icon,
+.nav-item.active span {
+  color: #fff !important;
 }
 
 .nav-item .app-icon {
