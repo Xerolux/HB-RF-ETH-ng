@@ -1,6 +1,6 @@
 {
   "name": "webui",
-  "version": "2.2.4-Beta.1",
+  "version": "2.2.4-Beta.2",
   "description": "WebUI of HB-RF-ETH firmware",
   "scripts": {
     "dev": "vite",
