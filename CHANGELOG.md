@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.4-Beta.3] - 2026-07-12
+
+### Fixed
+- **Memory fragmentation & Uptime Instability (Issue #362):** Replaced highly frequent dynamic `cJSON` memory allocations in the WebUI's 1-second background polling routes (`/api/sysinfo`, `/api/ota_status`) with zero-allocation `snprintf` and chunked HTTP streams. This prevents the severe heap fragmentation ("Swiss Cheese") that occurred over 1-2 days of uptime, and ultimately caused "Serverfehler" (HTTP 500) or Out-Of-Memory crashes when a 12 KB OTA task or TLS handshake could no longer find contiguous free memory.
+
 ## [2.2.4-Beta.2] - 2026-07-11
 
 ### Changes
