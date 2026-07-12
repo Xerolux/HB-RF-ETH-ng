@@ -245,6 +245,7 @@
                   type="text"
                   v-model="hostname"
                   trim
+                  maxlength="63"
                   :state="v$.hostname.$error ? false : null"
                 />
               </div>
@@ -598,7 +599,7 @@
 
 <script setup>
 import axios from 'axios'
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVuelidate } from '@vuelidate/core'
 import {
@@ -805,10 +806,46 @@ const isDcfActivated = computed(() => timesource.value === 1)
 const isGpsActivated = computed(() => timesource.value === 2)
 const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'static')
 
-const hostname_validator = helpers.regex(/^[a-zA-Z0-9][a-zA-Z0-9.-]{0,62}$/)
+// Keep these validators aligned with main/validation.cpp. Settings already
+// accepted by the firmware must never make an unrelated bulk save silently
+// fail in the WebUI.
+const hostname_validator = (value) => {
+  if (!value) return true
+  if (value.length > 63 || !/^[a-zA-Z0-9]/.test(value) || !/^[a-zA-Z0-9.-]+$/.test(value)) return false
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === '-' && (i === 0 || i === value.length - 1 || value[i - 1] === '.' || value[i + 1] === '.')) {
+      return false
+    }
+  }
+  return true
+}
 const username_validator = helpers.regex(/^[a-zA-Z0-9._-]{1,32}$/)
 const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
-const ipv6_validator = helpers.regex(/^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/)
+const ipv6_validator = (value) => {
+  if (!value) return true
+  if (typeof value !== 'string' || value.length > 45 || value.includes(':::')) return false
+
+  let normalized = value
+  if (value.includes('.')) {
+    const separator = value.lastIndexOf(':')
+    if (separator < 0) return false
+    const ipv4 = value.slice(separator + 1).split('.')
+    if (ipv4.length !== 4 || ipv4.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) return false
+    // An embedded IPv4 suffix occupies two IPv6 hextets.
+    normalized = `${value.slice(0, separator)}:0:0`
+  }
+
+  if ((normalized.match(/::/g) || []).length > 1) return false
+  const hasCompression = normalized.includes('::')
+  const [left = '', right = ''] = normalized.split('::')
+  const leftParts = left ? left.split(':') : []
+  const rightParts = right ? right.split(':') : []
+  const validHextet = part => /^[0-9a-fA-F]{1,4}$/.test(part)
+  if (!leftParts.every(validHextet) || !rightParts.every(validHextet)) return false
+
+  const count = leftParts.length + rightParts.length
+  return hasCompression ? count < 8 : count === 8
+}
 
 // Custom validator for CCU IP that accepts both IPv4 and IPv6
 const ccuIPValidator = (value) => {
@@ -834,7 +871,7 @@ const rules = computed(() => ({
   hostname: {
     required,
     hostname_validator,
-    maxLength: maxLength(32)
+    maxLength: maxLength(63)
   },
   localIP: {
     required: requiredUnless(useDHCP),
@@ -869,11 +906,9 @@ const rules = computed(() => ({
     maxValue: helpers.withMessage(t('settings.validation.maxPrefix'), val => val <= 128)
   },
   ipv6Gateway: {
-    required: requiredIf(isIPv6Static),
     ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ipv6Dns1: {
-    required: requiredIf(isIPv6Static),
     ipv6_validator: helpers.withMessage(t('settings.validation.invalidIpv6'), ipv6_validator)
   },
   ipv6Dns2: {
@@ -1039,7 +1074,19 @@ const handleFileSelect = (event) => {
 
 const saveSettingsClick = async () => {
   v$.value.$touch()
-  if (v$.value.$error) return
+  if (v$.value.$error) {
+    const validationTabs = [
+      ['general', ['adminUsername', 'ccuIP']],
+      ['network', ['hostname', 'localIP', 'netmask', 'gateway', 'dns1', 'dns2', 'ipv6Address', 'ipv6PrefixLength', 'ipv6Gateway', 'ipv6Dns1', 'ipv6Dns2']],
+      ['time', ['ntpServer', 'dcfOffset']]
+    ]
+    const invalidGroup = validationTabs.find(([, fields]) => fields.some(field => v$.value[field]?.$error))
+    if (invalidGroup) activeTab.value = invalidGroup[0]
+    showError.value = t('settings.validation.fixErrors')
+    await nextTick()
+    document.querySelector('.tab-panel .is-invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
 
   showError.value = null
 

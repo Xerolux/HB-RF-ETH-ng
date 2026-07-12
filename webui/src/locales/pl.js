@@ -204,7 +204,8 @@ export default {
       invalidIpv4OrIpv6: 'Nieprawidłowy adres IPv4 lub IPv6',
       invalidIpv6: 'Nieprawidłowy adres IPv6',
       minPrefix: 'Min. 1',
-      maxPrefix: 'Maks. 128'
+      maxPrefix: 'Maks. 128',
+      fixErrors: 'Popraw zaznaczone pola.'
     }
   },
 
@@ -342,11 +343,9 @@ export default {
     archiveStable: 'Stable',
     archiveBeta: 'Beta',
     archiveAll: 'Wszystkie',
-    archiveRefresh: 'Odśwież listę',
     archiveLoading: 'Ładowanie wydań...',
     archiveWarning: 'Utwórz kopię zapasową przed zmianą firmware. Starsze wersje mogą nie rozumieć nowszych ustawień.',
     archiveLoadError: 'Nie udało się załadować archiwum firmware',
-    archiveUsingCache: 'GitHub jest teraz niedostępny. Wyświetlana jest ostatnio zapisana lista archiwum z {time}.',
     archiveEmpty: 'Nie znaleziono pasujących wydań firmware.',
     archiveCurrent: 'Zainstalowana',
     archiveInstalled: 'Zainstalowana',

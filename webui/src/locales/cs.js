@@ -204,7 +204,8 @@ export default {
       invalidIpv4OrIpv6: 'Neplatná IPv4 nebo IPv6 adresa',
       invalidIpv6: 'Neplatná IPv6 adresa',
       minPrefix: 'Min 1',
-      maxPrefix: 'Max 128'
+      maxPrefix: 'Max 128',
+      fixErrors: 'Opravte zvýrazněná pole.'
     }
   },
 
@@ -342,11 +343,9 @@ export default {
     archiveStable: 'Stabilní',
     archiveBeta: 'Beta',
     archiveAll: 'Vše',
-    archiveRefresh: 'Obnovit seznam',
     archiveLoading: 'Načítání vydání...',
     archiveWarning: 'Před změnou firmwaru vytvořte zálohu. Starší verze nemusí plně rozumět novějším nastavením.',
     archiveLoadError: 'Archiv firmwaru se nepodařilo načíst',
-    archiveUsingCache: 'GitHub momentálně není dostupný. Zobrazuje se naposledy uložený archiv z {time}.',
     archiveEmpty: 'Nebyla nalezena žádná odpovídající vydání firmwaru.',
     archiveCurrent: 'Nainstalováno',
     archiveInstalled: 'Nainstalováno',

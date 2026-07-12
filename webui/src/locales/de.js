@@ -217,7 +217,8 @@ export default {
       invalidIpv4OrIpv6: 'Ungültige IPv4- oder IPv6-Adresse',
       invalidIpv6: 'Ungültige IPv6-Adresse',
       minPrefix: 'Mindestens 1',
-      maxPrefix: 'Maximal 128'
+      maxPrefix: 'Maximal 128',
+      fixErrors: 'Bitte korrigiere die markierten Felder.'
     }
   },
 
@@ -355,11 +356,9 @@ export default {
     archiveStable: 'Stable',
     archiveBeta: 'Beta',
     archiveAll: 'Alle',
-    archiveRefresh: 'Liste aktualisieren',
     archiveLoading: 'Releases werden geladen...',
     archiveWarning: 'Vor dem Firmware-Wechsel bitte ein Backup erstellen. Ältere Versionen verstehen neuere Einstellungen eventuell nicht vollständig.',
     archiveLoadError: 'Firmware-Archiv konnte nicht geladen werden',
-    archiveUsingCache: 'GitHub ist gerade nicht erreichbar. Es wird die zuletzt gespeicherte Archivliste von {time} angezeigt.',
     archiveEmpty: 'Keine passenden Firmware-Releases gefunden.',
     archiveCurrent: 'Installiert',
     archiveInstalled: 'Installiert',

@@ -204,7 +204,8 @@ export default {
       invalidIpv4OrIpv6: 'Ugyldig IPv4- eller IPv6-adresse',
       invalidIpv6: 'Ugyldig IPv6-adresse',
       minPrefix: 'Min 1',
-      maxPrefix: 'Maks 128'
+      maxPrefix: 'Maks 128',
+      fixErrors: 'Korriger de markerte feltene.'
     }
   },
 
@@ -342,11 +343,9 @@ export default {
     archiveStable: 'Stabil',
     archiveBeta: 'Beta',
     archiveAll: 'Alle',
-    archiveRefresh: 'Oppdater liste',
     archiveLoading: 'Laster utgivelser...',
     archiveWarning: 'Lag en sikkerhetskopi før du bytter fastvare. Eldre versjoner forstår kanskje ikke nyere innstillinger fullt ut.',
     archiveLoadError: 'Kunne ikke laste fastvarearkivet',
-    archiveUsingCache: 'GitHub er ikke tilgjengelig akkurat nå. Viser den sist lagrede arkivlisten fra {time}.',
     archiveEmpty: 'Ingen passende fastvareutgivelser funnet.',
     archiveCurrent: 'Installert',
     archiveInstalled: 'Installert',

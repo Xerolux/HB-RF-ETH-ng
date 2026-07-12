@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Einstellungen: Speichern scheinbar ohne Funktion:** Die WebUI-Validierung entspricht jetzt dem Firmware-Vertrag (Hostnamen bis 63 Zeichen, optionale IPv6-Gateway/DNS-Felder und IPv4-gemappte IPv6-Adressen). Bereits gültig gespeicherte Werte blockieren dadurch keinen späteren Sammel-Save mehr. Bei echten Eingabefehlern öffnet die Oberfläche den betroffenen Tab und zeigt eine verständliche Meldung.
+- **Firmware-Archiv vollständig offline:** Die Archivliste wird ausschließlich aus dem in die Firmware eingebetteten `archive.json` über `/api/firmware_archive` geladen. Online-Fallback, manuelles Aktualisieren, Retry und Browser-Cache wurden entfernt; nur Update-Prüfung und OTA verwenden weiterhin Onlinequellen.
+
 ## [2.2.4-Beta.3] - 2026-07-12
 
 ### Fixed

@@ -235,11 +235,6 @@
               {{ filter.label }}
             </button>
           </div>
-          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive(true)" :disabled="firmwareLookupBusy" :title="archiveRefreshTitle">
-            <span v-if="archiveLoading" class="spinner-border spinner-border-sm"></span>
-            <AppIcon v-else name="refresh" />
-            {{ archiveLoading ? t('firmware.archiveLoading') : t('firmware.archiveRefresh') }}
-          </button>
         </div>
 
         <div class="archive-warning">
@@ -400,23 +395,13 @@ const firmwareArchive = ref([])
 const archiveInstallingVersion = ref('')
 const selectedArchiveVersion = ref('')
 
-// The firmware embeds archive.json (gzipped) in flash and serves it via
-// /api/firmware_archive — instant, offline, no TLS/heap cost. That is the
-// primary source. The live GitHub raw URL is only a fallback for when a newer
-// release was published after the running firmware was built (the embedded copy
-// is frozen at build time).
+// The firmware embeds archive.json (gzipped) in flash and serves it locally.
+// This is intentionally the only archive source: update checks and OTA may use
+// the network, but browsing the firmware archive must always work offline and
+// must never contact GitHub from the browser.
 const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
-const ARCHIVE_MANIFEST_FALLBACK_URL = 'https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json'
-const ARCHIVE_CACHE_KEY = 'hb-rf-eth-ng-firmware-archive-cache-v1'
-const ARCHIVE_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
-const firmwareLookupBusy = computed(() => archiveLoading.value || updateStore.isChecking || updateStore.fetchInProgress)
-
-const archiveRefreshTitle = computed(() => (
-  updateStore.isChecking || updateStore.fetchInProgress
-    ? t('firmware.checking')
-    : ''
-))
+const firmwareLookupBusy = computed(() => updateStore.isChecking || updateStore.fetchInProgress)
 
 const archiveFilters = computed(() => [
   { value: 'stable', label: t('firmware.archiveStable') },
@@ -569,57 +554,12 @@ const parseArchiveManifest = (data) => {
     .filter((release) => release?.version && release.downloadUrl)
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const fetchArchiveManifest = (url) => axios.get(url, {
+const fetchArchiveManifest = () => axios.get(ARCHIVE_MANIFEST_URL, {
   headers: { Accept: 'application/json' },
   params: { _: Date.now() },
-  timeout: 15000,
+  timeout: 5000,
   silent: true
 })
-
-const fetchArchiveManifestWithRetry = async (url, attempts = 2) => {
-  let lastError = null
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await fetchArchiveManifest(url)
-    } catch (error) {
-      lastError = error
-      if (attempt < attempts) {
-        await sleep(600 * attempt)
-      }
-    }
-  }
-  throw lastError
-}
-
-const cacheArchiveManifest = (releases) => {
-  try {
-    localStorage.setItem(ARCHIVE_CACHE_KEY, JSON.stringify({
-      savedAt: Date.now(),
-      releases
-    }))
-  } catch (error) {
-    console.warn('Failed to cache firmware archive manifest', error)
-  }
-}
-
-const loadCachedArchiveManifest = () => {
-  try {
-    const raw = localStorage.getItem(ARCHIVE_CACHE_KEY)
-    if (!raw) return null
-    const cached = JSON.parse(raw)
-    if (!cached || !Array.isArray(cached.releases) || !Number.isFinite(cached.savedAt)) return null
-    if (Date.now() - cached.savedAt > ARCHIVE_CACHE_MAX_AGE_MS) return null
-    const releases = cached.releases
-      .map(normalizeArchiveEntry)
-      .filter((release) => release?.version && release.downloadUrl)
-    return releases.length > 0 ? { releases, savedAt: cached.savedAt } : null
-  } catch (error) {
-    console.warn('Failed to read cached firmware archive manifest', error)
-    return null
-  }
-}
 
 const archiveErrorDetails = (error) => {
   const status = error?.response?.status
@@ -629,68 +569,23 @@ const archiveErrorDetails = (error) => {
     : error?.message || ''
 }
 
-const loadArchiveManifest = async (forceLive = false) => {
-  let lastError = null
-  if (forceLive) {
-    try {
-      const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
-      const releases = parseArchiveManifest(response.data)
-      cacheArchiveManifest(releases)
-      return { releases, fromCache: false }
-    } catch (err) {
-      lastError = err
-    }
-  } else {
-    try {
-      const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_URL)
-      const releases = parseArchiveManifest(response.data)
-      cacheArchiveManifest(releases)
-      return { releases, fromCache: false }
-    } catch (primaryError) {
-      lastError = primaryError
-      // Fall back to the live GitHub raw URL. The embedded copy is frozen at
-      // firmware build time, so only GitHub has releases published afterwards.
-      try {
-        const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
-        const releases = parseArchiveManifest(response.data)
-        cacheArchiveManifest(releases)
-        return { releases, fromCache: false }
-      } catch (fallbackError) {
-        lastError = fallbackError
-      }
-    }
-  }
-
-  const cached = loadCachedArchiveManifest()
-  if (cached) {
-    return { ...cached, fromCache: true, error: lastError }
-  }
-
-  throw lastError || new Error(t('firmware.archiveLoadError'))
-}
-
-const loadFirmwareArchive = async (forceLive = false) => {
-  if (archiveLoading.value || updateStore.isChecking || updateStore.fetchInProgress) return
+const loadFirmwareArchive = async () => {
+  if (archiveLoading.value) return
 
   archiveLoading.value = true
   archiveError.value = ''
 
   try {
-    const archiveResult = await loadArchiveManifest(forceLive)
-    firmwareArchive.value = archiveResult.releases
+    const response = await fetchArchiveManifest()
+    firmwareArchive.value = parseArchiveManifest(response.data)
     archiveLoaded.value = true
     selectDefaultArchiveRelease()
-    if (archiveResult.fromCache) {
-      const savedAt = new Date(archiveResult.savedAt).toLocaleString()
-      const details = archiveErrorDetails(archiveResult.error)
-      archiveError.value = `${t('firmware.archiveUsingCache', { time: savedAt })}${details ? ` (${details})` : ''}`
-    }
   } catch (error) {
     const details = archiveErrorDetails(error)
     archiveError.value = details
       ? `${t('firmware.archiveLoadError')} (${details})`
       : t('firmware.archiveLoadError')
-    archiveLoaded.value = firmwareArchive.value.length > 0
+    archiveLoaded.value = false
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
   } finally {
     archiveLoading.value = false
@@ -920,8 +815,6 @@ const factoryResetClick = async () => {
 }
 
 const manualCheckForUpdate = async () => {
-  if (archiveLoading.value) return
-
   if (!sysInfoStore.currentVersion) {
     await sysInfoStore.update()
   }
@@ -971,11 +864,8 @@ onMounted(async () => {
     console.warn('Initial cached update read failed:', e.response?.status || e.message)
   }
   syncArchiveFilterWithUpdateChannel()
-  // Load the archive immediately on page open. Since archive.json is embedded
-  // in the firmware flash and served from /api/firmware_archive, this is an
-  // instant local read — no GitHub round-trip, no TLS heap cost on the ESP32,
-  // no UI freeze. The "Refresh list" button remains for fetching the live
-  // GitHub copy (which may contain versions newer than the embedded one).
+  // Load only the archive embedded in this firmware. Online update checks and
+  // OTA remain separate; the archive itself never contacts an external host.
   await loadFirmwareArchive()
   // Periodically re-read the cache while the page is open so the
   // "last check" indicator and download URL stay fresh (cached read only,
@@ -1451,10 +1341,6 @@ onUnmounted(() => {
   box-shadow: var(--shadow-sm);
 }
 
-.archive-refresh {
-  margin-top: 0;
-}
-
 .archive-warning,
 .archive-error,
 .archive-empty {
@@ -1850,8 +1736,7 @@ onUnmounted(() => {
   }
 
   .archive-actions > *,
-  .archive-notes-row > *,
-  .archive-refresh {
+  .archive-notes-row > * {
     width: 100%;
     justify-content: center;
   }

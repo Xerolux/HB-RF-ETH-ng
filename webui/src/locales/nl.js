@@ -204,7 +204,8 @@ export default {
       invalidIpv4OrIpv6: 'Ongeldig IPv4- of IPv6-adres',
       invalidIpv6: 'Ongeldig IPv6-adres',
       minPrefix: 'Min 1',
-      maxPrefix: 'Max 128'
+      maxPrefix: 'Max 128',
+      fixErrors: 'Corrigeer de gemarkeerde velden.'
     }
   },
 
@@ -342,11 +343,9 @@ export default {
     archiveStable: 'Stabiel',
     archiveBeta: 'Bèta',
     archiveAll: 'Alles',
-    archiveRefresh: 'Lijst vernieuwen',
     archiveLoading: 'Releases laden...',
     archiveWarning: 'Maak een back-up voordat u van firmware wisselt. Oudere versies begrijpen nieuwere instellingen mogelijk niet volledig.',
     archiveLoadError: 'Firmwarearchief kon niet worden geladen',
-    archiveUsingCache: 'GitHub is momenteel niet beschikbaar. De laatst opgeslagen archieflijst van {time} wordt getoond.',
     archiveEmpty: 'Geen passende firmwarereleases gevonden.',
     archiveCurrent: 'Geïnstalleerd',
     archiveInstalled: 'Geïnstalleerd',

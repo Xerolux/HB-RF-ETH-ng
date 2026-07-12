@@ -204,7 +204,8 @@ export default {
       invalidIpv4OrIpv6: 'Ogiltig IPv4- eller IPv6-adress',
       invalidIpv6: 'Ogiltig IPv6-adress',
       minPrefix: 'Min 1',
-      maxPrefix: 'Max 128'
+      maxPrefix: 'Max 128',
+      fixErrors: 'Korrigera de markerade fälten.'
     }
   },
 
@@ -342,11 +343,9 @@ export default {
     archiveStable: 'Stabil',
     archiveBeta: 'Beta',
     archiveAll: 'Alla',
-    archiveRefresh: 'Uppdatera lista',
     archiveLoading: 'Läser in utgåvor...',
     archiveWarning: 'Skapa en säkerhetskopia innan du byter firmware. Äldre versioner kanske inte förstår nyare inställningar fullt ut.',
     archiveLoadError: 'Kunde inte läsa in firmwarearkivet',
-    archiveUsingCache: 'GitHub är inte tillgängligt just nu. Visar den senast sparade arkivlistan från {time}.',
     archiveEmpty: 'Inga matchande firmwareutgåvor hittades.',
     archiveCurrent: 'Installerad',
     archiveInstalled: 'Installerad',
