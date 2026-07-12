@@ -70,7 +70,7 @@
       :title="t('supporter.expiredPromptTitle')"
       :ok-title="t('supporter.expiredPromptSupport')"
       ok-variant="primary"
-      cancel-title-class="d-none"
+      ok-only
       no-close-on-backdrop
       @ok="showSponsorModal = true"
     >
@@ -86,10 +86,9 @@
     <BModal
       v-model="showUpdateSuccess"
       :title="t('updateSuccess.title')"
-      :ok-title="t('common.ok')"
-      cancel-title-class="d-none"
+      :ok-title="t('common.close')"
+      ok-only
       @ok="showUpdateSuccess = false"
-      @cancel="showUpdateSuccess = false"
       no-close-on-backdrop
       no-close-on-esc
       hide-header-close

@@ -41,12 +41,12 @@ const archive = {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('locale', 'en')
+    if (!localStorage.getItem('locale')) localStorage.setItem('locale', 'en')
     sessionStorage.setItem('hb-rf-eth-ng-pw', 'device-secret-token')
     sessionStorage.setItem('hb-rf-eth-ng-last-activity', String(Date.now()))
   })
 
-  await page.route('**/sysinfo.json', route => route.fulfill({
+  await page.route('**/sysinfo.json**', route => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({ sysInfo: { currentVersion: '2.2.4-Beta.3' } })
   }))
@@ -59,13 +59,17 @@ test.beforeEach(async ({ page }) => {
 
 test('settings save/discard state follows the edited form immediately', async ({ page }) => {
   const persisted = { ...settings }
+  const getUrls = []
+  const postUrls = []
 
-  await page.route('**/settings.json', async route => {
+  await page.route('**/settings.json**', async route => {
     if (route.request().method() === 'POST') {
+      postUrls.push(route.request().url())
       Object.assign(persisted, route.request().postDataJSON())
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true }) })
       return
     }
+    getUrls.push(route.request().url())
     await route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({ settings: persisted })
@@ -94,6 +98,9 @@ test('settings save/discard state follows the edited form immediately', async ({
   await footer.locator('.save-btn').click()
   await expect(footer).toBeHidden()
   expect(persisted.hostname).toBe('saved-host')
+  expect(getUrls.length).toBeGreaterThan(0)
+  expect(getUrls.every(url => new URL(url).searchParams.has('t'))).toBe(true)
+  expect(postUrls).toEqual([`${BASE_URL}/settings.json`])
 })
 
 for (const scenario of [
@@ -127,7 +134,7 @@ for (const scenario of [
     const persisted = { ...settings, ...scenario.overrides }
     let postCount = 0
 
-    await page.route('**/settings.json', async route => {
+    await page.route('**/settings.json**', async route => {
       if (route.request().method() === 'POST') {
         postCount++
         Object.assign(persisted, route.request().postDataJSON())
@@ -152,7 +159,7 @@ for (const scenario of [
 
 test('invalid settings reveal the affected tab instead of silently ignoring save', async ({ page }) => {
   let postCount = 0
-  await page.route('**/settings.json', async route => {
+  await page.route('**/settings.json**', async route => {
     if (route.request().method() === 'POST') {
       postCount++
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true }) })
@@ -176,8 +183,28 @@ test('invalid settings reveal the affected tab instead of silently ignoring save
   expect(postCount).toBe(0)
 })
 
+test('OTA success dialog uses the active locale and has no default cancel button', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+
+  await page.goto(BASE_URL)
+  await page.evaluate(() => {
+    localStorage.setItem('locale', 'de')
+    localStorage.setItem('otaUpdateVersion', '2.2.4-Beta.5')
+  })
+  await page.reload()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toContainText('Update erfolgreich')
+  await expect(dialog).toContainText('Die Firmware wurde erfolgreich auf Version 2.2.4-Beta.5 aktualisiert.')
+  await expect(dialog.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(1)
+  await expect(dialog.getByRole('button', { name: /Cancel|Abbrechen/, exact: true })).toHaveCount(0)
+})
+
 test('firmware archive loads only from the manifest embedded in the device', async ({ page }) => {
-  await page.route('**/settings.json', route => route.fulfill({
+  await page.route('**/settings.json**', route => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({ settings })
   }))

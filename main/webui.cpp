@@ -798,27 +798,29 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // 8192 leaves comfortable headroom over the ~700-byte settings payload
-    // (monitoring handler uses 16384). recv_full_body rejects content_len >=
-    // buf_size, so an oversized POST now gets a clear error instead of being
-    // silently truncated to "No data received".
-    char *buffer = (char *)malloc(8192);
+    // Keep the 8 KiB request limit, but allocate only what this request needs.
+    // A normal settings payload is ~700 bytes; reserving a fixed contiguous
+    // 8 KiB block made saves fail on fragmented/low-memory ESP32 devices even
+    // though the body itself was small.
+    constexpr size_t maxSettingsBodySize = 8192;
+    if (req->content_len == 0) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+    }
+    if (req->content_len >= maxSettingsBodySize) {
+        return httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "Request body too large");
+    }
+
+    const size_t bufferSize = req->content_len + 1;
+    char *buffer = (char *)malloc(bufferSize);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    int len = recv_full_body(req, buffer, 8192);
+    int len = recv_full_body(req, buffer, bufferSize);
 
     if (len < 0) {
-        // content_len >= buffer — payload too large to fit.
         free(buffer);
-        httpd_resp_set_status(req, "413 Payload Too Large");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Request body too large");
-    }
-
-    if (len == 0) {
-        free(buffer);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive request body");
     }
 
     cJSON *root = cJSON_Parse(buffer);
@@ -1113,25 +1115,28 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    char *buffer = (char*)malloc(8192);
+    constexpr size_t maxRestoreBodySize = 8192;
+    if (req->content_len == 0)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+    }
+    if (req->content_len >= maxRestoreBodySize)
+    {
+        return httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "Request body too large");
+    }
+
+    const size_t bufferSize = req->content_len + 1;
+    char *buffer = (char*)malloc(bufferSize);
     if (!buffer) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
     }
 
-    int len = recv_full_body(req, buffer, 8192);
+    int len = recv_full_body(req, buffer, bufferSize);
 
     if (len < 0)
     {
-        // content_len >= buffer — backup/restore payload too large to fit.
         free(buffer);
-        httpd_resp_set_status(req, "413 Payload Too Large");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Request body too large");
-    }
-
-    if (len == 0)
-    {
-        free(buffer);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to receive request body");
     }
 
     cJSON *root = cJSON_Parse(buffer);

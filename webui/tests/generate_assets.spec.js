@@ -23,7 +23,7 @@ test.describe('Generate Assets', () => {
     // --- Mocks ---
 
     // SysInfo (Dashboard data)
-    await page.route('**/sysinfo.json', async route => {
+    await page.route('**/sysinfo.json**', async route => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -54,7 +54,7 @@ test.describe('Generate Assets', () => {
     });
 
     // Settings
-    await page.route('**/settings.json', async route => {
+    await page.route('**/settings.json**', async route => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
