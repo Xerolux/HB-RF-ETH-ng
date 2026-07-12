@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.4-Beta.8] - 2026-07-12
+
+### Changes
+- fix(webui): keep settings actions visible
+- chore: update manifests for v2.2.4-Beta.7
+
 ## [2.2.4-Beta.7] - 2026-07-12
 
 ### Changes
