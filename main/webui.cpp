@@ -606,15 +606,14 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     // ipv6Array
     snprintf(buf, sizeof(buf), "\"ipv6Addresses\":[");
     httpd_resp_send_chunk(req, buf, strlen(buf));
-    bool first_ip6 = true;
-    for (int i = 0; i < LWIP_IPV6_NUM_ADDRESSES; i++) {
-        ip6_addr_t ip6;
-        if (_ethernet->getIpv6Address(i, &ip6)) {
-            snprintf(buf, sizeof(buf), "%s\"%s\"", first_ip6 ? "" : ",", ip6addr_ntoa(&ip6));
-            httpd_resp_send_chunk(req, buf, strlen(buf));
-            first_ip6 = false;
-        }
+    
+    char ipv6_addrs[4][48];
+    int ipv6_count = _ethernet->getIPv6AddressStrings(ipv6_addrs, 4);
+    for (int i = 0; i < ipv6_count; i++) {
+        snprintf(buf, sizeof(buf), "%s\"%s\"", (i == 0) ? "" : ",", ipv6_addrs[i]);
+        httpd_resp_send_chunk(req, buf, strlen(buf));
     }
+    
     snprintf(buf, sizeof(buf), "],");
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
