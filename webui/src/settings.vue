@@ -943,15 +943,9 @@ const buildSettingsPayload = () => ({
 const serializeSettings = () => JSON.stringify(buildSettingsPayload())
 
 const serializedCurrent = ref('')
-let dirtyTimer = null
-const updateDirtyState = () => {
-  clearTimeout(dirtyTimer)
-  dirtyTimer = setTimeout(() => {
-    serializedCurrent.value = serializeSettings()
-  }, 300)
-}
-
-watch([adminUsername, hostname, useDHCP, localIP, netmask, gateway, dns1, dns2, ccuIP, timesource, dcfOffset, gpsBaudrate, ntpServer, ledBrightness, ledProgramValues, enableIPv6, ipv6Mode, ipv6Address, ipv6PrefixLength, ipv6Gateway, ipv6Dns1, ipv6Dns2, flashPause], updateDirtyState, { deep: true })
+watch(serializeSettings, (newVal) => {
+  serializedCurrent.value = newVal
+})
 
 const hasUnsavedChanges = computed(() => loadedSnapshot.value !== '' && serializedCurrent.value !== '' && serializedCurrent.value !== loadedSnapshot.value)
 const adminUsernameChanged = computed(() => adminUsername.value !== (settingsStore.adminUsername || 'admin'))

@@ -235,7 +235,7 @@
               {{ filter.label }}
             </button>
           </div>
-          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive" :disabled="firmwareLookupBusy" :title="archiveRefreshTitle">
+          <button class="check-btn archive-refresh" type="button" @click="loadFirmwareArchive(true)" :disabled="firmwareLookupBusy" :title="archiveRefreshTitle">
             <span v-if="archiveLoading" class="spinner-border spinner-border-sm"></span>
             <AppIcon v-else name="refresh" />
             {{ archiveLoading ? t('firmware.archiveLoading') : t('firmware.archiveRefresh') }}
@@ -629,24 +629,35 @@ const archiveErrorDetails = (error) => {
     : error?.message || ''
 }
 
-const loadArchiveManifest = async () => {
+const loadArchiveManifest = async (forceLive = false) => {
   let lastError = null
-  try {
-    const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_URL)
-    const releases = parseArchiveManifest(response.data)
-    cacheArchiveManifest(releases)
-    return { releases, fromCache: false }
-  } catch (primaryError) {
-    lastError = primaryError
-    // Fall back to the live GitHub raw URL. The embedded copy is frozen at
-    // firmware build time, so only GitHub has releases published afterwards.
+  if (forceLive) {
     try {
       const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
       const releases = parseArchiveManifest(response.data)
       cacheArchiveManifest(releases)
       return { releases, fromCache: false }
-    } catch (fallbackError) {
-      lastError = fallbackError
+    } catch (err) {
+      lastError = err
+    }
+  } else {
+    try {
+      const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_URL)
+      const releases = parseArchiveManifest(response.data)
+      cacheArchiveManifest(releases)
+      return { releases, fromCache: false }
+    } catch (primaryError) {
+      lastError = primaryError
+      // Fall back to the live GitHub raw URL. The embedded copy is frozen at
+      // firmware build time, so only GitHub has releases published afterwards.
+      try {
+        const response = await fetchArchiveManifestWithRetry(ARCHIVE_MANIFEST_FALLBACK_URL)
+        const releases = parseArchiveManifest(response.data)
+        cacheArchiveManifest(releases)
+        return { releases, fromCache: false }
+      } catch (fallbackError) {
+        lastError = fallbackError
+      }
     }
   }
 
@@ -658,14 +669,14 @@ const loadArchiveManifest = async () => {
   throw lastError || new Error(t('firmware.archiveLoadError'))
 }
 
-const loadFirmwareArchive = async () => {
+const loadFirmwareArchive = async (forceLive = false) => {
   if (archiveLoading.value || updateStore.isChecking || updateStore.fetchInProgress) return
 
   archiveLoading.value = true
   archiveError.value = ''
 
   try {
-    const archiveResult = await loadArchiveManifest()
+    const archiveResult = await loadArchiveManifest(forceLive)
     firmwareArchive.value = archiveResult.releases
     archiveLoaded.value = true
     selectDefaultArchiveRelease()

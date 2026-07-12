@@ -1946,7 +1946,7 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
             _updateCheck->finishOtaOperation();
         }
         vTaskDelete(NULL);
-    }, "ota_url_update", 16384, args, 5, NULL);
+    }, "ota_url_update", 12288, args, 5, NULL);
 
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create OTA update task");

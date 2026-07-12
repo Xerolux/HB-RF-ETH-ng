@@ -745,17 +745,19 @@ onMounted(async () => {
   } catch (error) {}
 })
 
-watch([checkmkConfig, mqttConfig, prometheusConfig, syslogConfig, notifyConfig], () => {
+const serializeConfig = () => JSON.stringify({
+  checkmk: { ...checkmkConfig.value },
+  mqtt: { ...mqttConfig.value },
+  prometheus: { ...prometheusConfig.value },
+  syslog: { ...syslogConfig.value },
+  notify: { ...notifyConfig.value }
+})
+
+watch(serializeConfig, (newVal) => {
   if (originalConfig.value) {
-    hasChanges.value = JSON.stringify({
-      checkmk: { ...checkmkConfig.value },
-      mqtt: { ...mqttConfig.value },
-      prometheus: { ...prometheusConfig.value },
-      syslog: { ...syslogConfig.value },
-      notify: { ...notifyConfig.value }
-    }) !== originalConfig.value
+    hasChanges.value = newVal !== originalConfig.value
   }
-}, { deep: true })
+})
 
 const saveConfig = async () => {
   if (mqttConfig.value.enabled && !mqttConfig.value.server) {
