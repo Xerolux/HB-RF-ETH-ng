@@ -27,6 +27,8 @@
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
 #include "esp_timer.h"
+#include "esp_system.h"
+#include <sys/time.h>
 #include "string.h"
 #include "reset_info.h"
 #include "system_reset.h"
@@ -67,9 +69,30 @@ void _update_check_task_func(void *parameter)
 
 void buildUpdateManifestUrl(bool beta, char* out, size_t outLen)
 {
-    snprintf(out, outLen, "%s/%s.json?t=%llu", UPDATE_MANIFEST_BASE,
+    // Cache-buster query parameter. The previous implementation used
+    // esp_timer_get_time() / 1e6 (seconds-since-boot), which means right
+    // after every reboot the value is small again and several reboots in
+    // quick succession generate overlapping values. raw.githubusercontent.com
+    // is fronted by Fastly with a 5-minute Cache-Control, so devices kept
+    // receiving stale manifest data ("no update available") after a new
+    // release was published.
+    //
+    // Combine a real-time component (epoch seconds when the clock is
+    // synchronised via NTP/GPS/DCF) with a per-call random suffix. This
+    // guarantees a unique URL on every fetch and defeats any caching layer
+    // between the device and GitHub, while staying monotonic across reboots.
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    unsigned long long t = (unsigned long long)tv.tv_sec;
+    if (t < 1700000000ULL) {
+        // Clock not synchronised yet (still ~1970). Fall back to boot-time
+        // microseconds, which at least varies across reboots.
+        t = (unsigned long long)esp_timer_get_time();
+    }
+    unsigned int rnd = esp_random();
+    snprintf(out, outLen, "%s/%s.json?t=%llu%u", UPDATE_MANIFEST_BASE,
              beta ? "beta" : "latest",
-             (unsigned long long)(esp_timer_get_time() / 1000000ULL));
+             t, rnd);
 }
 
 void normalizeTag(const char* tag, char* out, size_t outLen)

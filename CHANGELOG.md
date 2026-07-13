@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.4-Beta.12] - 2026-07-13
+
+### Changes
+- fix(updatecheck): use epoch seconds + random suffix as manifest cache-buster
+
+### Fixed
+- **Update-Check lieferte veraltete Daten nach einem neuen Release:** Der Cache-Buster in der Manifest-URL basierte auf `esp_timer_get_time()` (Sekunden seit Boot). Direkt nach jedem Reboot war dieser Wert wieder klein, und mehrere Reboots kurz hintereinander erzeugten überlappende Werte. Da `raw.githubusercontent.com` über Fastly 5 Minuten lang cached (`Cache-Control: max-age=300`), bekamen Geräte nach einem neuen Release stundenlang die alte `beta.json` aus dem Cache und boten das Update nicht an. Die URL nutzt jetzt echte Epoch-Sekunden (sofern die Uhrzeit via NTP/GPS/DCF synchronisiert ist) plus einen Zufalls-Suffix, sodass jeder Fetch eine einzigartige URL erzeugt und jede Caching-Schicht zwischen Gerät und GitHub umgangen wird.
+
 ## [2.2.4-Beta.11] - 2026-07-13
 
 ### Changes
