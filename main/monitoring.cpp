@@ -847,7 +847,10 @@ static void heap_watchdog_task(void *pvParameters)
                 size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
                 size_t min_ever = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
                 uint32_t secs = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
-                char diag[200];
+                // Keep in sync with last_diag_buffer[96] in reset_info.cpp —
+                // the snapshot stored here is later surfaced through that
+                // buffer, so it must not exceed 96 bytes.
+                char diag[80];
                 snprintf(diag, sizeof(diag),
                          "low heap: free=%u largest=%u min_ever=%u uptime=%us",
                          (unsigned)free_heap, (unsigned)largest,

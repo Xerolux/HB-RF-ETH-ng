@@ -37,8 +37,11 @@ static const char *NVS_DIAG_KEY = "diag";
 static char reset_text_buffer[256];
 // Buffer for the diagnostic string of the last non-normal reset. Filled by
 // getLastDiag() on first access and cleared from NVS so a normal reboot does
-// not show stale data.
-static char last_diag_buffer[256];
+// not show stale data. Kept deliberately small (96 bytes) so that the
+// combined "reason (esp_reason) - diag" string always fits into
+// reset_text_buffer[256] without triggering -Wformat-truncation under the
+// strict ESP-IDF 6.0.2 build flags.
+static char last_diag_buffer[96];
 
 static const char* get_reason_text(reset_reason_type_t reason) {
     switch (reason) {
@@ -90,12 +93,12 @@ void ResetInfo::storeResetReason(reset_reason_type_t reason, const char *diag) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to store reset reason: %s", esp_err_to_name(err));
     } else {
-        // Optional diagnostic string. Truncated to fit the NVS entry and the
-        // internal buffer. Cleared whenever the reason is cleared.
+        // Optional diagnostic string. Stored verbatim; callers are expected
+        // to keep it short (the in-tree caller passes a fixed 200-byte stack
+        // buffer with a snprintf of bounded numerics). Cleared whenever the
+        // reason is cleared.
         if (diag && diag[0]) {
-            char tmp[sizeof(last_diag_buffer)];
-            snprintf(tmp, sizeof(tmp), "%s", diag);
-            nvs_set_str(nvs_handle, NVS_DIAG_KEY, tmp);
+            nvs_set_str(nvs_handle, NVS_DIAG_KEY, diag);
         } else {
             nvs_erase_key(nvs_handle, NVS_DIAG_KEY);
         }
@@ -208,16 +211,18 @@ const char* ResetInfo::getResetDetails() {
 
         if (stored_reason != RESET_REASON_NORMAL) {
             const char *diag = getLastDiag();
+            // Copy diag into a local buffer whose size GCC can see, so the
+            // combined "reason (esp_reason) - diag" snprintf below provably
+            // fits reset_text_buffer[256] (96 + 32 + 32 + literal overhead).
+            // Without this copy, -Wformat-truncation fires because getLastDiag
+            // returns const char* with no length the compiler can reason about.
+            char diag_bounded[96];
             if (diag && diag[0]) {
-                // Copy diag into a short local buffer so the compiler can
-                // prove the snprintf below cannot overflow reset_text_buffer
-                // (which is also 256 bytes). Without this, -Wformat-truncation
-                // fires because getLastDiag() can return up to 255 bytes.
-                char diag_short[96];
-                snprintf(diag_short, sizeof(diag_short), "%s", diag);
+                strncpy(diag_bounded, diag, sizeof(diag_bounded) - 1);
+                diag_bounded[sizeof(diag_bounded) - 1] = '\0';
                 snprintf(reset_text_buffer, sizeof(reset_text_buffer),
                          "%s (%s) - %s",
-                         get_reason_text(stored_reason), esp_reason, diag_short);
+                         get_reason_text(stored_reason), esp_reason, diag_bounded);
             } else {
                 snprintf(reset_text_buffer, sizeof(reset_text_buffer), "%s (%s)",
                          get_reason_text(stored_reason), esp_reason);
