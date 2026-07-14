@@ -3024,7 +3024,7 @@ static void _share_log_task(void *arg)
         config.crt_bundle_attach = esp_crt_bundle_attach;
         config.keep_alive_enable = false;
         config.disable_auto_redirect = true;
-        config.timeout_ms = 20000;
+        config.timeout_ms = 45000;
         config.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
             PasteCtx *ctx = (PasteCtx *)evt->user_data;
             if (!ctx) return ESP_OK;
@@ -3075,14 +3075,10 @@ static void _share_log_task(void *arg)
             int status = esp_http_client_get_status_code(client);
             if ((status == 303 || status == 302 || status == 301) && pctx.hasLocation)
             {
-                // MicroBin returns Location: https://paste.blueml.eu/upload/<id>
-                // but the paste view URL is https://paste.blueml.eu/p/<id>.
-                char* upload_ptr = strstr(pctx.location, "/upload");
-                if (upload_ptr) {
-                    memmove(upload_ptr + 2, upload_ptr + 7, strlen(upload_ptr + 7) + 1);
-                    upload_ptr[0] = '/';
-                    upload_ptr[1] = 'p';
-                }
+                // MicroBin returns the final share URL in Location (currently
+                // /upload/<id> on paste.blueml.eu). Keep it verbatim instead
+                // of rewriting paths client-side; the service owns the URL
+                // format and may change aliases independently.
                 snprintf(result, sizeof(result),
                          "{\"success\":true,\"url\":\"%s\"}", pctx.location);
             }

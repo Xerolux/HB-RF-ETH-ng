@@ -146,6 +146,8 @@ static bool command_token_ok(const char *payload, int payload_len)
     return strncmp(payload, current_mqtt_config.command_token, expected) == 0;
 }
 
+static constexpr uint32_t MQTT_UPDATE_TASK_STACK_BYTES = 12288;
+
 static void handle_mqtt_command(const char* command, const char* payload, int payload_len)
 {
     ESP_LOGI(TAG, "Received MQTT command: %s (payload %d bytes)", command, payload_len);
@@ -186,7 +188,7 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
             BaseType_t created = xTaskCreate([](void *p) {
                 static_cast<UpdateCheck *>(p)->performOnlineUpdate();
                 vTaskDelete(NULL);
-            }, "mqtt_ota", 8192, updateCheck, 5, NULL);
+            }, "mqtt_ota", MQTT_UPDATE_TASK_STACK_BYTES, updateCheck, 5, NULL);
             if (created != pdPASS) {
                 ESP_LOGE(TAG, "Failed to create OTA update task");
                 mqtt_handler_publish_event("event/update_failed", "task_create_failed");
@@ -205,7 +207,7 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
             BaseType_t created = xTaskCreate([](void *p) {
                 static_cast<UpdateCheck *>(p)->refresh();
                 vTaskDelete(NULL);
-            }, "mqtt_chkupd", 8192, updateCheck, 4, NULL);
+            }, "mqtt_chkupd", MQTT_UPDATE_TASK_STACK_BYTES, updateCheck, 4, NULL);
             mqtt_handler_publish_event("event/check_update",
                                        created == pdPASS ? "requested" : "task_create_failed");
         } else {
