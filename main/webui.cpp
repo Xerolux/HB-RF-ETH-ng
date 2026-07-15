@@ -1322,6 +1322,12 @@ httpd_uri_t post_restore_handler = {
     .handler = post_restore_handler_func,
     .user_ctx = NULL};
 
+// Forward declaration: prepare_ota_heap() is defined further down (after the
+// upload handler) but is now also used on the success path of the upload
+// handler so that heap/network-active subsystems are stopped before the
+// restart. Without this the upload handler would not compile.
+static uint32_t prepare_ota_heap();
+
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
     {                                                                             \
@@ -1518,6 +1524,19 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // Release the upload buffer before entering the restart path.
     free(ota_buff);
     ota_buff = NULL;
+
+    // Stop heap- and network-active subsystems before the restart so they do
+    // not touch lwIP / TLS during the link-down pause (flashPause) or the GPIO
+    // reconfiguration in full_system_restart(). The URL-OTA path
+    // (performOnlineUpdate in updatecheck.cpp) already does this via its own
+    // monitoring_pause_for_ota / supporter_crl_stop_refresh_task / stop()
+    // sequence; without it the WebUI upload was the only full_system_restart()
+    // caller that left MQTT, the CRL refresh task, the UpdateCheck esp_timer
+    // and the WebSocket publish worker running into the restart. On a flashPause
+    // device these kept operating on an Ethernet that had just been stopped,
+    // which surfaced as an Exception/Panic during the reboot. The success path
+    // ends in a full restart, so the returned paused-mask is discarded.
+    (void)prepare_ota_heap();
 
     // Restart on the existing 8 KiB httpd task. The previous dedicated 2 KiB
     // task overflowed while stopping Ethernet; simply enlarging it is not
