@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Exception/Panic nach WebUI-Datei-Update (fortlaufend):** Der Erfolgspfad des `/ota_update`-Handlers rief `full_system_restart()` auf, ohne vorher die heap-/netzaktiven Subsysteme (MQTT, CheckMK/Prometheus/Syslog, CRL-Refresh, UpdateCheck-esp_timer, WebSocket-Publish-Worker) zu stoppen — im Gegensatz zum URL-OTA-Pfad (`performOnlineUpdate`), der genau diese Stopp-Sequenz über `monitoring_pause_for_ota` / `supporter_crl_stop_refresh_task` / `UpdateCheck::stop()` ausführt. Bei aktiviertem Link-Down-Pause (flashPause) liefen diese Subsysteme während der 35-sekündigen Pause auf einem Ethernet, dessen MAC gerade gestoppt worden war, was in lwIP/TLS zu einem Exception/Panic führte, der beim Reboot sichtbar wurde. Der Erfolgspfad ruft jetzt `prepare_ota_heap()` auf, bevor der Restart erfolgt, sodass beide OTA-Pfade dieselbe konsistente Herunterfahr-Sequenz nutzen.
+
 ## [2.2.4-Beta.17] - 2026-07-14
 
 ### Changes
