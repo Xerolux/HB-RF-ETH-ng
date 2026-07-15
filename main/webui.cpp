@@ -87,9 +87,9 @@ static inline int cJSON_GetIntValueSafe(cJSON *item, int defaultValue)
         .handler = _resource##_handler_func,                           \
         .user_ctx = NULL};
 
-EMBED_HANDLER("/*", index_html_br, "text/html", "br")
-EMBED_HANDLER("/main.js", main_js_br, "application/javascript", "br")
-EMBED_HANDLER("/main.css", main_css_br, "text/css", "br")
+EMBED_HANDLER("/*", index_html_gz, "text/html", "gzip")
+EMBED_HANDLER("/main.js", main_js_gz, "application/javascript", "gzip")
+EMBED_HANDLER("/main.css", main_css_gz, "text/css", "gzip")
 EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon", "gzip")
 // PWA assets — make the WebUI installable. The single icon-256.png serves as
 // the standard icon, the maskable icon (declared in manifest.webmanifest with

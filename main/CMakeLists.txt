@@ -28,9 +28,9 @@ idf_component_register(SRCS ${app_sources}
                            spi_flash
                            )
 
-target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.css.br" BINARY)
-target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.js.br" BINARY)
-target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/index.html.br" BINARY)
+target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.css.gz" BINARY)
+target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.js.gz" BINARY)
+target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/index.html.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/favicon.ico.gz" BINARY)
 # PWA assets — make the WebUI installable ("Add to Home screen" on iOS,
 # "Install app" on Android). Single icon serves any/maskable/apple-touch.

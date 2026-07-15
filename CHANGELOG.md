@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **WebUI unbrauchbar (`ERR_CONTENT_DECODING_FAILED` in Chrome / rohe Brotli-Bytes in Firefox) seit Beta.19:** Die Brotli-Umstellung (Commit 1a912d8) hatte die eingebetteten WebUI-Assets (index.html, main.js, main.css) auf `Content-Encoding: br` umgestellt. Browser akzeptieren Brotli aber **nur über HTTPS** — über eine reine `http://`-Verbindung (wie sie das Gerät im LAN ausliefert) bieten Firefox/Chrome nur `gzip, deflate` an und dekodieren den Brotli-Stream nicht. Die Firmware sendete das `Content-Encoding: br` trotzdem hardcoded, wodurch Firefox die rohen komprimierten Bytes als Text anzeigte und Chrome mit `ERR_CONTENT_DECODING_FAILED` abbrach. Zurück auf Gzip für die eingebetteten Assets (`index.html.gz`, `main.js.gz`, `main.css.gz`); Gzip wird von jedem Browser auf HTTP und HTTPS unterstützt. Der Kompressionsunterschied zu Brotli (~15 %) ist im LAN irrelevant.
+
 ## [2.2.4-Beta.22] - 2026-07-15
 
 ### Changes
