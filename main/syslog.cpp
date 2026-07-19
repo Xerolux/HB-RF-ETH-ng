@@ -61,7 +61,14 @@ struct syslog_entry {
     size_t len;
 };
 
-static constexpr int QUEUE_DEPTH = 32;
+// Queue depth: 16 entries × ~516 bytes ≈ 8.3 KB heap. Halved from the
+// original 32 (16.5 KB) to ease heap pressure on the WROOM-32 (no PSRAM)
+// when syslog is enabled. Syslog forwarding is best-effort UDP; a full
+// queue already drops new lines via xQueueSend(..., 0) in enqueue(), so
+// the lower depth trades burst capacity for ~8 KB of freed heap that is
+// better spent on the TLS handshake during the periodic update check /
+// OTA path. 16 still covers the typical smart-home log volume.
+static constexpr int QUEUE_DEPTH = 16;
 
 // ---------------------------------------------------------------------------
 // ESP-IDF log line parsing.

@@ -30,6 +30,7 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
+#include "esp_heap_caps.h"
 
 #include "pins.h"
 #include "led.h"
@@ -298,6 +299,30 @@ void app_main()
 
     // Initialize reset info system
     ResetInfo::init();
+
+    // Surface the reset reason at boot. getResetDetails() is the canonical
+    // one-shot entry point: it auto-classifies unexplained reboots (panic,
+    // watchdog, brownout) when no subsystem had a chance to tag them, reads
+    // the persisted diagnostic string, and clears NVS so the next normal
+    // reboot does not show stale data. Calling it here makes the boot log
+    // the first consumer — MQTT (status/last_reset_reason) and /sysinfo.json
+    // later read the cached reset_text_buffer and see the same value. Without
+    // this block a user inspecting the serial log after an unexplained
+    // overnight reboot sees "no error" because nothing else logs the reason.
+    {
+        const char *details = sysInfo.getResetReason();
+        const char *esp_reason = ResetInfo::getEspResetReason();
+        const char *diag = ResetInfo::getLastDiag();
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+        ESP_LOGI(TAG, "Boot reset reason: %s (esp: %s)%s%s",
+                 details ? details : "(unknown)",
+                 esp_reason ? esp_reason : "(unknown)",
+                 (diag && diag[0]) ? " - " : "",
+                 (diag && diag[0]) ? diag : "");
+        ESP_LOGI(TAG, "Boot heap: %u bytes free, %u bytes largest block",
+                 (unsigned)free_heap, (unsigned)largest);
+    }
 
     static UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
     // NOTE: updateCheck.start() is intentionally deferred until AFTER

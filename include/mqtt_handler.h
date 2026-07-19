@@ -49,6 +49,11 @@ void mqtt_handler_publish_status(void);
 // Used for transient events like OTA started / finished / command rejected.
 void mqtt_handler_publish_event(const char *subtopic, const char *payload);
 
+// Publish the FreeRTOS task stack high-water marks under
+// <prefix>/status/task_stacks (retained). Called periodically by the publish
+// task; safe to call from elsewhere but not on the hot 5 s status cycle.
+void mqtt_handler_publish_task_stacks(void);
+
 // Force a single immediate status publish cycle (e.g. after a setting changed
 // or after OTA state changed). Safe to call from any task; returns immediately
 // and schedules the publish on the periodic task if it is running.
