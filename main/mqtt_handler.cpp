@@ -291,6 +291,13 @@ void mqtt_publish_task(void *pvParameters)
         mqtt_handler_publish_status();
         publish_ota_state();
 
+        // Task-stack diagnostics move slowly; publishing every cycle (5 s)
+        // wastes broker storage for no insight. ~60 s cadence is enough to
+        // spot slow leaks or post-OTA drift when the user files a bug.
+        if (publish_cycle % 12 == 0) {
+            mqtt_handler_publish_task_stacks();
+        }
+
         // Re-publish the moment the OTA state changes - users get instant
         // feedback when an update starts, finishes or fails.
         OtaSnapshot ota = monitoring_get_updatecheck()
@@ -356,6 +363,27 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload)
     snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic);
     // Non-retained, QoS 0: events are transient by definition.
     esp_mqtt_client_publish(client, topic, payload, 0, 0, 0);
+}
+
+// Publish the FreeRTOS task stack high-water marks as a single retained string.
+// Called infrequently (every 60 s) because the values move slowly and the
+// payload can be several hundred bytes — publishing it on the 5 s status cycle
+// would waste bandwidth and MQTT broker storage for no diagnostic gain.
+void mqtt_handler_publish_task_stacks(void)
+{
+    if (!mqtt_running.load() || client == NULL) {
+        return;
+    }
+    SysInfo *sysInfo = monitoring_get_sysinfo();
+    if (!sysInfo) return;
+
+    const char *stacks = sysInfo->getTaskStackInfo();
+    if (!stacks || !stacks[0]) return;
+
+    char topic[160];
+    snprintf(topic, sizeof(topic), "%s/status/task_stacks",
+             current_mqtt_config.topic_prefix);
+    esp_mqtt_client_publish(client, topic, stacks, 0, 0, 1);
 }
 
 // Publish one value under <prefix>/<subtopic> with retain=1, QoS=0.

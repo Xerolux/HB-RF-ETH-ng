@@ -37,6 +37,8 @@
 #include "pins.h"
 #include <atomic>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 
 #define DEFAULT_VREF 1100
@@ -318,4 +320,75 @@ const char* SysInfo::getResetReason()
 {
     // Use ResetInfo for detailed reset reasons
     return ResetInfo::getResetDetails();
+}
+
+const char* SysInfo::getTaskStackInfo()
+{
+    // Build a compact "name=hwm_bytes" list sorted by stack usage descending.
+    // The high-water mark (uxTaskGetStackHighWaterMark) is the minimum free
+    // stack ever observed for a task — small values flag tasks close to
+    // overflow, large values flag over-provisioned stacks that waste heap.
+    // Returned pointer is a static buffer so callers must copy if they need
+    // to keep the value across another call.
+    static char out[512];
+
+    // uxTaskGetSystemState needs CONFIG_FREERTOS_USE_TRACE_FACILITY (set in
+    // sdkconfig.defaults). Estimate an upper bound on the task count so the
+    // transient scratch allocation is right-sized without a second pass.
+    const size_t MAX_TASKS = 32;
+    TaskStatus_t *tasks = (TaskStatus_t *)malloc(sizeof(TaskStatus_t) * MAX_TASKS);
+    if (!tasks) {
+        snprintf(out, sizeof(out), "alloc-failed");
+        return out;
+    }
+
+    UBaseType_t n = uxTaskGetSystemState(tasks, MAX_TASKS, NULL);
+    if (n == 0) {
+        free(tasks);
+        snprintf(out, sizeof(out), "no-tasks");
+        return out;
+    }
+
+    // Sort descending by usStackHighWaterMark (bytes). The smaller this value,
+    // the closer the task got to overflow — so the most interesting entries
+    // (largest hwm = biggest waste) go to the end; we sort biggest-first so
+    // a truncated buffer still surfaces the worst waste.
+    for (UBaseType_t i = 1; i < n; i++) {
+        TaskStatus_t key = tasks[i];
+        UBaseType_t j = i;
+        while (j > 0 && tasks[j - 1].usStackHighWaterMark < key.usStackHighWaterMark) {
+            tasks[j] = tasks[j - 1];
+            j--;
+        }
+        tasks[j] = key;
+    }
+
+    size_t pos = 0;
+    out[0] = 0;
+    for (UBaseType_t i = 0; i < n; i++) {
+        // Skip the idle tasks — their hwm is not actionable and would just
+        // waste the limited buffer budget.
+        if (strcmp(tasks[i].pcTaskName, "IDLE0") == 0 ||
+            strcmp(tasks[i].pcTaskName, "IDLE1") == 0) {
+            continue;
+        }
+        // High-water mark is in stack words; multiply by sizeof(StackType_t)
+        // (= 4 bytes on the ESP32) to report bytes, matching the task-creation
+        // stack sizes passed to xTaskCreate.
+        unsigned hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark * sizeof(StackType_t);
+        int written = snprintf(out + pos, sizeof(out) - pos,
+                               "%s%s=%u",
+                               pos > 0 ? " " : "",
+                               tasks[i].pcTaskName,
+                               hwm_bytes);
+        if (written <= 0 || (size_t)written >= sizeof(out) - pos) {
+            // Truncated — append a marker and stop so the JSON is well-formed.
+            snprintf(out + pos, sizeof(out) - pos, "...");
+            break;
+        }
+        pos += (size_t)written;
+    }
+
+    free(tasks);
+    return out;
 }

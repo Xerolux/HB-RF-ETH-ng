@@ -635,6 +635,28 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
              hmIPMAC, _radioModuleDetector->getSGTIN());
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
+    // Task stack high-water marks. The summary string can exceed the 256-byte
+    // buf above, so emit it as its own chunk with a dedicated buffer. Spaces
+    // are legal in JSON strings; only escape quotes and backslashes (defensive
+    // — task names are bounded ASCII).
+    {
+        const char *stacks = _sysInfo->getTaskStackInfo();
+        char stack_buf[640];
+        size_t pos = 0;
+        stack_buf[0] = 0;
+        pos += snprintf(stack_buf + pos, sizeof(stack_buf) - pos,
+                        ",\"taskStacks\":\"");
+        for (const char *p = stacks; *p && pos + 4 < sizeof(stack_buf); p++) {
+            if (*p == '"' || *p == '\\') {
+                stack_buf[pos++] = '\\';
+            }
+            stack_buf[pos++] = *p;
+        }
+        stack_buf[pos++] = '"';
+        stack_buf[pos] = 0;
+        httpd_resp_send_chunk(req, stack_buf, pos);
+    }
+
     // Supporter key logic
     if (_settings->getSupporterKey() && strlen(_settings->getSupporterKey()) > 0) {
         SupporterKeyStatus sk;
