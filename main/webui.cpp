@@ -47,6 +47,7 @@
 #include "log_manager.h"
 #include "reset_info.h"
 #include "system_reset.h"
+#include "system_overview_api.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
@@ -2800,7 +2801,8 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 40;
+    // Reserve capacity for modular diagnostics/theme APIs.
+    config.max_uri_handlers = 44;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = log_stream_close_socket;
     // Increase stack: POST handlers allocate content buffers + config structs
@@ -2815,6 +2817,7 @@ void WebUI::start()
         // so subscribers can connect before any monitoring backend is enabled.
         log_stream_init();
         httpd_register_uri_handler(_httpd_handle, &log_stream_ws_uri);
+        system_overview_api_register(_httpd_handle);
 
         httpd_register_uri_handler(_httpd_handle, &post_login_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_password_reset_start_handler);
