@@ -27,7 +27,7 @@ namespace
 {
 constexpr const char *TAG = "WebUIStorage";
 constexpr const char *PARTITION_LABEL = "spiffs";
-constexpr const char *BASE_PATH = "/www";
+#define BASE_PATH "/www"
 constexpr size_t SHA256_HEX_LENGTH = 64;
 constexpr size_t UPDATE_BUFFER_SIZE = 2048;
 constexpr size_t INVALIDATE_SECTOR_SIZE = 0x1000;
