@@ -26,37 +26,16 @@
     <link rel="apple-touch-icon" href="/icon-256.png" />
     <link rel="icon" type="image/png" sizes="256x256" href="/icon-256.png" />
     <!-- Never cache the HTML shell: it carries the cache-busting ?v=<hash>
-         query params that point at the current JS/CSS build. If the browser
-         served a stale index.html, it would keep loading the previous (cached)
-         main.js / main.css after a firmware update, so the user would have to
-         clear the cache manually. Keeping the HTML uncached guarantees the
-         asset references are always fresh, and the assets themselves are then
-         fetched with the new ?v=<hash> URL (forcing a real reload). -->
+         query params that point at the current JS/CSS build. -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
 </head>
-<body>
-  <script>
-    // Prevent a flash of the OLD design before Vue mounts.
-    //
-    // The new-design toggle is persisted in localStorage as
-    // "hb-rf-eth-ng-test-design" = "1". The new-design CSS in styles/main.css
-    // keys off `body.newdesign-active`, so we set that class synchronously,
-    // inline, before first paint — otherwise the page renders the old glass UI
-    // for a frame and then flips when app.vue / the experimental store mounts.
-    // The login landing page is by far the most visible case of that flash.
-    // try/catch: iOS Safari private mode / some embedded WebViews throw on
-    // storage access; a failure here just means we skip the early class (the
-    // store still applies it once Vue mounts).
-    try {
-      if (localStorage.getItem('hb-rf-eth-ng-test-design') === '1') {
-        document.body.classList.add('newdesign-active');
-      }
-    } catch (e) { /* ignore: storage unavailable */ }
-  </script>
+<body class="newdesign-active">
+  <!-- The New Design is now the only supported WebUI. The class is fixed in
+       the HTML shell so no retired-layout flash is possible before Vue mounts. -->
   <div id="app"></div>
   <script type="module" src="./src/main.js"></script>
 </body>
