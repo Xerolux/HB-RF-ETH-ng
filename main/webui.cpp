@@ -47,6 +47,8 @@
 #include "log_manager.h"
 #include "reset_info.h"
 #include "system_reset.h"
+#include "system_overview_api.h"
+#include "theme_api.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
@@ -2758,10 +2760,25 @@ esp_err_t get_log_download_handler_func(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"hb-rf-eth-log.txt\"");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
-    std::string content = LogManager::instance().getLogContent();
-    httpd_resp_send(req, content.c_str(), content.length());
+    uint64_t absolute_offset = 0;
+    char chunk[1024];
+    esp_err_t result = ESP_OK;
+    while (true)
+    {
+        const size_t count = LogManager::instance().readChunk(
+            &absolute_offset, chunk, sizeof(chunk));
+        if (count == 0) break;
 
-    return ESP_OK;
+        result = httpd_resp_send_chunk(req, chunk, count);
+        if (result != ESP_OK) break;
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    if (result == ESP_OK)
+    {
+        result = httpd_resp_send_chunk(req, nullptr, 0);
+    }
+    return result;
 }
 
 httpd_uri_t get_log_download_handler = {
@@ -2800,7 +2817,8 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 40;
+    // Reserve capacity for modular diagnostics/theme APIs.
+    config.max_uri_handlers = 44;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = log_stream_close_socket;
     // Increase stack: POST handlers allocate content buffers + config structs
@@ -2815,6 +2833,8 @@ void WebUI::start()
         // so subscribers can connect before any monitoring backend is enabled.
         log_stream_init();
         httpd_register_uri_handler(_httpd_handle, &log_stream_ws_uri);
+        system_overview_api_register(_httpd_handle);
+        theme_api_register(_httpd_handle);
 
         httpd_register_uri_handler(_httpd_handle, &post_login_json_handler);
         httpd_register_uri_handler(_httpd_handle, &post_password_reset_start_handler);

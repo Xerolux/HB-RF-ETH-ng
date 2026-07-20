@@ -20,6 +20,8 @@ import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import SystemLog from './systemlog.vue'
+import SystemOverview from './systemoverview.vue'
+import ThemeSettings from './theme.vue'
 import AppIcon from './components/AppIcon.vue'
 
 // Router
@@ -32,6 +34,8 @@ const router = createRouter({
     { path: '/webui', component: WebUIUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
+    { path: '/system-overview', component: SystemOverview, meta: { requiresAuth: true } },
+    { path: '/theme', component: ThemeSettings, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
     // bareLayout: rendered WITHOUT the app shell (no sidebar header, no footer).
