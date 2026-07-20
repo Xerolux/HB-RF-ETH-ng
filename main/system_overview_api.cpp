@@ -14,11 +14,11 @@
 #include "security_headers.h"
 #include "webui_storage.h"
 
+extern esp_err_t validate_auth(httpd_req_t *req);
+
 namespace
 {
 constexpr const char *TAG = "SystemOverview";
-
-extern esp_err_t validate_auth(httpd_req_t *req);
 
 esp_err_t get_system_overview(httpd_req_t *req)
 {

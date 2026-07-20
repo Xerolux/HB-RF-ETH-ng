@@ -10,6 +10,8 @@
 
 #include "security_headers.h"
 
+extern esp_err_t validate_auth(httpd_req_t *req);
+
 namespace
 {
 constexpr const char *TAG = "ThemeAPI";
@@ -18,8 +20,6 @@ constexpr const char *NVS_SCHEME_KEY = "scheme";
 constexpr const char *NVS_COLOR_KEY = "primary";
 constexpr const char *DEFAULT_SCHEME = "system";
 constexpr const char *DEFAULT_COLOR = "#f26a3d";
-
-extern esp_err_t validate_auth(httpd_req_t *req);
 
 bool valid_scheme(const char *value)
 {
