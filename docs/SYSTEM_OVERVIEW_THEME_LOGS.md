@@ -63,11 +63,12 @@ flash of the default theme. The device response then becomes authoritative and
 is mirrored back to local storage. Theme settings are stored in the NVS
 namespace `ui_theme` and therefore survive firmware and separate WebUI updates.
 
-## Allocation-free log download
+## Bounded log download
 
 `GET /api/log/download` no longer constructs a complete `std::string` snapshot.
-It reads the existing in-memory ring buffer in 1 KiB chunks and sends them using
-HTTP chunked transfer encoding.
+It records the absolute end offset at request start, allocates one bounded 1 KiB
+heap buffer, and streams only the data that existed at that moment. New log lines
+written during the transfer cannot keep the response open indefinitely.
 
 A reader whose absolute offset points to overwritten data is advanced to the
 oldest byte still present. This keeps download memory constant while preserving
