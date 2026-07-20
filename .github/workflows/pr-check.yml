@@ -80,6 +80,9 @@ jobs:
           cd webui
           npm run build
 
+      - name: Validate translations and German fallback
+        run: node scripts/check-translations.mjs
+
       - name: Check for console.log statements
         run: |
           cd webui
