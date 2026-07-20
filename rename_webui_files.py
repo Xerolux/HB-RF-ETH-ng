@@ -1,142 +1,199 @@
 """
-Script to rename Vite/Parcel output files with content hashes to fixed names
+Prepare the Vite output for both firmware embedding and the standalone WWW image.
+
+Only the current New Design is packaged. The retired UI and the historical
+`alt/webui` build are deliberately excluded.
 """
 from pathlib import Path
-import shutil
 import gzip
+import json
+import shutil
 
 try:
     Import("env")
 except NameError:
     pass
 
+
+def gzip_file(source: Path, target: Path) -> None:
+    with source.open("rb") as f_in:
+        with gzip.open(target, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+
+def build_spiffs_source(dist_dir: Path) -> None:
+    """Create a minimal source tree for spiffs_create_partition_image()."""
+    image_dir = Path("webui/spiffs_image")
+    if image_dir.exists():
+        shutil.rmtree(image_dir)
+    image_dir.mkdir(parents=True)
+
+    mandatory_assets = [
+        "index.html.gz",
+        "main.js.gz",
+        "main.css.gz",
+    ]
+    optional_assets = [
+        "favicon.ico.gz",
+        "manifest.webmanifest.gz",
+        "icon-256.png.gz",
+    ]
+
+    missing = [name for name in mandatory_assets if not (dist_dir / name).is_file()]
+    if missing:
+        raise RuntimeError(
+            "Cannot build standalone New Design image; missing: "
+            + ", ".join(missing)
+        )
+
+    copied = []
+    for name in mandatory_assets + optional_assets:
+        source = dist_dir / name
+        if source.is_file():
+            shutil.copy2(source, image_dir / name)
+            copied.append(name)
+
+    package_file = Path("webui/package.json")
+    package = json.loads(package_file.read_text(encoding="utf-8"))
+    version = str(package.get("version", "unknown")).strip() or "unknown"
+
+    (image_dir / "webui-version.txt").write_text(
+        version + "\n", encoding="utf-8"
+    )
+    (image_dir / "webui-manifest.json").write_text(
+        json.dumps(
+            {
+                "format": 1,
+                "product": "HB-RF-ETH-ng",
+                "design": "newdesign",
+                "version": version,
+                "assets": copied,
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    total_size = sum(path.stat().st_size for path in image_dir.iterdir())
+    partition_size = 0x50000
+    if total_size >= partition_size:
+        raise RuntimeError(
+            f"New Design assets use {total_size} bytes and exceed the "
+            f"{partition_size}-byte SPIFFS partition before filesystem overhead"
+        )
+
+    print(
+        f"Prepared standalone New Design image source: {len(copied)} assets, "
+        f"version {version}, {total_size}/{partition_size} bytes before SPIFFS overhead"
+    )
+
+
 def rename_webui_files():
-    """Rename webui dist files to fixed names expected by platformio.ini"""
+    """Rename Vite output files to the stable names expected by the firmware."""
     dist_dir = Path("webui/dist")
 
     if not dist_dir.exists():
         print("WARNING: webui/dist directory not found")
         return
 
-    # Mapping of patterns to target filenames (Vite uses index-[hash].js/css)
+    # Mapping of patterns to target filenames (Vite uses index-[hash].js/css).
     renames = [
         ("index-*.js.gz", "main.js.gz"),
         ("index-*.css.gz", "main.css.gz"),
-        # Fallback for Parcel naming
+        # Fallback for historical Parcel naming.
         ("webui.*.js.gz", "main.js.gz"),
         ("webui.*.css.gz", "main.css.gz"),
     ]
 
-    # Track old -> new names for HTML replacement
     replacements = {}
 
     for pattern, target in renames:
         matches = list(dist_dir.glob(pattern))
-
         if not matches:
             continue
 
         source = matches[0]
         dest = dist_dir / target
-
-        # Store replacement mapping (without .gz extension for HTML)
-        old_name = source.name.replace('.gz', '')
-        new_name = target.replace('.gz', '')
+        old_name = source.name.replace(".gz", "")
+        new_name = target.replace(".gz", "")
         replacements[old_name] = new_name
 
-        # Remove old target if exists
         if dest.exists():
             dest.unlink()
 
-        # Rename source to target
         shutil.move(str(source), str(dest))
         print(f"Renamed {source.name} -> {target}")
 
-    # Update index.html and index.html.gz with new filenames
+    # Update index.html and regenerate its compressed copy.
     index_html = dist_dir / "index.html"
     index_html_gz = dist_dir / "index.html.gz"
 
     if index_html.exists():
-        with open(index_html, 'r', encoding='utf-8') as f:
-            html_content = f.read()
+        html_content = index_html.read_text(encoding="utf-8")
 
-        # Replace old filenames with new ones
         for old_name, new_name in replacements.items():
             html_content = html_content.replace(old_name, new_name)
             print(f"Replaced {old_name} -> {new_name} in index.html")
 
-        # Also update favicon references (Vite generates index-[hash].ico or favicon.[hash].ico)
         import re
-        favicon_pattern = re.compile(r'(?:index|favicon)-[A-Za-z0-9_-]+\.ico')
-        favicon_matches = favicon_pattern.findall(html_content)
-        for old_favicon in favicon_matches:
+
+        favicon_pattern = re.compile(r"(?:index|favicon)-[A-Za-z0-9_-]+\.ico")
+        for old_favicon in favicon_pattern.findall(html_content):
             html_content = html_content.replace(old_favicon, "favicon.ico")
             print(f"Replaced {old_favicon} -> favicon.ico in index.html")
 
-        with open(index_html, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+        index_html.write_text(html_content, encoding="utf-8")
         print("Updated index.html with new filenames")
 
-        with gzip.open(index_html_gz, 'wt', encoding='utf-8') as f:
-            f.write(html_content)
+        with gzip.open(index_html_gz, "wt", encoding="utf-8") as f_out:
+            f_out.write(html_content)
         print("Created index.html.gz")
 
-    # Handle favicon - copy from webui root and compress
+    # Favicon: copy the canonical file and compress it.
     webui_favicon = Path("webui/favicon.ico")
     dist_favicon = dist_dir / "favicon.ico"
     favicon_gz = dist_dir / "favicon.ico.gz"
 
-    # Delete any hashed favicon files (both favicon.[hash].ico and index-[hash].ico)
     for pattern in ["favicon.*.ico", "index-*.ico"]:
-        for f in dist_dir.glob(pattern):
-            f.unlink()
-            print(f"Removed {f.name}")
+        for file in dist_dir.glob(pattern):
+            file.unlink()
+            print(f"Removed {file.name}")
 
-    # Copy favicon from webui root to dist
     if webui_favicon.exists():
         if not dist_favicon.exists():
-            shutil.copy2(str(webui_favicon), str(dist_favicon))
+            shutil.copy2(webui_favicon, dist_favicon)
             print("Copied favicon.ico to dist")
-
-        # Compress favicon
         if dist_favicon.exists():
-            with open(dist_favicon, 'rb') as f_in:
-                with gzip.open(favicon_gz, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+            gzip_file(dist_favicon, favicon_gz)
             print("Created favicon.ico.gz")
     else:
         print("WARNING: webui/favicon.ico not found")
 
+    # Some Vite configurations emit uncompressed JS/CSS. Ensure compressed
+    # stable-name variants exist for both embedding and SPIFFS packaging.
     for filename in ["main.js", "main.css"]:
         source = dist_dir / filename
         target = dist_dir / f"{filename}.gz"
         if source.exists():
-            with open(source, 'rb') as f_in:
-                with gzip.open(target, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+            gzip_file(source, target)
             print(f"Created {target.name}")
-        else:
+        elif not target.exists():
             print(f"WARNING: {filename} not found in dist")
 
-    # PWA assets (progressive web app installability). Vite copies files from
-    # webui/public/ to dist/ verbatim; gzip them here so CMake can embed the
-    # .gz variants the same way it embeds main.js.gz / favicon.ico.gz. PNG icons
-    # are already compressed image data, so gzip barely shrinks them — but the
-    # firmware handler sets Content-Encoding: gzip for every embedded asset, so
-    # a .gz copy is required for the response to decode correctly.
-    pwa_assets = [
-        "manifest.webmanifest",
-        "icon-256.png",
-    ]
-    for filename in pwa_assets:
+    # PWA assets. PNG is already compressed, but the firmware consistently
+    # serves the packaged variant with Content-Encoding: gzip.
+    for filename in ["manifest.webmanifest", "icon-256.png"]:
         source = dist_dir / filename
         target = dist_dir / f"{filename}.gz"
         if source.exists():
-            with open(source, 'rb') as f_in:
-                with gzip.open(target, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+            gzip_file(source, target)
             print(f"Created {target.name}")
         else:
             print(f"WARNING: PWA asset {filename} not found in dist")
+
+    build_spiffs_source(dist_dir)
+
 
 rename_webui_files()
