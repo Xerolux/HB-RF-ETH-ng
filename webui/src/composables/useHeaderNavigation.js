@@ -6,6 +6,7 @@ export const useHeaderNavigation = (t, loginStore) => {
     { to: '/monitoring', icon: 'monitoring', label: t('nav.monitoring'), group: 'overview' },
     { to: '/settings', icon: 'settings', label: t('nav.settings'), group: 'system' },
     { to: '/firmware', icon: 'firmware', label: t('nav.firmware'), group: 'system' },
+    { to: '/webui', icon: 'firmware', label: 'WebUI', group: 'system' },
     { to: '/systemlog', icon: 'logs', label: t('nav.systemlog'), group: 'system' },
     { to: '/about', icon: 'info', label: t('nav.about'), group: 'info', public: true }
   ])
