@@ -8,22 +8,87 @@ const getStoredLastActivity = () => {
   return Number.isFinite(stored) && stored > 0 ? stored : Date.now()
 }
 
+const DEFAULT_PRIMARY_COLOR = '#f26a3d'
+const isHexColor = (value) => /^#[0-9a-f]{6}$/i.test(value || '')
+const shiftColor = (hex, amount) => {
+  const value = parseInt(hex.slice(1), 16)
+  const clamp = (part) => Math.max(0, Math.min(255, part + amount))
+  const red = clamp((value >> 16) & 0xff)
+  const green = clamp((value >> 8) & 0xff)
+  const blue = clamp(value & 0xff)
+  return `#${[red, green, blue].map((part) => part.toString(16).padStart(2, '0')).join('')}`
+}
+const rgbaColor = (hex, alpha) => {
+  const value = parseInt(hex.slice(1), 16)
+  return `rgba(${(value >> 16) & 0xff}, ${(value >> 8) & 0xff}, ${value & 0xff}, ${alpha})`
+}
+
 export const useThemeStore = defineStore('theme', {
   state: () => ({
-    theme: safeLocal.get('theme') || 'light'
+    theme: safeLocal.get('theme') || 'system',
+    primaryColor: isHexColor(safeLocal.get('primaryColor'))
+      ? safeLocal.get('primaryColor')
+      : DEFAULT_PRIMARY_COLOR,
+    loadedFromDevice: false
   }),
   actions: {
-    setTheme(newTheme) {
+    apply() {
+      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+      const resolved = this.theme === 'system'
+        ? (prefersDark ? 'dark' : 'light')
+        : this.theme
+      document.documentElement.setAttribute('data-bs-theme', resolved)
+
+      const color = isHexColor(this.primaryColor) ? this.primaryColor : DEFAULT_PRIMARY_COLOR
+      const root = document.documentElement.style
+      root.setProperty('--color-primary', color)
+      root.setProperty('--color-primary-hover', shiftColor(color, -20))
+      root.setProperty('--color-primary-strong', shiftColor(color, -42))
+      root.setProperty('--color-primary-dark', shiftColor(color, -42))
+      root.setProperty('--color-primary-soft', rgbaColor(color, resolved === 'dark' ? 0.16 : 0.12))
+      root.setProperty('--color-primary-light', rgbaColor(color, resolved === 'dark' ? 0.16 : 0.12))
+    },
+    persist() {
+      axios.post('/api/theme', {
+        colorScheme: this.theme,
+        primaryColor: this.primaryColor
+      }, { timeout: 5000, silent: true }).catch(() => {})
+    },
+    setTheme(newTheme, persist = true) {
+      if (!['system', 'light', 'dark'].includes(newTheme)) return
       this.theme = newTheme
       safeLocal.set('theme', newTheme)
-      document.documentElement.setAttribute('data-bs-theme', newTheme)
+      this.apply()
+      if (persist) this.persist()
+    },
+    setPrimaryColor(newColor, persist = true) {
+      if (!isHexColor(newColor)) return
+      this.primaryColor = newColor.toLowerCase()
+      safeLocal.set('primaryColor', this.primaryColor)
+      this.apply()
+      if (persist) this.persist()
     },
     toggleTheme() {
-      const newTheme = this.theme === 'light' ? 'dark' : 'light'
-      this.setTheme(newTheme)
+      const currentlyDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
+      this.setTheme(currentlyDark ? 'light' : 'dark')
     },
     init() {
-      document.documentElement.setAttribute('data-bs-theme', this.theme)
+      this.apply()
+      window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+        if (this.theme === 'system') this.apply()
+      })
+      axios.get('/api/theme', { timeout: 5000, silent: true })
+        .then((response) => {
+          const scheme = response.data?.colorScheme
+          const color = response.data?.primaryColor
+          if (['system', 'light', 'dark'].includes(scheme)) this.theme = scheme
+          if (isHexColor(color)) this.primaryColor = color.toLowerCase()
+          safeLocal.set('theme', this.theme)
+          safeLocal.set('primaryColor', this.primaryColor)
+          this.loadedFromDevice = true
+          this.apply()
+        })
+        .catch(() => {})
     }
   }
 })
