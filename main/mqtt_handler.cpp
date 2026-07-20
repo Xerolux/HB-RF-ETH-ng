@@ -163,29 +163,17 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         ESP_LOGI(TAG, "Restart command received via MQTT");
         ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
         mqtt_handler_publish_event("event/restart", "requested");
-        // Give the broker a moment to flush the publish before we tear down TCP.
         vTaskDelay(pdMS_TO_TICKS(300));
-        // Route through full_system_restart() so the optional flash pause
-        // (35 s Ethernet link drop) also applies when the device is rebooted
-        // via MQTT, matching the behaviour of the WebUI restart button.
         full_system_restart();
     } else if (strcmp(command, "factory_reset") == 0) {
         ESP_LOGI(TAG, "Factory reset command received via MQTT");
         mqtt_handler_publish_event("event/factory_reset", "requested");
         vTaskDelay(pdMS_TO_TICKS(300));
         perform_factory_reset();
-        // After factory reset, the flash-pause setting has just been wiped
-        // from NVS — full_system_restart() will skip the 35 s wait naturally.
         full_system_restart();
     } else {
-                mqtt_handler_publish_event("event/update_started", "requested");
-            }
-        } else {
-            ESP_LOGW(TAG, "UpdateCheck not available");
-            mqtt_handler_publish_event("event/update_failed", "updatecheck_unavailable");
-        }
-    } else {
         ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
+        mqtt_handler_publish_event("event/command_rejected", "reason=unknown_command");
     }
 }
 
