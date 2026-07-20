@@ -1,5 +1,5 @@
 <template>
-  <div id="app" :class="{ 'newdesign-shell': experimentalStore.testDesignEnabled, 'bare-layout': isBareLayout }">
+  <div id="app" class="newdesign-shell" :class="{ 'bare-layout': isBareLayout }">
     <!-- Bare layout: full-screen pages (login) render standalone, no shell. -->
     <main v-if="isBareLayout" class="bare-main">
       <RouterView v-slot="{ Component }">
@@ -11,7 +11,7 @@
 
     <!-- Full app shell: sidebar header + content + footer. -->
     <div v-else class="app-container">
-      <component :is="experimentalStore.testDesignEnabled ? NewDesignHeader : Header" />
+      <NewDesignHeader />
       <main class="main-content">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
@@ -107,9 +107,8 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { useExperimentalStore, useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
+import { useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
 import { safeLocal, safeSession } from './composables/useSafeStorage'
-import Header from './header.vue'
 import NewDesignHeader from './components/NewDesignHeader.vue'
 import SponsorModal from './components/SponsorModal.vue'
 import AppToastContainer from './components/AppToastContainer.vue'
@@ -118,7 +117,6 @@ const { t } = useI18n()
 const route = useRoute()
 const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
-const experimentalStore = useExperimentalStore()
 const restartUiStore = useRestartUiStore()
 const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)

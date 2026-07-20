@@ -2,7 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
-import { useExperimentalStore, useLoginStore, useThemeStore, useUiStore } from './stores.js'
+import { useLoginStore, useThemeStore, useUiStore } from './stores.js'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
@@ -183,33 +183,8 @@ app.component('AppIcon', AppIcon)
 const themeStore = useThemeStore()
 themeStore.init()
 
-// The New Design is no longer experimental or optional. Keep the historical
-// store temporarily for compatibility with existing device settings, but make
-// the retired layout unreachable.
-const experimentalStore = useExperimentalStore()
-const enforceNewDesign = () => {
-  if (!experimentalStore.testDesignEnabled) {
-    experimentalStore.$patch({ testDesignEnabled: true })
-  }
-  document.body.classList.add('newdesign-active')
-  try {
-    localStorage.setItem('hb-rf-eth-ng-test-design', '1')
-  } catch (e) {
-    // Runtime state remains authoritative if browser storage is unavailable.
-  }
-}
-
-enforceNewDesign()
-experimentalStore.init()
-experimentalStore.$subscribe((_mutation, state) => {
-  if (!state.testDesignEnabled) {
-    queueMicrotask(enforceNewDesign)
-  }
-})
-experimentalStore.$onAction(({ after, onError }) => {
-  after(enforceNewDesign)
-  onError(enforceNewDesign)
-})
+// The New Design is the only application shell.
+document.body.classList.add('newdesign-active')
 
 // Activity tracking for idle timeout
 let lastUpdate = 0
