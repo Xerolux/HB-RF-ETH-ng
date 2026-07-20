@@ -1,0 +1,31 @@
+name: Apply WebUI version split
+
+on:
+  push:
+    branches:
+      - feature/separate-webui-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/separate-webui-update
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Synchronize package lock
+        run: python3 update_webui_version.py 1.0.0-Beta.1
+
+      - name: Remove helper and push
+        run: |
+          rm .github/workflows/apply-webui-version-split.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add webui/package.json webui/package-lock.json webui/compatibility.json .github/workflows/apply-webui-version-split.yml
+          git commit -m 'chore(webui): synchronize independent version metadata'
+          git push origin HEAD:feature/separate-webui-update
