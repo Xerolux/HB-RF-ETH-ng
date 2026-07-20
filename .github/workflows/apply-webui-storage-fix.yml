@@ -1,0 +1,42 @@
+name: Apply WebUI storage source fix
+
+on:
+  push:
+    branches:
+      - feature/separate-webui-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/separate-webui-update
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Replace invalid path concatenation declaration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('main/webui_storage.cpp')
+          text = source.read_text(encoding='utf-8')
+          old = 'constexpr const char *BASE_PATH = "/www";'
+          new = '#define BASE_PATH "/www"'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one BASE_PATH declaration, found {text.count(old)}')
+          source.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Remove one-time workflow and push fix
+        run: |
+          rm .github/workflows/apply-webui-storage-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/webui_storage.cpp .github/workflows/apply-webui-storage-fix.yml
+          git commit -m 'fix(webui): use literal base path for asset concatenation'
+          git push origin HEAD:feature/separate-webui-update
