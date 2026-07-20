@@ -17,31 +17,31 @@ except NameError:
 
 def gzip_file(source: Path, target: Path) -> None:
     with source.open("rb") as f_in:
-        with gzip.open(target, "wb") as f_out:
+        with gzip.open(target, "wb", compresslevel=9) as f_out:
             shutil.copyfileobj(f_in, f_out)
 
 
 def build_spiffs_source(dist_dir: Path) -> None:
-    """Create a minimal source tree for spiffs_create_partition_image()."""
+    """Create the minimal source tree for spiffs_create_partition_image()."""
     image_dir = Path("webui/spiffs_image")
     if image_dir.exists():
         shutil.rmtree(image_dir)
     image_dir.mkdir(parents=True)
 
+    # The full single-file Vue application is too large for the existing
+    # 0x50000-byte partition when stored as gzip. Vite already creates Brotli
+    # variants through vite-plugin-compression2; modern browsers decode them
+    # directly via Content-Encoding: br. HTML stays gzip because it is tiny and
+    # must be regenerated after the cache-busting plugin rewrites its URLs.
     mandatory_assets = [
         "index.html.gz",
-        "main.js.gz",
-        "main.css.gz",
+        "main.js.br",
+        "main.css.br",
     ]
     optional_assets = [
         "favicon.ico.gz",
         "manifest.webmanifest.gz",
     ]
-
-    # icon-256.png.gz is intentionally NOT copied to the 320 KiB WWW image. It
-    # is comparatively large and remains available through the embedded New
-    # Design fallback handler. This leaves enough SPIFFS headroom for future JS
-    # and CSS growth without changing the existing 4 MB partition table.
 
     missing = [name for name in mandatory_assets if not (dist_dir / name).is_file()]
     if missing:
@@ -72,6 +72,11 @@ def build_spiffs_source(dist_dir: Path) -> None:
                 "design": "newdesign",
                 "version": version,
                 "assets": copied,
+                "encodings": {
+                    "index.html": "gzip",
+                    "main.js": "br",
+                    "main.css": "br",
+                },
                 "embeddedFallbackAssets": ["icon-256.png.gz"],
             },
             separators=(",", ":"),
@@ -83,10 +88,13 @@ def build_spiffs_source(dist_dir: Path) -> None:
 
     total_size = sum(path.stat().st_size for path in image_dir.iterdir())
     partition_size = 0x50000
-    if total_size >= partition_size:
+    # Reserve room for SPIFFS metadata/pages rather than merely comparing raw
+    # bytes with the partition boundary.
+    safety_margin = 12 * 1024
+    if total_size > partition_size - safety_margin:
         raise RuntimeError(
-            f"New Design assets use {total_size} bytes and exceed the "
-            f"{partition_size}-byte SPIFFS partition before filesystem overhead"
+            f"New Design assets use {total_size} bytes; maximum with SPIFFS "
+            f"headroom is {partition_size - safety_margin} bytes"
         )
 
     print(
@@ -103,11 +111,11 @@ def rename_webui_files():
         print("WARNING: webui/dist directory not found")
         return
 
-    # Mapping of patterns to target filenames (Vite uses index-[hash].js/css).
+    # Compatibility with historical Vite/Parcel hashed output. Current Vite
+    # emits stable main.js/main.css names directly.
     renames = [
         ("index-*.js.gz", "main.js.gz"),
         ("index-*.css.gz", "main.css.gz"),
-        # Fallback for historical Parcel naming.
         ("webui.*.js.gz", "main.js.gz"),
         ("webui.*.css.gz", "main.css.gz"),
     ]
@@ -131,7 +139,8 @@ def rename_webui_files():
         shutil.move(str(source), str(dest))
         print(f"Renamed {source.name} -> {target}")
 
-    # Update index.html and regenerate its compressed copy.
+    # Update index.html and regenerate its compressed copy after all Vite
+    # plugins have finished rewriting it.
     index_html = dist_dir / "index.html"
     index_html_gz = dist_dir / "index.html.gz"
 
@@ -152,7 +161,7 @@ def rename_webui_files():
         index_html.write_text(html_content, encoding="utf-8")
         print("Updated index.html with new filenames")
 
-        with gzip.open(index_html_gz, "wt", encoding="utf-8") as f_out:
+        with gzip.open(index_html_gz, "wt", encoding="utf-8", compresslevel=9) as f_out:
             f_out.write(html_content)
         print("Created index.html.gz")
 
@@ -176,8 +185,7 @@ def rename_webui_files():
     else:
         print("WARNING: webui/favicon.ico not found")
 
-    # Some Vite configurations emit uncompressed JS/CSS. Ensure compressed
-    # stable-name variants exist for both embedding and SPIFFS packaging.
+    # Ensure gzip variants remain available to the embedded transition UI.
     for filename in ["main.js", "main.css"]:
         source = dist_dir / filename
         target = dist_dir / f"{filename}.gz"
@@ -187,8 +195,8 @@ def rename_webui_files():
         elif not target.exists():
             print(f"WARNING: {filename} not found in dist")
 
-    # PWA assets remain embedded in the transition firmware. Only the compact
-    # manifest is also copied into the standalone SPIFFS source above.
+    # PWA assets remain embedded. The compact manifest also enters SPIFFS; the
+    # larger PNG icon is served by the embedded fallback route.
     for filename in ["manifest.webmanifest", "icon-256.png"]:
         source = dist_dir / filename
         target = dist_dir / f"{filename}.gz"
