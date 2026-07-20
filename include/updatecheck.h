@@ -59,6 +59,8 @@ struct ReleaseInfo {
     bool isPrerelease;          // matches GitHub "prerelease" flag
     bool betaChannel;           // channel used to populate this cache
     WebUIReleaseInfo webui;     // optional WebUI block from the same manifest
+    bool betaChannel;           // channel used to populate this cache
+    WebUIReleaseInfo webui;     // optional WebUI block from the same manifest
     char body[4096];            // release notes markdown (truncated if too long)
     int64_t fetchedAtMs;        // epoch millis of the last successful fetch
     char error[128];            // human-readable last error (empty when valid)

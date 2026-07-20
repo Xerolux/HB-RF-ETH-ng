@@ -1549,6 +1549,14 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
                 goto err;
             }
 
+            if (recv_len <= 0 || static_cast<unsigned char>(ota_buff[0]) != 0xE9) {
+                ESP_LOGW(TAG, "Rejected non-ESP firmware image (magic 0x%02x)",
+                         recv_len > 0 ? static_cast<unsigned char>(ota_buff[0]) : 0);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                    "Falsche Datei: kein gueltiges ESP32-Firmware-Abbild. WebUI unter System -> WebUI installieren.");
+                goto err;
+            }
+
             // Only raw binary uploads are supported (the WebUI posts the file
             // as the request body). The previous multipart/form-data path was
             // broken by design: it compared stripped body bytes against the

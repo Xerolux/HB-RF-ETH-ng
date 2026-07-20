@@ -783,6 +783,7 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
 
         parsedOk = _parseUpdateManifest(resp.buf, out);
         if (parsedOk) out->betaChannel = beta;
+        if (parsedOk) out->betaChannel = beta;
 
         ESP_LOGI(TAG, "Parse %s (heap free %u KB)",
                  parsedOk ? "ok" : "failed",
