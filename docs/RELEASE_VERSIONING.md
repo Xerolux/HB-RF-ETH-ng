@@ -46,8 +46,7 @@ check, but publishes only:
 
 The tag is `webui-v<version>`. The release is never marked as GitHub's Latest
 firmware release. Existing firmware fields in `latest.json` or `beta.json` are
-preserved byte-for-byte at the logical JSON-field level; only the `webui` block
-is replaced.
+preserved at the logical JSON-field level; only the `webui` block is replaced.
 
 ## Channels
 
@@ -64,10 +63,14 @@ is replaced.
 - `minFirmwareVersion`: minimum semantic firmware version
 
 The same values are embedded into `webui-manifest.json` inside `spiffs.bin` and
-published in the update manifest. The browser rejects an incompatible online
-update before download. The ESP32 validates the fields again after writing and
-before mounting the external WebUI. If validation fails, the embedded New
-Design remains active.
+published in the update manifest. The normal online updater checks both values
+before downloading or erasing anything. The ESP32 then verifies image size,
+SHA-256, product, design, image format and required assets before activating the
+external WebUI.
+
+The manual upload remains an expert/recovery path. Use only the image and
+compatibility metadata from the matching GitHub release; normal users should use
+the online updater.
 
 Increment `apiVersion` only for an incompatible API change. Compatible API
 additions keep the existing value and may raise `minFirmwareVersion` when the
