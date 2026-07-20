@@ -1,0 +1,64 @@
+name: Extend log status diagnostics
+
+on:
+  push:
+    branches:
+      - feature/system-overview-theme-logs
+
+permissions:
+  contents: write
+
+jobs:
+  extend-status:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extend log status response
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('main/webui.cpp')
+          text = path.read_text(encoding='utf-8')
+          old = '''    httpd_resp_set_type(req, "application/json");
+    char body[64];
+    snprintf(body, sizeof(body), "{\"enabled\":%s,\"persistent\":%s}",
+             LogManager::instance().isEnabled() ? "true" : "false",
+             (_settings && _settings->getSystemLogEnabled()) ? "true" : "false");
+    httpd_resp_send(req, body, HTTPD_RESP_USE_STRLEN);
+'''
+          new = '''    LogManager &log = LogManager::instance();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control",
+                       "no-store, no-cache, must-revalidate, max-age=0");
+    char body[256];
+    snprintf(body, sizeof(body),
+             "{\"enabled\":%s,\"persistent\":%s,\"bufferBytes\":%u,"
+             "\"availableBytes\":%u,\"totalWritten\":%llu,"
+             "\"subscribers\":%d}",
+             log.isEnabled() ? "true" : "false",
+             (_settings && _settings->getSystemLogEnabled()) ? "true" : "false",
+             static_cast<unsigned>(log.getBufferSize()),
+             static_cast<unsigned>(log.getBufferedBytes()),
+             static_cast<unsigned long long>(log.getTotalWritten()),
+             log.subscriberCount());
+    httpd_resp_send(req, body, HTTPD_RESP_USE_STRLEN);
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'log status anchor count: {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Remove helper and push result
+        run: |
+          rm .github/workflows/extend-log-status.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/webui.cpp .github/workflows/extend-log-status.yml
+          git commit -m 'feat(logs): expose ring-buffer stream diagnostics'
+          git push origin HEAD:feature/system-overview-theme-logs
