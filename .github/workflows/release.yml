@@ -49,14 +49,13 @@ jobs:
             VERSION="${{ github.ref_name }}"
           fi
           VERSION="${VERSION#v}"
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION_TAG=v$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "VERSION_TAG=v$VERSION" >> "$GITHUB_OUTPUT"
 
-          # Detect if triggered by tag push vs workflow_dispatch
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "TRIGGERED_BY_TAG=true" >> $GITHUB_OUTPUT
+            echo "TRIGGERED_BY_TAG=true" >> "$GITHUB_OUTPUT"
           else
-            echo "TRIGGERED_BY_TAG=false" >> $GITHUB_OUTPUT
+            echo "TRIGGERED_BY_TAG=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Python for version update
@@ -68,14 +67,8 @@ jobs:
         if: steps.get_version.outputs.TRIGGERED_BY_TAG == 'false'
         run: |
           NEW_VERSION="${{ steps.get_version.outputs.VERSION }}"
-          echo "Updating changelog for $NEW_VERSION..."
           python update_changelog.py "$NEW_VERSION"
-
-          echo "Updating all version numbers to $NEW_VERSION..."
           python update_version.py "$NEW_VERSION"
-
-          echo ""
-          echo "Changed files:"
           git status --short
 
       - name: Commit version changes and create tag
@@ -84,23 +77,18 @@ jobs:
           NEW_VERSION="${{ steps.get_version.outputs.VERSION }}"
           VERSION_TAG="${{ steps.get_version.outputs.VERSION_TAG }}"
 
-          if git diff --quiet; then
-            echo "No changes to commit"
-          else
+          if ! git diff --quiet; then
             git add -A
             git commit -m "chore: bump version to $NEW_VERSION"
-            echo "Committed version changes"
           fi
 
           if git rev-parse "$VERSION_TAG" >/dev/null 2>&1; then
-            echo "Tag $VERSION_TAG already exists locally. Deleting..."
             git tag -d "$VERSION_TAG"
           fi
 
           git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG"
           git push origin HEAD:main
           git push -f origin "$VERSION_TAG"
-          echo "Created and pushed tag $VERSION_TAG"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -109,21 +97,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: webui/package-lock.json
 
-      - name: Build WebUI
+      - name: Build New Design WebUI
         run: |
           cd webui
           npm ci
           npm run build
 
-      - name: Rename WebUI files
+      - name: Prepare embedded and standalone WebUI assets
         run: python3 rename_webui_files.py
 
       - name: Regenerate embedded firmware archive
-        # Embeds the release archive into the firmware build. Uses the
-        # committed archive.json (which contains all PRIOR releases, since the
-        # current release is only appended after the build) so a freshly
-        # released firmware lists every version up to the previous one. The
-        # just-built release is added on the NEXT rebuild-archive run.
         run: python3 scripts/update_archive.py
 
       - name: Setup ESP-IDF v6.1-beta1
@@ -133,7 +116,7 @@ jobs:
           git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
           "$HOME/esp-idf/install.sh" esp32
 
-      - name: Build firmware
+      - name: Build firmware and standalone WWW image
         run: |
           . "$HOME/esp-idf/export.sh"
           export IDF_TARGET=esp32
@@ -141,34 +124,41 @@ jobs:
           idf.py build
 
       - name: Create release directory
-        run: |
-          mkdir -p release
+        run: mkdir -p release
 
-      - name: Copy firmware files
+      - name: Copy firmware and New Design files
         run: |
+          set -euo pipefail
           VERSION="${{ steps.get_version.outputs.VERSION }}"
 
           if [ -f "build/HB-RF-ETH-ng.bin" ]; then
             cp "build/HB-RF-ETH-ng.bin" "release/firmware_${VERSION}.bin"
-            echo "Found HB-RF-ETH-ng.bin"
           else
-            FIRST_APP_BIN=$(find build -maxdepth 1 -name "*.bin" | head -n 1)
-            if [ -n "$FIRST_APP_BIN" ]; then
-              cp "$FIRST_APP_BIN" "release/firmware_${VERSION}.bin"
-              echo "Using fallback app binary: $FIRST_APP_BIN"
-            else
-              echo "ERROR: No app firmware binary found in build/"
+            FIRST_APP_BIN=$(find build -maxdepth 1 -name "*.bin" \
+              ! -name "spiffs.bin" \
+              ! -name "bootloader.bin" \
+              ! -name "partition-table.bin" | head -n 1)
+            if [ -z "$FIRST_APP_BIN" ]; then
+              echo "ERROR: No app firmware binary found in build/" >&2
               find build -maxdepth 2 -type f || true
               exit 1
             fi
+            cp "$FIRST_APP_BIN" "release/firmware_${VERSION}.bin"
           fi
 
-          cp "build/bootloader/bootloader.bin" release/ 2>/dev/null || true
+          test -f build/spiffs.bin
+          WEBUI_SIZE=$(stat -c '%s' build/spiffs.bin)
+          EXPECTED_WEBUI_SIZE=$((0x50000))
+          if [ "$WEBUI_SIZE" -ne "$EXPECTED_WEBUI_SIZE" ]; then
+            echo "ERROR: spiffs.bin has $WEBUI_SIZE bytes, expected $EXPECTED_WEBUI_SIZE" >&2
+            exit 1
+          fi
+          cp build/spiffs.bin "release/webui_${VERSION}.bin"
 
+          cp "build/bootloader/bootloader.bin" release/ 2>/dev/null || true
           if [ -f "build/partition_table/partition-table.bin" ]; then
             cp "build/partition_table/partition-table.bin" "release/partitions.bin"
           fi
-
           cp version.txt release/
 
       - name: Generate release notes
@@ -188,19 +178,12 @@ jobs:
           IS_PRERELEASE="false"
           IS_DRAFT="false"
 
-          if [ "${{ inputs.prerelease }}" = "true" ]; then
-            IS_PRERELEASE="true"
-          fi
-          if [ "${{ inputs.draft }}" = "true" ]; then
-            IS_DRAFT="true"
-          fi
+          if [ "${{ inputs.prerelease }}" = "true" ]; then IS_PRERELEASE="true"; fi
+          if [ "${{ inputs.draft }}" = "true" ]; then IS_DRAFT="true"; fi
+          if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then IS_PRERELEASE="true"; fi
 
-          if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then
-            IS_PRERELEASE="true"
-          fi
-
-          echo "IS_PRERELEASE=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "IS_DRAFT=$IS_DRAFT" >> $GITHUB_OUTPUT
+          echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "IS_DRAFT=$IS_DRAFT" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -210,6 +193,7 @@ jobs:
           body_path: release/RELEASE_NOTES.md
           files: |
             release/firmware_*.bin
+            release/webui_*.bin
             release/bootloader.bin
             release/partitions.bin
             release/SHA256SUMS.txt
@@ -223,23 +207,21 @@ jobs:
       - name: Generate update manifest
         if: steps.release_type.outputs.IS_DRAFT == 'false'
         run: |
+          set -euo pipefail
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           VERSION_TAG="${{ steps.get_version.outputs.VERSION_TAG }}"
           IS_PRERELEASE="${{ steps.release_type.outputs.IS_PRERELEASE }}"
 
           FIRMWARE_FILE="firmware_${VERSION}.bin"
-          if [ ! -f "release/${FIRMWARE_FILE}" ]; then
-            echo "ERROR: release/${FIRMWARE_FILE} not found"
-            ls -la release
-            exit 1
-          fi
+          WEBUI_FILE="webui_${VERSION}.bin"
+          test -f "release/${FIRMWARE_FILE}"
+          test -f "release/${WEBUI_FILE}"
 
-          SHA256="$(awk -v file="${FIRMWARE_FILE}" '$2 == file { print $1 }' release/SHA256SUMS.txt)"
-          if [ -z "$SHA256" ]; then
-            echo "ERROR: SHA256 for ${FIRMWARE_FILE} not found in release/SHA256SUMS.txt"
-            cat release/SHA256SUMS.txt
-            exit 1
-          fi
+          FIRMWARE_SHA256=$(awk -v file="$FIRMWARE_FILE" '$2 == file { print $1 }' release/SHA256SUMS.txt)
+          WEBUI_SHA256=$(awk -v file="$WEBUI_FILE" '$2 == file { print $1 }' release/SHA256SUMS.txt)
+          WEBUI_SIZE=$(stat -c '%s' "release/${WEBUI_FILE}")
+          test -n "$FIRMWARE_SHA256"
+          test -n "$WEBUI_SHA256"
 
           if [ "$IS_PRERELEASE" = "true" ]; then
             CHANNEL="beta"
@@ -249,12 +231,15 @@ jobs:
             MANIFEST_FILES="latest.json,beta.json"
           fi
 
-          PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          PUBLISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           mkdir -p manifest-out
           VERSION="$VERSION" \
           VERSION_TAG="$VERSION_TAG" \
           FIRMWARE_FILE="$FIRMWARE_FILE" \
-          SHA256="$SHA256" \
+          FIRMWARE_SHA256="$FIRMWARE_SHA256" \
+          WEBUI_FILE="$WEBUI_FILE" \
+          WEBUI_SHA256="$WEBUI_SHA256" \
+          WEBUI_SIZE="$WEBUI_SIZE" \
           CHANNEL="$CHANNEL" \
           MANIFEST_FILES="$MANIFEST_FILES" \
           IS_PRERELEASE="$IS_PRERELEASE" \
@@ -265,47 +250,51 @@ jobs:
           import re
 
           def excerpt(text, limit=300):
-              """Collapse whitespace and truncate to a single-line preview.
-              Full notes are fetched on demand from notesUrl so the archive
-              manifest stays small enough to stream through the ESP32 proxy."""
               if not text:
                   return ""
               flat = re.sub(r"\s+", " ", text).strip()
-              if len(flat) <= limit:
-                  return flat
-              return flat[:limit].rstrip() + "…"
+              return flat if len(flat) <= limit else flat[:limit].rstrip() + "…"
 
           version = os.environ["VERSION"]
           version_tag = os.environ["VERSION_TAG"]
           firmware_file = os.environ["FIRMWARE_FILE"]
-          sha256 = os.environ["SHA256"]
+          webui_file = os.environ["WEBUI_FILE"]
           channel = os.environ["CHANNEL"]
-          manifest_files = [name.strip() for name in os.environ["MANIFEST_FILES"].split(",") if name.strip()]
+          manifest_files = [item.strip() for item in os.environ["MANIFEST_FILES"].split(",") if item.strip()]
           is_prerelease = os.environ["IS_PRERELEASE"] == "true"
-
           release_url = f"https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/{version_tag}"
-          notes = ""
+          asset_base = f"https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/{version_tag}"
+
           try:
-              with open("release/RELEASE_NOTES.md", "r", encoding="utf-8") as f:
-                  notes = f.read().strip()
+              with open("release/RELEASE_NOTES.md", "r", encoding="utf-8") as file:
+                  notes = file.read().strip()
           except FileNotFoundError:
-              pass
+              notes = ""
 
           manifest = {
               "version": version,
               "channel": channel,
               "isPrerelease": is_prerelease,
               "publishedAt": os.environ["PUBLISHED_AT"],
-              "downloadUrl": f"https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/{version_tag}/{firmware_file}",
-              "sha256": sha256,
+              "downloadUrl": f"{asset_base}/{firmware_file}",
+              "sha256": os.environ["FIRMWARE_SHA256"],
               "releaseUrl": release_url,
               "notesUrl": release_url,
+              "webui": {
+                  "version": version,
+                  "design": "newdesign",
+                  "downloadUrl": f"{asset_base}/{webui_file}",
+                  "sha256": os.environ["WEBUI_SHA256"],
+                  "size": int(os.environ["WEBUI_SIZE"]),
+                  "partition": "spiffs",
+                  "format": 1,
+              },
           }
 
           for manifest_file in manifest_files:
-              with open(os.path.join("manifest-out", manifest_file), "w", encoding="utf-8") as f:
-                  json.dump(manifest, f, indent=2)
-                  f.write("\n")
+              with open(os.path.join("manifest-out", manifest_file), "w", encoding="utf-8") as file:
+                  json.dump(manifest, file, indent=2)
+                  file.write("\n")
 
           archive_entry = {
               **manifest,
@@ -313,15 +302,15 @@ jobs:
               "name": f"HB-RF-ETH-ng {version_tag}",
               "prerelease": is_prerelease,
               "assetName": firmware_file,
+              "webuiAssetName": webui_file,
               "notesExcerpt": excerpt(notes),
           }
 
-          archive_path = "archive.json"
           archive = []
-          if os.path.exists(archive_path):
+          if os.path.exists("archive.json"):
               try:
-                  with open(archive_path, "r", encoding="utf-8") as f:
-                      archive_data = json.load(f)
+                  with open("archive.json", "r", encoding="utf-8") as file:
+                      archive_data = json.load(file)
                   archive = archive_data.get("releases", archive_data if isinstance(archive_data, list) else [])
               except (json.JSONDecodeError, OSError):
                   archive = []
@@ -332,16 +321,14 @@ jobs:
               "updatedAt": os.environ["PUBLISHED_AT"],
               "releases": [archive_entry, *deduped][:50],
           }
-          with open(os.path.join("manifest-out", "archive.json"), "w", encoding="utf-8") as f:
-              json.dump(archive_out, f, indent=2)
-              f.write("\n")
+          with open(os.path.join("manifest-out", "archive.json"), "w", encoding="utf-8") as file:
+              json.dump(archive_out, file, indent=2)
+              file.write("\n")
           PY
 
-          echo "Generated manifests:"
-          ls -la manifest-out
           for manifest in manifest-out/*.json; do
             echo "--- ${manifest} ---"
-            cat "${manifest}"
+            cat "$manifest"
           done
 
       - name: Checkout main for manifest update
@@ -357,17 +344,13 @@ jobs:
         working-directory: manifest-repo
         run: |
           VERSION_TAG="${{ steps.get_version.outputs.VERSION_TAG }}"
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
           cp ../manifest-out/*.json .
-
           git add *.json
           if git diff --cached --quiet; then
             echo "Update manifests already up to date"
             exit 0
           fi
-
           git commit -m "chore: update manifests for ${VERSION_TAG}"
           git push origin main
