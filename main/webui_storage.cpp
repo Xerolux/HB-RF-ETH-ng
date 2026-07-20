@@ -15,6 +15,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "mbedtls/md.h"
+#include "nvs.h"
 
 #include "monitoring.h"
 #include "security_headers.h"
@@ -32,6 +33,8 @@ constexpr size_t SHA256_HEX_LENGTH = 64;
 constexpr size_t UPDATE_BUFFER_SIZE = 2048;
 constexpr size_t INVALIDATE_SECTOR_SIZE = 0x1000;
 constexpr size_t MANIFEST_MAX_SIZE = 1024;
+constexpr const char *TRANSACTION_NVS_NAMESPACE = "webui";
+constexpr const char *TRANSACTION_NVS_KEY = "pending";
 
 SemaphoreHandle_t s_mutex = nullptr;
 const esp_partition_t *s_partition = nullptr;
@@ -121,6 +124,41 @@ void set_error_locked(const char *message, esp_err_t error = ESP_OK)
                  local_message, esp_err_to_name(error));
     }
     ESP_LOGE(TAG, "%s", s_status.lastError);
+}
+
+esp_err_t set_transaction_pending_locked(bool pending)
+{
+    nvs_handle_t handle = 0;
+    esp_err_t result = nvs_open(TRANSACTION_NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (result != ESP_OK) return result;
+
+    if (pending)
+    {
+        result = nvs_set_u8(handle, TRANSACTION_NVS_KEY, 1);
+    }
+    else
+    {
+        result = nvs_erase_key(handle, TRANSACTION_NVS_KEY);
+        if (result == ESP_ERR_NVS_NOT_FOUND) result = ESP_OK;
+    }
+
+    if (result == ESP_OK) result = nvs_commit(handle);
+    nvs_close(handle);
+    return result;
+}
+
+bool transaction_pending_locked()
+{
+    nvs_handle_t handle = 0;
+    if (nvs_open(TRANSACTION_NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
+    {
+        return false;
+    }
+
+    uint8_t value = 0;
+    const esp_err_t result = nvs_get_u8(handle, TRANSACTION_NVS_KEY, &value);
+    nvs_close(handle);
+    return result == ESP_OK && value == 1;
 }
 
 bool is_regular_nonempty_file(const char *path)
@@ -268,14 +306,27 @@ void invalidate_image_locked(const char *message,
 
     // Destroy the filesystem header so a partial/hash-mismatched image can
     // never become active after reboot. Embedded New Design remains reachable.
+    esp_err_t erase_result = ESP_ERR_NOT_FOUND;
     if (s_partition)
     {
-        const esp_err_t erase_result = esp_partition_erase_range(
+        erase_result = esp_partition_erase_range(
             s_partition, 0, INVALIDATE_SECTOR_SIZE);
         if (erase_result != ESP_OK)
         {
             ESP_LOGW(TAG, "Could not invalidate failed WWW image: %s",
                      esp_err_to_name(erase_result));
+        }
+    }
+
+    // Clear the persistent marker only after the filesystem header was actually
+    // invalidated. Otherwise the next boot retries the cleanup before mounting.
+    if (erase_result == ESP_OK)
+    {
+        const esp_err_t marker_result = set_transaction_pending_locked(false);
+        if (marker_result != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Could not clear WWW transaction marker: %s",
+                     esp_err_to_name(marker_result));
         }
     }
 
@@ -706,6 +757,34 @@ esp_err_t webui_storage_init()
     StorageLock lock;
     if (!lock) return ESP_ERR_NO_MEM;
     if (s_status.updateActive) return ESP_ERR_INVALID_STATE;
+
+    find_partition_locked();
+    if (transaction_pending_locked())
+    {
+        ESP_LOGW(TAG, "Interrupted WWW update detected; discarding partial image");
+        unmount_locked();
+        if (!s_partition)
+        {
+            set_error_locked("Interrupted WWW update but SPIFFS partition is missing");
+            return ESP_ERR_NOT_FOUND;
+        }
+
+        const esp_err_t erase_result = esp_partition_erase_range(
+            s_partition, 0, INVALIDATE_SECTOR_SIZE);
+        if (erase_result != ESP_OK)
+        {
+            set_error_locked("Could not discard interrupted WWW image", erase_result);
+            return erase_result;
+        }
+
+        const esp_err_t marker_result = set_transaction_pending_locked(false);
+        if (marker_result != ESP_OK)
+        {
+            set_error_locked("Could not clear interrupted WWW transaction", marker_result);
+            return marker_result;
+        }
+    }
+
     return mount_locked();
 }
 
@@ -758,6 +837,15 @@ esp_err_t webui_storage_update_begin(size_t expected_size,
     {
         set_error_locked("Invalid WWW SHA-256 header");
         return ESP_ERR_INVALID_ARG;
+    }
+
+    // Commit the marker before erasing or writing flash. A power interruption
+    // leaves it set, so the next boot rejects the unverified image.
+    const esp_err_t marker_result = set_transaction_pending_locked(true);
+    if (marker_result != ESP_OK)
+    {
+        set_error_locked("Could not start safe WWW update transaction", marker_result);
+        return marker_result;
     }
 
     unmount_locked();
@@ -880,6 +968,13 @@ esp_err_t webui_storage_update_finish()
             "WWW image is not a valid HB-RF-ETH-ng New Design image",
             validation_error);
         return validation_error;
+    }
+
+    const esp_err_t marker_result = set_transaction_pending_locked(false);
+    if (marker_result != ESP_OK)
+    {
+        invalidate_image_locked("Could not commit safe WWW update transaction", marker_result);
+        return marker_result;
     }
 
     update_usage_locked();
