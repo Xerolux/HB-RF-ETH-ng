@@ -28,6 +28,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: release-webui
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     name: Build and Create WebUI Release
@@ -65,6 +69,10 @@ jobs:
           if [ "${{ inputs.prerelease }}" = "true" ]; then PRERELEASE=true; fi
           if [ "${{ inputs.draft }}" = "true" ]; then DRAFT=true; fi
           if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then PRERELEASE=true; fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
           echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_OUTPUT"
@@ -77,21 +85,6 @@ jobs:
             --min-firmware "${{ inputs.min_firmware_version }}" \
             --api-version "${{ inputs.api_version }}"
           git status --short
-
-      - name: Commit WebUI metadata and create tag
-        run: |
-          TAG="${{ steps.webui.outputs.TAG }}"
-          VERSION="${{ steps.webui.outputs.VERSION }}"
-          git add webui/package.json webui/package-lock.json webui/compatibility.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: bump WebUI version to $VERSION"
-          fi
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG"
-          fi
-          git tag -a "$TAG" -m "WebUI release $TAG"
-          git push origin HEAD:main
-          git push -f origin "$TAG"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -151,9 +144,22 @@ jobs:
           - Minimum firmware: ${{ inputs.min_firmware_version }}
           - Image size: 327680 bytes
 
-          The device verifies image size, SHA-256, product, design and compatibility
+          The online updater checks API and minimum firmware before downloading.
+          The ESP32 verifies image size, SHA-256, product, design and required assets
           before activating the separate WWW partition.
           EOF
+
+      - name: Commit WebUI metadata and create tag
+        run: |
+          TAG="${{ steps.webui.outputs.TAG }}"
+          VERSION="${{ steps.webui.outputs.VERSION }}"
+          git add webui/package.json webui/package-lock.json webui/compatibility.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump WebUI version to $VERSION"
+          fi
+          git tag -a "$TAG" -m "WebUI release $TAG"
+          git push origin HEAD:main
+          git push origin "$TAG"
 
       - name: Create GitHub WebUI release
         uses: softprops/action-gh-release@v3
