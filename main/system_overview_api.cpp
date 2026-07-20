@@ -11,6 +11,7 @@
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 
+#include "log_manager.h"
 #include "security_headers.h"
 #include "webui_storage.h"
 
@@ -36,6 +37,7 @@ esp_err_t get_system_overview(httpd_req_t *req)
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *next_update = esp_ota_get_next_update_partition(nullptr);
     const WebUIStorageStatus webui = webui_storage_get_status();
+    LogManager &logs = LogManager::instance();
 
     cJSON *root = cJSON_CreateObject();
     if (!root)
@@ -85,6 +87,20 @@ esp_err_t get_system_overview(httpd_req_t *req)
         cJSON_AddNumberToObject(webui_object, "partitionBytes",
                                 webui.partitionSize);
         cJSON_AddNumberToObject(webui_object, "usedBytes", webui.usedBytes);
+    }
+
+    cJSON *log_object = cJSON_AddObjectToObject(root, "logs");
+    if (log_object)
+    {
+        cJSON_AddBoolToObject(log_object, "enabled", logs.isEnabled());
+        cJSON_AddNumberToObject(log_object, "bufferBytes",
+                                logs.getBufferSize());
+        cJSON_AddNumberToObject(log_object, "availableBytes",
+                                logs.getBufferedBytes());
+        cJSON_AddNumberToObject(log_object, "totalWritten",
+                                static_cast<double>(logs.getTotalWritten()));
+        cJSON_AddNumberToObject(log_object, "subscribers",
+                                logs.subscriberCount());
     }
 
     char *json = cJSON_PrintUnformatted(root);
