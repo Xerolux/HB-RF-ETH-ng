@@ -3,6 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "esp_http_server.h"
+
+// ESP-IDF stores this function pointer directly in httpd_uri_t and does not
+// publish a named alias for it. Keep the wrapper implementation strongly typed
+// instead of falling back to void pointers/casts.
+using httpd_uri_func = esp_err_t (*)(httpd_req_t *request);
 
 struct WebUIStorageStatus
 {
@@ -22,22 +28,22 @@ struct WebUIStorageStatus
  * Mount the existing `spiffs` partition without formatting it.
  *
  * The function deliberately never formats a failed or empty partition. Existing
- * devices therefore keep the embedded WebUI as a guaranteed recovery fallback.
+ * devices therefore keep the embedded New Design as recovery fallback.
  */
 esp_err_t webui_storage_init();
 
 /** Return a snapshot of the external WebUI storage state. */
 WebUIStorageStatus webui_storage_get_status();
 
-/** True only when the partition is mounted and all mandatory WebUI files exist. */
+/** True only when the partition is mounted and the New Design manifest is valid. */
 bool webui_storage_is_valid();
 
 /**
  * Start a raw SPIFFS image update.
  *
  * expectedSha256Hex may be null or empty. If supplied, it must contain exactly
- * 64 hexadecimal characters. The current external WebUI is unmounted before the
- * partition is erased; the embedded WebUI remains available throughout.
+ * 64 hexadecimal characters. The embedded New Design remains available while
+ * the separate partition is erased and written.
  */
 esp_err_t webui_storage_update_begin(size_t expectedSize,
                                      const char *expectedSha256Hex);
@@ -45,8 +51,8 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
 /** Stream one image chunk directly into the SPIFFS partition. */
 esp_err_t webui_storage_update_write(const uint8_t *data, size_t length);
 
-/** Finalize SHA-256 verification, remount and validate the new WebUI image. */
+/** Finalize SHA-256 verification, remount and validate the New Design image. */
 esp_err_t webui_storage_update_finish();
 
-/** Abort an active update and attempt to remount whatever remains. */
+/** Abort an active update and invalidate the partial filesystem image. */
 void webui_storage_update_abort();
