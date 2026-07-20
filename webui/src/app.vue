@@ -21,7 +21,7 @@
       </main>
       <footer class="app-footer">
         <div class="footer-content">
-          <small class="text-muted">{{ t('app.footerCopyright', { version: sysInfoStore.currentVersion ? 'v' + sysInfoStore.currentVersion : '' }) }}</small>
+          <small class="text-muted">Firmware v{{ sysInfoStore.currentVersion || '—' }} · WebUI v{{ webUiVersion }} © 2025-2026 Xerolux</small>
           <div class="footer-actions">
             <a
               class="follow-x-btn"
@@ -107,6 +107,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import axios from 'axios'
 import { useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
 import { safeLocal, safeSession } from './composables/useSafeStorage'
 import NewDesignHeader from './components/NewDesignHeader.vue'
@@ -122,6 +123,7 @@ const showSponsorModal = ref(false)
 const showUpdateSuccess = ref(false)
 const showSupporterExpiredPrompt = ref(false)
 const otaUpdateVersion = ref('')
+const webUiVersion = ref(typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : 'unbekannt')
 let updateSuccessTimer = null
 const pageTitle = computed(() => `${sysInfoStore.hostname || 'HB-RF-ETH-ng'} - HB-RF-ETH-ng`)
 // Routes flagged meta.bareLayout (currently /login) render without the app
@@ -176,6 +178,10 @@ onMounted(() => {
   sysInfoStore.update().catch((error) => {
     console.warn('Failed to load system info on app mount:', error)
   })
+
+  axios.get('/api/webui/status', { timeout: 5000, silent: true })
+    .then(response => { webUiVersion.value = response.data?.effectiveVersion || response.data?.version || webUiVersion.value })
+    .catch(() => {})
 
   // Check if we just came back from an OTA update
   const pendingVersion = safeLocal.get('otaUpdateVersion')

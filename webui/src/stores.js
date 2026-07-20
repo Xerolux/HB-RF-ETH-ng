@@ -183,100 +183,12 @@ export const useRestartUiStore = defineStore('restartUi', {
 })
 
 export const useExperimentalStore = defineStore('experimental', {
-  state: () => ({
-    // Boot value comes from localStorage so the very first paint (before any
-    // server round-trip) is correct. Once /settings.json is loaded, the value
-    // is reconciled with the server (see syncFromServer) and localStorage
-    // becomes a mirror of the authoritative device setting.
-    testDesignEnabled: safeLocal.get("hb-rf-eth-ng-test-design") === "1",
-    // --- Race-guard state for the test-design toggle ---
-    // The toggle's persist POST and the header's settingsStore.load() (which
-    // fires because flipping swaps the header component) race. A naive server
-    // sync can read the OLD value while the POST is still being written and
-    // flip the toggle straight back — the exact "spring-back" bug.
-    //
-    // Guard mechanism (deterministic, not a wall-clock guess):
-    //   _persistInFlight: true while the flip's POST has not yet resolved.
-    //   _lastFlipAt:      ms timestamp of the last flip; used as an extra
-    //                     cooldown AFTER the POST resolves, to cover the NVS
-    //                     write commit window on the device. Both must be
-    //                     clear before syncFromServer trusts a server value.
-    _persistInFlight: false,
-    _lastFlipAt: 0
-  }),
+  state: () => ({ testDesignEnabled: true }),
   actions: {
-    applyDesignClass() {
-      // Single source of truth for the new-design toggle. The class MUST live
-      // on <body> because every new-design CSS rule in styles/main.css
-      // targets `body.newdesign-active`. (Previously this wrote to <html>,
-      // which matched no rule — the toggle only worked by accident via a
-      // duplicate watcher in app.vue, and it caused a pre-paint flash of the
-      // old UI on cold boot.) index.html also sets this class inline before
-      // first paint to prevent FOUC.
-      document.body.classList.toggle('newdesign-active', this.testDesignEnabled)
-    },
-    setTestDesignEnabled(enabled) {
-      const next = !!enabled
-      if (next === this.testDesignEnabled) return
-      this.testDesignEnabled = next
-      this._lastFlipAt = Date.now()
-      // Mirror to localStorage so a reload / new tab gets the right value
-      // before the server round-trip completes (prevents a one-frame flash of
-      // the wrong design on navigation).
-      safeLocal.set("hb-rf-eth-ng-test-design", next ? "1" : "0")
-      this.applyDesignClass()
-      // Persist device-wide immediately. The server accepts a partial payload
-      // ({testDesignEnabled: bool}) and saves to NVS, so the choice survives
-      // reboots and is shared across every browser that opens the WebUI.
-      // silent:true prevents the global axios interceptor from surfacing
-      // error toasts (and from force-redirecting to /login on a 401) — a
-      // failed experimental-toggle persist must NOT disturb the session.
-      // Fire-and-forget: a network failure does NOT roll back the local
-      // toggle; the device value stays stale until the next successful save.
-      this._persistInFlight = true
-      axios.post("/settings.json", { testDesignEnabled: next }, { timeout: 5000, silent: true })
-        .catch((e) => console.warn("Failed to persist test-design toggle to device:", e?.message || e))
-        // finally() runs on BOTH success and failure, so the in-flight flag is
-        // always cleared and the post-POST cooldown (_lastFlipAt) takes over.
-        .finally(() => { this._persistInFlight = false })
-    },
-    // Called by useSettingsStore.load() after /settings.json returns, so the
-    // device-wide persisted value wins over the localStorage boot guess.
-    //
-    // RACE GUARD: while a flip's persist POST is in flight, OR within a short
-    // cooldown after it resolved, ignore server values that disagree with the
-    // local choice. The POST is bound to its own lifecycle (deterministic),
-    // and the cooldown covers the ESP32's NVS commit latency after the HTTP
-    // response is sent. Both conditions are checked so that overlapping
-    // settingsStore.load() calls (header mount + page mount) cannot sneak a
-    // stale value past the guard: the flag is shared singleton state.
-    syncFromServer(serverValue) {
-      if (typeof serverValue !== 'boolean') return
-      if (serverValue === this.testDesignEnabled) {
-        // Already converged — nothing to do. We intentionally do NOT clear the
-        // guard here: a second in-flight load() could still return a stale
-        // value (the POST's NVS write may not be durably committed yet), and
-        // clearing early would let it through. The guard expires on its own
-        // (POST resolve + cooldown).
-        return
-      }
-      // Disagreement while a flip's POST is in flight: the server value is
-      // almost certainly stale (the POST hasn't landed). Trust the local flip.
-      if (this._persistInFlight) return
-      // Disagreement within the post-flip cooldown: even though the POST has
-      // resolved, the device's NVS write can lag the HTTP response by a few
-      // hundred ms, and a concurrent GET dispatched slightly earlier can
-      // still observe the pre-write state. 3 s is a conservative cooldown
-      // that covers the slowest realistic ESP32 NVS flush.
-      if (this._lastFlipAt && (Date.now() - this._lastFlipAt) < 3000) return
-      // No active guard: the server is authoritative. Apply it.
-      this.testDesignEnabled = serverValue
-      safeLocal.set("hb-rf-eth-ng-test-design", serverValue ? "1" : "0")
-      this.applyDesignClass()
-    },
-    init() {
-      this.applyDesignClass()
-    }
+    applyDesignClass() { document.body.classList.add('newdesign-active') },
+    setTestDesignEnabled() { this.testDesignEnabled = true; this.applyDesignClass() },
+    syncFromServer() { this.testDesignEnabled = true; this.applyDesignClass() },
+    init() { this.applyDesignClass() }
   }
 })
 

@@ -38,6 +38,9 @@ WebUIStorageStatus webui_storage_get_status();
 /** True only when the partition is mounted and the New Design manifest is valid. */
 bool webui_storage_is_valid();
 
+/** Copy the active WebUI version (external image or embedded fallback). */
+void webui_storage_get_effective_version(char *output, size_t outputSize);
+
 /**
  * Start a raw SPIFFS image update.
  *

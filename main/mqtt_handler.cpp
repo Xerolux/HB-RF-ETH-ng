@@ -25,6 +25,7 @@
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "updatecheck.h"
+#include "webui_storage.h"
 #include "settings.h"
 #include "reset_info.h"
 #include "system_reset.h"
@@ -146,8 +147,6 @@ static bool command_token_ok(const char *payload, int payload_len)
     return strncmp(payload, current_mqtt_config.command_token, expected) == 0;
 }
 
-static constexpr uint32_t MQTT_UPDATE_TASK_STACK_BYTES = 12288;
-
 static void handle_mqtt_command(const char* command, const char* payload, int payload_len)
 {
     ESP_LOGI(TAG, "Received MQTT command: %s (payload %d bytes)", command, payload_len);
@@ -178,21 +177,7 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         // After factory reset, the flash-pause setting has just been wiped
         // from NVS — full_system_restart() will skip the 35 s wait naturally.
         full_system_restart();
-    } else if (strcmp(command, "update") == 0) {
-        ESP_LOGI(TAG, "Update command received via MQTT");
-        UpdateCheck* updateCheck = monitoring_get_updatecheck();
-        if (updateCheck) {
-            // esp_https_ota needs more stack than the 6 KB MQTT task offers
-            // (TLS handshake alone takes several KB) and would block the MQTT
-            // keepalive loop for the whole download - run it in its own task.
-            BaseType_t created = xTaskCreate([](void *p) {
-                static_cast<UpdateCheck *>(p)->performOnlineUpdate();
-                vTaskDelete(NULL);
-            }, "mqtt_ota", MQTT_UPDATE_TASK_STACK_BYTES, updateCheck, 5, NULL);
-            if (created != pdPASS) {
-                ESP_LOGE(TAG, "Failed to create OTA update task");
-                mqtt_handler_publish_event("event/update_failed", "task_create_failed");
-            } else {
+    } else {
                 mqtt_handler_publish_event("event/update_started", "requested");
             }
         } else {
@@ -439,24 +424,32 @@ void mqtt_handler_publish_status(void)
     // ---- Identity ---------------------------------------------------------
     PUBLISH_STR("status/serial", sysInfo->getSerialNumber());
     PUBLISH_STR("status/version", sysInfo->getCurrentVersion());
+    PUBLISH_STR("status/firmware_version", sysInfo->getCurrentVersion());
+    char webuiVersion[32] = {};
+    webui_storage_get_effective_version(webuiVersion, sizeof(webuiVersion));
+    PUBLISH_STR("status/webui_version", webuiVersion);
     PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString());
 
-    // ---- Update info ------------------------------------------------------
+    // ---- Informational update status -------------------------------------
     if (updateCheck) {
         VersionSnapshot rel = updateCheck->getVersionSnapshot();
         const char* currentVersion = sysInfo->getCurrentVersion();
-        // Always publish a valid version string on latest_version so the HA
-        // MQTT update entity can compare it against installed_version. If no
-        // newer release is known, fall back to the current version so the
-        // entity state stays "up to date" instead of "unknown".
-        const char* latest = rel.valid ? rel.version : currentVersion;
-        if (rel.valid && compareVersions(latest, currentVersion) <= 0) {
-            latest = currentVersion;
+        const char* latestFirmware = rel.valid ? rel.version : currentVersion;
+        if (rel.valid && compareVersions(latestFirmware, currentVersion) <= 0) {
+            latestFirmware = currentVersion;
         }
-        PUBLISH_STR("status/latest_version", latest);
-        bool updateAvailable = rel.valid &&
+        const bool firmwareUpdateAvailable = rel.valid &&
             compareVersions(rel.version, currentVersion) > 0;
-        PUBLISH_STR("status/update_available", updateAvailable ? "true" : "false");
+        const char* latestWebui = rel.webuiValid ? rel.webuiVersion : webuiVersion;
+        const bool webuiUpdateAvailable = rel.webuiValid &&
+            compareVersions(rel.webuiVersion, webuiVersion) > 0;
+
+        PUBLISH_STR("status/latest_version", latestFirmware);
+        PUBLISH_STR("status/update_available", firmwareUpdateAvailable ? "true" : "false");
+        PUBLISH_STR("status/latest_firmware_version", latestFirmware);
+        PUBLISH_STR("status/latest_webui_version", latestWebui);
+        PUBLISH_STR("status/firmware_update_available", firmwareUpdateAvailable ? "true" : "false");
+        PUBLISH_STR("status/webui_update_available", webuiUpdateAvailable ? "true" : "false");
     }
 
     // ---- System metrics ---------------------------------------------------
@@ -607,8 +600,6 @@ void mqtt_handler_publish_ha_discovery(void)
     // plain "restart" etc. (legacy behaviour).
     const char* restart_payload  = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "restart";
     const char* reset_payload    = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "factory_reset";
-    const char* update_payload   = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "update";
-
     // Device Info — use the configurable hostname as the HA device name so
     // multiple HB-RF-ETH boards can be told apart in the UI. Fall back to a
     // generic label if the hostname is unavailable.
@@ -684,8 +675,14 @@ void mqtt_handler_publish_ha_discovery(void)
     remove_config("sensor", "temperature");
     publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
-    publish_config("sensor", "version", "Current Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
-    publish_config("sensor", "latest_version", "Latest Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
+    publish_config("sensor", "firmware_version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
+    publish_config("sensor", "webui_version", "WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web");
+    publish_config("sensor", "latest_version", "Latest Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web-sync");
+    publish_config("binary_sensor", "firmware_update_available", "Firmware Update Available", "update", NULL, NULL, NULL, "diagnostic", "mdi:package-up", "true", "false");
+    publish_config("binary_sensor", "webui_update_available", "WebUI Update Available", "update", NULL, NULL, NULL, "diagnostic", "mdi:web-sync", "true", "false");
     publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");
 
     // ---- Sensors: network -----------------------------------------------
@@ -714,7 +711,7 @@ void mqtt_handler_publish_ha_discovery(void)
                    NULL, "diagnostic", "mdi:clock-check", "true", "false");
 
     // ---- Sensors: OTA ----------------------------------------------------
-    publish_config("sensor", "ota_progress", "OTA Progress", NULL, "measurement", "%", NULL, "diagnostic", "mdi:progress-download");
+    remove_config("sensor", "ota_progress");
 
     // ---- Update Available (binary) --------------------------------------
     {
@@ -783,59 +780,8 @@ void mqtt_handler_publish_ha_discovery(void)
         publish_button("factory_reset", "Factory Reset", "factory_reset", reset_payload, "restart", "mdi:lock-reset");
     }
 
-    // ---- HA Update entity -----------------------------------------------
-    // Combines "current vs latest version" with an Install button that
-    // triggers OTA via MQTT. Uses latest_version as state so the entity shows
-    // the version number directly. enabled_by_default follows command_enabled.
-    //
-    // Home Assistant MQTT update semantics:
-    //   - state_topic receives the *latest* available version (plain text).
-    //   - installed_version_topic receives the *currently installed* version.
-    //   - Templates must use {{ value }} because the payloads are plain
-    //     strings, not JSON objects.
-    {
-        cJSON *root = cJSON_CreateObject();
-        cJSON_AddStringToObject(root, "name", "Firmware Update");
-        char unique_id[128];
-        snprintf(unique_id, sizeof(unique_id), "%s_firmware_update", identifiers);
-        cJSON_AddStringToObject(root, "unique_id", unique_id);
-
-        char state_topic[160];
-        snprintf(state_topic, sizeof(state_topic), "%s/status/latest_version", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "state_topic", state_topic);
-
-        char installed_topic[160];
-        snprintf(installed_topic, sizeof(installed_topic), "%s/status/version", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "installed_version_topic", installed_topic);
-        cJSON_AddStringToObject(root, "installed_version_template", "{{ value }}");
-
-        char latest_topic[160];
-        snprintf(latest_topic, sizeof(latest_topic), "%s/status/latest_version", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "latest_version_topic", latest_topic);
-        cJSON_AddStringToObject(root, "latest_version_template", "{{ value }}");
-
-        char command_topic[160];
-        snprintf(command_topic, sizeof(command_topic), "%s/command/update", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "command_topic", command_topic);
-        cJSON_AddStringToObject(root, "payload_install", update_payload);
-
-        cJSON_AddStringToObject(root, "entity_category", "config");
-        cJSON_AddStringToObject(root, "device_class", "firmware");
-        cJSON_AddStringToObject(root, "value_template", "{{ value }}");
-        if (!current_mqtt_config.command_enabled) {
-            cJSON_AddBoolToObject(root, "enabled_by_default", false);
-        }
-
-        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
-
-        char *json_str = cJSON_PrintUnformatted(root);
-        char topic[256];
-        snprintf(topic, sizeof(topic), "%s/update/hb-rf-eth-%s/firmware_update/config",
-                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
-        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
-        free(json_str);
-        cJSON_Delete(root);
-    }
+    // Remove the former install-capable update entity.
+    remove_config("update", "firmware_update");
 
     cJSON_Delete(device);
 }

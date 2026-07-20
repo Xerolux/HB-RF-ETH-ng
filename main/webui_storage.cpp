@@ -25,6 +25,10 @@
 // constant-time admin-token validation.
 extern esp_err_t validate_auth(httpd_req_t *req);
 
+#ifndef HB_WEBUI_VERSION
+#define HB_WEBUI_VERSION "unknown"
+#endif
+
 namespace
 {
 constexpr const char *TAG = "WebUIStorage";
@@ -558,8 +562,10 @@ esp_err_t get_webui_status_handler(httpd_req_t *req)
 
     const WebUIStorageStatus status = webui_storage_get_status();
     char safe_version[sizeof(status.version)] = {};
+    char effective_version[sizeof(status.version)] = {};
     char safe_error[sizeof(status.lastError)] = {};
     copy_json_safe(safe_version, sizeof(safe_version), status.version);
+    webui_storage_get_effective_version(effective_version, sizeof(effective_version));
     copy_json_safe(safe_error, sizeof(safe_error), status.lastError);
 
     char response[512];
@@ -813,6 +819,20 @@ WebUIStorageStatus webui_storage_get_status()
         return failed;
     }
     return s_status;
+}
+
+void webui_storage_get_effective_version(char *output, size_t outputSize)
+{
+    if (!output || outputSize == 0) return;
+    StorageLock lock;
+    if (!lock) {
+        copy_safe(output, outputSize, HB_WEBUI_VERSION);
+        return;
+    }
+    copy_safe(output, outputSize,
+              s_status.valid && s_status.version[0]
+                  ? s_status.version
+                  : HB_WEBUI_VERSION);
 }
 
 bool webui_storage_is_valid()

@@ -205,6 +205,8 @@ export default {
     experimentalTitle: 'Experimentell',
     experimentalWarningTitle: 'In Arbeit',
     experimentalWarningText: 'Diese Funktionen sind zum Testen gedacht. Es gibt keine Garantie auf Funktion oder Darstellung.',
+    experimentalEmptyTitle: 'Derzeit nichts vorhanden',
+    experimentalEmptyText: 'Aktuell sind keine experimentellen Funktionen verfügbar. Das New Design und der Neustart-Sync sind feste Standards für alle Geräte.',
     experimentalDesign: 'Testdesign',
     experimentalDesignHint: 'Aktiviert das neue experimentelle Layout. Die Auswahl wird auf dem Gerät gespeichert und bleibt nach einem Neustart erhalten.',
     flashPause: 'Neustart-Sync',

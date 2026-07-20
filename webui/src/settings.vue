@@ -515,40 +515,11 @@
               <h3>{{ t('settings.experimentalTitle') }}</h3>
             </div>
             <div class="card-body">
-              <div class="experimental-warning">
-                <AppIcon name="alert" />
+              <div class="experimental-empty-state">
+                <AppIcon name="check" />
                 <div>
-                  <strong>{{ t('settings.experimentalWarningTitle') }}</strong>
-                  <p>{{ t('settings.experimentalWarningText') }}</p>
-                </div>
-              </div>
-
-              <div class="switch-row experimental-switch-row">
-                <div class="switch-copy">
-                  <h4>{{ t('settings.experimentalDesign') }}</h4>
-                  <p>{{ t('settings.experimentalDesignHint') }}</p>
-                </div>
-                <div class="form-check form-switch">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    :checked="experimentalStore.testDesignEnabled"
-                    @change="experimentalStore.setTestDesignEnabled($event.target.checked)"
-                  >
-                </div>
-              </div>
-
-              <div class="switch-row experimental-switch-row">
-                <div class="switch-copy">
-                  <h4>{{ t('settings.flashPause') }}</h4>
-                  <p>{{ t('settings.flashPauseHint') }}</p>
-                </div>
-                <div class="form-check form-switch">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    v-model="flashPause"
-                  />
+                  <strong>{{ t('settings.experimentalEmptyTitle') }}</strong>
+                  <p>{{ t('settings.experimentalEmptyText') }}</p>
                 </div>
               </div>
             </div>
@@ -605,7 +576,7 @@
     >
       <p>{{ t('settings.restartMessage') }}</p>
       <BAlert
-        v-if="settingsStore.flashPause"
+        v-if="true"
         variant="info"
         :model-value="true"
         fade
@@ -641,7 +612,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useExperimentalStore, useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore } from './stores.js'
+import { useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 import { validateSupporterKey, normalizeSupporterKey } from './composables/supporterKey.js'
 
@@ -651,7 +622,6 @@ const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const loginStore = useLoginStore()
 const uiStore = useUiStore()
-const experimentalStore = useExperimentalStore()
 const sysInfoStore = useSysInfoStore()
 const restartUiStore = useRestartUiStore()
 const route = useRoute()
@@ -721,7 +691,6 @@ const dcfOffset = ref(0)
 const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
-const flashPause = ref(false)
 
 // ---- Supporter key (cosmetic badge) ----
 // The key is stored on the device and validated by the firmware. We do a
@@ -999,7 +968,6 @@ const buildSettingsPayload = () => ({
   ipv6Gateway: ipv6Gateway.value,
   ipv6Dns1: ipv6Dns1.value,
   ipv6Dns2: ipv6Dns2.value,
-  flashPause: flashPause.value
   // NOTE: testDesignEnabled is deliberately omitted. It is persisted device-
   // wide the moment the user flips the toggle (useExperimentalStore posts it
   // immediately), so it must never travel in the bulk "save settings" payload
@@ -1052,8 +1020,7 @@ const loadSettings = () => {
   // store value. Without this the local ref stays at its default and the
   // dirty-tracker / save-payload would silently rewrite the stored flag.
   if (settingsStore.flashPause !== undefined) {
-    flashPause.value = settingsStore.flashPause
-  }
+    }
   // NOTE: testDesignEnabled is intentionally NOT synced here. It is owned by
   // useExperimentalStore (single source of truth) and persisted device-wide on
   // every flip via that store. Re-syncing it on every settingsStore watcher
@@ -1185,7 +1152,7 @@ const performRestart = async () => {
     await axios.post('/api/restart')
     showRestartModal.value = false
     uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
-    restartUiStore.start({ includeFlashPause: settingsStore.flashPause })
+    restartUiStore.start({ includeFlashPause: true })
   } catch (e) {
     console.error("Restart request failed", e)
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })

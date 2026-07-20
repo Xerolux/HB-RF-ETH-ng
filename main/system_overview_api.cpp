@@ -109,6 +109,8 @@ esp_err_t get_system_overview(httpd_req_t *req)
     const esp_partition_t *running = esp_ota_get_running_partition();
     const esp_partition_t *next_update = esp_ota_get_next_update_partition(nullptr);
     const WebUIStorageStatus webui = webui_storage_get_status();
+    char webui_effective_version[32] = {};
+    webui_storage_get_effective_version(webui_effective_version, sizeof(webui_effective_version));
     LogManager &logs = LogManager::instance();
 
     const size_t total_internal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
@@ -176,7 +178,7 @@ esp_err_t get_system_overview(httpd_req_t *req)
         cJSON_AddStringToObject(webui_object, "source",
                                 webui.valid ? "spiffs" : "embedded");
         cJSON_AddStringToObject(webui_object, "version",
-                                webui.version[0] ? webui.version : "embedded");
+                                webui_effective_version);
         cJSON_AddBoolToObject(webui_object, "valid", webui.valid);
         cJSON_AddBoolToObject(webui_object, "mounted", webui.mounted);
         cJSON_AddNumberToObject(webui_object, "partitionBytes",

@@ -494,6 +494,8 @@ VersionSnapshot UpdateCheck::getVersionSnapshot()
         // and destination have the same size.
         snprintf(s.version, sizeof(s.version), "%s", _release.version);
         s.isPrerelease = _release.isPrerelease;
+        s.webuiValid = _release.webui.valid;
+        snprintf(s.webuiVersion, sizeof(s.webuiVersion), "%s", _release.webui.version);
         snprintf(s.error, sizeof(s.error), "%s", _release.error);
         xSemaphoreGive(_stateMutex);
     }

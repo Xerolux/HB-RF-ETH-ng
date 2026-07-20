@@ -31,6 +31,11 @@ idf_component_register(SRCS ${app_sources}
                            spiffs
                            )
 
+# Keep the WebUI version independent from the firmware version.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../webui/package.json" WEBUI_PACKAGE_JSON)
+string(JSON HB_WEBUI_VERSION GET "${WEBUI_PACKAGE_JSON}" version)
+target_compile_definitions(${COMPONENT_LIB} PRIVATE HB_WEBUI_VERSION=\"${HB_WEBUI_VERSION}\")
+
 # Transition firmware: keep the New Design embedded as a guaranteed fallback
 # while the same New Design can also be served and updated independently from
 # the existing 0x50000-byte `spiffs` partition.
@@ -43,12 +48,7 @@ target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/favicon.ico.gz" BINARY
 # Gzipped by rename_webui_files.py.
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/manifest.webmanifest.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/icon-256.png.gz" BINARY)
-# Embedded firmware release archive. Regenerate with scripts/update_archive.py
-# whenever archive.json changes (release process). Served from flash by
-# /api/firmware_archive so the WebUI never has to fetch it live from GitHub.
-target_add_binary_data(${COMPONENT_TARGET} "generated/archive.json.gz" BINARY)
-
-# Build the raw WWW image from the minimal Brotli-compressed New Design shell.
+# Build the raw WWW image from the gzip-compressed New Design shell.
 # Optional PWA/icon assets stay embedded and are served through the fallback
 # handlers, preserving functionality while fitting the existing 320 KiB SPIFFS.
 # The resulting build/spiffs.bin is accepted by POST /api/webui/update and

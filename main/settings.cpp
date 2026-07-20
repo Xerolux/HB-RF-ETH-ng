@@ -281,8 +281,9 @@ void Settings::load()
   // NVS key max length is 15; do not rename to "systemLogEnabled" (16) — it
   // silently fails with ESP_ERR_NVS_KEY_TOO_LONG and the toggle won't persist.
   GET_BOOL(handle, "sysLogEnabled", _systemLogEnabled, false);
-  GET_BOOL(handle, "flashPause", _flashPause, false);
-  GET_BOOL(handle, "testDesign", _testDesignEnabled, false);
+  // Fixed defaults for all devices; legacy false values are ignored.
+  _flashPause = true;
+  _testDesignEnabled = true;
 
   // Supporter key (optional, cosmetic). Stored verbatim — validation happens
   // on read so an expired or malformed key is harmless.
@@ -353,8 +354,8 @@ void Settings::save()
 
   SET_BOOL(handle, "betaChannel", _betaChannel);
   SET_BOOL(handle, "sysLogEnabled", _systemLogEnabled);
-  SET_BOOL(handle, "flashPause", _flashPause);
-  SET_BOOL(handle, "testDesign", _testDesignEnabled);
+  SET_BOOL(handle, "flashPause", true);
+  SET_BOOL(handle, "testDesign", true);
 
   SET_STR(handle, "supporterKey", _supporterKey);
 
@@ -883,32 +884,24 @@ void Settings::setSystemLogEnabled(bool enabled)
 
 bool Settings::getFlashPause()
 {
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  bool result = _flashPause;
-  if (_mutex) xSemaphoreGive(_mutex);
-  return result;
+  return true;
 }
 
 void Settings::setFlashPause(bool enabled)
 {
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  _flashPause = enabled;
-  if (_mutex) xSemaphoreGive(_mutex);
+  (void)enabled;
+  _flashPause = true;
 }
 
 bool Settings::getTestDesignEnabled()
 {
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  bool result = _testDesignEnabled;
-  if (_mutex) xSemaphoreGive(_mutex);
-  return result;
+  return true;
 }
 
 void Settings::setTestDesignEnabled(bool enabled)
 {
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  _testDesignEnabled = enabled;
-  if (_mutex) xSemaphoreGive(_mutex);
+  (void)enabled;
+  _testDesignEnabled = true;
 }
 
 char *Settings::getSupporterKey()

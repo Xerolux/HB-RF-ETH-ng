@@ -92,6 +92,8 @@ struct VersionSnapshot {
     bool valid = false;
     char version[32] = "n/a";
     bool isPrerelease = false;
+    bool webuiValid = false;
+    char webuiVersion[32] = {0};
     char error[128] = {0};
 };
 

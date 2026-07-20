@@ -1493,7 +1493,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         _ota_status = OTA_FAILED;
         _updateCheck->finishOtaOperation();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-            "Falsche Datei: WebUI-Abbild erkannt. Unter System -> WebUI installieren.");
+            "Falsche Datei: Das 327680-Byte-WebUI-/WWW-Image muss unter System -> WebUI installiert werden.");
     }
     int content_received = 0;
     int recv_len;
@@ -1540,14 +1540,6 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         if (!is_req_body_started)
         {
             is_req_body_started = true;
-
-            if (recv_len <= 0 || static_cast<unsigned char>(ota_buff[0]) != 0xE9) {
-                ESP_LOGW(TAG, "Rejected non-ESP firmware image (magic 0x%02x)",
-                         recv_len > 0 ? static_cast<unsigned char>(ota_buff[0]) : 0);
-                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                    "Falsche Datei: kein gueltiges ESP32-Firmware-Abbild. WebUI unter System -> WebUI installieren.");
-                goto err;
-            }
 
             if (recv_len <= 0 || static_cast<unsigned char>(ota_buff[0]) != 0xE9) {
                 ESP_LOGW(TAG, "Rejected non-ESP firmware image (magic 0x%02x)",
@@ -2200,170 +2192,6 @@ httpd_uri_t post_change_password_handler = {
     .user_ctx = NULL};
 
 
-// ---- Async proxy for external HTTPS fetches --------------------------------
-// /api/check_update, /api/changelog and /api/firmware_archive relay content
-// from external servers.
-// The fetch (DNS + TLS handshake + download, up to 10 s) must not run inside
-// the httpd task: esp_http_server is single-threaded, so every other request
-// (login, sysinfo polling, OTA status) would stall for the duration. The
-// handler detaches the request with the async handler API and a short-lived
-// worker task streams the upstream body to the client.
-
-struct AsyncProxyJob {
-    httpd_req_t *req;          // async copy of the request
-    const char *url;
-    const char *content_type;
-    const char *error_message; // sent to the client if the upstream fetch fails
-    bool failed;
-    bool header_sent;
-};
-
-// Only one upstream fetch at a time - each worker needs ~9 KB task stack for
-// the TLS handshake and these requests are rare (manual checks, 24 h timer).
-static std::atomic<bool> _proxy_busy{false};
-
-static esp_err_t _proxy_http_event_handler(esp_http_client_event_t *evt)
-{
-    AsyncProxyJob *job = (AsyncProxyJob *)evt->user_data;
-
-    switch(evt->event_id) {
-        case HTTP_EVENT_ON_DATA:
-            if (!job->failed && esp_http_client_get_status_code(evt->client) == 200) {
-                esp_err_t err = httpd_resp_send_chunk(job->req, (const char *)evt->data, evt->data_len);
-                if (err != ESP_OK) {
-                    job->failed = true;
-                    return ESP_FAIL;
-                }
-                job->header_sent = true;
-            }
-            break;
-        default:
-            break;
-    }
-    return ESP_OK;
-}
-
-static void _async_proxy_task(void *arg)
-{
-    AsyncProxyJob *job = (AsyncProxyJob *)arg;
-
-    // Serialize with UpdateCheck background fetch so two TLS handshakes never
-    // exhaust the heap at once. Never continue unlocked after a timeout.
-    // The 45 s budget tolerates a long-lived mutex holder (e.g. an in-flight
-    // SMTP notification) without prematurely failing the firmware archive /
-    // changelog fetch.
-    bool net_locked = false;
-    if (g_net_fetch_mutex) {
-        if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(45000)) != pdTRUE) {
-            ESP_LOGW(TAG, "External proxy rejected: HTTPS subsystem busy");
-            httpd_resp_set_status(job->req, "503 Service Unavailable");
-            httpd_resp_set_type(job->req, "text/plain");
-            httpd_resp_sendstr(job->req, "HTTPS subsystem busy, try again shortly");
-            httpd_req_async_handler_complete(job->req);
-            free(job);
-            _proxy_busy.store(false);
-            vTaskDelete(NULL);
-            return;
-        }
-        net_locked = true;
-    }
-
-    esp_http_client_config_t config = {};
-    configure_ota_http_client(config, job->url);
-    config.event_handler = _proxy_http_event_handler;
-    config.user_data = job;
-    config.timeout_ms = 30000;
-    config.buffer_size = 4096;
-
-    httpd_resp_set_type(job->req, job->content_type);
-    httpd_resp_set_hdr(job->req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        vTaskDelay(pdMS_TO_TICKS(2000));
-        client = esp_http_client_init(&config);
-    }
-    esp_err_t err = client ? esp_http_client_perform(client) : ESP_ERR_NO_MEM;
-    int status_code = client ? esp_http_client_get_status_code(client) : 0;
-
-    if ((err == ESP_OK && status_code == 200) || job->header_sent) {
-        httpd_resp_send_chunk(job->req, NULL, 0);
-        if (err != ESP_OK || status_code != 200) {
-            ESP_LOGE(TAG, "%s (%s, HTTP %d)", job->error_message, esp_err_to_name(err), status_code);
-        }
-    } else {
-        ESP_LOGE(TAG, "%s (%s, HTTP %d)", job->error_message, esp_err_to_name(err), status_code);
-        const char *client_status = "502 Bad Gateway";
-        if (status_code == 0) {
-            client_status = "504 Gateway Timeout";
-        } else if (status_code == 429 || status_code >= 500) {
-            client_status = "503 Service Unavailable";
-        }
-
-        char msg[160];
-        snprintf(msg, sizeof(msg), "%s (GitHub HTTP %d, %s)",
-                 job->error_message, status_code, esp_err_to_name(err));
-        httpd_resp_set_status(job->req, client_status);
-        httpd_resp_set_type(job->req, "text/plain");
-        httpd_resp_sendstr(job->req, msg);
-    }
-
-    if (client) {
-        esp_http_client_cleanup(client);
-    }
-    if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
-
-    httpd_req_async_handler_complete(job->req);
-    free(job);
-    _proxy_busy.store(false);
-    vTaskDelete(NULL);
-}
-
-static esp_err_t start_async_proxy(httpd_req_t *req, const char *url, const char *content_type, const char *error_message)
-{
-    add_security_headers(req);
-
-    if (validate_auth(req) != ESP_OK) {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-
-    bool expected = false;
-    if (!_proxy_busy.compare_exchange_strong(expected, true)) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_set_type(req, "text/plain");
-        httpd_resp_sendstr(req, "Another external fetch is in progress, try again shortly");
-        return ESP_OK;
-    }
-
-    AsyncProxyJob *job = (AsyncProxyJob *)calloc(1, sizeof(AsyncProxyJob));
-    if (!job) {
-        _proxy_busy.store(false);
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-    }
-    job->url = url;
-    job->content_type = content_type;
-    job->error_message = error_message;
-
-    // The async copy carries the already-set security headers (the response
-    // header block is duplicated by httpd_req_async_handler_begin).
-    if (httpd_req_async_handler_begin(req, &job->req) != ESP_OK) {
-        free(job);
-        _proxy_busy.store(false);
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-    }
-
-    if (xTaskCreate(_async_proxy_task, "ext_proxy", 9216, job, 5, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create proxy task");
-        httpd_resp_send_err(job->req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-        httpd_req_async_handler_complete(job->req);
-        free(job);
-        _proxy_busy.store(false);
-    }
-    return ESP_OK;
-}
-
 // Build and send a JSON snapshot of the currently cached GitHub release.
 // Served by GET /api/check_update — the release snapshot is refreshed
 // automatically every 24 h by the UpdateCheck esp_timer (see updatecheck.cpp).
@@ -2452,58 +2280,6 @@ httpd_uri_t get_check_update_handler = {
     .uri = "/api/check_update",
     .method = HTTP_GET,
     .handler = get_check_update_handler_func,
-    .user_ctx = NULL};
-
-esp_err_t get_changelog_handler_func(httpd_req_t *req)
-{
-    return start_async_proxy(req,
-                             "https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md",
-                             "text/markdown",
-                             "Failed to fetch changelog from GitHub");
-}
-
-httpd_uri_t get_changelog_handler = {
-    .uri = "/api/changelog",
-    .method = HTTP_GET,
-    .handler = get_changelog_handler_func,
-    .user_ctx = NULL};
-
-// Embedded firmware release archive (gzipped archive.json). Generated from
-// archive.json by scripts/update_archive.py at build time. Serving it from
-// flash avoids a TLS handshake + GitHub round-trip on every archive view,
-// which was one of the heap-pressure sources that could panic the WROOM-32.
-// The archive now lists releases up to the one before the running firmware;
-// the "newest release available" check still runs live via /api/check_update.
-//
-// Symbols follow the same convention the WebUI embed handlers use (see
-// EMBED_HANDLER): ESP-IDF's target_add_binary_data emits _start + _end via
-// objcopy and adds a convenience _length symbol the WebUI relies on.
-extern const char archive_json_gz[] asm("_binary_archive_json_gz_start");
-extern const size_t archive_json_gz_length asm("archive_json_gz_length");
-
-esp_err_t get_firmware_archive_handler_func(httpd_req_t *req)
-{
-    add_security_headers(req);
-    if (validate_auth(req) != ESP_OK)
-    {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-    // The archive is historical reference data that only changes with firmware
-    // releases, so it may be cached for the browser session. That also matches
-    // the WebUI's own caching of the parsed archive in localStorage.
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    httpd_resp_set_hdr(req, "Cache-Control", "private, max-age=3600");
-    httpd_resp_send(req, archive_json_gz, archive_json_gz_length);
-    return ESP_OK;
-}
-
-httpd_uri_t get_firmware_archive_handler = {
-    .uri = "/api/firmware_archive",
-    .method = HTTP_GET,
-    .handler = get_firmware_archive_handler_func,
     .user_ctx = NULL};
 
 esp_err_t get_log_handler_func(httpd_req_t *req)
@@ -2904,7 +2680,6 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_ota_update_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
         httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
-        httpd_register_uri_handler(_httpd_handle, &post_ota_url_handler);
         httpd_register_uri_handler(_httpd_handle, &get_ota_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
@@ -2916,8 +2691,6 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
         httpd_register_uri_handler(_httpd_handle, &get_check_update_handler);
-        httpd_register_uri_handler(_httpd_handle, &get_changelog_handler);
-        httpd_register_uri_handler(_httpd_handle, &get_firmware_archive_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_log_enable_handler);
