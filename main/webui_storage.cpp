@@ -19,8 +19,8 @@
 #include "monitoring.h"
 #include "security_headers.h"
 
-// Implemented in webui.cpp. Firmware and WWW updates intentionally share the
-// existing admin-token validation path.
+// Defined in webui.cpp. Both update paths deliberately share the existing
+// constant-time admin-token validation.
 extern esp_err_t validate_auth(httpd_req_t *req);
 
 namespace
@@ -53,39 +53,28 @@ class StorageLock
 {
 public:
     StorageLock()
-        : _locked(ensure_mutex() &&
-                  xSemaphoreTake(s_mutex, portMAX_DELAY) == pdTRUE)
+        : locked(ensure_mutex() &&
+                 xSemaphoreTake(s_mutex, portMAX_DELAY) == pdTRUE)
     {
     }
 
     ~StorageLock()
     {
-        if (_locked) xSemaphoreGive(s_mutex);
+        if (locked) xSemaphoreGive(s_mutex);
     }
 
-    explicit operator bool() const { return _locked; }
+    explicit operator bool() const { return locked; }
 
 private:
-    bool _locked;
+    bool locked;
 };
 
-void clear_error_locked()
+void copy_safe(char *destination, size_t destination_size, const char *source)
 {
-    s_status.lastError[0] = '\0';
-}
-
-void set_error_locked(const char *message, esp_err_t error = ESP_OK)
-{
-    if (error == ESP_OK)
-    {
-        snprintf(s_status.lastError, sizeof(s_status.lastError), "%s", message);
-    }
-    else
-    {
-        snprintf(s_status.lastError, sizeof(s_status.lastError), "%s: %s",
-                 message, esp_err_to_name(error));
-    }
-    ESP_LOGE(TAG, "%s", s_status.lastError);
+    if (!destination || destination_size == 0) return;
+    destination[0] = '\0';
+    if (!source) return;
+    snprintf(destination, destination_size, "%s", source);
 }
 
 void copy_json_safe(char *destination, size_t destination_size,
@@ -111,10 +100,34 @@ void copy_json_safe(char *destination, size_t destination_size,
     destination[out] = '\0';
 }
 
+void clear_error_locked()
+{
+    s_status.lastError[0] = '\0';
+}
+
+void set_error_locked(const char *message, esp_err_t error = ESP_OK)
+{
+    // Copy first so callers may safely pass s_status.lastError itself.
+    char local_message[sizeof(s_status.lastError)] = {};
+    copy_safe(local_message, sizeof(local_message), message ? message : "error");
+
+    if (error == ESP_OK)
+    {
+        copy_safe(s_status.lastError, sizeof(s_status.lastError), local_message);
+    }
+    else
+    {
+        snprintf(s_status.lastError, sizeof(s_status.lastError), "%s: %s",
+                 local_message, esp_err_to_name(error));
+    }
+    ESP_LOGE(TAG, "%s", s_status.lastError);
+}
+
 bool is_regular_nonempty_file(const char *path)
 {
-    struct stat st = {};
-    return stat(path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0;
+    struct stat file_info = {};
+    return stat(path, &file_info) == 0 &&
+           S_ISREG(file_info.st_mode) && file_info.st_size > 0;
 }
 
 bool validate_manifest_locked()
@@ -140,6 +153,13 @@ bool validate_manifest_locked()
     const cJSON *product = cJSON_GetObjectItemCaseSensitive(root, "product");
     const cJSON *design = cJSON_GetObjectItemCaseSensitive(root, "design");
     const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "version");
+    const cJSON *encodings = cJSON_GetObjectItemCaseSensitive(root, "encodings");
+    const cJSON *js_encoding = encodings
+        ? cJSON_GetObjectItemCaseSensitive(encodings, "main.js")
+        : nullptr;
+    const cJSON *css_encoding = encodings
+        ? cJSON_GetObjectItemCaseSensitive(encodings, "main.css")
+        : nullptr;
 
     const bool valid =
         cJSON_IsNumber(format) && format->valueint == 1 &&
@@ -148,7 +168,11 @@ bool validate_manifest_locked()
         cJSON_IsString(design) && design->valuestring &&
         strcmp(design->valuestring, "newdesign") == 0 &&
         cJSON_IsString(version) && version->valuestring &&
-        version->valuestring[0] != '\0';
+        version->valuestring[0] != '\0' &&
+        cJSON_IsString(js_encoding) && js_encoding->valuestring &&
+        strcmp(js_encoding->valuestring, "br") == 0 &&
+        cJSON_IsString(css_encoding) && css_encoding->valuestring &&
+        strcmp(css_encoding->valuestring, "br") == 0;
 
     if (valid)
     {
@@ -168,12 +192,12 @@ bool validate_files_locked()
         return false;
     }
 
-    // Only the New Design is accepted. The manifest prevents an old/alternate
-    // UI image from being activated even if it contains similarly named files.
+    // Only the New Design is accepted. Brotli keeps the complete single-file
+    // Vue application inside the existing 320 KiB partition.
     const bool valid =
         is_regular_nonempty_file(BASE_PATH "/index.html.gz") &&
-        is_regular_nonempty_file(BASE_PATH "/main.js.gz") &&
-        is_regular_nonempty_file(BASE_PATH "/main.css.gz") &&
+        is_regular_nonempty_file(BASE_PATH "/main.js.br") &&
+        is_regular_nonempty_file(BASE_PATH "/main.css.br") &&
         is_regular_nonempty_file(BASE_PATH "/webui-manifest.json") &&
         validate_manifest_locked();
 
@@ -227,23 +251,23 @@ void unmount_locked()
 
 void sha_cleanup_locked()
 {
-    if (s_sha_ready)
-    {
-        mbedtls_md_free(&s_sha_context);
-        s_sha_ready = false;
-    }
+    if (!s_sha_ready) return;
+    mbedtls_md_free(&s_sha_context);
+    s_sha_ready = false;
 }
 
 void invalidate_image_locked(const char *message,
                              esp_err_t original_error = ESP_OK)
 {
+    char preserved_message[sizeof(s_status.lastError)] = {};
+    copy_safe(preserved_message, sizeof(preserved_message), message);
+
     sha_cleanup_locked();
     s_status.updateActive = false;
     unmount_locked();
 
-    // Destroy the first SPIFFS sector so a partial, corrupt or hash-mismatched
-    // image can never mount on the next boot. The embedded New Design remains
-    // available as the safe recovery UI.
+    // Destroy the filesystem header so a partial/hash-mismatched image can
+    // never become active after reboot. Embedded New Design remains reachable.
     if (s_partition)
     {
         const esp_err_t erase_result = esp_partition_erase_range(
@@ -255,7 +279,8 @@ void invalidate_image_locked(const char *message,
         }
     }
 
-    set_error_locked(message, original_error);
+    set_error_locked(preserved_message[0] ? preserved_message : "WWW update failed",
+                     original_error);
 }
 
 esp_err_t mount_locked()
@@ -292,13 +317,12 @@ esp_err_t mount_locked()
     const esp_err_t result = esp_vfs_spiffs_register(&config);
     if (result != ESP_OK)
     {
-        // Empty/unformatted is the expected state after upgrading an existing
-        // device. Never format automatically because the user may still be in
-        // the middle of the compatibility migration.
+        // Empty/unformatted is expected immediately after installing the
+        // transition firmware. Never auto-format during boot.
         if (result == ESP_FAIL)
         {
-            snprintf(s_status.lastError, sizeof(s_status.lastError),
-                     "Standalone New Design not installed");
+            copy_safe(s_status.lastError, sizeof(s_status.lastError),
+                      "Standalone New Design not installed");
             ESP_LOGI(TAG, "%s; using embedded New Design",
                      s_status.lastError);
         }
@@ -316,8 +340,8 @@ esp_err_t mount_locked()
 
     if (!s_status.valid)
     {
-        snprintf(s_status.lastError, sizeof(s_status.lastError),
-                 "No valid New Design manifest found");
+        copy_safe(s_status.lastError, sizeof(s_status.lastError),
+                  "No valid New Design manifest found");
     }
 
     ESP_LOGI(TAG,
@@ -333,10 +357,9 @@ bool valid_sha256_hex(const char *value)
 {
     if (!value || value[0] == '\0') return true;
     if (strlen(value) != SHA256_HEX_LENGTH) return false;
-
-    for (size_t i = 0; i < SHA256_HEX_LENGTH; ++i)
+    for (size_t index = 0; index < SHA256_HEX_LENGTH; ++index)
     {
-        if (!isxdigit(static_cast<unsigned char>(value[i]))) return false;
+        if (!isxdigit(static_cast<unsigned char>(value[index]))) return false;
     }
     return true;
 }
@@ -345,43 +368,47 @@ void digest_to_hex(const unsigned char digest[32],
                    char output[SHA256_HEX_LENGTH + 1])
 {
     static const char HEX[] = "0123456789abcdef";
-    for (size_t i = 0; i < 32; ++i)
+    for (size_t index = 0; index < 32; ++index)
     {
-        output[i * 2] = HEX[(digest[i] >> 4) & 0x0F];
-        output[i * 2 + 1] = HEX[digest[i] & 0x0F];
+        output[index * 2] = HEX[(digest[index] >> 4) & 0x0F];
+        output[index * 2 + 1] = HEX[digest[index] & 0x0F];
     }
     output[SHA256_HEX_LENGTH] = '\0';
 }
 
-const char *external_path_for_uri(const char *uri)
+struct AssetSpec
+{
+    const char *uri;
+    const char *path;
+    const char *content_type;
+    const char *content_encoding;
+};
+
+constexpr AssetSpec ASSET_SPECS[] = {
+    {"/main.js", BASE_PATH "/main.js.br", "application/javascript", "br"},
+    {"/main.css", BASE_PATH "/main.css.br", "text/css", "br"},
+    {"/favicon.ico", BASE_PATH "/favicon.ico.gz", "image/x-icon", "gzip"},
+    {"/manifest.webmanifest", BASE_PATH "/manifest.webmanifest.gz", "application/manifest+json", "gzip"},
+    {"/icon-256.png", BASE_PATH "/icon-256.png.gz", "image/png", "gzip"},
+    {"/*", BASE_PATH "/index.html.gz", "text/html", "gzip"},
+};
+
+const AssetSpec *find_asset_spec(const char *uri)
 {
     if (!uri) return nullptr;
-    if (strcmp(uri, "/main.js") == 0) return BASE_PATH "/main.js.gz";
-    if (strcmp(uri, "/main.css") == 0) return BASE_PATH "/main.css.gz";
-    if (strcmp(uri, "/favicon.ico") == 0) return BASE_PATH "/favicon.ico.gz";
-    if (strcmp(uri, "/manifest.webmanifest") == 0) return BASE_PATH "/manifest.webmanifest.gz";
-    if (strcmp(uri, "/icon-256.png") == 0) return BASE_PATH "/icon-256.png.gz";
-    if (strcmp(uri, "/*") == 0) return BASE_PATH "/index.html.gz";
+    for (const auto &spec : ASSET_SPECS)
+    {
+        if (strcmp(uri, spec.uri) == 0) return &spec;
+    }
     return nullptr;
-}
-
-const char *content_type_for_uri(const char *uri)
-{
-    if (strcmp(uri, "/main.js") == 0) return "application/javascript";
-    if (strcmp(uri, "/main.css") == 0) return "text/css";
-    if (strcmp(uri, "/favicon.ico") == 0) return "image/x-icon";
-    if (strcmp(uri, "/manifest.webmanifest") == 0) return "application/manifest+json";
-    if (strcmp(uri, "/icon-256.png") == 0) return "image/png";
-    return "text/html";
 }
 
 struct WrappedRoute
 {
     bool used = false;
     httpd_uri_t replacement = {};
-    httpd_uri_func originalHandler = nullptr;
-    const char *externalPath = nullptr;
-    const char *contentType = nullptr;
+    httpd_uri_func original_handler = nullptr;
+    const AssetSpec *asset = nullptr;
 };
 
 WrappedRoute s_wrapped_routes[10];
@@ -399,16 +426,16 @@ WrappedRoute *allocate_route()
     return nullptr;
 }
 
-esp_err_t stream_external_file(httpd_req_t *req, WrappedRoute *route)
+esp_err_t stream_external_file(httpd_req_t *req, const AssetSpec *asset)
 {
-    FILE *file = fopen(route->externalPath, "rb");
+    if (!asset) return ESP_ERR_INVALID_ARG;
+
+    FILE *file = fopen(asset->path, "rb");
     if (!file) return ESP_ERR_NOT_FOUND;
 
     add_security_headers(req);
-    httpd_resp_set_type(req, route->contentType);
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    // Stable filenames are used instead of hashes, therefore an updated WWW
-    // image must not be hidden by a stale browser cache.
+    httpd_resp_set_type(req, asset->content_type);
+    httpd_resp_set_hdr(req, "Content-Encoding", asset->content_encoding);
     httpd_resp_set_hdr(req, "Cache-Control",
                        "no-store, no-cache, must-revalidate, max-age=0");
 
@@ -440,35 +467,34 @@ esp_err_t stream_external_file(httpd_req_t *req, WrappedRoute *route)
 esp_err_t wrapped_asset_handler(httpd_req_t *req)
 {
     auto *route = static_cast<WrappedRoute *>(req->user_ctx);
-    if (!route || !route->originalHandler) return ESP_FAIL;
+    if (!route || !route->original_handler) return ESP_FAIL;
 
     if (webui_storage_is_valid())
     {
-        const esp_err_t result = stream_external_file(req, route);
+        const esp_err_t result = stream_external_file(req, route->asset);
         if (result != ESP_ERR_NOT_FOUND) return result;
 
-        ESP_LOGW(TAG, "External asset missing despite valid image: %s",
-                 route->externalPath);
+        // Optional assets such as the large PWA icon intentionally remain in
+        // firmware and fall through to the embedded New Design handler.
+        ESP_LOGD(TAG, "Using embedded fallback asset for %s",
+                 route->asset ? route->asset->uri : "unknown");
     }
 
-    // Transition/recovery fallback. This is the same New Design embedded in the
-    // migration firmware, never the retired old UI.
-    return route->originalHandler(req);
+    return route->original_handler(req);
 }
 
 esp_err_t wrapped_firmware_update_handler(httpd_req_t *req)
 {
     auto *route = static_cast<WrappedRoute *>(req->user_ctx);
-    if (!route || !route->originalHandler) return ESP_FAIL;
+    if (!route || !route->original_handler) return ESP_FAIL;
 
-    const WebUIStorageStatus status = webui_storage_get_status();
-    if (status.updateActive)
+    if (webui_storage_get_status().updateActive)
     {
         add_security_headers(req);
         return httpd_resp_send_custom_err(req, "409 Conflict",
                                           "WWW update already in progress");
     }
-    return route->originalHandler(req);
+    return route->original_handler(req);
 }
 
 esp_err_t get_webui_status_handler(httpd_req_t *req)
@@ -480,8 +506,8 @@ esp_err_t get_webui_status_handler(httpd_req_t *req)
     }
 
     const WebUIStorageStatus status = webui_storage_get_status();
-    char safe_version[sizeof(status.version)];
-    char safe_error[sizeof(status.lastError)];
+    char safe_version[sizeof(status.version)] = {};
+    char safe_error[sizeof(status.lastError)] = {};
     copy_json_safe(safe_version, sizeof(safe_version), status.version);
     copy_json_safe(safe_error, sizeof(safe_error), status.lastError);
 
@@ -515,7 +541,6 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, nullptr);
     }
-
     if (req->content_len <= 0)
     {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
@@ -528,7 +553,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
         strstr(content_type, "multipart/form-data") != nullptr)
     {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                   "Send the raw SPIFFS image as request body");
+                                   "Send raw spiffs.bin as request body");
     }
 
     if (net_fetch_ota_active())
@@ -575,8 +600,11 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     {
         const size_t remaining =
             static_cast<size_t>(req->content_len) - received;
-        const size_t wanted = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
-        const int count = httpd_req_recv(req, reinterpret_cast<char *>(buffer),
+        const size_t wanted = remaining < sizeof(buffer)
+            ? remaining
+            : sizeof(buffer);
+        const int count = httpd_req_recv(req,
+                                         reinterpret_cast<char *>(buffer),
                                          wanted);
 
         if (count == HTTPD_SOCK_ERR_TIMEOUT && timeout_retries-- > 0)
@@ -623,7 +651,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     }
 
     const WebUIStorageStatus status = webui_storage_get_status();
-    char safe_version[sizeof(status.version)];
+    char safe_version[sizeof(status.version)] = {};
     copy_json_safe(safe_version, sizeof(safe_version), status.version);
 
     char response[192];
@@ -653,8 +681,7 @@ void register_storage_endpoints_once(httpd_handle_t server)
 {
     if (s_registered_server == server) return;
 
-    // Mark first to prevent duplicate registration when one endpoint fails.
-    // The normal WebUI must continue even if the optional WWW API is unavailable.
+    // Mark first to avoid recursive duplicate registration through the shim.
     s_registered_server = server;
     webui_storage_init();
 
@@ -665,8 +692,10 @@ void register_storage_endpoints_once(httpd_handle_t server)
 
     if (status_result != ESP_OK || update_result != ESP_OK)
     {
-        ESP_LOGE(TAG, "Could not register WWW update endpoints: status=%s update=%s",
-                 esp_err_to_name(status_result), esp_err_to_name(update_result));
+        ESP_LOGE(TAG,
+                 "Could not register WWW update endpoints: status=%s update=%s",
+                 esp_err_to_name(status_result),
+                 esp_err_to_name(update_result));
     }
 }
 
@@ -676,7 +705,6 @@ esp_err_t webui_storage_init()
 {
     StorageLock lock;
     if (!lock) return ESP_ERR_NO_MEM;
-
     if (s_status.updateActive) return ESP_ERR_INVALID_STATE;
     return mount_locked();
 }
@@ -687,8 +715,8 @@ WebUIStorageStatus webui_storage_get_status()
     if (!lock)
     {
         WebUIStorageStatus failed = {};
-        snprintf(failed.lastError, sizeof(failed.lastError),
-                 "storage mutex unavailable");
+        copy_safe(failed.lastError, sizeof(failed.lastError),
+                  "storage mutex unavailable");
         return failed;
     }
     return s_status;
@@ -701,8 +729,8 @@ bool webui_storage_is_valid()
            !s_status.updateActive;
 }
 
-esp_err_t webui_storage_update_begin(size_t expectedSize,
-                                     const char *expectedSha256Hex)
+esp_err_t webui_storage_update_begin(size_t expected_size,
+                                     const char *expected_sha256_hex)
 {
     StorageLock lock;
     if (!lock) return ESP_ERR_NO_MEM;
@@ -720,14 +748,13 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
         set_error_locked("SPIFFS partition not found");
         return ESP_ERR_NOT_FOUND;
     }
-    // spiffs_create_partition_image() produces an image exactly as large as its
-    // partition. Requiring the full size rejects arbitrary files before erase.
-    if (expectedSize != s_partition->size)
+    // spiffs_create_partition_image() creates a full partition-sized image.
+    if (expected_size != s_partition->size)
     {
         set_error_locked("WWW image size does not match SPIFFS partition");
         return ESP_ERR_INVALID_SIZE;
     }
-    if (!valid_sha256_hex(expectedSha256Hex))
+    if (!valid_sha256_hex(expected_sha256_hex))
     {
         set_error_locked("Invalid WWW SHA-256 header");
         return ESP_ERR_INVALID_ARG;
@@ -757,12 +784,12 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
     }
 
     s_sha_ready = true;
-    s_expected_size = expectedSize;
+    s_expected_size = expected_size;
     s_expected_sha256[0] = '\0';
-    if (expectedSha256Hex && expectedSha256Hex[0])
+    if (expected_sha256_hex && expected_sha256_hex[0])
     {
-        snprintf(s_expected_sha256, sizeof(s_expected_sha256), "%s",
-                 expectedSha256Hex);
+        copy_safe(s_expected_sha256, sizeof(s_expected_sha256),
+                  expected_sha256_hex);
     }
 
     s_status.updateActive = true;
@@ -771,7 +798,7 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
     clear_error_locked();
 
     ESP_LOGI(TAG, "Starting separate New Design update: %u bytes%s",
-             static_cast<unsigned>(expectedSize),
+             static_cast<unsigned>(expected_size),
              s_expected_sha256[0] ? " with SHA-256 verification" : "");
     return ESP_OK;
 }
@@ -833,7 +860,7 @@ esp_err_t webui_storage_update_finish()
     }
     sha_cleanup_locked();
 
-    char actual_sha256[SHA256_HEX_LENGTH + 1];
+    char actual_sha256[SHA256_HEX_LENGTH + 1] = {};
     digest_to_hex(digest, actual_sha256);
     if (s_expected_sha256[0] &&
         strcasecmp(actual_sha256, s_expected_sha256) != 0)
@@ -846,10 +873,13 @@ esp_err_t webui_storage_update_finish()
     const esp_err_t mount_result = mount_locked();
     if (mount_result != ESP_OK || !validate_files_locked())
     {
+        const esp_err_t validation_error = mount_result == ESP_OK
+            ? ESP_ERR_INVALID_RESPONSE
+            : mount_result;
         invalidate_image_locked(
             "WWW image is not a valid HB-RF-ETH-ng New Design image",
-            mount_result == ESP_OK ? ESP_ERR_INVALID_RESPONSE : mount_result);
-        return mount_result == ESP_OK ? ESP_ERR_INVALID_RESPONSE : mount_result;
+            validation_error);
+        return validation_error;
     }
 
     update_usage_locked();
@@ -864,8 +894,12 @@ void webui_storage_update_abort()
     StorageLock lock;
     if (!lock) return;
 
-    invalidate_image_locked(
-        s_status.lastError[0] ? s_status.lastError : "WWW update aborted");
+    char reason[sizeof(s_status.lastError)] = {};
+    copy_safe(reason, sizeof(reason),
+              s_status.lastError[0]
+                  ? s_status.lastError
+                  : "WWW update aborted");
+    invalidate_image_locked(reason);
 }
 
 esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
@@ -878,12 +912,12 @@ esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
 
     register_storage_endpoints_once(server);
 
-    const char *external_path = external_path_for_uri(uri_handler->uri);
+    const AssetSpec *asset = find_asset_spec(uri_handler->uri);
     const bool firmware_update_route =
         strcmp(uri_handler->uri, "/ota_update") == 0 ||
         strcmp(uri_handler->uri, "/api/ota_url") == 0;
 
-    if (!external_path && !firmware_update_route)
+    if (!asset && !firmware_update_route)
     {
         return httpd_register_uri_handler(server, uri_handler);
     }
@@ -896,20 +930,12 @@ esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
     }
 
     route->replacement = *uri_handler;
-    route->originalHandler = uri_handler->handler;
-
-    if (firmware_update_route)
-    {
-        route->replacement.handler = wrapped_firmware_update_handler;
-        route->replacement.user_ctx = route;
-    }
-    else
-    {
-        route->externalPath = external_path;
-        route->contentType = content_type_for_uri(uri_handler->uri);
-        route->replacement.handler = wrapped_asset_handler;
-        route->replacement.user_ctx = route;
-    }
+    route->original_handler = uri_handler->handler;
+    route->asset = asset;
+    route->replacement.user_ctx = route;
+    route->replacement.handler = firmware_update_route
+        ? wrapped_firmware_update_handler
+        : wrapped_asset_handler;
 
     return httpd_register_uri_handler(server, &route->replacement);
 }
