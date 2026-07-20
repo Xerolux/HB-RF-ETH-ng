@@ -118,7 +118,7 @@ static void save_last_attempt(int64_t value)
 
 // Short-lived task spawned by the periodic esp_timer every 24 h. It runs a
 // single refresh() + LED/version evaluation and then self-deletes, so the
-// 12 KB stack is only resident for the ~5 s of the actual check instead of
+// worker stack is only resident for the actual check instead of
 // being blocked in vTaskDelay for 24 h like the former background task.
 static void _periodic_check_task(void *parameter)
 {
@@ -137,8 +137,8 @@ static void _periodic_timer_callback(void *arg)
 {
   UpdateCheck *uc = static_cast<UpdateCheck *>(arg);
 
-  // Do not create the 12 KB worker stack or begin TLS when the WROOM-32 heap is
-  // already fragmented. Skipping one daily check is safer than destabilising
+  // Do not create the worker stack or begin TLS when the WROOM-32 heap is
+  // already fragmented. Skipping one scheduled check is safer than destabilising
   // Homematic/MQTT operation; the persistent cache remains available.
   const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
   const size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
@@ -152,9 +152,9 @@ static void _periodic_timer_callback(void *arg)
     return;
   }
 
-  // refresh() allocates a ReleaseInfo struct (~5 KB) on the worker stack and
-  // performs the HTTPS fetch. The stack only exists for this short operation.
-  BaseType_t created = xTaskCreate(_periodic_check_task, "upd_chk", 12288,
+  // ReleaseInfo is now compact (~2.5 KB including WebUI metadata). A 9 KB
+  // worker leaves TLS/function headroom while reducing the temporary heap spike.
+  BaseType_t created = xTaskCreate(_periodic_check_task, "upd_chk", 9216,
                                    uc, 2, NULL);
   if (created != pdPASS) {
     ESP_LOGE(TAG, "Failed to create daily update-check task");

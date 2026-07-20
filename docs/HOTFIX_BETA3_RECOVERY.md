@@ -10,9 +10,9 @@ This hotfix addresses issues found during the first hardware test of firmware
 - an external WebUI image could be selected on the firmware upload page;
 - an empty primary IPv4 DNS setting prevented hostname-based NTP and OTA access.
 
-The server now uses the embedded gzip assets whenever a browser does not
-advertise Brotli support. Browsers that advertise Brotli continue to use the
-compact external WebUI. The updated WebUI version is `1.0.0-Beta.2`.
+The standalone WebUI now uses gzip exclusively. Brotli assets and Brotli
+negotiation are removed, so the same encoding is used on every private-LAN
+browser. The updated WebUI version is `1.0.0-Beta.2`.
 
 Existing custom DNS values remain unchanged. Only missing or legacy `0.0.0.0`
 primary DNS values are initialized to `1.1.1.1`.
@@ -36,3 +36,10 @@ update metadata. A persistent NVS timestamp limits online update-manifest
 requests to exactly one attempt per 24 hours, including across device reboots.
 Page visits, local refresh buttons and MQTT status publication only read the
 cached snapshot.
+
+
+The daily update check is persisted in NVS and cannot be retriggered by page
+visits or device reboots. A stable per-device stagger spreads fleets across a
+2-60 minute window. Before creating the short-lived worker or opening TLS, the
+firmware checks total free heap and the largest free block; an unsafe check is
+skipped instead of risking a crash.

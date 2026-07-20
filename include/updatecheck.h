@@ -59,9 +59,7 @@ struct ReleaseInfo {
     bool isPrerelease;          // matches GitHub "prerelease" flag
     bool betaChannel;           // channel used to populate this cache
     WebUIReleaseInfo webui;     // optional WebUI block from the same manifest
-    bool betaChannel;           // channel used to populate this cache
-    WebUIReleaseInfo webui;     // optional WebUI block from the same manifest
-    char body[4096];            // release notes markdown (truncated if too long)
+    char body[1024];            // compact release-note excerpt or notes URL
     int64_t fetchedAtMs;        // epoch millis of the last successful fetch
     char error[128];            // human-readable last error (empty when valid)
 };
@@ -86,9 +84,9 @@ struct OtaSnapshot {
     char error_text[64] = {0};  // human readable, e.g. "ESP_ERR_OTA_VALIDATE_FAILED"
 };
 
-// Lightweight release snapshot — omits the 4 KB body / 256 B URL fields so
-// periodic callers (MQTT publish every 5 s, update-check task) don't copy a
-// 5 KB struct on their stack.  WebUI (which needs body/URLs) still uses
+// Lightweight release snapshot — omits URLs, WebUI metadata and the note
+// excerpt so periodic callers do not copy the full cached manifest on stack.
+// WebUI callers use
 // the full ReleaseInfo via getReleaseInfo().
 struct VersionSnapshot {
     bool valid = false;
@@ -103,11 +101,9 @@ private:
     SysInfo* _sysInfo;
     LED *_statusLED;
     Settings* _settings;
-    // Periodic 24 h timer that replaces the former always-sleeping background
-    // task. Keeping a task alive only to vTaskDelay for 24 h wasted 12 KB of
-    // precious ESP32 (no PSRAM) heap permanently. The timer fires every 24 h,
-    // spawns a short-lived "upd_chk" task (12 KB) that runs refresh() +
-    // _evaluateReleaseInfo() and self-deletes, so the 12 KB stack is only
+    // Persistent, staggered timer replacing the former always-sleeping task.
+    // The short-lived worker is created only when heap checks pass and the
+    // stored 24-hour window is due.
     // resident for the ~5 s of the actual check.
     esp_timer_handle_t _periodicTimer = NULL;
     esp_timer_handle_t _initialTimer = NULL;
