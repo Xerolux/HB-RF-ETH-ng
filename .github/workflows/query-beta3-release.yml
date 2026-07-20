@@ -1,0 +1,41 @@
+name: Query Beta.3 Release Status
+
+on:
+  push:
+    branches:
+      - ops/beta3-release-status
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  query:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout status branch
+        uses: actions/checkout@v7
+        with:
+          ref: ops/beta3-release-status
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Query release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow release.yml \
+            --limit 10 \
+            --json databaseId,status,conclusion,createdAt,displayTitle,event,headSha,url \
+            > beta3-release-status.json
+
+      - name: Commit status report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add beta3-release-status.json
+          git commit -m "ci: record Beta.3 release status"
+          git push origin HEAD:ops/beta3-release-status
