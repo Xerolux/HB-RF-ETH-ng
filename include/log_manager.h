@@ -54,6 +54,18 @@ public:
 
     uint64_t getTotalWritten() const;
 
+    /** Current allocated ring-buffer capacity in bytes. */
+    size_t getBufferSize() const { return log_buffer_size; }
+
+    /** Bytes currently available to a new reader after ring-buffer overwrite. */
+    size_t getBufferedBytes() const
+    {
+        const uint64_t written = getTotalWritten();
+        return written < log_buffer_size
+            ? static_cast<size_t>(written)
+            : log_buffer_size;
+    }
+
     static constexpr size_t CRASH_TAIL_MAX = 1024;
     bool saveCrashTailNvs(const char *tag);
     static std::string loadCrashTailNvs();
