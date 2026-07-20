@@ -1,0 +1,194 @@
+name: Apply WebUI release compatibility
+
+on:
+  push:
+    branches:
+      - feature/separate-webui-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/separate-webui-update
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply firmware and browser compatibility checks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              return text.replace(old, new, 1)
+
+          # Firmware-side manifest validation.
+          path = Path('main/webui_storage.cpp')
+          text = path.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '#include "esp_spiffs.h"\n',
+              '#include "esp_spiffs.h"\n#include "esp_app_format.h"\n',
+              'app description include')
+          text = replace_once(
+              text,
+              '#include "security_headers.h"\n',
+              '#include "security_headers.h"\n#include "semver.h"\n',
+              'semver include')
+          text = replace_once(
+              text,
+              "    s_status.version[0] = '\\0';\n\n    FILE *file",
+              "    s_status.version[0] = '\\0';\n    s_status.minFirmwareVersion[0] = '\\0';\n    s_status.apiVersion = 0;\n\n    FILE *file",
+              'manifest reset')
+          text = replace_once(
+              text,
+              '    const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "version");\n'
+              '    const cJSON *encodings = cJSON_GetObjectItemCaseSensitive(root, "encodings");',
+              '    const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "version");\n'
+              '    const cJSON *api_version = cJSON_GetObjectItemCaseSensitive(root, "apiVersion");\n'
+              '    const cJSON *minimum_firmware = cJSON_GetObjectItemCaseSensitive(root, "minFirmwareVersion");\n'
+              '    const cJSON *encodings = cJSON_GetObjectItemCaseSensitive(root, "encodings");',
+              'manifest compatibility fields')
+          text = replace_once(
+              text,
+              "        cJSON_IsString(version) && version->valuestring &&\n"
+              "        version->valuestring[0] != '\\0' &&\n"
+              "        cJSON_IsString(js_encoding)",
+              "        cJSON_IsString(version) && version->valuestring &&\n"
+              "        version->valuestring[0] != '\\0' &&\n"
+              "        cJSON_IsNumber(api_version) &&\n"
+              "        api_version->valueint == static_cast<int>(HB_WEBUI_API_VERSION) &&\n"
+              "        cJSON_IsString(minimum_firmware) && minimum_firmware->valuestring &&\n"
+              "        minimum_firmware->valuestring[0] != '\\0' &&\n"
+              "        compareVersions(esp_app_get_description()->version,\n"
+              "                        minimum_firmware->valuestring) >= 0 &&\n"
+              "        cJSON_IsString(js_encoding)",
+              'manifest compatibility validation')
+          text = replace_once(
+              text,
+              '        copy_json_safe(s_status.version, sizeof(s_status.version),\n'
+              '                       version->valuestring);\n',
+              '        copy_json_safe(s_status.version, sizeof(s_status.version),\n'
+              '                       version->valuestring);\n'
+              '        copy_json_safe(s_status.minFirmwareVersion,\n'
+              '                       sizeof(s_status.minFirmwareVersion),\n'
+              '                       minimum_firmware->valuestring);\n'
+              '        s_status.apiVersion = static_cast<uint32_t>(api_version->valueint);\n',
+              'store compatibility metadata')
+          text = replace_once(
+              text,
+              "    if (!valid) s_status.version[0] = '\\0';\n",
+              "    if (!valid)\n"
+              "    {\n"
+              "        s_status.version[0] = '\\0';\n"
+              "        s_status.minFirmwareVersion[0] = '\\0';\n"
+              "        s_status.apiVersion = 0;\n"
+              "    }\n",
+              'clear invalid compatibility')
+          text = replace_once(
+              text,
+              "    s_status.version[0] = '\\0';\n}\n\nvoid sha_cleanup_locked",
+              "    s_status.version[0] = '\\0';\n"
+              "    s_status.minFirmwareVersion[0] = '\\0';\n"
+              "    s_status.apiVersion = 0;\n"
+              "}\n\nvoid sha_cleanup_locked",
+              'unmount compatibility reset')
+          text = replace_once(
+              text,
+              '    char safe_version[sizeof(status.version)] = {};\n'
+              '    char safe_error[sizeof(status.lastError)] = {};\n'
+              '    copy_json_safe(safe_version, sizeof(safe_version), status.version);\n'
+              '    copy_json_safe(safe_error, sizeof(safe_error), status.lastError);\n\n'
+              '    char response[512];',
+              '    char safe_version[sizeof(status.version)] = {};\n'
+              '    char safe_minimum[sizeof(status.minFirmwareVersion)] = {};\n'
+              '    char safe_error[sizeof(status.lastError)] = {};\n'
+              '    copy_json_safe(safe_version, sizeof(safe_version), status.version);\n'
+              '    copy_json_safe(safe_minimum, sizeof(safe_minimum), status.minFirmwareVersion);\n'
+              '    copy_json_safe(safe_error, sizeof(safe_error), status.lastError);\n\n'
+              '    char response[768];',
+              'status buffers')
+          text = replace_once(
+              text,
+              '             "\\\"usedBytes\\\":%u,\\\"bytesWritten\\\":%u,\\\"version\\\":\\\"%s\\\",\n"\n'
+              '             "\\\"design\\\":\\\"newdesign\\\",\\\"lastError\\\":\\\"%s\\\"}",',
+              '             "\\\"usedBytes\\\":%u,\\\"bytesWritten\\\":%u,\\\"version\\\":\\\"%s\\\",\n"\n'
+              '             "\\\"apiVersion\\\":%u,\\\"supportedApiVersion\\\":%u,"\n'
+              '             "\\\"minFirmwareVersion\\\":\\\"%s\\\",\\\"firmwareVersion\\\":\\\"%s\\\","\n'
+              '             "\\\"design\\\":\\\"newdesign\\\",\\\"lastError\\\":\\\"%s\\\"}",',
+              'status json fields')
+          text = replace_once(
+              text,
+              '              static_cast<unsigned>(status.bytesWritten),\n'
+              '              safe_version,\n'
+              '              safe_error);',
+              '              static_cast<unsigned>(status.bytesWritten),\n'
+              '              safe_version,\n'
+              '              static_cast<unsigned>(status.apiVersion),\n'
+              '              static_cast<unsigned>(HB_WEBUI_API_VERSION),\n'
+              '              safe_minimum,\n'
+              '              esp_app_get_description()->version,\n'
+              '              safe_error);',
+              'status json values')
+          path.write_text(text, encoding='utf-8')
+
+          # Browser-side preflight before downloading the image.
+          path = Path('webui/src/webuiupdate.vue')
+          text = path.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              "    invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', failed: 'WebUI-Update fehlgeschlagen.'",
+              "    invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', incompatibleApi: 'Diese WebUI benötigt eine andere Firmware-API.', tooOldFirmware: 'Die installierte Firmware ist für diese WebUI zu alt.', failed: 'WebUI-Update fehlgeschlagen.'",
+              'German compatibility messages')
+          text = replace_once(
+              text,
+              "    invalidFile: 'The file must exactly match the WWW partition.', failed: 'WebUI update failed.'",
+              "    invalidFile: 'The file must exactly match the WWW partition.', incompatibleApi: 'This WebUI requires a different firmware API.', tooOldFirmware: 'The installed firmware is too old for this WebUI.', failed: 'WebUI update failed.'",
+              'English compatibility messages')
+          text = replace_once(
+              text,
+              "const status = ref({ partitionFound: false, mounted: false, valid: false, updateActive: false, partitionSize: 0, totalBytes: 0, usedBytes: 0, bytesWritten: 0, version: '', design: 'newdesign', lastError: '' })",
+              "const status = ref({ partitionFound: false, mounted: false, valid: false, updateActive: false, partitionSize: 0, totalBytes: 0, usedBytes: 0, bytesWritten: 0, version: '', apiVersion: 0, supportedApiVersion: 1, minFirmwareVersion: '', firmwareVersion: '', design: 'newdesign', lastError: '' })",
+              'status defaults')
+          old_online = "const onlineReady = computed(() => release.value?.design === 'newdesign' && release.value.downloadUrl && /^[0-9a-f]{64}$/i.test(release.value.sha256 || '') && Number(release.value.size) === Number(status.value.partitionSize) && status.value.partitionSize > 0)"
+          new_online = """const compareVersions = (left = '', right = '') => {
+  const parse = value => {
+    const [core, pre = ''] = String(value).split('-', 2)
+    const numbers = core.split('.').map(part => Number(part) || 0)
+    return { numbers: [numbers[0] || 0, numbers[1] || 0, numbers[2] || 0], pre }
+  }
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < 3; index += 1) {
+    if (a.numbers[index] !== b.numbers[index]) return a.numbers[index] > b.numbers[index] ? 1 : -1
+  }
+  if (!a.pre && !b.pre) return 0
+  if (!a.pre) return 1
+  if (!b.pre) return -1
+  return a.pre.localeCompare(b.pre, undefined, { numeric: true, sensitivity: 'base' })
+}
+const onlineReady = computed(() => release.value?.design === 'newdesign' && release.value.downloadUrl && /^[0-9a-f]{64}$/i.test(release.value.sha256 || '') && Number(release.value.size) === Number(status.value.partitionSize) && Number(release.value.apiVersion) === Number(status.value.supportedApiVersion) && compareVersions(status.value.firmwareVersion, release.value.minFirmwareVersion) >= 0 && status.value.partitionSize > 0)"""
+          text = replace_once(text, old_online, new_online, 'online compatibility readiness')
+          text = replace_once(
+              text,
+              "    if (item.design !== 'newdesign') return void (manifestError.value = text.value.wrongDesign)\n    release.value = item\n    if (Number(item.size) !== Number(status.value.partitionSize)) manifestError.value = text.value.sizeMismatch",
+              "    if (item.design !== 'newdesign') return void (manifestError.value = text.value.wrongDesign)\n    release.value = item\n    if (Number(item.size) !== Number(status.value.partitionSize)) manifestError.value = text.value.sizeMismatch\n    else if (Number(item.apiVersion) !== Number(status.value.supportedApiVersion)) manifestError.value = text.value.incompatibleApi\n    else if (compareVersions(status.value.firmwareVersion, item.minFirmwareVersion) < 0) manifestError.value = `${text.value.tooOldFirmware} (>= ${item.minFirmwareVersion})`",
+              'manifest preflight')
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Remove helper and push
+        run: |
+          rm .github/workflows/apply-webui-release-compatibility.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/webui_storage.cpp webui/src/webuiupdate.vue .github/workflows/apply-webui-release-compatibility.yml
+          git commit -m 'feat(webui): enforce release API and firmware compatibility'
+          git push origin HEAD:feature/separate-webui-update
