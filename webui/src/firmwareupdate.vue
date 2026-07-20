@@ -1,81 +1,105 @@
 <template>
   <div class="firmware-page page-shell">
-    <!-- Countdown Overlay -->
-    <Transition name="fade">
-      <div v-if="showCountdown" class="countdown-overlay">
-        <div class="countdown-card">
-          <div class="spinner-container">
-            <div class="spinner-ring"></div>
-            <div class="spinner-icon"><AppIcon name="refresh" /></div>
-          </div>
-          <div v-if="countdownPhaseTotal > 1" class="countdown-phase">
-            <span>{{ countdownPhaseIndex }}/{{ countdownPhaseTotal }}</span>
-          </div>
-          <h2 class="countdown-title">{{ countdownTitle }}</h2>
-          <div class="countdown-value">{{ countdown }}</div>
-          <p class="countdown-text">{{ countdownText }}</p>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: countdownProgress + '%' }"></div>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <div class="page-header page-hero">
+    <section class="page-hero">
       <div class="hero-copy">
-        <span class="hero-eyebrow">
-          <AppIcon name="firmware" />
-          {{ t('firmware.title') }}
-        </span>
-        <h1 class="hero-title">{{ t('firmware.title') }}</h1>
-        <p class="hero-subtitle">{{ t('firmware.subtitle') }}</p>
+        <span class="hero-eyebrow"><AppIcon name="firmware" /> Firmware</span>
+        <h1 class="hero-title">Firmware aktualisieren</h1>
+        <p class="hero-subtitle">Updates werden einmal täglich gesucht. Die Installation erfolgt ausschließlich über eine lokal ausgewählte BIN-Datei.</p>
       </div>
-      <div class="hero-meta version-badge">
-        <span class="label">{{ t('sysinfo.version') }}</span>
-        <span class="value">{{ sysInfoStore.currentVersion }}</span>
+      <div class="hero-meta">
+        <span class="meta-chip"><AppIcon name="firmware" /> Installiert: {{ sysInfoStore.currentVersion || '—' }}</span>
+        <span class="meta-chip"><AppIcon name="clock" /> {{ lastCheckText }}</span>
       </div>
-    </div>
-
-    <div class="quick-actions">
-      <span class="chip-btn static">
-        <AppIcon name="clock" />
-        {{ updateStore.lastCheck ? t('firmware.lastCheckAt', { time: formatLastCheck(updateStore.lastCheck) }) : t('firmware.noRecentCheck') }}
-      </span>
-    </div>
+    </section>
 
     <div class="content-grid">
-      <!-- File Upload Card -->
-      <div class="update-card">
+      <section class="update-card">
+        <div class="card-header">
+          <div class="header-icon bg-success-light text-success"><AppIcon name="download" /></div>
+          <div class="header-text">
+            <h2>Verfügbare Firmware</h2>
+            <p>Der ESP lädt nur das kleine Update-Manifest. Die Firmware-Datei wird von deinem Browser heruntergeladen.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <BAlert v-if="updateStore.checkError" variant="warning" :model-value="true">
+            Update-Prüfung fehlgeschlagen: {{ updateStore.checkError }}
+          </BAlert>
+
+          <div v-if="updateStore.updateAvailable" class="release-box">
+            <div>
+              <span class="release-label">Neue Version</span>
+              <strong>v{{ updateStore.latestVersion }}</strong>
+              <small v-if="updateStore.publishedAt">Veröffentlicht: {{ formatDate(updateStore.publishedAt) }}</small>
+            </div>
+            <span v-if="updateStore.isPrerelease" class="beta-badge">Beta</span>
+          </div>
+          <div v-else class="release-box is-current">
+            <div>
+              <span class="release-label">Status</span>
+              <strong>{{ updateStore.latestVersion && updateStore.latestVersion !== 'n/a' ? 'Firmware ist aktuell' : 'Noch kein Prüfergebnis vorhanden' }}</strong>
+            </div>
+          </div>
+
+          <div class="actions">
+            <a
+              v-if="updateStore.updateAvailable && updateStore.downloadUrl"
+              class="btn btn-success action-btn"
+              :href="updateStore.downloadUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <AppIcon name="download" /> Firmware-BIN herunterladen
+            </a>
+            <a
+              v-if="updateStore.releaseUrl"
+              class="btn btn-outline-secondary action-btn"
+              :href="updateStore.releaseUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <AppIcon name="externalLink" /> Release auf GitHub
+            </a>
+          </div>
+
+          <div class="beta-toggle-row">
+            <div class="form-check form-switch">
+              <input
+                id="betaChannelSwitch"
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                :checked="updateStore.betaChannel"
+                :disabled="betaToggleSaving"
+                @change="onBetaToggle"
+              >
+            </div>
+            <label for="betaChannelSwitch" class="beta-toggle-label">
+              Beta-Versionen anzeigen
+              <span class="beta-toggle-hint">Die Änderung gilt bei der nächsten automatischen Prüfung innerhalb des 24-Stunden-Zyklus.</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="update-card">
         <div class="card-header">
           <div class="header-icon bg-primary-light text-primary"><AppIcon name="upload" /></div>
           <div class="header-text">
-            <h3>{{ t('firmware.fileUpload') }}</h3>
-            <p>{{ t('firmware.fileUploadHint') }}</p>
+            <h2>Firmware manuell installieren</h2>
+            <p>Hier ausschließlich <code>firmware_*.bin</code> verwenden. WebUI-Dateien gehören unter <strong>System → WebUI</strong>.</p>
           </div>
         </div>
-
         <div class="card-body">
-          <div
-            class="upload-zone"
-            :class="{ 'has-file': file, 'dragging': isDragging }"
-            @dragover.prevent="isDragging = true"
-            @dragleave.prevent="isDragging = false"
-            @drop.prevent="handleDrop"
-            @click="$refs.fileInput.click()"
-          >
-            <input
-              type="file"
-              ref="fileInput"
-              accept=".bin"
-              @change="handleFileSelect"
-              class="hidden-input"
-            />
-
+          <label class="upload-zone" :class="{ 'has-file': file, dragging: isDragging, invalid: !!fileError }"
+                 @dragover.prevent="isDragging = true"
+                 @dragleave.prevent="isDragging = false"
+                 @drop.prevent="handleDrop">
+            <input ref="fileInput" type="file" accept=".bin,application/octet-stream" class="hidden-input" @change="handleFileSelect">
             <template v-if="!file">
               <div class="upload-icon"><AppIcon name="upload" /></div>
-              <span class="upload-text">{{ t('firmware.selectFile') }}</span>
+              <span class="upload-text">Firmware-BIN auswählen oder hierher ziehen</span>
             </template>
-
             <template v-else>
               <div class="file-preview">
                 <div class="file-icon"><AppIcon name="file" /></div>
@@ -83,1669 +107,217 @@
                   <span class="file-name">{{ file.name }}</span>
                   <span class="file-size">{{ formatSize(file.size) }}</span>
                 </div>
-                <button @click.stop="clearFile" class="remove-file-btn"><AppIcon name="close" /></button>
+                <button type="button" class="remove-file-btn" @click.stop.prevent="clearFile"><AppIcon name="close" /></button>
               </div>
             </template>
-          </div>
+          </label>
+
+          <BAlert v-if="fileError" variant="danger" :model-value="true">{{ fileError }}</BAlert>
 
           <div v-if="uploadProgress > 0" class="progress-container">
-            <div class="progress-bar">
-              <div class="progress-value" :style="{ width: uploadProgress + '%' }"></div>
-            </div>
+            <div class="progress-bar"><div class="progress-value" :style="{ width: uploadProgress + '%' }"></div></div>
             <span class="progress-label">{{ uploadProgress }}%</span>
           </div>
 
-          <BButton
-            variant="primary"
-            size="lg"
-            block
-            :disabled="!file || uploading"
-            @click="uploadFirmware"
-            class="action-btn"
-          >
+          <BAlert variant="warning" :model-value="true">
+            Während des Schreibens Stromversorgung und Netzwerk nicht unterbrechen. Nach erfolgreichem Upload startet das Gerät mit dauerhaft aktivem Neustart-Sync neu.
+          </BAlert>
+
+          <BButton variant="primary" size="lg" block class="action-btn"
+                   :disabled="!file || !!fileError || uploading" @click="uploadFirmware">
             <span v-if="uploading" class="spinner-border spinner-border-sm me-2"></span>
-            {{ uploading ? t('firmware.uploading') : t('firmware.upload') }}
+            <AppIcon v-else name="upload" /> {{ uploading ? 'Firmware wird übertragen …' : 'Firmware installieren' }}
           </BButton>
         </div>
-      </div>
-
-      <!-- Network Update Card -->
-      <div class="update-card network-update-card">
-        <div class="card-header">
-          <div class="header-icon bg-success-light text-success"><AppIcon name="globe" /></div>
-          <div class="header-text">
-            <h3>{{ t('firmware.networkUpdate') }}</h3>
-            <p>{{ t('firmware.networkUpdateHint') }}</p>
-          </div>
-        </div>
-
-        <div class="card-body">
-          <div v-if="updateStore.latestVersion && updateStore.latestVersion !== 'n/a' && updateStore.updateAvailable" class="update-info">
-            <div class="update-available">
-              <span class="update-icon"><AppIcon name="download" /></span>
-              <div class="update-text">
-                <strong>
-                  {{ t('firmware.updateAvailable') }}
-                  <span v-if="updateStore.isPrerelease" class="beta-badge">{{ t('firmware.beta') }}</span>
-                </strong>
-                <span class="version-info">v{{ updateStore.latestVersion }}</span>
-              </div>
-            </div>
-            <button class="changelog-link" type="button" @click="showChangelogModal = true">
-              <AppIcon name="logs" />
-              {{ t('changelog.title') }}
-              <AppIcon name="arrowRight" />
-            </button>
-          </div>
-          <div v-else-if="updateStore.checkError" class="update-info">
-            <div class="no-update">
-              <span class="check-icon"><AppIcon name="alert" /></span>
-              <span>{{ t('firmware.checkFailed') }}: {{ updateStore.checkError }}</span>
-            </div>
-            <div v-if="updateStore.lastCheck" class="last-check">
-              {{ t('firmware.lastCheck') }}: {{ formatLastCheck(updateStore.lastCheck) }}
-            </div>
-          </div>
-          <div v-else class="update-info">
-            <div class="no-update">
-              <span class="check-icon"><AppIcon name="check" /></span>
-              <span>{{ t('firmware.upToDate') }}</span>
-            </div>
-            <div class="form-text mt-2 text-muted" style="font-size: 0.75rem; line-height: 1.2;">
-               {{ t('privacy.updateCheck') }}
-            </div>
-            <div v-if="updateStore.lastCheck" class="last-check">
-              {{ t('firmware.lastCheck') }}: {{ formatLastCheck(updateStore.lastCheck) }}
-            </div>
-          </div>
-
-          <!-- Beta channel toggle -->
-          <div class="beta-toggle-row">
-            <div class="form-check form-switch">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                id="betaChannelSwitch"
-                :checked="updateStore.betaChannel"
-                @change="onBetaToggle"
-                :disabled="betaToggleSaving"
-              >
-            </div>
-            <label for="betaChannelSwitch" class="beta-toggle-label">
-              {{ t('firmware.betaChannel') }}
-              <span class="beta-toggle-hint">{{ t('firmware.betaChannelHint') }}</span>
-            </label>
-          </div>
-
-          <div v-if="otaProgress > 0" class="progress-container">
-            <div class="progress-bar">
-              <div class="progress-value success" :style="{ width: otaProgress + '%' }"></div>
-            </div>
-            <span class="progress-label">{{ otaProgress }}%</span>
-          </div>
-
-          <BButton
-            variant="success"
-            size="lg"
-            block
-            :disabled="!updateStore.updateAvailable || !updateStore.downloadUrl || otaUpdating"
-            @click="startOtaUpdate"
-            class="action-btn"
-          >
-            <span v-if="otaUpdating" class="spinner-border spinner-border-sm me-2"></span>
-            {{ otaUpdating ? t('firmware.downloading') : t('firmware.downloadInstall') }}
-          </BButton>
-        </div>
-      </div>
+      </section>
     </div>
 
-    <!-- Firmware Archive -->
-    <div class="update-card archive-card">
-      <div class="card-header">
-        <div class="header-icon bg-warning-light text-warning"><AppIcon name="download" /></div>
-        <div class="header-text">
-          <h3>{{ t('firmware.archiveTitle') }}</h3>
-          <p>{{ t('firmware.archiveHint') }}</p>
-        </div>
-      </div>
-
-      <div class="card-body">
-        <div class="archive-toolbar">
-          <div class="archive-filters" role="group" :aria-label="t('firmware.archiveFilter')">
-            <button
-              v-for="filter in archiveFilters"
-              :key="filter.value"
-              type="button"
-              :class="['filter-btn', { active: archiveFilter === filter.value }]"
-              @click="setArchiveFilter(filter.value)"
-            >
-              {{ filter.label }}
-            </button>
-          </div>
-        </div>
-
-        <div class="archive-warning">
-          <AppIcon name="alert" />
-          <span>{{ t('firmware.archiveWarning') }}</span>
-        </div>
-
-        <div v-if="archiveError" class="archive-error">
-          <AppIcon name="alert" />
-          <span>{{ archiveError }}</span>
-        </div>
-
-        <div v-if="archiveLoading && firmwareArchive.length === 0" class="archive-empty">
-          <span class="spinner-border spinner-border-sm"></span>
-          {{ t('firmware.archiveLoading') }}
-        </div>
-
-        <div v-else-if="!archiveLoaded" class="archive-empty">
-          <AppIcon name="info" />
-          {{ t('firmware.archiveHint') }}
-        </div>
-
-        <div v-else-if="filteredFirmwareArchive.length === 0" class="archive-empty">
-          <AppIcon name="info" />
-          {{ t('firmware.archiveEmpty') }}
-        </div>
-
-        <div v-else class="archive-picker">
-          <label class="archive-select-label" for="firmwareArchiveSelect">{{ t('firmware.archiveSelect') }}</label>
-          <select id="firmwareArchiveSelect" v-model="selectedArchiveVersion" class="archive-select">
-            <option
-              v-for="release in filteredFirmwareArchive"
-              :key="release.id"
-              :value="release.version"
-            >
-              {{ archiveOptionLabel(release) }}
-            </option>
-          </select>
-
-          <div v-if="selectedArchiveRelease" class="archive-selected">
-            <div class="archive-main-row">
-              <div class="archive-version">
-                <div class="archive-title-row">
-                  <strong>v{{ selectedArchiveRelease.version }}</strong>
-                  <span v-if="selectedArchiveRelease.prerelease" class="beta-badge">{{ t('firmware.beta') }}</span>
-                  <span v-if="selectedArchiveRelease.isCurrent" class="current-badge">{{ t('firmware.archiveCurrent') }}</span>
-                </div>
-                <div class="archive-meta">
-                  <span>{{ formatReleaseDate(selectedArchiveRelease.publishedAt) }}</span>
-                  <span v-if="selectedArchiveRelease.assetName">· {{ selectedArchiveRelease.assetName }}</span>
-                  <span v-if="selectedArchiveRelease.assetSize">· {{ formatSize(selectedArchiveRelease.assetSize) }}</span>
-                </div>
-              </div>
-              <div class="archive-actions">
-                <a class="archive-link" :href="selectedArchiveRelease.releaseUrl" target="_blank" rel="noopener noreferrer">
-                  <AppIcon name="externalLink" />
-                  {{ t('firmware.viewOnGithub') }}
-                </a>
-                <button
-                  class="archive-install-btn"
-                  type="button"
-                  :disabled="otaUpdating || !selectedArchiveRelease.downloadUrl || selectedArchiveRelease.isCurrent"
-                  @click="installArchivedFirmware(selectedArchiveRelease)"
-                >
-                  <span v-if="archiveInstallingVersion === selectedArchiveRelease.version" class="spinner-border spinner-border-sm"></span>
-                  <AppIcon v-else name="download" />
-                  {{ selectedArchiveRelease.isCurrent ? t('firmware.archiveInstalled') : t('firmware.archiveInstall') }}
-                </button>
-              </div>
-            </div>
-            <div class="archive-notes-row">
-              <button
-                type="button"
-                class="archive-changelog-btn"
-                :disabled="!selectedArchiveRelease.notesUrl"
-                @click="showChangelogModal = true"
-              >
-                <AppIcon name="logs" />
-                {{ t('firmware.archiveReleaseNotes') }}
-              </button>
-              <a
-                v-if="selectedArchiveRelease.notesUrl"
-                class="archive-notes-link"
-                :href="selectedArchiveRelease.notesUrl"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <AppIcon name="externalLink" />
-                {{ t('firmware.viewOnGithub') }}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- System Actions -->
-    <div class="system-actions">
-      <div class="action-tile warning" @click="restartClick">
+    <section class="system-actions">
+      <button type="button" class="action-tile warning" @click="restartClick">
         <div class="tile-icon"><AppIcon name="refresh" /></div>
-        <div class="tile-text">
-          <h4>{{ t('firmware.restart') }}</h4>
-          <p>{{ t('firmware.restartHint') }}</p>
-        </div>
-      </div>
-
-      <div class="action-tile danger" @click="factoryResetClick">
+        <div class="tile-text"><h4>Neustart</h4><p>Gerät mit aktivem Neustart-Sync neu starten</p></div>
+      </button>
+      <button type="button" class="action-tile danger" @click="factoryResetClick">
         <div class="tile-icon"><AppIcon name="restore" /></div>
-        <div class="tile-text">
-          <h4>{{ t('firmware.factoryReset') }}</h4>
-          <p>{{ t('firmware.factoryResetHint') }}</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Changelog Modal -->
-    <ChangelogModal v-model="showChangelogModal" />
-
+        <div class="tile-text"><h4>Werkseinstellungen</h4><p>Alle gespeicherten Einstellungen löschen</p></div>
+      </button>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useUpdateStore, useFirmwareUpdateStore, useUiStore, useSettingsStore } from './stores.js'
+import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
-import ChangelogModal from './components/ChangelogModal.vue'
-import { safeLocal } from './composables/useSafeStorage'
+import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, useUpdateStore } from './stores.js'
 
-const { t } = useI18n()
-const sysInfoStore = useSysInfoStore()
-const updateStore = useUpdateStore()
+const WEBUI_IMAGE_SIZE = 0x50000
+const ESP_IMAGE_MAGIC = 0xe9
+
 const firmwareUpdateStore = useFirmwareUpdateStore()
+const restartUiStore = useRestartUiStore()
+const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
-const settingsStore = useSettingsStore()
+const updateStore = useUpdateStore()
 
-// State
 const file = ref(null)
 const fileInput = ref(null)
+const fileError = ref('')
 const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
-const otaUpdating = ref(false)
-const otaProgress = ref(0)
-const showCountdown = ref(false)
-const countdown = ref(30)
-const countdownPhase = ref('restart')
-const countdownPhaseIndex = ref(1)
-const countdownPhaseTotal = ref(1)
-const countdownPhaseDuration = ref(30)
-const showChangelogModal = ref(false)
 const betaToggleSaving = ref(false)
-const archiveFilter = ref('stable')
-const archiveLoading = ref(false)
-const archiveLoaded = ref(false)
-const archiveError = ref('')
-const firmwareArchive = ref([])
-const archiveInstallingVersion = ref('')
-const selectedArchiveVersion = ref('')
 
-// The firmware embeds archive.json (gzipped) in flash and serves it locally.
-// This is intentionally the only archive source: update checks and OTA may use
-// the network, but browsing the firmware archive must always work offline and
-// must never contact GitHub from the browser.
-const ARCHIVE_MANIFEST_URL = '/api/firmware_archive'
-
-const firmwareLookupBusy = computed(() => updateStore.isChecking || updateStore.fetchInProgress)
-
-const archiveFilters = computed(() => [
-  { value: 'stable', label: t('firmware.archiveStable') },
-  { value: 'beta', label: t('firmware.archiveBeta') },
-  { value: 'all', label: t('firmware.archiveAll') }
-])
-
-const countdownTitle = computed(() => (
-  countdownPhase.value === 'sync'
-    ? t('settings.flashPause')
-    : t('firmware.restarting')
-))
-
-const countdownText = computed(() => (
-  countdownPhase.value === 'sync'
-    ? t('firmware.restartFlashPauseHint')
-    : t('firmware.restartingText')
-))
-
-const countdownProgress = computed(() => {
-  const duration = Math.max(countdownPhaseDuration.value, 1)
-  return Math.min(100, Math.max(0, ((duration - countdown.value) / duration) * 100))
+const lastCheckText = computed(() => {
+  if (!updateStore.lastCheck) return 'Noch nicht geprüft'
+  return `Geprüft: ${new Date(updateStore.lastCheck).toLocaleString()}`
 })
 
-const normalizeVersion = (version) => String(version || '').replace(/^v/i, '')
-
-const filteredFirmwareArchive = computed(() => {
-  if (archiveFilter.value === 'stable') {
-    return firmwareArchive.value.filter((release) => !release.prerelease)
-  }
-  if (archiveFilter.value === 'beta') {
-    return firmwareArchive.value.filter((release) => release.prerelease)
-  }
-  return firmwareArchive.value
-})
-
-const prefersBetaArchive = () => (
-  updateStore.betaChannel
-  || /(?:beta|alpha|rc)/i.test(sysInfoStore.currentVersion || '')
-)
-
-const selectedArchiveRelease = computed(() => (
-  filteredFirmwareArchive.value.find((release) => release.version === selectedArchiveVersion.value)
-  || filteredFirmwareArchive.value[0]
-  || null
-))
-
-const selectDefaultArchiveRelease = () => {
-  const releases = filteredFirmwareArchive.value
-  if (releases.length === 0) {
-    selectedArchiveVersion.value = ''
-    return
-  }
-  const currentSelectionStillVisible = releases.some((release) => release.version === selectedArchiveVersion.value)
-  if (!currentSelectionStillVisible) {
-    selectedArchiveVersion.value = (releases.find((release) => !release.isCurrent) || releases[0]).version
-  }
-}
-
-const setArchiveFilter = (filter) => {
-  archiveFilter.value = filter
-  selectDefaultArchiveRelease()
-}
-
-const syncArchiveFilterWithUpdateChannel = () => {
-  archiveFilter.value = prefersBetaArchive() ? 'beta' : 'stable'
-  selectDefaultArchiveRelease()
-}
-
-const onBetaToggle = async (event) => {
-  const enabled = event.target.checked
-  betaToggleSaving.value = true
-  try {
-    await axios.post('/settings.json', { betaChannel: enabled })
-    updateStore.betaChannel = enabled
-    uiStore.pushToast({
-      type: 'success',
-      title: t('common.success'),
-      message: enabled ? t('firmware.betaChannelOn') : t('firmware.betaChannelOff'),
-      duration: 2000
-    })
-    // The new channel takes effect on the next automatic 24 h update check.
-    // No manual trigger available — show the cached snapshot for now.
-  } catch (error) {
-    // Revert checkbox on error.
-    event.target.checked = !enabled
-    uiStore.pushToast({
-      type: 'error',
-      title: t('common.error'),
-      message: error.response?.data?.error || error.message
-    })
-  } finally {
-    betaToggleSaving.value = false
-  }
-}
-
-const formatSize = (bytes) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const formatReleaseDate = (dateStr) => {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
-}
-
-const archiveOptionLabel = (release) => {
-  const channel = release.prerelease ? t('firmware.archiveBeta') : t('firmware.archiveStable')
-  const current = release.isCurrent ? ` - ${t('firmware.archiveCurrent')}` : ''
-  const date = formatReleaseDate(release.publishedAt)
-  return `v${release.version} - ${channel}${date ? ` - ${date}` : ''}${current}`
-}
-
-const normalizeArchiveEntry = (entry, index = 0) => {
-  const version = normalizeVersion(entry.version || entry.tagName || entry.tag_name || entry.name)
-  if (!version) return null
-
-  const tagName = entry.tagName || entry.tag_name || `v${version}`
-  const prerelease = entry.prerelease ?? entry.isPrerelease ?? /(?:beta|alpha|rc)/i.test(version)
-  const downloadUrl = entry.downloadUrl || entry.download_url || ''
-  const currentVersion = normalizeVersion(sysInfoStore.currentVersion)
-
-  return {
-    id: entry.id || tagName || `${version}-${index}`,
-    version,
-    name: entry.name || `HB-RF-ETH-ng ${tagName}`,
-    prerelease: !!prerelease,
-    publishedAt: entry.publishedAt || entry.published_at || '',
-    releaseUrl: entry.releaseUrl || entry.html_url || `https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/${tagName}`,
-    downloadUrl,
-    assetName: entry.assetName || entry.asset_name || (downloadUrl ? downloadUrl.split('/').pop() : ''),
-    assetSize: entry.assetSize || entry.asset_size || entry.size || 0,
-    notes: entry.notesExcerpt || entry.notes || entry.body || '',
-    notesUrl: entry.notesUrl || entry.releaseUrl || entry.html_url || '',
-    isCurrent: currentVersion && normalizeVersion(version) === currentVersion
-  }
-}
-
-const parseArchiveManifest = (data) => {
-  const entries = Array.isArray(data) ? data : data?.releases
-  if (!Array.isArray(entries)) {
-    throw new Error(t('firmware.archiveLoadError'))
-  }
-
-  return entries
-    .map(normalizeArchiveEntry)
-    .filter((release) => release?.version && release.downloadUrl)
-}
-
-const fetchArchiveManifest = () => axios.get(ARCHIVE_MANIFEST_URL, {
-  headers: { Accept: 'application/json' },
-  params: { _: Date.now() },
-  timeout: 5000,
-  silent: true
-})
-
-const archiveErrorDetails = (error) => {
-  const status = error?.response?.status
-  const serverMessage = typeof error?.response?.data === 'string' ? error.response.data : ''
-  return status
-    ? `${status}${serverMessage ? `: ${serverMessage}` : ''}`
-    : error?.message || ''
-}
-
-const loadFirmwareArchive = async () => {
-  if (archiveLoading.value) return
-
-  archiveLoading.value = true
-  archiveError.value = ''
-
-  try {
-    const response = await fetchArchiveManifest()
-    firmwareArchive.value = parseArchiveManifest(response.data)
-    archiveLoaded.value = true
-    selectDefaultArchiveRelease()
-  } catch (error) {
-    const details = archiveErrorDetails(error)
-    archiveError.value = details
-      ? `${t('firmware.archiveLoadError')} (${details})`
-      : t('firmware.archiveLoadError')
-    archiveLoaded.value = false
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: archiveError.value })
-  } finally {
-    archiveLoading.value = false
-  }
-}
-
-const WEBUI_IMAGE_SIZE = 0x50000
-const isWebUiImage = (selectedFile) => {
-  if (!selectedFile) return false
-  const name = String(selectedFile.name || '').toLowerCase()
-  return name.startsWith('webui_')
-    || name === 'spiffs.bin'
-    || Number(selectedFile.size) === WEBUI_IMAGE_SIZE
-}
-
-const acceptFirmwareFile = (selectedFile) => {
-  if (!selectedFile || !selectedFile.name.toLowerCase().endsWith('.bin')) return
-  if (isWebUiImage(selectedFile)) {
-    clearFile()
-    uiStore.pushToast({
-      type: 'warning',
-      title: t('firmware.webuiFileDetectedTitle'),
-      message: t('firmware.webuiFileDetectedMessage'),
-      duration: 7000
-    })
-    return
-  }
-  file.value = selectedFile
-}
-
-const handleFileSelect = (event) => acceptFirmwareFile(event.target.files[0])
-
-const handleDrop = (event) => {
-  isDragging.value = false
-  acceptFirmwareFile(event.dataTransfer.files[0])
+const formatDate = value => value ? new Date(value).toLocaleString() : '—'
+const formatSize = bytes => {
+  const value = Number(bytes) || 0
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(2)} MB`
 }
 
 const clearFile = () => {
   file.value = null
+  fileError.value = ''
   if (fileInput.value) fileInput.value.value = ''
 }
 
-const uploadFirmware = async () => {
-  if (!file.value) return
-  executeUpload()
-}
+const validateFirmwareFile = async selectedFile => {
+  fileError.value = ''
+  file.value = null
+  if (!selectedFile) return
 
-const executeUpload = async () => {
-  uploading.value = true
-  uploadProgress.value = 0
+  const name = String(selectedFile.name || '').toLowerCase()
+  if (!name.endsWith('.bin')) {
+    fileError.value = 'Ungültige Datei: Es wird eine Firmware-Datei mit der Endung .bin benötigt.'
+    return
+  }
+  if (name.startsWith('webui_') || name === 'spiffs.bin' || Number(selectedFile.size) === WEBUI_IMAGE_SIZE) {
+    fileError.value = 'Falsche Datei: Das ist ein WebUI-/WWW-Image. Bitte unter System → WebUI installieren.'
+    return
+  }
+  if (selectedFile.size < 1024) {
+    fileError.value = 'Die ausgewählte Datei ist zu klein und kann keine gültige Firmware sein.'
+    return
+  }
 
   try {
+    const firstByte = new Uint8Array(await selectedFile.slice(0, 1).arrayBuffer())[0]
+    if (firstByte !== ESP_IMAGE_MAGIC) {
+      fileError.value = 'Ungültiges Firmware-Image: Der ESP32-Dateikopf 0xE9 fehlt. Die Datei wurde nicht angenommen.'
+      return
+    }
+  } catch {
+    fileError.value = 'Die ausgewählte Datei konnte nicht geprüft werden.'
+    return
+  }
+
+  file.value = selectedFile
+}
+
+const handleFileSelect = event => validateFirmwareFile(event.target.files?.[0])
+const handleDrop = event => {
+  isDragging.value = false
+  validateFirmwareFile(event.dataTransfer.files?.[0])
+}
+
+const uploadFirmware = async () => {
+  if (!file.value || fileError.value || uploading.value) return
+  uploading.value = true
+  uploadProgress.value = 0
+  try {
     await firmwareUpdateStore.update(file.value, {
-      onUploadProgress: (p) => {
-        if (p.lengthComputable) uploadProgress.value = Math.round((p.loaded / p.total) * 100)
+      onUploadProgress: event => {
+        if (event.total) uploadProgress.value = Math.round(event.loaded * 100 / event.total)
       }
     })
-    startCountdown()
+    uiStore.pushToast({ type: 'success', title: 'Firmware übertragen', message: 'Das Gerät startet jetzt neu.', duration: 2500 })
+    restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message })
+    const message = typeof error.response?.data === 'string'
+      ? error.response.data
+      : (error.response?.data?.error || error.message || 'Firmware-Upload fehlgeschlagen.')
+    uiStore.pushToast({ type: 'error', title: 'Firmware-Upload fehlgeschlagen', message, duration: 7000 })
   } finally {
     uploading.value = false
     uploadProgress.value = 0
   }
 }
 
-const startOtaUpdate = async () => {
-  const version = updateStore.latestVersion
-  if (!version || version === 'n/a') return
-
-  // Prefer the asset URL advertised by the GitHub release. Fall back to the
-  // legacy mirror only if the device somehow has a version but no URL
-  // (e.g. asset upload is still in progress) - this should be rare.
-  const updateUrl = updateStore.downloadUrl
-  if (!updateUrl) {
-    uiStore.pushToast({
-      type: 'error',
-      title: t('common.error'),
-      message: t('firmware.noDownloadUrl')
-    })
-    return
-  }
-
-  await startOtaFromUrl(updateUrl, version)
-}
-
-const installArchivedFirmware = async (release) => {
-  if (!release?.downloadUrl || release.isCurrent) return
-
-  const confirmed = window.confirm(t('firmware.archiveInstallConfirm', { version: release.version }))
-  if (!confirmed) return
-
-  archiveInstallingVersion.value = release.version
+const onBetaToggle = async event => {
+  const enabled = event.target.checked
+  betaToggleSaving.value = true
   try {
-    await startOtaFromUrl(release.downloadUrl, release.version)
-  } finally {
-    archiveInstallingVersion.value = ''
-  }
-}
-
-const startOtaFromUrl = async (updateUrl, version) => {
-  otaUpdating.value = true
-  otaProgress.value = 0
-
-  // Remember target version so app.vue can show a success modal after reboot
-  safeLocal.set('otaUpdateVersion', version)
-
-  uiStore.pushToast({ type: 'info', title: t('firmware.title'), message: t('firmware.otaProgress'), duration: 2200 })
-
-  try {
-    const response = await axios.post('/api/ota_url', { url: updateUrl })
-
-    if (response.data.success) {
-      const otaStatus = await pollOtaStatus()
-      uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.otaSuccess'), duration: 2400 })
-      setTimeout(() => startCountdown({ includeFlashPause: otaStatus?.flashPause }), 1000)
-    } else {
-      // Firmware returns HTTP 200 with { success: false, error } for several
-      // legitimate conditions (already-in-progress, invalid URL, ...). Surface
-      // it instead of silently doing nothing.
-      safeLocal.remove('otaUpdateVersion')
-      uiStore.pushToast({ type: 'error', title: t('common.error'), message: response.data.error || t('firmware.otaFailed') })
-    }
+    await axios.post('/settings.json', { betaChannel: enabled })
+    updateStore.betaChannel = enabled
+    uiStore.pushToast({ type: 'success', title: 'Update-Kanal gespeichert', message: 'Die Auswahl gilt bei der nächsten täglichen Prüfung.' })
   } catch (error) {
-    safeLocal.remove('otaUpdateVersion')
-    uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || error.message || t('firmware.otaFailed') })
+    event.target.checked = !enabled
+    uiStore.pushToast({ type: 'error', title: 'Speichern fehlgeschlagen', message: error.response?.data?.error || error.message })
   } finally {
-    otaUpdating.value = false
+    betaToggleSaving.value = false
   }
-}
-
-let otaPollTimer = null
-let otaPollCancelled = false
-
-const pollOtaStatus = () => {
-  otaPollCancelled = false
-  return new Promise((resolve, reject) => {
-    // The device may briefly stop answering while it writes flash - tolerate
-    // a bounded number of consecutive fetch errors instead of resolving
-    // (= reporting success) on the first 3 s timeout, which used to start
-    // the reboot countdown even when the OTA later failed.
-    let consecutiveErrors = 0
-
-    const poll = async () => {
-      otaPollTimer = null
-      if (otaPollCancelled) {
-        resolve()
-        return
-      }
-      try {
-        const res = await axios.get('/api/ota_status', { timeout: 3000, silent: true })
-        const { status, progress, error: otaError } = res.data
-
-        consecutiveErrors = 0
-        otaProgress.value = progress || 0
-
-        if (status === 'downloading') {
-          otaPollTimer = setTimeout(poll, 1000)
-        } else if (status === 'success') {
-          otaProgress.value = 100
-          resolve(res.data)
-        } else if (status === 'failed') {
-          reject(new Error(otaError || t('firmware.otaFailed')))
-        } else {
-          resolve()
-        }
-      } catch (err) {
-        consecutiveErrors++
-        if (consecutiveErrors >= 10) {
-          reject(new Error(t('firmware.lostConnection')))
-        } else {
-          otaPollTimer = setTimeout(poll, 2000)
-        }
-      }
-    }
-    otaPollTimer = setTimeout(poll, 1000)
-  })
-}
-
-let countdownTimer = null
-
-const RESTART_SECONDS = 30
-const RESTART_SYNC_SECONDS = 35
-
-const setCountdownPhase = (phase, seconds, index, total) => {
-  countdownPhase.value = phase
-  countdownPhaseDuration.value = seconds
-  countdown.value = seconds
-  countdownPhaseIndex.value = index
-  countdownPhaseTotal.value = total
-}
-
-const startCountdown = (options = {}) => {
-  // Clear any previous countdown interval so repeated triggers (e.g. restart
-  // clicked twice, or both try/catch branches firing on a network drop) cannot
-  // stack two intervals racing to reload the page.
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-  const includeFlashPause = options.includeFlashPause ?? settingsStore.flashPause
-  showCountdown.value = true
-  if (includeFlashPause) {
-    setCountdownPhase('sync', RESTART_SYNC_SECONDS, 1, 2)
-  } else {
-    setCountdownPhase('restart', RESTART_SECONDS, 1, 1)
-  }
-  countdownTimer = setInterval(() => {
-    countdown.value--
-      if (countdown.value <= 0) {
-        if (countdownPhase.value === 'sync') {
-          setCountdownPhase('restart', RESTART_SECONDS, 2, 2)
-          return
-        }
-        clearInterval(countdownTimer)
-        countdownTimer = null
-        window.location.href = '/'
-      }
-  }, 1000)
 }
 
 const restartClick = async () => {
-  if (!confirm(t('firmware.restartConfirm'))) return
-  try {
-    await axios.post('/api/restart')
-    uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
-    startCountdown()
-  } catch (e) {
-    startCountdown() // Assume success if network drops
-  }
+  if (!window.confirm('Gerät wirklich neu starten?')) return
+  try { await axios.post('/api/restart') } catch { /* Verbindung bricht beim Neustart erwartbar ab. */ }
+  restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
 }
 
 const factoryResetClick = async () => {
-  if (confirm(t('firmware.factoryResetConfirm'))) {
-    try {
-      await axios.post('/api/factory-reset')
-      uiStore.pushToast({ type: 'warning', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
-      startCountdown()
-    } catch (e) {
-      startCountdown()
-    }
-  }
+  if (!window.confirm('Wirklich auf Werkseinstellungen zurücksetzen? Alle Einstellungen gehen verloren.')) return
+  try { await axios.post('/api/factory-reset') } catch { /* Verbindung bricht beim Neustart erwartbar ab. */ }
+  restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
 }
-
-const formatLastCheck = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleString()
-}
-
-let updateCheckInterval = null
 
 onMounted(async () => {
-  // Load system info and read the cached update snapshot independently: a
-  // failure fetching system info must not stop us from showing the device's
-  // cached firmware status (and vice versa).
-  try {
-    await sysInfoStore.update()
-  } catch (e) {
-    console.warn('Failed to load system info:', e.response?.status || e.message)
-  }
-
-  try {
-    await settingsStore.ensureLoaded()
-  } catch (e) {
-    console.warn('Failed to load settings for restart sync state:', e.response?.status || e.message)
-  }
-
-  try {
-    // Only read the device's cached snapshot - opening the Firmware page must
-    // never trigger a live manifest fetch. The device runs its own 24h
-    // background check, and the user can force a check on demand with the
-    // "Check now" button. This keeps every page visit from consuming a
-    // manifest request. If the cache is still empty (e.g. fresh
-    // boot before the background task ran), the page shows "n/a" until the
-    // background task populates it, which the cached poll below picks up.
-    await updateStore.checkForUpdate(sysInfoStore.currentVersion)
-  } catch (e) {
-    console.warn('Initial cached update read failed:', e.response?.status || e.message)
-  }
-  syncArchiveFilterWithUpdateChannel()
-  // Load only the archive embedded in this firmware. Online update checks and
-  // OTA remain separate; the archive itself never contacts an external host.
-  await loadFirmwareArchive()
-  // Periodically re-read the cache while the page is open so the
-  // "last check" indicator and download URL stay fresh (cached read only,
-  // no GitHub call).
-  updateCheckInterval = setInterval(() => {
-    if (sysInfoStore.currentVersion) {
-      updateStore.checkForUpdate(sysInfoStore.currentVersion)
-    }
-  }, 60 * 1000)
-})
-
-onUnmounted(() => {
-  if (updateCheckInterval) {
-    clearInterval(updateCheckInterval)
-  }
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-    countdownTimer = null
-  }
-  otaPollCancelled = true
-  if (otaPollTimer) {
-    clearTimeout(otaPollTimer)
-    otaPollTimer = null
-  }
+  try { await sysInfoStore.update() } catch { /* Anzeige bleibt mit Platzhalter nutzbar. */ }
+  await updateStore.checkForUpdate(sysInfoStore.currentVersion)
 })
 </script>
 
 <style scoped>
-.firmware-page {
-  padding-bottom: 60px;
-}
-
-/* Page Header */
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-}
-
-.version-badge {
-  margin-left: auto;
-  text-align: right;
-  padding: 8px 16px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.version-badge .label {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-}
-
-.version-badge .value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-/* Content Grid */
-.content-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-}
-
-.update-card {
-  background: var(--color-surface);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.card-header {
-  padding: var(--spacing-lg);
-  display: flex;
-  gap: var(--spacing-md);
-  align-items: center;
-  border-bottom: 1px solid var(--color-border-light);
-}
-
-.header-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-}
-
-.header-text h3 {
-  font-size: 1.125rem;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.header-text p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.card-body {
-  padding: var(--spacing-lg);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Upload Zone */
-/* Hide the native file input: it sits inside the clickable upload-zone, so a
- * visible input would open the file dialog twice (native click + the zone's
- * programmatic click). Display:none keeps it functional but non-interactive. */
-.hidden-input {
-  display: none;
-}
-
-.upload-zone {
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--color-bg);
-  min-height: 140px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: var(--spacing-md);
-}
-
-.upload-zone:hover, .upload-zone.dragging {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-}
-
-.upload-zone.has-file {
-  border-style: solid;
-  border-color: var(--color-success);
-  background: var(--color-success-light);
-}
-
-.upload-icon { font-size: 2.5rem; margin-bottom: var(--spacing-sm); opacity: 0.5; display: flex; }
-.upload-text { color: var(--color-text-secondary); font-weight: 500; }
-
-.file-preview {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  width: 100%;
-}
-
-.file-icon { font-size: 2rem; display: flex; }
-.file-details { flex: 1; text-align: left; overflow: hidden; }
-.file-name { display: block; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-.file-size { color: var(--color-text-secondary); font-size: 0.8125rem; }
-.remove-file-btn {
-  background: transparent; border: none; font-size: 1.25rem; color: var(--color-text-secondary); cursor: pointer;
-}
-
-/* Modern Input */
-.modern-input {
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 12px;
-  font-size: 1rem;
-}
-.modern-input:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
-}
-
-/* Quick Actions */
-.quick-actions {
-  margin-top: var(--spacing-sm);
-  margin-bottom: var(--spacing-md);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-}
-
-.chip-btn {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 6px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: all 0.2s;
-  max-width: 100%;
-  white-space: normal;
-  text-align: left;
-}
-
-.chip-btn:hover {
-  background: var(--color-border-light);
-  transform: translateY(-1px);
-}
-
-/* Update Info */
-.update-info {
-  margin-bottom: var(--spacing-md);
-}
-
-.update-available {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: var(--radius-lg);
-}
-
-.update-icon {
-  font-size: 1.5rem;
-  animation: bounce 2s infinite;
-  display: flex;
-}
-
-.chip-btn.static {
-  cursor: default;
-}
-
-.update-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.update-text strong {
-  color: #059669;
-  font-size: 0.9375rem;
-}
-
-.version-info {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-
-/* Beta badge shown next to a pre-release version */
-.beta-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 8px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #92400e;
-  background: #fde68a;
-  border-radius: var(--radius-full);
-  vertical-align: middle;
-}
-
-/* Beta channel toggle row */
-.beta-toggle-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin: var(--spacing-md) 0;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-bg);
-  border-radius: var(--radius-md);
-}
-
-.beta-toggle-row .form-switch {
-  margin: 0;
-  flex-shrink: 0;
-}
-
-.beta-toggle-row .form-check-input {
-  cursor: pointer;
-}
-
-.beta-toggle-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.beta-toggle-hint {
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--color-text-secondary);
-  line-height: 1.3;
-}
-
-.changelog-link {
-  width: 100%;
-  margin-top: var(--spacing-sm);
-  padding: 12px 14px;
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-align: left;
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.changelog-link > :last-child {
-  margin-left: auto;
-}
-
-.changelog-link:hover {
-  border-color: var(--color-success);
-  background: var(--color-success-light);
-}
-
-.no-update {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-bg);
-  border-radius: var(--radius-md);
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-}
-
-.check-icon {
-  font-size: 1.125rem;
-  display: flex;
-}
-
-.check-btn {
-  margin-top: var(--spacing-sm);
-  padding: 6px 14px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.check-btn:hover:not(:disabled) {
-  background: var(--color-border-light);
-  color: var(--color-text);
-}
-
-.check-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.last-check {
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  opacity: 0.7;
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-/* Progress */
-.progress-container {
-  margin-bottom: var(--spacing-md);
-}
-
-.progress-bar {
-  height: 6px;
-  background: var(--color-border-light);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.progress-value {
-  height: 100%;
-  background: var(--color-primary);
-  transition: width 0.3s ease;
-}
-
-.progress-value.success { background: var(--color-success); }
-
-.progress-label {
-  display: block;
-  text-align: right;
-  font-size: 0.75rem;
-  font-weight: 600;
-  margin-top: 4px;
-}
-
-.action-btn {
-  margin-top: auto;
-  border-radius: var(--radius-lg);
-  padding: 12px;
-}
-
-/* Firmware Archive */
-.archive-card {
-  margin-bottom: var(--spacing-xl);
-}
-
-.archive-toolbar,
-.archive-main-row,
-.archive-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.archive-toolbar {
-  justify-content: space-between;
-  flex-wrap: wrap;
-  margin-bottom: var(--spacing-md);
-}
-
-.archive-filters {
-  display: inline-flex;
-  flex-wrap: wrap;
-  padding: 4px;
-  border-radius: var(--radius-full);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border-light);
-  max-width: 100%;
-}
-
-.filter-btn {
-  flex: 1 1 auto;
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  border-radius: var(--radius-full);
-  padding: 6px 12px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  cursor: pointer;
-  min-width: 0;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.filter-btn.active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  box-shadow: var(--shadow-sm);
-}
-
-.archive-warning,
-.archive-error,
-.archive-empty {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-}
-
-.archive-warning {
-  margin-bottom: var(--spacing-md);
-  color: var(--color-warning);
-  background: var(--color-warning-light);
-}
-
-.archive-error {
-  margin-bottom: var(--spacing-md);
-  color: var(--color-danger);
-  background: var(--color-danger-light);
-}
-
-.archive-empty {
-  color: var(--color-text-secondary);
-  background: var(--color-bg);
-}
-
-.archive-picker {
-  display: grid;
-  gap: var(--spacing-sm);
-}
-
-.archive-select-label {
-  font-size: 0.8125rem;
-  font-weight: 800;
-  color: var(--color-text-secondary);
-}
-
-.archive-select {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  color: var(--color-text);
-  padding: 9px 12px;
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.archive-select:focus {
-  border-color: var(--color-primary);
-  outline: 3px solid var(--color-primary-light);
-}
-
-.archive-selected {
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg);
-}
-
-.archive-main-row {
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.archive-version {
-  min-width: 0;
-}
-
-.archive-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  overflow-wrap: anywhere;
-}
-
-.archive-meta {
-  margin-top: 4px;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
-}
-
-.current-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  color: var(--color-success);
-  background: var(--color-success-light);
-  font-size: 0.6875rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.archive-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.archive-link,
-.archive-install-btn {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 7px 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  text-decoration: none;
-  max-width: 100%;
-  white-space: normal;
-}
-
-.archive-link {
-  color: var(--color-text-secondary);
-  background: var(--color-surface);
-}
-
-.archive-install-btn {
-  color: #fff;
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  cursor: pointer;
-}
-
-.archive-install-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.archive-notes-row {
-  margin-top: var(--spacing-sm);
-  border-top: 1px solid var(--color-border-light);
-  padding-top: var(--spacing-sm);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.archive-changelog-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 800;
-  background: none;
-  border: none;
-  padding: 0;
-  transition: color 0.2s;
-  max-width: 100%;
-  white-space: normal;
-}
-
-.archive-changelog-btn:hover:not(:disabled) {
-  color: var(--color-primary);
-}
-
-.archive-changelog-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.archive-notes-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-  max-width: 100%;
-  white-space: normal;
-}
-
-.archive-notes-link:hover {
-  color: var(--color-primary);
-}
-
-/* System Actions */
-.system-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: var(--spacing-lg);
-}
-
-.action-tile {
-  background: var(--color-surface);
-  padding: var(--spacing-lg);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.action-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.action-tile.warning:hover { background: var(--color-warning-light); }
-.action-tile.danger:hover { background: var(--color-danger-light); }
-
-.tile-icon { font-size: 2rem; display: flex; }
-.tile-text h4 { margin: 0; font-size: 1rem; }
-.tile-text p { margin: 0; font-size: 0.8125rem; color: var(--color-text-secondary); }
-
-/* Countdown Overlay */
-.countdown-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.8);
-  backdrop-filter: blur(8px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.countdown-card {
-  text-align: center;
-  color: white;
-  width: min(92vw, 420px);
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-lg);
-  background: rgba(15, 23, 42, 0.42);
-}
-
-.spinner-container {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  margin: 0 auto var(--spacing-lg);
-}
-
-.spinner-ring {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  border: 4px solid rgba(255,255,255,0.1);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.spinner-icon {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 2rem;
-  color: white;
-  display: inline-flex;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.countdown-value {
-  font-size: 4rem;
-  font-weight: 700;
-  margin: var(--spacing-md) 0;
-}
-
-.countdown-phase {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 52px;
-  min-height: 30px;
-  margin-bottom: var(--spacing-sm);
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid rgba(255,255,255,0.32);
-  background: rgba(255,255,255,0.12);
-  color: white;
-  font-size: 0.8125rem;
-  font-weight: 800;
-}
-
-.countdown-text {
-  overflow-wrap: anywhere;
-}
-
-.progress-track {
-  width: 300px;
-  height: 4px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 2px;
-  margin: 0 auto;
-}
-
-.progress-fill {
-  height: 100%;
-  background: white;
-  transition: width 1s linear;
-}
-
-@media (max-width: 768px) {
-  .firmware-page {
-    padding-bottom: 40px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    text-align: center;
-    padding: var(--spacing-md);
-    gap: var(--spacing-md);
-  }
-
-  .icon-wrapper {
-    font-size: 2rem;
-    width: 48px;
-    height: 48px;
-  }
-
-  .text-wrapper h1 {
-    font-size: 1.25rem;
-  }
-
-  .version-badge {
-    width: 100%;
-    margin: 0;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: var(--spacing-sm);
-  }
-
-  .content-grid {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-  }
-
-  .card-header {
-    padding: var(--spacing-md);
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .header-icon {
-    width: 40px;
-    height: 40px;
-    font-size: 1.25rem;
-  }
-
-  .header-text h3 {
-    font-size: 1rem;
-  }
-
-  .card-body {
-    padding: var(--spacing-md);
-  }
-
-  .upload-zone {
-    min-height: 100px;
-    padding: var(--spacing-md);
-  }
-
-  .upload-icon {
-    font-size: 2rem;
-  }
-
-  .system-actions {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-  }
-
-  .action-tile {
-    padding: var(--spacing-md);
-  }
-
-  .quick-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .archive-toolbar,
-  .archive-main-row,
-  .archive-actions,
-  .archive-notes-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .archive-actions > *,
-  .archive-notes-row > * {
-    width: 100%;
-    justify-content: center;
-  }
-
-  /* Countdown */
-  .progress-track {
-    width: 80%;
-    max-width: 300px;
-  }
-
-  .countdown-value {
-    font-size: 3rem;
-  }
-}
-
-/* Utility Colors */
-.bg-primary-light { background-color: var(--color-primary-light); }
-.bg-success-light { background-color: var(--color-success-light); }
-.text-primary { color: var(--color-primary); }
-.text-success { color: var(--color-success); }
+.content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.update-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
+.card-header { display:flex; gap:14px; align-items:flex-start; padding:20px; border-bottom:1px solid var(--color-border); }
+.header-icon { width:44px; height:44px; flex:0 0 auto; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+.header-text h2 { margin:0; font-size:1.1rem; }
+.header-text p { margin:.35rem 0 0; color:var(--color-text-secondary); }
+.card-body { padding:20px; display:flex; flex-direction:column; gap:16px; }
+.release-box { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:16px; border-radius:12px; background:var(--color-success-soft); }
+.release-box.is-current { background:var(--color-bg-alt); }
+.release-box div { display:flex; flex-direction:column; gap:3px; }
+.release-label, .release-box small { color:var(--color-text-secondary); font-size:.82rem; }
+.release-box strong { font-size:1.1rem; }
+.beta-badge { padding:4px 8px; border-radius:999px; background:var(--color-warning-soft); font-size:.78rem; font-weight:700; }
+.actions { display:flex; flex-wrap:wrap; gap:10px; }
+.action-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; }
+.beta-toggle-row { display:flex; gap:12px; align-items:flex-start; padding-top:14px; border-top:1px solid var(--color-border); }
+.beta-toggle-label { display:flex; flex-direction:column; gap:3px; font-weight:700; }
+.beta-toggle-hint { font-size:.8rem; font-weight:400; color:var(--color-text-secondary); }
+.upload-zone { min-height:150px; border:2px dashed var(--color-border-strong); border-radius:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:18px; text-align:center; }
+.upload-zone.dragging { border-color:var(--color-primary); background:var(--color-primary-soft); }
+.upload-zone.invalid { border-color:var(--color-danger); }
+.hidden-input { display:none; }
+.upload-icon { font-size:2rem; margin-bottom:8px; }
+.upload-text { display:block; font-weight:700; }
+.file-preview { width:100%; display:flex; gap:12px; align-items:center; text-align:left; }
+.file-details { min-width:0; flex:1; display:flex; flex-direction:column; }
+.file-name { overflow-wrap:anywhere; font-weight:700; }
+.file-size { color:var(--color-text-secondary); font-size:.85rem; }
+.remove-file-btn { border:0; background:transparent; color:var(--color-danger); padding:8px; }
+.progress-container { display:flex; align-items:center; gap:10px; }
+.progress-bar { flex:1; height:10px; border-radius:999px; background:var(--color-bg-alt); overflow:hidden; }
+.progress-value { height:100%; background:var(--color-primary); }
+.system-actions { margin-top:18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.action-tile { width:100%; display:flex; gap:12px; align-items:center; text-align:left; padding:16px; border:1px solid var(--color-border); border-radius:14px; background:var(--color-surface); color:var(--color-text); }
+.action-tile h4,.action-tile p { margin:0; }
+.action-tile p { color:var(--color-text-secondary); font-size:.85rem; }
+.action-tile.danger { border-color:var(--color-danger); }
+@media(max-width:900px){ .content-grid,.system-actions { grid-template-columns:1fr; } }
 </style>
