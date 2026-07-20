@@ -21,6 +21,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: release-full
+  cancel-in-progress: false
+
 jobs:
   build-and-release:
     name: Build and Create Full Release
@@ -49,13 +53,17 @@ jobs:
             VERSION="${{ github.ref_name }}"
           fi
           VERSION="${VERSION#v}"
-          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "TAG=v$VERSION" >> "$GITHUB_OUTPUT"
+          TAG="v$VERSION"
+          TRIGGERED_BY_TAG=false
           if [ "${{ github.event_name }}" = "push" ]; then
-            echo "TRIGGERED_BY_TAG=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "TRIGGERED_BY_TAG=false" >> "$GITHUB_OUTPUT"
+            TRIGGERED_BY_TAG=true
+          elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
           fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+          echo "TRIGGERED_BY_TAG=$TRIGGERED_BY_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -69,22 +77,6 @@ jobs:
           python update_changelog.py "$VERSION"
           python update_version.py "$VERSION"
           git status --short
-
-      - name: Commit firmware version and create tag
-        if: steps.firmware.outputs.TRIGGERED_BY_TAG == 'false'
-        run: |
-          VERSION="${{ steps.firmware.outputs.VERSION }}"
-          TAG="${{ steps.firmware.outputs.TAG }}"
-          if ! git diff --quiet; then
-            git add -A
-            git commit -m "chore: bump firmware version to $VERSION"
-          fi
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag -d "$TAG"
-          fi
-          git tag -a "$TAG" -m "Firmware release $TAG"
-          git push origin HEAD:main
-          git push -f origin "$TAG"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -102,20 +94,41 @@ jobs:
       - name: Prepare embedded and standalone WebUI assets
         run: python3 rename_webui_files.py
 
-      - name: Read WebUI release metadata
+      - name: Read and validate WebUI release metadata
         id: webui
+        env:
+          FIRMWARE_VERSION: ${{ steps.firmware.outputs.VERSION }}
         run: |
           python3 - <<'PY'
           import json
           import os
+          import re
           from pathlib import Path
+
+          pattern = re.compile(r'^(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z]+)\.(\d+))?$')
+
+          def semver(value):
+              match = pattern.fullmatch(value)
+              if not match:
+                  raise SystemExit(f'Invalid semantic version: {value}')
+              major, minor, patch, label, number = match.groups()
+              return (int(major), int(minor), int(patch), 1 if label is None else 0, (label or '').lower(), int(number or 0))
 
           package = json.loads(Path('webui/package.json').read_text(encoding='utf-8'))
           compatibility = json.loads(Path('webui/compatibility.json').read_text(encoding='utf-8'))
+          version = package['version']
+          api_version = compatibility['apiVersion']
+          minimum = compatibility['minFirmwareVersion']
+          firmware = os.environ['FIRMWARE_VERSION']
+          semver(version)
+          if not isinstance(api_version, int) or api_version < 1:
+              raise SystemExit(f'Invalid WebUI API version: {api_version}')
+          if semver(firmware) < semver(minimum):
+              raise SystemExit(f'WebUI requires firmware >= {minimum}, full release is {firmware}')
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-              output.write(f"VERSION={package['version']}\n")
-              output.write(f"API_VERSION={compatibility['apiVersion']}\n")
-              output.write(f"MIN_FIRMWARE={compatibility['minFirmwareVersion']}\n")
+              output.write(f'VERSION={version}\n')
+              output.write(f'API_VERSION={api_version}\n')
+              output.write(f'MIN_FIRMWARE={minimum}\n')
           PY
 
       - name: Regenerate embedded firmware archive
@@ -135,14 +148,12 @@ jobs:
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
           idf.py build
 
-      - name: Create release directory
-        run: mkdir -p release
-
-      - name: Copy full release files
+      - name: Prepare full release files
         run: |
           set -euo pipefail
           FIRMWARE_VERSION="${{ steps.firmware.outputs.VERSION }}"
           WEBUI_VERSION="${{ steps.webui.outputs.VERSION }}"
+          mkdir -p release
 
           if [ -f build/HB-RF-ETH-ng.bin ]; then
             cp build/HB-RF-ETH-ng.bin "release/firmware_${FIRMWARE_VERSION}.bin"
@@ -156,8 +167,7 @@ jobs:
           fi
 
           test -f build/spiffs.bin
-          WEBUI_SIZE=$(stat -c '%s' build/spiffs.bin)
-          test "$WEBUI_SIZE" -eq $((0x50000))
+          test "$(stat -c '%s' build/spiffs.bin)" -eq $((0x50000))
           cp build/spiffs.bin "release/webui_${WEBUI_VERSION}.bin"
 
           cp build/bootloader/bootloader.bin release/ 2>/dev/null || true
@@ -197,6 +207,19 @@ jobs:
           if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then PRERELEASE=true; fi
           echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "DRAFT=$DRAFT" >> "$GITHUB_OUTPUT"
+
+      - name: Commit firmware metadata and create tag
+        if: steps.firmware.outputs.TRIGGERED_BY_TAG == 'false'
+        run: |
+          VERSION="${{ steps.firmware.outputs.VERSION }}"
+          TAG="${{ steps.firmware.outputs.TAG }}"
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "chore: bump firmware version to $VERSION"
+          fi
+          git tag -a "$TAG" -m "Firmware release $TAG"
+          git push origin HEAD:main
+          git push origin "$TAG"
 
       - name: Create GitHub full release
         uses: softprops/action-gh-release@v3
