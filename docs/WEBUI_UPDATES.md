@@ -17,6 +17,8 @@ can migrate through the normal firmware OTA process without USB access.
 - Firmware and WebUI flash operations are mutually exclusive.
 - The browser sends the release SHA-256; the ESP32 verifies it again while
   streaming the image directly into flash.
+- The WebUI upload uses one bounded 2 KiB heap buffer instead of reserving that
+  space on the HTTP server task stack.
 - The image must exactly match the SPIFFS partition size.
 - `webui-manifest.json` must identify `HB-RF-ETH-ng`, format `1`, design
   `newdesign`, and the expected Brotli encodings.
