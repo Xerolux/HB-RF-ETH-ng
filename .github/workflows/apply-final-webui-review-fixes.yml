@@ -1,0 +1,132 @@
+name: Apply final WebUI storage review fixes
+
+on:
+  push:
+    branches:
+      - feature/separate-webui-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/separate-webui-update
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply reviewed fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('main/webui_storage.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''    char manifest[MANIFEST_MAX_SIZE + 1] = {};
+              const size_t length = fread(manifest, 1, MANIFEST_MAX_SIZE, file);
+              const bool too_large = !feof(file);
+              const bool read_error = ferror(file);
+              fclose(file);
+          '''
+          new = '''    char manifest[MANIFEST_MAX_SIZE + 1] = {};
+              const size_t length = fread(manifest, 1, MANIFEST_MAX_SIZE, file);
+              const bool too_large =
+                  length == MANIFEST_MAX_SIZE && fgetc(file) != EOF;
+              const bool read_error = ferror(file);
+              fclose(file);
+          '''
+          if old not in text:
+              raise SystemExit('manifest validation block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    uint8_t buffer[UPDATE_BUFFER_SIZE];
+              size_t received = 0;
+              int timeout_retries = 5;
+          '''
+          new = '''    uint8_t *buffer = static_cast<uint8_t *>(malloc(UPDATE_BUFFER_SIZE));
+              if (!buffer)
+              {
+                  webui_storage_update_abort();
+                  if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+                  return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                             "Could not allocate WWW upload buffer");
+              }
+
+              size_t received = 0;
+              int timeout_retries = 5;
+          '''
+          if old not in text:
+              raise SystemExit('stack upload buffer block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''        const size_t wanted = remaining < sizeof(buffer)
+                  ? remaining
+                  : sizeof(buffer);
+          '''
+          new = '''        const size_t wanted = remaining < UPDATE_BUFFER_SIZE
+                  ? remaining
+                  : UPDATE_BUFFER_SIZE;
+          '''
+          if old not in text:
+              raise SystemExit('upload buffer size block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    if (result == ESP_OK &&
+                  received == static_cast<size_t>(req->content_len))
+              {
+                  result = webui_storage_update_finish();
+              }
+              else
+              {
+                  webui_storage_update_abort();
+              }
+          '''
+          new = '''    free(buffer);
+
+              if (result == ESP_OK &&
+                  received == static_cast<size_t>(req->content_len))
+              {
+                  result = webui_storage_update_finish();
+              }
+              else
+              {
+                  webui_storage_update_abort();
+              }
+          '''
+          if old not in text:
+              raise SystemExit('upload completion block not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    // Mark first to avoid recursive duplicate registration through the shim.
+              s_registered_server = server;
+              webui_storage_init();
+          '''
+          new = '''    // Mark first to avoid recursive duplicate registration through the shim.
+              s_registered_server = server;
+              for (auto &route : s_wrapped_routes)
+              {
+                  route = WrappedRoute{};
+              }
+              webui_storage_init();
+          '''
+          if old not in text:
+              raise SystemExit('route reset insertion point not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/apply-final-webui-review-fixes.yml
+
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add main/webui_storage.cpp .github/workflows/apply-final-webui-review-fixes.yml
+          git commit -m "fix: harden WebUI storage update path"
+          git push origin HEAD:feature/separate-webui-update
