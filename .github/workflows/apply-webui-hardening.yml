@@ -1,0 +1,303 @@
+name: Apply WebUI hardening edits
+
+on:
+  push:
+    branches:
+      - feature/separate-webui-update
+
+permissions:
+  contents: write
+
+jobs:
+  apply-hardening:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/separate-webui-update
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply source transformations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              return text.replace(old, new, 1)
+
+          storage = Path('main/webui_storage.cpp')
+          text = storage.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '#include "mbedtls/md.h"\n',
+              '#include "mbedtls/md.h"\n#include "nvs.h"\n',
+              'nvs include',
+          )
+          text = replace_once(
+              text,
+              'constexpr size_t MANIFEST_MAX_SIZE = 1024;\n',
+              'constexpr size_t MANIFEST_MAX_SIZE = 1024;\n'
+              'constexpr const char *TRANSACTION_NVS_NAMESPACE = "webui";\n'
+              'constexpr const char *TRANSACTION_NVS_KEY = "pending";\n',
+              'transaction constants',
+          )
+
+          marker_functions = r'''
+esp_err_t write_transaction_marker_locked(bool pending)
+{
+    nvs_handle_t handle = 0;
+    esp_err_t result = nvs_open(TRANSACTION_NVS_NAMESPACE,
+                                NVS_READWRITE, &handle);
+    if (result != ESP_OK) return result;
+
+    if (pending)
+    {
+        result = nvs_set_u8(handle, TRANSACTION_NVS_KEY, 1);
+    }
+    else
+    {
+        result = nvs_erase_key(handle, TRANSACTION_NVS_KEY);
+        if (result == ESP_ERR_NVS_NOT_FOUND) result = ESP_OK;
+    }
+
+    if (result == ESP_OK) result = nvs_commit(handle);
+    nvs_close(handle);
+    return result;
+}
+
+bool transaction_marker_is_set_locked()
+{
+    nvs_handle_t handle = 0;
+    if (nvs_open(TRANSACTION_NVS_NAMESPACE,
+                 NVS_READONLY, &handle) != ESP_OK)
+    {
+        return false;
+    }
+
+    uint8_t pending = 0;
+    const esp_err_t result = nvs_get_u8(handle, TRANSACTION_NVS_KEY,
+                                        &pending);
+    nvs_close(handle);
+    return result == ESP_OK && pending == 1;
+}
+
+'''
+          text = replace_once(
+              text,
+              'bool is_regular_nonempty_file(const char *path)\n',
+              marker_functions + 'bool is_regular_nonempty_file(const char *path)\n',
+              'marker functions',
+          )
+
+          old_invalidate = r'''    // Destroy the filesystem header so a partial/hash-mismatched image can
+    // never become active after reboot. Embedded New Design remains reachable.
+    if (s_partition)
+    {
+        const esp_err_t erase_result = esp_partition_erase_range(
+            s_partition, 0, INVALIDATE_SECTOR_SIZE);
+        if (erase_result != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Could not invalidate failed WWW image: %s",
+                     esp_err_to_name(erase_result));
+        }
+    }
+
+    set_error_locked(preserved_message[0] ? preserved_message : "WWW update failed",
+                     original_error);
+'''
+          new_invalidate = r'''    // Destroy the filesystem header so a partial/hash-mismatched image can
+    // never become active after reboot. Embedded New Design remains reachable.
+    esp_err_t erase_result = ESP_ERR_NOT_FOUND;
+    if (s_partition)
+    {
+        erase_result = esp_partition_erase_range(
+            s_partition, 0, INVALIDATE_SECTOR_SIZE);
+        if (erase_result != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Could not invalidate failed WWW image: %s",
+                     esp_err_to_name(erase_result));
+        }
+    }
+
+    // Keep the marker when invalidation itself failed. The next boot retries
+    // before attempting to mount the external image.
+    if (erase_result == ESP_OK)
+    {
+        const esp_err_t marker_result =
+            write_transaction_marker_locked(false);
+        if (marker_result != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Could not clear WWW transaction marker: %s",
+                     esp_err_to_name(marker_result));
+        }
+    }
+
+    set_error_locked(preserved_message[0] ? preserved_message : "WWW update failed",
+                     original_error);
+'''
+          text = replace_once(text, old_invalidate, new_invalidate,
+                              'invalidate transaction cleanup')
+
+          old_init = r'''esp_err_t webui_storage_init()
+{
+    StorageLock lock;
+    if (!lock) return ESP_ERR_NO_MEM;
+    if (s_status.updateActive) return ESP_ERR_INVALID_STATE;
+    return mount_locked();
+}
+'''
+          new_init = r'''esp_err_t webui_storage_init()
+{
+    StorageLock lock;
+    if (!lock) return ESP_ERR_NO_MEM;
+    if (s_status.updateActive) return ESP_ERR_INVALID_STATE;
+
+    find_partition_locked();
+    if (transaction_marker_is_set_locked())
+    {
+        ESP_LOGW(TAG, "Interrupted WWW update detected; discarding image");
+        unmount_locked();
+        if (!s_partition)
+        {
+            set_error_locked("Interrupted WWW update but partition is missing");
+            return ESP_ERR_NOT_FOUND;
+        }
+
+        const esp_err_t erase_result = esp_partition_erase_range(
+            s_partition, 0, INVALIDATE_SECTOR_SIZE);
+        if (erase_result != ESP_OK)
+        {
+            set_error_locked("Could not discard interrupted WWW image",
+                             erase_result);
+            return erase_result;
+        }
+
+        const esp_err_t marker_result =
+            write_transaction_marker_locked(false);
+        if (marker_result != ESP_OK)
+        {
+            set_error_locked("Could not clear interrupted WWW transaction",
+                             marker_result);
+            return marker_result;
+        }
+    }
+
+    return mount_locked();
+}
+'''
+          text = replace_once(text, old_init, new_init, 'boot transaction recovery')
+
+          old_begin = r'''    if (!valid_sha256_hex(expected_sha256_hex))
+    {
+        set_error_locked("Invalid WWW SHA-256 header");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    unmount_locked();
+'''
+          new_begin = r'''    if (!valid_sha256_hex(expected_sha256_hex))
+    {
+        set_error_locked("Invalid WWW SHA-256 header");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Persist before erasing anything. A power loss leaves this marker set and
+    // the next boot invalidates the partial image before mounting SPIFFS.
+    const esp_err_t marker_result =
+        write_transaction_marker_locked(true);
+    if (marker_result != ESP_OK)
+    {
+        set_error_locked("Could not start safe WWW transaction",
+                         marker_result);
+        return marker_result;
+    }
+
+    unmount_locked();
+'''
+          text = replace_once(text, old_begin, new_begin, 'begin transaction marker')
+
+          old_finish = r'''    update_usage_locked();
+    clear_error_locked();
+    ESP_LOGI(TAG, "Separate New Design installed successfully, version=%s",
+'''
+          new_finish = r'''    const esp_err_t marker_result =
+        write_transaction_marker_locked(false);
+    if (marker_result != ESP_OK)
+    {
+        invalidate_image_locked("Could not commit safe WWW transaction",
+                                marker_result);
+        return marker_result;
+    }
+
+    update_usage_locked();
+    clear_error_locked();
+    ESP_LOGI(TAG, "Separate New Design installed successfully, version=%s",
+'''
+          text = replace_once(text, old_finish, new_finish,
+                              'finish transaction marker')
+          storage.write_text(text, encoding='utf-8')
+
+          app = Path('webui/src/app.vue')
+          text = app.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '<div id="app" :class="{ \'newdesign-shell\': experimentalStore.testDesignEnabled, \'bare-layout\': isBareLayout }">',
+              '<div id="app" class="newdesign-shell" :class="{ \'bare-layout\': isBareLayout }">',
+              'app root class',
+          )
+          text = replace_once(
+              text,
+              '<component :is="experimentalStore.testDesignEnabled ? NewDesignHeader : Header" />',
+              '<NewDesignHeader />',
+              'new design header',
+          )
+          text = replace_once(
+              text,
+              'import { useExperimentalStore, useLoginStore, useRestartUiStore, useSysInfoStore } from \'./stores.js\'',
+              'import { useLoginStore, useRestartUiStore, useSysInfoStore } from \'./stores.js\'',
+              'app store import',
+          )
+          text = replace_once(text, "import Header from './header.vue'\n", '',
+                              'old header import')
+          text = replace_once(text, 'const experimentalStore = useExperimentalStore()\n', '',
+                              'experimental store instance')
+          app.write_text(text, encoding='utf-8')
+
+          main = Path('webui/src/main.js')
+          text = main.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              'import { useExperimentalStore, useLoginStore, useThemeStore, useUiStore } from \'./stores.js\'',
+              'import { useLoginStore, useThemeStore, useUiStore } from \'./stores.js\'',
+              'main store import',
+          )
+          pattern = re.compile(
+              r'// The New Design is no longer experimental or optional\..*?'
+              r'// Activity tracking for idle timeout',
+              re.S,
+          )
+          text, count = pattern.subn(
+              '// The New Design is the only application shell.\n'
+              "document.body.classList.add('newdesign-active')\n\n"
+              '// Activity tracking for idle timeout',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit(f'main new-design block: expected one match, found {count}')
+          main.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Remove one-time workflow and push hardening
+        run: |
+          rm .github/workflows/apply-webui-hardening.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/webui_storage.cpp webui/src/app.vue webui/src/main.js .github/workflows/apply-webui-hardening.yml
+          git commit -m 'feat(webui): harden standalone update transaction'
+          git push origin HEAD:feature/separate-webui-update
