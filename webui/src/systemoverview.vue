@@ -25,9 +25,20 @@
 
       <section class="overview-grid">
         <article class="overview-card">
-          <span class="overview-label">{{ copy.freeHeap }}</span>
-          <strong>{{ formatBytes(data.freeHeap) }}</strong>
+          <span class="overview-label">{{ copy.freeRam }}</span>
+          <strong>{{ formatBytes(data.freeInternalHeap) }}</strong>
           <small>{{ copy.currentAvailable }}</small>
+        </article>
+        <article class="overview-card">
+          <span class="overview-label">{{ copy.usedRam }}</span>
+          <strong>{{ formatBytes(data.usedInternalHeap) }}</strong>
+          <small>{{ formatPercent(data.internalHeapUsagePercent) }}</small>
+          <div class="usage-track"><span :style="{ width: usageWidth + '%' }"></span></div>
+        </article>
+        <article class="overview-card">
+          <span class="overview-label">{{ copy.totalRam }}</span>
+          <strong>{{ formatBytes(data.totalInternalHeap) }}</strong>
+          <small>{{ copy.allocatableRam }}</small>
         </article>
         <article class="overview-card">
           <span class="overview-label">{{ copy.minimumHeap }}</span>
@@ -57,7 +68,10 @@
             <div class="kv-row"><span>{{ copy.target }}</span><strong>{{ data.target || '—' }}</strong></div>
             <div class="kv-row"><span>{{ copy.cores }}</span><strong>{{ data.chipCores ?? '—' }}</strong></div>
             <div class="kv-row"><span>{{ copy.chipRevision }}</span><strong>{{ data.chipRevision ?? '—' }}</strong></div>
-            <div class="kv-row"><span>{{ copy.internalHeap }}</span><strong>{{ formatBytes(data.freeInternalHeap) }}</strong></div>
+            <div class="kv-row"><span>{{ copy.resetReason }}</span><strong>{{ data.resetReasonText || data.resetReason || '—' }}</strong></div>
+            <div class="kv-row"><span>{{ copy.psram }}</span><strong>{{ data.psramAvailable ? copy.available : copy.notAvailable }}</strong></div>
+            <div v-if="data.psramAvailable" class="kv-row"><span>{{ copy.psramTotal }}</span><strong>{{ formatBytes(data.totalPsram) }}</strong></div>
+            <div v-if="data.psramAvailable" class="kv-row"><span>{{ copy.psramFree }}</span><strong>{{ formatBytes(data.freePsram) }}</strong></div>
           </div>
         </article>
 
@@ -95,12 +109,17 @@
           <div class="kv-list">
             <div class="kv-row"><span>{{ copy.capture }}</span><strong>{{ data.logs?.enabled ? copy.active : copy.inactive }}</strong></div>
             <div class="kv-row"><span>{{ copy.bufferSize }}</span><strong>{{ formatBytes(data.logs?.bufferBytes) }}</strong></div>
-            <div class="kv-row"><span>{{ copy.available }}</span><strong>{{ formatBytes(data.logs?.availableBytes) }}</strong></div>
+            <div class="kv-row"><span>{{ copy.availableLogs }}</span><strong>{{ formatBytes(data.logs?.availableBytes) }}</strong></div>
             <div class="kv-row"><span>{{ copy.totalStream }}</span><strong>{{ formatBytes(data.logs?.totalWritten) }}</strong></div>
             <div class="kv-row"><span>{{ copy.subscribers }}</span><strong>{{ data.logs?.subscribers ?? 0 }}</strong></div>
+            <div class="kv-row"><span>{{ copy.crashTail }}</span><strong :class="data.logs?.crashTailAvailable ? 'warning-text' : ''">{{ data.logs?.crashTailAvailable ? copy.available : copy.notAvailable }}</strong></div>
           </div>
         </article>
       </section>
+
+      <BAlert variant="info" :model-value="true">
+        {{ copy.onDemandHint }} <code>/recovery</code>
+      </BAlert>
 
       <div class="action-row">
         <BButton variant="outline-primary" :disabled="loading" @click="loadOverview">
@@ -124,27 +143,30 @@ const data = ref({ webui: {}, logs: {} })
 const translations = {
   de: {
     eyebrow: 'Diagnose', title: 'Systemübersicht',
-    subtitle: 'Speicher, Flash, Partitionen, Logs und aktive Weboberfläche auf einen Blick.',
-    freeHeap: 'Freier Heap', minimumHeap: 'Heap-Minimum', largestBlock: 'Größter Block', flash: 'Flash',
-    currentAvailable: 'Aktuell verfügbar', sinceBoot: 'Niedrigster Wert seit Start', contiguous: 'Größte zusammenhängende Allokation', physicalFlash: 'Erkannter Flash-Speicher',
-    runtime: 'Laufzeitumgebung', runtimeHint: 'ESP-IDF und Hardwaredaten', idf: 'ESP-IDF', target: 'Zielplattform', cores: 'CPU-Kerne', chipRevision: 'Chip-Revision', internalHeap: 'Interner Heap',
+    subtitle: 'RAM, Flash, Partitionen, Logs und aktive Weboberfläche auf einen Blick.',
+    freeRam: 'RAM frei', usedRam: 'RAM belegt', totalRam: 'RAM gesamt', minimumHeap: 'RAM-Minimum', largestBlock: 'Größter Block', flash: 'Flash',
+    currentAvailable: 'Aktuell verfügbar', allocatableRam: 'Vom Heap nutzbarer interner RAM', sinceBoot: 'Niedrigster Wert seit Start', contiguous: 'Größte zusammenhängende Allokation', physicalFlash: 'Erkannter Flash-Speicher',
+    runtime: 'Laufzeitumgebung', runtimeHint: 'ESP-IDF, Hardware und letzter Neustart', idf: 'ESP-IDF', target: 'Zielplattform', cores: 'CPU-Kerne', chipRevision: 'Chip-Revision', resetReason: 'Letzter Resetgrund', psram: 'PSRAM', psramTotal: 'PSRAM gesamt', psramFree: 'PSRAM frei',
     partitions: 'OTA-Partitionen', partitionsHint: 'Aktive und nächste Firmware-Partition', runningPartition: 'Aktiv', runningSize: 'Aktive Größe', nextPartition: 'Nächstes Update', nextSize: 'Update-Größe',
     webuiHint: 'Quelle und Speicher des New Designs', source: 'Quelle', version: 'Version', partitionSize: 'Partitionsgröße', used: 'Belegt',
-    logs: 'Log-Puffer', logsHint: 'Speicher und aktive Live-Streams', capture: 'Aufzeichnung', active: 'Aktiv', inactive: 'Inaktiv', bufferSize: 'Puffergröße', available: 'Verfügbar', totalStream: 'Gesamt geschrieben', subscribers: 'Subscriber', refresh: 'Aktualisieren'
+    logs: 'Log-Puffer', logsHint: 'Speicher, Crash-Tail und aktive Live-Streams', capture: 'Aufzeichnung', active: 'Aktiv', inactive: 'Inaktiv', bufferSize: 'Puffergröße', availableLogs: 'Gespeicherte Logs', totalStream: 'Gesamt geschrieben', subscribers: 'Subscriber', crashTail: 'Crash-Tail', available: 'Vorhanden', notAvailable: 'Nicht vorhanden',
+    onDemandHint: 'Alle Werte werden nur beim Öffnen oder manuellen Aktualisieren gelesen. Die unabhängige Notfallseite ist erreichbar unter', refresh: 'Aktualisieren'
   },
   en: {
     eyebrow: 'Diagnostics', title: 'System Overview',
-    subtitle: 'Memory, flash, partitions, logs and the active web interface at a glance.',
-    freeHeap: 'Free heap', minimumHeap: 'Minimum heap', largestBlock: 'Largest block', flash: 'Flash',
-    currentAvailable: 'Currently available', sinceBoot: 'Lowest value since boot', contiguous: 'Largest contiguous allocation', physicalFlash: 'Detected flash storage',
-    runtime: 'Runtime', runtimeHint: 'ESP-IDF and hardware information', idf: 'ESP-IDF', target: 'Target', cores: 'CPU cores', chipRevision: 'Chip revision', internalHeap: 'Internal heap',
+    subtitle: 'RAM, flash, partitions, logs and the active web interface at a glance.',
+    freeRam: 'Free RAM', usedRam: 'Used RAM', totalRam: 'Total RAM', minimumHeap: 'RAM minimum', largestBlock: 'Largest block', flash: 'Flash',
+    currentAvailable: 'Currently available', allocatableRam: 'Internal RAM available to the heap', sinceBoot: 'Lowest value since boot', contiguous: 'Largest contiguous allocation', physicalFlash: 'Detected flash storage',
+    runtime: 'Runtime', runtimeHint: 'ESP-IDF, hardware and last restart', idf: 'ESP-IDF', target: 'Target', cores: 'CPU cores', chipRevision: 'Chip revision', resetReason: 'Last reset reason', psram: 'PSRAM', psramTotal: 'Total PSRAM', psramFree: 'Free PSRAM',
     partitions: 'OTA partitions', partitionsHint: 'Running and next firmware partition', runningPartition: 'Running', runningSize: 'Running size', nextPartition: 'Next update', nextSize: 'Update size',
     webuiHint: 'New Design source and storage', source: 'Source', version: 'Version', partitionSize: 'Partition size', used: 'Used',
-    logs: 'Log buffer', logsHint: 'Memory and active live streams', capture: 'Capture', active: 'Active', inactive: 'Inactive', bufferSize: 'Buffer size', available: 'Available', totalStream: 'Total written', subscribers: 'Subscribers', refresh: 'Refresh'
+    logs: 'Log buffer', logsHint: 'Memory, crash tail and active live streams', capture: 'Capture', active: 'Active', inactive: 'Inactive', bufferSize: 'Buffer size', availableLogs: 'Buffered logs', totalStream: 'Total written', subscribers: 'Subscribers', crashTail: 'Crash tail', available: 'Available', notAvailable: 'Not available',
+    onDemandHint: 'All values are read only when this page is opened or manually refreshed. The independent emergency page is available at', refresh: 'Refresh'
   }
 }
 
 const copy = computed(() => translations[locale.value] || translations.en)
+const usageWidth = computed(() => Math.min(100, Math.max(0, Number(data.value.internalHeapUsagePercent) || 0)))
 
 const formatBytes = (value) => {
   const bytes = Number(value) || 0
@@ -153,6 +175,8 @@ const formatBytes = (value) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`
 }
+
+const formatPercent = (value) => `${(Number(value) || 0).toFixed(1)} %`
 
 const loadOverview = async () => {
   loading.value = true
@@ -173,13 +197,15 @@ onMounted(loadOverview)
 <style scoped>
 .system-overview-page { display: flex; flex-direction: column; gap: 20px; }
 .success-chip { color: var(--color-success); }
-.warning-chip { color: var(--color-warning); }
-.overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.warning-chip, .warning-text { color: var(--color-warning); }
+.overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .overview-card, .detail-card { border: 1px solid var(--color-border-light); background: var(--color-surface); box-shadow: var(--shadow-sm); }
 .overview-card { min-height: 135px; border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 8px; }
 .overview-card strong { font-size: 1.5rem; }
 .overview-card small, .overview-label { color: var(--color-text-secondary); }
 .overview-label { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+.usage-track { height: 6px; border-radius: var(--radius-full); background: var(--color-border-light); overflow: hidden; margin-top: auto; }
+.usage-track span { display: block; height: 100%; background: var(--color-primary); }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .detail-card { border-radius: var(--radius-xl); padding: 22px; min-width: 0; }
 .detail-heading { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
@@ -194,6 +220,7 @@ onMounted(loadOverview)
 .action-row { display: flex; justify-content: flex-end; }
 .skeleton { min-height: 135px; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: .45; } 50% { opacity: .8; } }
-@media (max-width: 1000px) { .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .detail-grid { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .overview-grid { grid-template-columns: 1fr; } .kv-row { flex-direction: column; gap: 4px; } .kv-row strong { text-align: left; } }
+@media (max-width: 1000px) { .overview-grid, .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .overview-grid, .detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .kv-row { flex-direction: column; gap: 4px; } .kv-row strong { text-align: left; } }
 </style>
