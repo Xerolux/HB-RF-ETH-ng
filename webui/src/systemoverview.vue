@@ -169,8 +169,8 @@ const copy = computed(() => translations[locale.value] || translations.en)
 const usageWidth = computed(() => Math.min(100, Math.max(0, Number(data.value.internalHeapUsagePercent) || 0)))
 
 const formatBytes = (value) => {
-  const bytes = Number(value) || 0
-  if (!bytes) return '—'
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—'
+  const bytes = Number(value)
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`
@@ -185,7 +185,11 @@ const loadOverview = async () => {
     const response = await axios.get('/api/system/overview', { timeout: 8000 })
     data.value = response.data || { webui: {}, logs: {} }
   } catch (requestError) {
-    error.value = requestError.response?.data || requestError.message || 'System overview unavailable'
+    const responseData = requestError.response?.data
+    error.value = responseData?.error
+      || (typeof responseData === 'string' ? responseData : '')
+      || requestError.message
+      || 'System overview unavailable'
   } finally {
     loading.value = false
   }

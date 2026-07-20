@@ -2760,13 +2760,25 @@ esp_err_t get_log_download_handler_func(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"hb-rf-eth-log.txt\"");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
+    const uint64_t snapshot_end = LogManager::instance().getTotalWritten();
     uint64_t absolute_offset = 0;
-    char chunk[1024];
-    esp_err_t result = ESP_OK;
-    while (true)
+    constexpr size_t CHUNK_SIZE = 1024;
+    char *chunk = static_cast<char *>(malloc(CHUNK_SIZE));
+    if (!chunk)
     {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Could not allocate log download buffer");
+    }
+
+    esp_err_t result = ESP_OK;
+    while (absolute_offset < snapshot_end)
+    {
+        const uint64_t remaining = snapshot_end - absolute_offset;
+        const size_t requested = remaining < CHUNK_SIZE
+            ? static_cast<size_t>(remaining)
+            : CHUNK_SIZE;
         const size_t count = LogManager::instance().readChunk(
-            &absolute_offset, chunk, sizeof(chunk));
+            &absolute_offset, chunk, requested);
         if (count == 0) break;
 
         result = httpd_resp_send_chunk(req, chunk, count);
@@ -2774,6 +2786,7 @@ esp_err_t get_log_download_handler_func(httpd_req_t *req)
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
+    free(chunk);
     if (result == ESP_OK)
     {
         result = httpd_resp_send_chunk(req, nullptr, 0);
