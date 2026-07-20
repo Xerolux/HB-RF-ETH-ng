@@ -19,6 +19,9 @@ can migrate through the normal firmware OTA process without USB access.
   streaming the image directly into flash.
 - The WebUI upload uses one bounded 2 KiB heap buffer instead of reserving that
   space on the HTTP server task stack.
+- Wrapped route slots are reset when a new HTTP server instance is registered.
+- A manifest exactly at the configured size limit remains valid; only additional
+  trailing data is rejected as oversized.
 - The image must exactly match the SPIFFS partition size.
 - `webui-manifest.json` must identify `HB-RF-ETH-ng`, format `1`, design
   `newdesign`, and the expected Brotli encodings.
