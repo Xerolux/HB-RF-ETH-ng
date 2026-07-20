@@ -31,7 +31,11 @@
 
 static const char *TAG = "SystemReset";
 
-static bool g_flashPauseEnabled = false;
+// Restart sync is a fixed safety feature for every device. Legacy settings and
+// old backups may still contain flashPause=false, but they can no longer disable
+// the 35-second Ethernet link-down window.
+static bool g_flashPauseEnabled = true;
+
 // Optional callback registered by the Ethernet driver. When set, it cleanly
 // stops the MAC (esp_eth_stop) BEFORE we toggle the PHY reset pin. This
 // guarantees the link drops at both layers — GPIO-only PHY reset alone was
@@ -40,7 +44,8 @@ static bool g_flashPauseEnabled = false;
 static restart_eth_pause_fn_t g_eth_pause_cb = NULL;
 
 void set_flash_pause_enabled(bool enabled) {
-    g_flashPauseEnabled = enabled;
+    (void)enabled;
+    g_flashPauseEnabled = true;
 }
 
 void register_restart_eth_pause_callback(restart_eth_pause_fn_t cb) {
@@ -53,7 +58,7 @@ void full_system_restart() {
     // Cleanly stop the Ethernet MAC first so the link partner (switch / CCU)
     // immediately sees carrier loss. The PHY pin toggle below keeps the PHY
     // in reset during the pause window; together both layers are down.
-    if (g_flashPauseEnabled && g_eth_pause_cb) {
+    if (g_eth_pause_cb) {
         ESP_LOGI(TAG, "Stopping Ethernet MAC for link-down pause...");
         g_eth_pause_cb();
     }
@@ -73,17 +78,13 @@ void full_system_restart() {
     gpio_set_level(ETH_POWER_PIN, 0);
     gpio_set_level(HM_RST_PIN, 0);
 
-    if (g_flashPauseEnabled) {
-        // Hold Ethernet PHY in reset for 35 s so the CCU watchdog (30 s
-        // timeout) detects the link loss and triggers a clean CCU restart.
-        // The PHY nRST pin is driven, not a power rail — PoE is unaffected.
-        // pdMS_TO_TICKS overflows for large values, so loop in 5 s chunks.
-        ESP_LOGI(TAG, "Link-down pause active: Ethernet off for 35 s (CCU watchdog trigger)...");
-        for (int i = 0; i < 7; i++) {
-            vTaskDelay(pdMS_TO_TICKS(5000));
-        }
-    } else {
-        vTaskDelay(pdMS_TO_TICKS(500));
+    // Hold Ethernet PHY in reset for 35 s so the CCU watchdog (30 s timeout)
+    // detects the link loss and triggers a clean CCU restart. The PHY nRST pin
+    // is driven, not a power rail — PoE is unaffected. pdMS_TO_TICKS can
+    // overflow for large values, so wait in 5-second chunks.
+    ESP_LOGI(TAG, "Link-down pause active: Ethernet off for 35 s (CCU watchdog trigger)...");
+    for (int i = 0; i < 7; i++) {
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 
     ESP_LOGI(TAG, "Releasing peripheral reset pins before ESP32 restart...");
