@@ -38,9 +38,6 @@ jobs:
           python-version: '3.13'
 
       - name: Regenerate embedded firmware archive
-        # Produces main/generated/archive.json.gz from the committed archive.json
-        # so the firmware build always embeds a current archive. Fails the build
-        # if archive.json is missing or invalid (strict mode).
         run: python3 scripts/update_archive.py
 
       - name: Setup ESP-IDF v6.1-beta1
@@ -52,10 +49,21 @@ jobs:
 
       - name: Build firmware and standalone WWW image
         run: |
+          set -o pipefail
           . "$HOME/esp-idf/export.sh"
           export IDF_TARGET=esp32
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
-          idf.py build
+          mkdir -p build
+          idf.py build 2>&1 | tee build/build-output.log
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-log-${{ github.sha }}
+          path: build/build-output.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Validate standalone New Design image
         run: |
