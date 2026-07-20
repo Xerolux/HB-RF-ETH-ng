@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
@@ -177,7 +178,8 @@ bool validate_manifest_locked()
 
     char manifest[MANIFEST_MAX_SIZE + 1] = {};
     const size_t length = fread(manifest, 1, MANIFEST_MAX_SIZE, file);
-    const bool too_large = !feof(file);
+    const bool too_large =
+        length == MANIFEST_MAX_SIZE && fgetc(file) != EOF;
     const bool read_error = ferror(file);
     fclose(file);
 
@@ -643,7 +645,15 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
                                        : "Could not start WWW update");
     }
 
-    uint8_t buffer[UPDATE_BUFFER_SIZE];
+    uint8_t *buffer = static_cast<uint8_t *>(malloc(UPDATE_BUFFER_SIZE));
+    if (!buffer)
+    {
+        webui_storage_update_abort();
+        if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Could not allocate WWW upload buffer");
+    }
+
     size_t received = 0;
     int timeout_retries = 5;
 
@@ -651,9 +661,9 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     {
         const size_t remaining =
             static_cast<size_t>(req->content_len) - received;
-        const size_t wanted = remaining < sizeof(buffer)
+        const size_t wanted = remaining < UPDATE_BUFFER_SIZE
             ? remaining
-            : sizeof(buffer);
+            : UPDATE_BUFFER_SIZE;
         const int count = httpd_req_recv(req,
                                          reinterpret_cast<char *>(buffer),
                                          wanted);
@@ -679,6 +689,8 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
             vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
+
+    free(buffer);
 
     if (result == ESP_OK &&
         received == static_cast<size_t>(req->content_len))
@@ -734,6 +746,10 @@ void register_storage_endpoints_once(httpd_handle_t server)
 
     // Mark first to avoid recursive duplicate registration through the shim.
     s_registered_server = server;
+    for (auto &route : s_wrapped_routes)
+    {
+        route = WrappedRoute{};
+    }
     webui_storage_init();
 
     const esp_err_t status_result =
