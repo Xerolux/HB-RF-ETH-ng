@@ -411,7 +411,6 @@ void mqtt_handler_publish_status(void)
 
     // ---- Identity ---------------------------------------------------------
     PUBLISH_STR("status/serial", sysInfo->getSerialNumber());
-    PUBLISH_STR("status/version", sysInfo->getCurrentVersion());
     PUBLISH_STR("status/firmware_version", sysInfo->getCurrentVersion());
     char webuiVersion[32] = {};
     webui_storage_get_effective_version(webuiVersion, sizeof(webuiVersion));
@@ -432,7 +431,6 @@ void mqtt_handler_publish_status(void)
         const bool webuiUpdateAvailable = rel.webuiValid &&
             compareVersions(rel.webuiVersion, webuiVersion) > 0;
 
-        PUBLISH_STR("status/latest_version", latestFirmware);
         PUBLISH_STR("status/update_available", firmwareUpdateAvailable ? "true" : "false");
         PUBLISH_STR("status/latest_firmware_version", latestFirmware);
         PUBLISH_STR("status/latest_webui_version", latestWebui);
@@ -663,10 +661,17 @@ void mqtt_handler_publish_ha_discovery(void)
     remove_config("sensor", "temperature");
     publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
-    publish_config("sensor", "version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
+    // Remove the legacy short-named version sensors. Before the dual-version
+    // refactor these were the only version topics; afterwards they duplicated
+    // firmware_version/latest_firmware_version 1:1, showing up in Home
+    // Assistant as two sensors named "Firmware Version". The explicit
+    // firmware_version / webui_version (and latest_*) sensors below fully
+    // cover the use case. Empty retained discovery payload removes the
+    // already-announced entities from HA on the next status publish.
+    remove_config("sensor", "version");
+    remove_config("sensor", "latest_version");
     publish_config("sensor", "firmware_version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
     publish_config("sensor", "webui_version", "WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web");
-    publish_config("sensor", "latest_version", "Latest Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
     publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
     publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web-sync");
     publish_config("binary_sensor", "firmware_update_available", "Firmware Update Available", "update", NULL, NULL, NULL, "diagnostic", "mdi:package-up", "true", "false");
