@@ -17,6 +17,8 @@ ESP32-WROOM-32:
 - detected flash size
 - running and next OTA partition labels and sizes
 - active WebUI source, version, mount state, and SPIFFS usage
+- log capture state, ring capacity, currently available bytes, total stream
+  offset, and active subscriber count
 
 Values are calculated only when requested. No permanent diagnostic task or
 additional polling loop is created in firmware.
@@ -45,3 +47,8 @@ HTTP chunked transfer encoding.
 A reader whose absolute offset points to overwritten data is advanced to the
 oldest byte still present. This keeps download memory constant while preserving
 existing WebSocket live-log and syslog subscriber behavior.
+
+The System Overview displays the same ring-buffer state without allocating a
+log snapshot, which makes it possible to diagnose disabled capture, buffer
+wraparound, and concurrent WebSocket/syslog subscribers before downloading a
+log file.
