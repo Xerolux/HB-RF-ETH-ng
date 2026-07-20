@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
-    "@vitejs/plugin-vue": "^6.0.7",
+    "@vitejs/plugin-vue": "^6.0.8",
     "esbuild": "^0.28.1",
     "vite": "^8.1.4"
   }
