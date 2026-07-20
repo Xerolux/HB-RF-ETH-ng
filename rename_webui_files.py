@@ -19,8 +19,6 @@ except NameError:
 
 
 PARTITION_SIZE = 0x50000
-# SPIFFS needs object-index/data pages in addition to the raw file bytes.
-# Keeping at least 24 KiB free avoids images that only fit theoretically.
 SPIFFS_HEADROOM = 24 * 1024
 
 
@@ -30,6 +28,30 @@ def gzip_file(source: Path, target: Path) -> None:
             shutil.copyfileobj(source_file, target_file)
 
 
+def load_release_metadata() -> tuple[str, int, str]:
+    package = json.loads(Path("webui/package.json").read_text(encoding="utf-8"))
+    compatibility = json.loads(
+        Path("webui/compatibility.json").read_text(encoding="utf-8")
+    )
+
+    version = str(package.get("version", "")).strip()
+    api_version = compatibility.get("apiVersion")
+    minimum_firmware = str(compatibility.get("minFirmwareVersion", "")).strip()
+
+    if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?", version):
+        raise RuntimeError(f"Invalid WebUI version: {version}")
+    if not isinstance(api_version, int) or api_version < 1:
+        raise RuntimeError(f"Invalid WebUI API version: {api_version}")
+    if not re.fullmatch(
+        r"\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?", minimum_firmware
+    ):
+        raise RuntimeError(
+            f"Invalid minimum firmware version: {minimum_firmware}"
+        )
+
+    return version, api_version, minimum_firmware
+
+
 def build_spiffs_source(dist_dir: Path) -> None:
     """Create the smallest complete standalone New Design image source."""
     image_dir = Path("webui/spiffs_image")
@@ -37,9 +59,6 @@ def build_spiffs_source(dist_dir: Path) -> None:
         shutil.rmtree(image_dir)
     image_dir.mkdir(parents=True)
 
-    # Only the application shell belongs in the independently updated image.
-    # Favicon, PWA manifest and icon remain embedded in the transition firmware;
-    # the route wrapper automatically falls back to those embedded assets.
     assets = [
         "index.html.gz",
         "main.js.br",
@@ -56,16 +75,15 @@ def build_spiffs_source(dist_dir: Path) -> None:
     for name in assets:
         shutil.copy2(dist_dir / name, image_dir / name)
 
-    package = json.loads(
-        Path("webui/package.json").read_text(encoding="utf-8")
-    )
-    version = str(package.get("version", "unknown")).strip() or "unknown"
+    version, api_version, minimum_firmware = load_release_metadata()
 
     manifest = {
         "format": 1,
         "product": "HB-RF-ETH-ng",
         "design": "newdesign",
         "version": version,
+        "apiVersion": api_version,
+        "minFirmwareVersion": minimum_firmware,
         "assets": assets,
         "encodings": {
             "index.html": "gzip",
@@ -95,7 +113,8 @@ def build_spiffs_source(dist_dir: Path) -> None:
 
     details = ", ".join(f"{path.name}={path.stat().st_size}" for path in files)
     print(
-        f"Prepared standalone New Design image: version {version}, "
+        f"Prepared standalone New Design image: version {version}, API "
+        f"{api_version}, firmware >= {minimum_firmware}, "
         f"{total_size}/{PARTITION_SIZE} raw bytes ({details})"
     )
 
@@ -145,7 +164,6 @@ def prepare_index(dist_dir: Path, replacements: dict[str, str]) -> None:
 
 
 def prepare_embedded_assets(dist_dir: Path) -> None:
-    # Embedded transition/recovery UI continues using gzip.
     for filename in ("main.js", "main.css"):
         source = dist_dir / filename
         if not source.is_file():
