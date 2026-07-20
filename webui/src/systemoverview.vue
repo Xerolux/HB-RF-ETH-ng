@@ -86,6 +86,20 @@
             <div class="kv-row"><span>{{ copy.used }}</span><strong>{{ formatBytes(data.webui?.usedBytes) }}</strong></div>
           </div>
         </article>
+
+        <article class="detail-card">
+          <div class="detail-heading">
+            <span class="icon-badge success"><AppIcon name="logs" /></span>
+            <div><h2>{{ copy.logs }}</h2><p>{{ copy.logsHint }}</p></div>
+          </div>
+          <div class="kv-list">
+            <div class="kv-row"><span>{{ copy.capture }}</span><strong>{{ data.logs?.enabled ? copy.active : copy.inactive }}</strong></div>
+            <div class="kv-row"><span>{{ copy.bufferSize }}</span><strong>{{ formatBytes(data.logs?.bufferBytes) }}</strong></div>
+            <div class="kv-row"><span>{{ copy.available }}</span><strong>{{ formatBytes(data.logs?.availableBytes) }}</strong></div>
+            <div class="kv-row"><span>{{ copy.totalStream }}</span><strong>{{ formatBytes(data.logs?.totalWritten) }}</strong></div>
+            <div class="kv-row"><span>{{ copy.subscribers }}</span><strong>{{ data.logs?.subscribers ?? 0 }}</strong></div>
+          </div>
+        </article>
       </section>
 
       <div class="action-row">
@@ -105,26 +119,28 @@ import axios from 'axios'
 const { locale } = useI18n()
 const loading = ref(true)
 const error = ref('')
-const data = ref({ webui: {} })
+const data = ref({ webui: {}, logs: {} })
 
 const translations = {
   de: {
     eyebrow: 'Diagnose', title: 'Systemübersicht',
-    subtitle: 'Speicher, Flash, Partitionen und aktive Weboberfläche auf einen Blick.',
+    subtitle: 'Speicher, Flash, Partitionen, Logs und aktive Weboberfläche auf einen Blick.',
     freeHeap: 'Freier Heap', minimumHeap: 'Heap-Minimum', largestBlock: 'Größter Block', flash: 'Flash',
     currentAvailable: 'Aktuell verfügbar', sinceBoot: 'Niedrigster Wert seit Start', contiguous: 'Größte zusammenhängende Allokation', physicalFlash: 'Erkannter Flash-Speicher',
     runtime: 'Laufzeitumgebung', runtimeHint: 'ESP-IDF und Hardwaredaten', idf: 'ESP-IDF', target: 'Zielplattform', cores: 'CPU-Kerne', chipRevision: 'Chip-Revision', internalHeap: 'Interner Heap',
     partitions: 'OTA-Partitionen', partitionsHint: 'Aktive und nächste Firmware-Partition', runningPartition: 'Aktiv', runningSize: 'Aktive Größe', nextPartition: 'Nächstes Update', nextSize: 'Update-Größe',
-    webuiHint: 'Quelle und Speicher des New Designs', source: 'Quelle', version: 'Version', partitionSize: 'Partitionsgröße', used: 'Belegt', refresh: 'Aktualisieren'
+    webuiHint: 'Quelle und Speicher des New Designs', source: 'Quelle', version: 'Version', partitionSize: 'Partitionsgröße', used: 'Belegt',
+    logs: 'Log-Puffer', logsHint: 'Speicher und aktive Live-Streams', capture: 'Aufzeichnung', active: 'Aktiv', inactive: 'Inaktiv', bufferSize: 'Puffergröße', available: 'Verfügbar', totalStream: 'Gesamt geschrieben', subscribers: 'Subscriber', refresh: 'Aktualisieren'
   },
   en: {
     eyebrow: 'Diagnostics', title: 'System Overview',
-    subtitle: 'Memory, flash, partitions and the active web interface at a glance.',
+    subtitle: 'Memory, flash, partitions, logs and the active web interface at a glance.',
     freeHeap: 'Free heap', minimumHeap: 'Minimum heap', largestBlock: 'Largest block', flash: 'Flash',
     currentAvailable: 'Currently available', sinceBoot: 'Lowest value since boot', contiguous: 'Largest contiguous allocation', physicalFlash: 'Detected flash storage',
     runtime: 'Runtime', runtimeHint: 'ESP-IDF and hardware information', idf: 'ESP-IDF', target: 'Target', cores: 'CPU cores', chipRevision: 'Chip revision', internalHeap: 'Internal heap',
     partitions: 'OTA partitions', partitionsHint: 'Running and next firmware partition', runningPartition: 'Running', runningSize: 'Running size', nextPartition: 'Next update', nextSize: 'Update size',
-    webuiHint: 'New Design source and storage', source: 'Source', version: 'Version', partitionSize: 'Partition size', used: 'Used', refresh: 'Refresh'
+    webuiHint: 'New Design source and storage', source: 'Source', version: 'Version', partitionSize: 'Partition size', used: 'Used',
+    logs: 'Log buffer', logsHint: 'Memory and active live streams', capture: 'Capture', active: 'Active', inactive: 'Inactive', bufferSize: 'Buffer size', available: 'Available', totalStream: 'Total written', subscribers: 'Subscribers', refresh: 'Refresh'
   }
 }
 
@@ -143,7 +159,7 @@ const loadOverview = async () => {
   error.value = ''
   try {
     const response = await axios.get('/api/system/overview', { timeout: 8000 })
-    data.value = response.data || { webui: {} }
+    data.value = response.data || { webui: {}, logs: {} }
   } catch (requestError) {
     error.value = requestError.response?.data || requestError.message || 'System overview unavailable'
   } finally {
@@ -164,7 +180,7 @@ onMounted(loadOverview)
 .overview-card strong { font-size: 1.5rem; }
 .overview-card small, .overview-label { color: var(--color-text-secondary); }
 .overview-label { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
-.detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .detail-card { border-radius: var(--radius-xl); padding: 22px; min-width: 0; }
 .detail-heading { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
 .detail-heading h2 { margin: 0; font-size: 1.2rem; }
