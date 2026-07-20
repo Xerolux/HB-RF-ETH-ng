@@ -1,0 +1,50 @@
+name: Register theme API
+
+on:
+  push:
+    branches:
+      - feature/system-overview-theme-logs
+
+permissions:
+  contents: write
+
+jobs:
+  register-theme:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Register theme endpoints
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('main/webui.cpp')
+          text = path.read_text(encoding='utf-8')
+
+          old = '#include "system_overview_api.h"\n'
+          new = old + '#include "theme_api.h"\n'
+          if text.count(old) != 1:
+              raise SystemExit('system overview include anchor not unique')
+          text = text.replace(old, new, 1)
+
+          old = '        system_overview_api_register(_httpd_handle);\n\n'
+          new = ('        system_overview_api_register(_httpd_handle);\n'
+                 '        theme_api_register(_httpd_handle);\n\n')
+          if text.count(old) != 1:
+              raise SystemExit('system overview registration anchor not unique')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Remove helper and push result
+        run: |
+          rm .github/workflows/register-theme-api.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/webui.cpp .github/workflows/register-theme-api.yml
+          git commit -m 'feat(theme): register persistent theme endpoints'
+          git push origin HEAD:feature/system-overview-theme-logs
