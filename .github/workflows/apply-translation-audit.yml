@@ -1,0 +1,208 @@
+name: Apply German translation fallback audit
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout translation branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/german-translation-fallback
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Enforce German fallback and add audit
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('webui/src/main.js'): [
+                  ("fallbackLocale: 'en'", "fallbackLocale: 'de'"),
+              ],
+              Path('webui/src/locales/index.js'): [
+                  ('// Default to English', '// Default to German'),
+                  ("return 'en'", "return 'de'"),
+              ],
+              Path('webui/src/theme.vue'): [
+                  ('translations[locale.value] || translations.en', 'translations[locale.value] || translations.de'),
+              ],
+              Path('webui/src/systemoverview.vue'): [
+                  ('translations[locale.value] || translations.en', 'translations[locale.value] || translations.de'),
+              ],
+              Path('webui/src/webuiupdate.vue'): [
+                  ('translations[locale.value] || translations.en', 'translations[locale.value] || translations.de'),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f'Expected translation fallback not found in {path}: {old}')
+                  text = text.replace(old, new)
+              path.write_text(text, encoding='utf-8')
+
+          workflow = Path('.github/workflows/pr-check.yml')
+          text = workflow.read_text(encoding='utf-8')
+          marker = "      - name: Check for console.log statements\n"
+          step = (
+              "      - name: Validate translations and German fallback\n"
+              "        run: node scripts/check-translations.mjs\n\n"
+          )
+          if step not in text:
+              if marker not in text:
+                  raise SystemExit('Could not locate PR translation-check insertion point')
+              text = text.replace(marker, step + marker, 1)
+              workflow.write_text(text, encoding='utf-8')
+          PY
+
+          mkdir -p scripts
+          cat > scripts/check-translations.mjs <<'EOF'
+          import fs from 'node:fs'
+          import path from 'node:path'
+          import { fileURLToPath } from 'node:url'
+
+          const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+          const localeDirectory = path.join(repositoryRoot, 'webui', 'src', 'locales')
+          const sourceDirectory = path.join(repositoryRoot, 'webui', 'src')
+
+          const fail = (message) => {
+            console.error(`Translation check failed: ${message}`)
+            process.exitCode = 1
+          }
+
+          const loadLocale = (filePath) => {
+            const source = fs.readFileSync(filePath, 'utf8')
+            const transformed = source.replace(/^\s*export\s+default\s+/, 'return ')
+            if (transformed === source) {
+              throw new Error(`Unsupported locale module format: ${filePath}`)
+            }
+            return Function(`"use strict";\n${transformed}`)()
+          }
+
+          const flattenKeys = (value, prefix = '', result = new Set()) => {
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+              if (prefix) result.add(prefix)
+              return result
+            }
+            for (const [key, nested] of Object.entries(value)) {
+              const fullKey = prefix ? `${prefix}.${key}` : key
+              if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+                flattenKeys(nested, fullKey, result)
+              } else {
+                result.add(fullKey)
+              }
+            }
+            return result
+          }
+
+          const walk = (directory) => {
+            const files = []
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const absolute = path.join(directory, entry.name)
+              if (entry.isDirectory()) files.push(...walk(absolute))
+              else if (/\.(?:js|vue)$/.test(entry.name)) files.push(absolute)
+            }
+            return files
+          }
+
+          const localeFiles = fs.readdirSync(localeDirectory)
+            .filter((name) => /^[a-z]{2}\.js$/.test(name))
+            .sort()
+
+          const locales = {}
+          const localeKeys = {}
+          for (const fileName of localeFiles) {
+            const code = fileName.slice(0, 2)
+            locales[code] = loadLocale(path.join(localeDirectory, fileName))
+            localeKeys[code] = flattenKeys(locales[code])
+          }
+
+          if (!localeKeys.de) fail('German locale file webui/src/locales/de.js is missing')
+          const germanKeys = localeKeys.de || new Set()
+
+          const usedKeys = new Set()
+          const translationCall = /(?:^|[^\w$])(?:t|\$t|translate|i18n\.global\.t)\(\s*(['"`])([^'"`]+)\1/gm
+          for (const filePath of walk(sourceDirectory)) {
+            const source = fs.readFileSync(filePath, 'utf8')
+            for (const match of source.matchAll(translationCall)) {
+              if (!match[2].includes('${')) usedKeys.add(match[2])
+            }
+          }
+
+          const missingGerman = [...usedKeys].filter((key) => !germanKeys.has(key)).sort()
+          if (missingGerman.length) {
+            fail(`German translations missing for used keys:\n  ${missingGerman.join('\n  ')}`)
+          }
+
+          for (const [code, keys] of Object.entries(localeKeys)) {
+            if (code === 'de') continue
+            const unknownToGerman = [...keys].filter((key) => !germanKeys.has(key)).sort()
+            if (unknownToGerman.length) {
+              fail(`${code}.js contains keys that are absent from de.js:\n  ${unknownToGerman.join('\n  ')}`)
+            }
+            const missing = [...germanKeys].filter((key) => !keys.has(key)).sort()
+            if (missing.length) {
+              console.warn(`${code}.js is missing ${missing.length} German reference keys; runtime fallback remains German.`)
+            }
+          }
+
+          const mainSource = fs.readFileSync(path.join(sourceDirectory, 'main.js'), 'utf8')
+          const indexSource = fs.readFileSync(path.join(localeDirectory, 'index.js'), 'utf8')
+          if (!/fallbackLocale\s*:\s*['"]de['"]/.test(mainSource)) {
+            fail('Vue-I18n fallbackLocale must be German')
+          }
+          if (/fallbackLocale\s*:\s*['"]en['"]/.test(mainSource)) {
+            fail('English Vue-I18n fallback is forbidden')
+          }
+          if (!/Default to German[\s\S]*return\s+['"]de['"]/.test(indexSource)) {
+            fail('Unknown browser locales must default to German')
+          }
+
+          const forbiddenFallbacks = [
+            { pattern: /(?:\|\||\?\?)\s*translations\.en\b/g, label: 'local translations.en fallback' },
+            { pattern: /(?:\|\||\?\?)\s*messages\.en\b/g, label: 'local messages.en fallback' },
+          ]
+          for (const filePath of walk(sourceDirectory)) {
+            const source = fs.readFileSync(filePath, 'utf8')
+            for (const rule of forbiddenFallbacks) {
+              if (rule.pattern.test(source)) {
+                fail(`${rule.label} found in ${path.relative(repositoryRoot, filePath)}`)
+              }
+              rule.pattern.lastIndex = 0
+            }
+          }
+
+          if (!process.exitCode) {
+            console.log(`Translation check passed: ${usedKeys.size} used keys, ${germanKeys.size} German keys, ${localeFiles.length} locales.`)
+          }
+          EOF
+
+          node scripts/check-translations.mjs
+
+      - name: Commit translation audit branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add webui/src/main.js webui/src/locales/index.js webui/src/theme.vue webui/src/systemoverview.vue webui/src/webuiupdate.vue scripts/check-translations.mjs .github/workflows/pr-check.yml
+          git commit -m "fix(i18n): use German as the only fallback"
+          git push origin HEAD:fix/german-translation-fallback
+
+      - name: Remove maintenance workflow from main
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+          git rm .github/workflows/apply-translation-audit.yml
+          git commit -m "ci: remove completed translation maintenance workflow"
+          git push origin main
