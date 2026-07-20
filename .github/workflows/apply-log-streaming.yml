@@ -1,0 +1,50 @@
+name: Apply allocation-free log streaming
+
+on:
+  push:
+    branches:
+      - feature/system-overview-theme-logs
+
+permissions:
+  contents: write
+
+jobs:
+  apply-streaming:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add ring-buffer chunk reader and use it for downloads
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manager = Path('main/log_manager.cpp')
+          text = manager.read_text(encoding='utf-8')
+          anchor = '''    return result;\n}\n\nuint64_t LogManager::getTotalWritten() const {\n'''
+          implementation = '''    return result;\n}\n\nsize_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,\n                             size_t maximum_length) {\n    if (!absolute_offset || !destination || maximum_length == 0 ||\n        !_mutex || !log_buffer || log_buffer_size == 0) {\n        return 0;\n    }\n\n    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {\n        return 0;\n    }\n\n    const uint64_t local_total = total_written;\n    uint64_t requested = *absolute_offset;\n    if (requested > local_total) requested = local_total;\n\n    const uint64_t oldest = local_total > log_buffer_size\n        ? local_total - log_buffer_size\n        : 0;\n    if (requested < oldest) requested = oldest;\n\n    const uint64_t available64 = local_total - requested;\n    const size_t available = available64 > SIZE_MAX\n        ? SIZE_MAX\n        : static_cast<size_t>(available64);\n    const size_t count = available < maximum_length\n        ? available\n        : maximum_length;\n\n    if (count > 0) {\n        const size_t start = static_cast<size_t>(requested % log_buffer_size);\n        const size_t first = (count < log_buffer_size - start)\n            ? count\n            : log_buffer_size - start;\n        memcpy(destination, log_buffer + start, first);\n        if (count > first) {\n            memcpy(destination + first, log_buffer, count - first);\n        }\n    }\n\n    *absolute_offset = requested + count;\n    xSemaphoreGive(_mutex);\n    return count;\n}\n\nuint64_t LogManager::getTotalWritten() const {\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit(f'log manager anchor count: {text.count(anchor)}')
+          manager.write_text(text.replace(anchor, implementation, 1), encoding='utf-8')
+
+          webui = Path('main/webui.cpp')
+          text = webui.read_text(encoding='utf-8')
+          old = '''    std::string content = LogManager::instance().getLogContent();\n    httpd_resp_send(req, content.c_str(), content.length());\n\n    return ESP_OK;\n'''
+          new = '''    uint64_t absolute_offset = 0;\n    char chunk[1024];\n    esp_err_t result = ESP_OK;\n    while (true)\n    {\n        const size_t count = LogManager::instance().readChunk(\n            &absolute_offset, chunk, sizeof(chunk));\n        if (count == 0) break;\n\n        result = httpd_resp_send_chunk(req, chunk, count);\n        if (result != ESP_OK) break;\n        vTaskDelay(pdMS_TO_TICKS(1));\n    }\n\n    if (result == ESP_OK)\n    {\n        result = httpd_resp_send_chunk(req, nullptr, 0);\n    }\n    return result;\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'log download anchor count: {text.count(old)}')
+          webui.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Remove helper and push result
+        run: |
+          rm .github/workflows/apply-log-streaming.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add main/log_manager.cpp main/webui.cpp .github/workflows/apply-log-streaming.yml
+          git commit -m 'feat(logs): stream downloads directly from ring buffer'
+          git push origin HEAD:feature/system-overview-theme-logs
