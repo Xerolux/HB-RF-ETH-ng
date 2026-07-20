@@ -22,11 +22,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           gh run list --repo "${{ github.repository }}" --workflow apply-gzip-24h-hotfix.yml --limit 10 --json databaseId,status,conclusion,createdAt,displayTitle,event,headSha,url > gzip-hotfix-status.json
+          run_id=$(python3 - <<'PY'
+          import json
+          runs=json.load(open('gzip-hotfix-status.json'))
+          print(next((str(r['databaseId']) for r in runs if r.get('conclusion') == 'failure'), ''))
+          PY
+          )
+          if [ -n "$run_id" ]; then
+            gh run view "$run_id" --repo "${{ github.repository }}" --log-failed > gzip-hotfix-failed.log 2>&1 || true
+          fi
       - name: Commit report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add gzip-hotfix-status.json
-          git commit -m "ci: record gzip hotfix status"
+          git add gzip-hotfix-status.json gzip-hotfix-failed.log
+          git commit -m "ci: record gzip hotfix failure details"
           git push origin HEAD:ops/beta3-release-status
