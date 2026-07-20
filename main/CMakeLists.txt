@@ -23,6 +23,7 @@ idf_component_register(SRCS ${app_sources}
                            nvs_flash
                            lwip
                            mbedtls
+                           json
                            app_update
                            esp_adc
                            esp_partition
