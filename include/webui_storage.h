@@ -5,10 +5,10 @@
 #include "esp_err.h"
 #include "esp_http_server.h"
 
-// ESP-IDF stores this function pointer directly in httpd_uri_t and does not
-// publish a named alias for it. Keep the wrapper implementation strongly typed
-// instead of falling back to void pointers/casts.
 using httpd_uri_func = esp_err_t (*)(httpd_req_t *request);
+
+// Increment only when the firmware/WebUI API contract changes incompatibly.
+constexpr uint32_t HB_WEBUI_API_VERSION = 1;
 
 struct WebUIStorageStatus
 {
@@ -20,7 +20,9 @@ struct WebUIStorageStatus
     size_t totalBytes;
     size_t usedBytes;
     size_t bytesWritten;
+    uint32_t apiVersion;
     char version[32];
+    char minFirmwareVersion[32];
     char lastError[96];
 };
 
