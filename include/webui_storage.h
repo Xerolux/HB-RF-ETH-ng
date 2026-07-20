@@ -5,9 +5,6 @@
 #include "esp_err.h"
 #include "esp_http_server.h"
 
-// ESP-IDF stores this function pointer directly in httpd_uri_t and does not
-// publish a named alias for it. Keep the wrapper implementation strongly typed
-// instead of falling back to void pointers/casts.
 using httpd_uri_func = esp_err_t (*)(httpd_req_t *request);
 
 struct WebUIStorageStatus

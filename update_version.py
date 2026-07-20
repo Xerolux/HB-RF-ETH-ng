@@ -1,184 +1,102 @@
 #!/usr/bin/env python3
-"""
-Update version numbers across the project for releases.
-This script is called by the release workflow to ensure consistent versioning.
+"""Update firmware version numbers across the project.
+
+The WebUI has an independent semantic version and is intentionally not touched
+by this script. Use ``update_webui_version.py`` for WebUI-only releases.
 
 Usage:
-    python update_version.py <version>
-
-Example:
-    python update_version.py 2.2.0
+    python update_version.py <firmware-version>
 """
 
-import sys
-import re
 import json
+import re
+import sys
 from pathlib import Path
 
-def update_version_txt(version: str):
-    """Update version.txt file"""
-    version_file = Path("version.txt")
-    version_file.write_text(f"{version}\n", encoding='utf-8')
-    print(f"✓ Updated version.txt to {version}")
+VERSION_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?$")
 
-def update_readme(version: str):
-    """Update README.md with new version"""
-    readme_file = Path("README.md")
-    if not readme_file.exists():
-        print("⚠ README.md not found, skipping")
+
+def update_version_txt(version: str) -> None:
+    Path("version.txt").write_text(f"{version}\n", encoding="utf-8")
+    print(f"Updated firmware version.txt to {version}")
+
+
+def update_readme(version: str) -> None:
+    path = Path("README.md")
+    if not path.exists():
         return
-
-    content = readme_file.read_text(encoding='utf-8')
-
-    # Update version changes section if exists
-    content = re.sub(
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(
         r"\*\*Version [\d.]+(?:-[A-Za-z]+\.\d+)? Änderungen:\*\*",
         f"**Version {version} Änderungen:**",
-        content
+        text,
     )
+    path.write_text(text, encoding="utf-8")
 
-    readme_file.write_text(content, encoding='utf-8')
-    print(f"Updated README.md to version {version}")
-def update_locales(version: str):
-    """Update version in locale files"""
-    # Use full version for display (e.g. "Version 2.1.0")
 
-    locales_dir = Path("webui/src/locales")
-    if not locales_dir.exists():
-        print("⚠ webui/src/locales not found, skipping")
+def update_locales(version: str) -> None:
+    directory = Path("webui/src/locales")
+    if not directory.exists():
         return
-
-    for file_path in sorted(locales_dir.glob("*.js")):
-        locale = file_path.name
-        content = file_path.read_text(encoding='utf-8')
-        # Update version: 'Word X.X' (preserves localized "Version" word)
-        content = re.sub(
+    for path in sorted(directory.glob("*.js")):
+        text = path.read_text(encoding="utf-8")
+        text = re.sub(
             r"(version: '.*? )([\d.]+(?:-[A-Za-z]+\.\d+)?)(\"|,')",
-            f"\\g<1>{version}\\g<3>",
-            content
+            rf"\g<1>{version}\g<3>",
+            text,
         )
-        content = re.sub(
+        text = re.sub(
             r"(versionInfo:.*v)(\d+\.\d+\.\d+(?:-[A-Za-z]+\.\d+)?)",
-            f"\\g<1>{version}",
-            content
+            rf"\g<1>{version}",
+            text,
         )
-        file_path.write_text(content, encoding='utf-8')
-        print(f"Updated {locale} to version {version}")
+        path.write_text(text, encoding="utf-8")
 
-def update_about_vue(version: str):
-    """Update about.vue with new version.
 
-    The about page now reads the version from /sysinfo.json at runtime, so
-    there is no static version string left to update here. This function is
-    kept as a no-op for backwards compatibility with existing release scripts.
-    """
-    print(f"About page uses runtime sysinfo version, skipping static update")
-
-def update_package_json(version: str):
-    """Update webui/package.json with new version"""
-    package_file = Path("webui/package.json")
-
-    with open(package_file, 'r') as f:
-        package_data = json.load(f)
-
-    package_data['version'] = version
-
-    with open(package_file, 'w') as f:
-        json.dump(package_data, f, indent=2)
-        f.write('\n')  # Add trailing newline
-
-    print(f"✓ Updated package.json to version {version}")
-
-def update_package_lock_json(version: str):
-    """Update webui/package-lock.json with new version"""
-    lock_file = Path("webui/package-lock.json")
-    if not lock_file.exists():
-        print("⚠ webui/package-lock.json not found, skipping")
+def update_openapi(version: str) -> None:
+    path = Path("docs/openapi.yaml")
+    if not path.exists():
         return
-
-    with open(lock_file, 'r') as f:
-        lock_data = json.load(f)
-
-    lock_data['version'] = version
-    if "" in lock_data.get('packages', {}):
-         lock_data['packages'][""]['version'] = version
-
-    with open(lock_file, 'w') as f:
-        json.dump(lock_data, f, indent=2)
-        f.write('\n')
-
-    print(f"✓ Updated package-lock.json to version {version}")
-
-def update_openapi_yaml(version: str):
-    """Update docs/openapi.yaml with new version"""
-    openapi_file = Path("docs/openapi.yaml")
-
-    if not openapi_file.exists():
-        print("⚠ docs/openapi.yaml not found, skipping")
-        return
-
-    content = openapi_file.read_text(encoding='utf-8')
-
-    content = re.sub(
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(
         r"version:\s*['\"]?[\d.]+(?:-[A-Za-z]+\.\d+)?['\"]?",
         f"version: '{version}'",
-        content
+        text,
     )
+    path.write_text(text, encoding="utf-8")
 
-    openapi_file.write_text(content, encoding='utf-8')
-    print(f"Updated openapi.yaml to version {version}")
 
-def update_troubleshooting(version: str):
-    """Update TROUBLESHOOTING.md with new version"""
-    troubleshooting_file = Path("docs/TROUBLESHOOTING.md")
-
-    if not troubleshooting_file.exists():
-        print("⚠ docs/TROUBLESHOOTING.md not found, skipping")
+def update_troubleshooting(version: str) -> None:
+    path = Path("docs/TROUBLESHOOTING.md")
+    if not path.exists():
         return
-
-    content = troubleshooting_file.read_text(encoding='utf-8')
-
-    # Update version in header (match full semver incl. optional pre-release so
-    # repeated runs are idempotent and don't accumulate -Beta.x suffixes)
-    content = re.sub(
+    text = path.read_text(encoding="utf-8")
+    text = re.sub(
         r"HB-RF-ETH-ng firmware v[\d.]+(?:-[A-Za-z]+\.\d+)?",
         f"HB-RF-ETH-ng firmware v{version}",
-        content
+        text,
     )
+    path.write_text(text, encoding="utf-8")
 
-    troubleshooting_file.write_text(content, encoding='utf-8')
-    print(f"Updated TROUBLESHOOTING.md to version {version}")
 
-def main():
+def main() -> None:
     if len(sys.argv) != 2:
-        print("Usage: python update_version.py <version>")
-        print("Example: python update_version.py 2.2.0")
-        sys.exit(1)
+        raise SystemExit("Usage: python update_version.py <firmware-version>")
 
-    version = sys.argv[1].lstrip('v')  # Remove leading 'v' if present
+    version = sys.argv[1].lstrip("v")
+    if not VERSION_PATTERN.fullmatch(version):
+        raise SystemExit(f"Invalid firmware version: {version}")
 
-    # Validate version format (semantic versioning)
-    if not re.match(r'^\d+\.\d+\.\d+(-[A-Za-z]+\.\d+)?$', version):
-        print(f"Error: Invalid version format '{version}'. Expected format: X.Y.Z")
-        sys.exit(1)
+    update_version_txt(version)
+    update_readme(version)
+    update_locales(version)
+    update_openapi(version)
+    update_troubleshooting(version)
 
-    print(f"\n🔄 Updating project to version {version}\n")
+    # Guard against accidentally coupling both release trains again.
+    package = json.loads(Path("webui/package.json").read_text(encoding="utf-8"))
+    print(f"Firmware updated to {version}; WebUI remains {package['version']}")
 
-    try:
-        update_version_txt(version)
-        update_readme(version)
-        update_locales(version)
-        update_about_vue(version)
-        update_package_json(version)
-        update_package_lock_json(version)
-        update_openapi_yaml(version)
-        update_troubleshooting(version)
-
-        print(f"\n✅ Successfully updated all files to version {version}")
-
-    except Exception as e:
-        print(f"\n❌ Error updating version: {e}")
-        sys.exit(1)
 
 if __name__ == "__main__":
     main()
