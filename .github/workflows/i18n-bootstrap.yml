@@ -43,15 +43,6 @@ jobs:
                   elif new not in text:
                       raise SystemExit(f'Expected translation fallback not found in {name}: {old}')
               path.write_text(text, encoding='utf-8')
-
-          workflow = Path('.github/workflows/pr-check.yml')
-          text = workflow.read_text(encoding='utf-8')
-          marker = "      - name: Check for console.log statements\n"
-          step = "      - name: Validate translations and German fallback\n        run: node scripts/check-translations.mjs\n\n"
-          if step not in text:
-              if marker not in text:
-                  raise SystemExit('Could not locate translation-check insertion point')
-              workflow.write_text(text.replace(marker, step + marker, 1), encoding='utf-8')
           PY
 
           mkdir -p scripts
@@ -134,12 +125,10 @@ jobs:
           console.log(`Translation check passed: ${used.size} used keys, ${german.size} German keys, ${localeFiles.length} locales.`)
           EOF
 
-          rm .github/workflows/i18n-bootstrap.yml
-
       - name: Commit German translation fallback
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add webui/src/main.js webui/src/locales/index.js webui/src/theme.vue webui/src/systemoverview.vue webui/src/webuiupdate.vue scripts/check-translations.mjs
           git commit -m "fix(i18n): use German as the only fallback"
           git push origin HEAD:${{ github.head_ref }}
