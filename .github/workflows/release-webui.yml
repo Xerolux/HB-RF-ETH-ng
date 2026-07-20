@@ -1,0 +1,279 @@
+name: Release WebUI Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'WebUI version (e.g. 1.0.1 or 1.1.0-Beta.1)'
+        required: true
+        type: string
+      min_firmware_version:
+        description: 'Minimum compatible firmware version'
+        required: true
+        type: string
+        default: '2.2.5-Beta.1'
+      api_version:
+        description: 'Required WebUI API version'
+        required: true
+        type: string
+        default: '1'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build-and-release:
+    name: Build and Create WebUI Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Resolve WebUI release metadata
+        id: webui
+        run: |
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#webui-v}"
+          VERSION="${VERSION#v}"
+          TAG="webui-v${VERSION}"
+          PRERELEASE=false
+          DRAFT=false
+          if [ "${{ inputs.prerelease }}" = "true" ]; then PRERELEASE=true; fi
+          if [ "${{ inputs.draft }}" = "true" ]; then DRAFT=true; fi
+          if [[ "$VERSION" =~ [Aa]lpha|[Bb]eta|[Rr][Cc] ]]; then PRERELEASE=true; fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+          echo "PRERELEASE=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          echo "DRAFT=$DRAFT" >> "$GITHUB_OUTPUT"
+
+      - name: Update independent WebUI version
+        run: |
+          python update_webui_version.py \
+            "${{ steps.webui.outputs.VERSION }}" \
+            --min-firmware "${{ inputs.min_firmware_version }}" \
+            --api-version "${{ inputs.api_version }}"
+          git status --short
+
+      - name: Commit WebUI metadata and create tag
+        run: |
+          TAG="${{ steps.webui.outputs.TAG }}"
+          VERSION="${{ steps.webui.outputs.VERSION }}"
+          git add webui/package.json webui/package-lock.json webui/compatibility.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: bump WebUI version to $VERSION"
+          fi
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -d "$TAG"
+          fi
+          git tag -a "$TAG" -m "WebUI release $TAG"
+          git push origin HEAD:main
+          git push -f origin "$TAG"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Build New Design WebUI
+        run: |
+          cd webui
+          npm ci
+          npm run build
+
+      - name: Prepare standalone WebUI assets
+        run: python3 rename_webui_files.py
+
+      - name: Regenerate embedded archive for build verification
+        run: python3 scripts/update_archive.py
+
+      - name: Setup ESP-IDF v6.1-beta1
+        run: |
+          python -m pip install --upgrade pip
+          git clone --depth 1 --branch v6.1-beta1 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
+          git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
+          "$HOME/esp-idf/install.sh" esp32
+
+      - name: Verify complete firmware and build WWW image
+        run: |
+          . "$HOME/esp-idf/export.sh"
+          export IDF_TARGET=esp32
+          export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
+          idf.py build
+
+      - name: Prepare WebUI-only release files
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.webui.outputs.VERSION }}"
+          test -f build/spiffs.bin
+          test "$(stat -c '%s' build/spiffs.bin)" -eq $((0x50000))
+          mkdir -p release
+          cp build/spiffs.bin "release/webui_${VERSION}.bin"
+          cp webui/compatibility.json release/webui-compatibility.json
+          printf '%s\n' "$VERSION" > release/webui-version.txt
+          cd release
+          sha256sum "webui_${VERSION}.bin" > SHA256SUMS.txt
+
+      - name: Generate WebUI release notes
+        run: |
+          cat > release/RELEASE_NOTES.md <<EOF
+          # HB-RF-ETH-ng WebUI v${{ steps.webui.outputs.VERSION }}
+
+          This is a **WebUI-only release**. It does not contain or update the firmware.
+
+          - Design: New Design
+          - WebUI API: ${{ inputs.api_version }}
+          - Minimum firmware: ${{ inputs.min_firmware_version }}
+          - Image size: 327680 bytes
+
+          The device verifies image size, SHA-256, product, design and compatibility
+          before activating the separate WWW partition.
+          EOF
+
+      - name: Create GitHub WebUI release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.webui.outputs.TAG }}
+          name: HB-RF-ETH-ng WebUI v${{ steps.webui.outputs.VERSION }}
+          body_path: release/RELEASE_NOTES.md
+          files: |
+            release/webui_*.bin
+            release/SHA256SUMS.txt
+            release/webui-version.txt
+            release/webui-compatibility.json
+          draft: ${{ steps.webui.outputs.DRAFT }}
+          prerelease: ${{ steps.webui.outputs.PRERELEASE }}
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate WebUI-only manifest update
+        if: steps.webui.outputs.DRAFT == 'false'
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.webui.outputs.VERSION }}"
+          TAG="${{ steps.webui.outputs.TAG }}"
+          FILE="webui_${VERSION}.bin"
+          SHA256=$(awk -v file="$FILE" '$2 == file { print $1 }' release/SHA256SUMS.txt)
+          SIZE=$(stat -c '%s' "release/$FILE")
+          test -n "$SHA256"
+
+          if [ "${{ steps.webui.outputs.PRERELEASE }}" = "true" ]; then
+            CHANNEL=beta
+            MANIFEST_FILES=beta.json
+          else
+            CHANNEL=stable
+            MANIFEST_FILES=latest.json,beta.json
+          fi
+
+          VERSION="$VERSION" \
+          TAG="$TAG" \
+          FILE="$FILE" \
+          SHA256="$SHA256" \
+          SIZE="$SIZE" \
+          API_VERSION="${{ inputs.api_version }}" \
+          MIN_FIRMWARE="${{ inputs.min_firmware_version }}" \
+          CHANNEL="$CHANNEL" \
+          MANIFEST_FILES="$MANIFEST_FILES" \
+          PRERELEASE="${{ steps.webui.outputs.PRERELEASE }}" \
+          PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          output = Path('manifest-out')
+          output.mkdir(exist_ok=True)
+          tag = os.environ['TAG']
+          release_url = f"https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/{tag}"
+          asset_url = f"https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/{tag}/{os.environ['FILE']}"
+          webui = {
+              'version': os.environ['VERSION'],
+              'design': 'newdesign',
+              'apiVersion': int(os.environ['API_VERSION']),
+              'minFirmwareVersion': os.environ['MIN_FIRMWARE'],
+              'downloadUrl': asset_url,
+              'sha256': os.environ['SHA256'],
+              'size': int(os.environ['SIZE']),
+              'partition': 'spiffs',
+              'format': 1,
+              'releaseUrl': release_url,
+              'publishedAt': os.environ['PUBLISHED_AT'],
+          }
+
+          for name in os.environ['MANIFEST_FILES'].split(','):
+              path = Path(name)
+              if not path.exists():
+                  raise SystemExit(f"Cannot publish WebUI-only update: {name} is missing")
+              manifest = json.loads(path.read_text(encoding='utf-8'))
+              if not manifest.get('version') or not manifest.get('downloadUrl'):
+                  raise SystemExit(f"Cannot preserve firmware data in {name}")
+              manifest['webui'] = webui
+              (output / name).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          archive_path = Path('webui-archive.json')
+          archive = []
+          if archive_path.exists():
+              try:
+                  archive = json.loads(archive_path.read_text(encoding='utf-8')).get('releases', [])
+              except (json.JSONDecodeError, OSError):
+                  pass
+          archive = [item for item in archive if item.get('version') != webui['version']]
+          entry = {
+              **webui,
+              'tagName': tag,
+              'name': f"HB-RF-ETH-ng WebUI v{webui['version']}",
+              'prerelease': os.environ['PRERELEASE'] == 'true',
+              'channel': os.environ['CHANNEL'],
+              'assetName': os.environ['FILE'],
+          }
+          (output / 'webui-archive.json').write_text(
+              json.dumps({'schema': 1, 'updatedAt': os.environ['PUBLISHED_AT'], 'releases': [entry, *archive][:50]}, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Checkout updated main for manifest publishing
+        if: steps.webui.outputs.DRAFT == 'false'
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          path: manifest-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish WebUI-only manifest update
+        if: steps.webui.outputs.DRAFT == 'false'
+        working-directory: manifest-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp ../manifest-out/*.json .
+          git add *.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: update WebUI manifest for ${{ steps.webui.outputs.TAG }}"
+          git push origin main
