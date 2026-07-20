@@ -38,6 +38,7 @@
 #include "events.h"
 #include "esp_heap_caps.h"
 #include "cJSON.h"
+#include "nvs.h"
 #include "supporter_crl.h"
 
 static const char *TAG = "UpdateCheck";
@@ -56,6 +57,61 @@ static const char *UPDATE_MANIFEST_BASE =
 // the old large-response heap pressure.
 static const size_t MANIFEST_RESPONSE_CAP = 4 * 1024;
 
+static constexpr int64_t UPDATE_INTERVAL_SECONDS = 24LL * 60 * 60;
+static constexpr int64_t VALID_EPOCH_THRESHOLD = 1700000000LL;
+static const char *UPDATE_CACHE_NAMESPACE = "upd_cache";
+static const char *UPDATE_CACHE_RELEASE_KEY = "release";
+static const char *UPDATE_CACHE_LAST_TRY_KEY = "last_try";
+
+static int64_t current_epoch_seconds()
+{
+    struct timeval tv = {};
+    gettimeofday(&tv, nullptr);
+    return tv.tv_sec >= VALID_EPOCH_THRESHOLD ? static_cast<int64_t>(tv.tv_sec) : 0;
+}
+
+static bool load_cached_release(ReleaseInfo *out)
+{
+    if (!out) return false;
+    nvs_handle_t handle = 0;
+    if (nvs_open(UPDATE_CACHE_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return false;
+    size_t size = sizeof(*out);
+    const esp_err_t result = nvs_get_blob(handle, UPDATE_CACHE_RELEASE_KEY, out, &size);
+    nvs_close(handle);
+    return result == ESP_OK && size == sizeof(*out) && out->valid;
+}
+
+static void save_cached_release(const ReleaseInfo &info)
+{
+    nvs_handle_t handle = 0;
+    if (nvs_open(UPDATE_CACHE_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return;
+    if (nvs_set_blob(handle, UPDATE_CACHE_RELEASE_KEY, &info, sizeof(info)) == ESP_OK) {
+        nvs_commit(handle);
+    }
+    nvs_close(handle);
+}
+
+static int64_t load_last_attempt()
+{
+    nvs_handle_t handle = 0;
+    int64_t value = 0;
+    if (nvs_open(UPDATE_CACHE_NAMESPACE, NVS_READONLY, &handle) == ESP_OK) {
+        nvs_get_i64(handle, UPDATE_CACHE_LAST_TRY_KEY, &value);
+        nvs_close(handle);
+    }
+    return value;
+}
+
+static void save_last_attempt(int64_t value)
+{
+    nvs_handle_t handle = 0;
+    if (nvs_open(UPDATE_CACHE_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return;
+    if (nvs_set_i64(handle, UPDATE_CACHE_LAST_TRY_KEY, value) == ESP_OK) {
+        nvs_commit(handle);
+    }
+    nvs_close(handle);
+}
+
 // esp_https_ota in IDF 6.x no longer exposes ESP_ERR_HTTPS_OTA_INCOMPLETE; use
 // a private application code to report a download that ended prematurely.
 #define OTA_ERR_DOWNLOAD_INCOMPLETE 0x10001
@@ -69,7 +125,7 @@ static void _periodic_check_task(void *parameter)
   UpdateCheck *uc = static_cast<UpdateCheck *>(parameter);
   ESP_LOGI(TAG, "Periodic update check starting (heap free: %u KB)",
            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
-  uc->refresh();
+  uc->refreshIfDue();
   uc->_evaluateReleaseInfo();
   vTaskDelete(NULL);
 }
@@ -80,15 +136,50 @@ static void _periodic_check_task(void *parameter)
 static void _periodic_timer_callback(void *arg)
 {
   UpdateCheck *uc = static_cast<UpdateCheck *>(arg);
-  // refresh() allocates a ReleaseInfo struct (~4.9 KB, the bulk being
-  // body[4096]) on the stack and then performs an HTTPS fetch whose TLS
-  // handshake consumes another 2-4 KB. 12 KB matches the stack budget the
-  // former background UpdateCheck task used for the same call.
-  BaseType_t created = xTaskCreate(_periodic_check_task, "upd_chk", 12288,
-                                   uc, 3, NULL);
-  if (created != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create periodic update-check task");
+
+  // Do not create the 12 KB worker stack or begin TLS when the WROOM-32 heap is
+  // already fragmented. Skipping one daily check is safer than destabilising
+  // Homematic/MQTT operation; the persistent cache remains available.
+  const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+  const size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+  constexpr size_t MIN_FREE_HEAP = 72 * 1024;
+  constexpr size_t MIN_LARGEST_BLOCK = 18 * 1024;
+  if (free_heap < MIN_FREE_HEAP || largest_block < MIN_LARGEST_BLOCK) {
+    ESP_LOGW(TAG,
+             "Daily update check skipped before task creation: free=%u KB largest=%u KB",
+             (unsigned)(free_heap / 1024),
+             (unsigned)(largest_block / 1024));
+    return;
   }
+
+  // refresh() allocates a ReleaseInfo struct (~5 KB) on the worker stack and
+  // performs the HTTPS fetch. The stack only exists for this short operation.
+  BaseType_t created = xTaskCreate(_periodic_check_task, "upd_chk", 12288,
+                                   uc, 2, NULL);
+  if (created != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create daily update-check task");
+  }
+}
+
+static uint32_t update_check_stagger_seconds(SysInfo *sysInfo)
+{
+  // Stable FNV-1a hash of the device serial. Devices updated or rebooted at the
+  // same time are spread across a 2-60 minute window instead of opening TLS
+  // simultaneously every day.
+  const char *serial = sysInfo ? sysInfo->getSerialNumber() : nullptr;
+  uint32_t hash = 2166136261u;
+  if (serial) {
+    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(serial);
+         *p; ++p) {
+      hash ^= *p;
+      hash *= 16777619u;
+    }
+  } else {
+    hash ^= esp_random();
+  }
+  constexpr uint32_t MIN_DELAY_SECONDS = 2 * 60;
+  constexpr uint32_t WINDOW_SECONDS = 58 * 60 + 1;
+  return MIN_DELAY_SECONDS + (hash % WINDOW_SECONDS);
 }
 
 // ---- Testable helpers ------------------------------------------------------
@@ -260,6 +351,40 @@ static bool _parseUpdateManifest(const char *buf, ReleaseInfo *out)
         else if (notesUrl) snprintf(out->body, sizeof(out->body), "Release notes: %s", notesUrl);
         out->isPrerelease = json_bool(root, "isPrerelease", json_bool(root, "prerelease", false));
         out->valid = ok;
+
+        cJSON *webui = cJSON_GetObjectItemCaseSensitive(root, "webui");
+        if (cJSON_IsObject(webui)) {
+            const char *webuiVersion = json_string(webui, "version");
+            const char *design = json_string(webui, "design");
+            const char *minimumFirmware = json_string(webui, "minFirmwareVersion");
+            const char *webuiUrl = json_string(webui, "downloadUrl");
+            const char *webuiSha = json_string(webui, "sha256");
+            const char *partition = json_string(webui, "partition");
+            const char *webuiReleaseUrl = json_string(webui, "releaseUrl");
+            const char *webuiPublishedAt = json_string(webui, "publishedAt");
+            cJSON *apiVersion = cJSON_GetObjectItemCaseSensitive(webui, "apiVersion");
+            cJSON *imageSize = cJSON_GetObjectItemCaseSensitive(webui, "size");
+            cJSON *format = cJSON_GetObjectItemCaseSensitive(webui, "format");
+
+            const bool webuiOk = webuiVersion && design && minimumFirmware &&
+                webuiUrl && is_hex_sha256(webuiSha) &&
+                cJSON_IsNumber(apiVersion) && cJSON_IsNumber(imageSize) &&
+                cJSON_IsNumber(format);
+            if (webuiOk) {
+                out->webui.valid = true;
+                snprintf(out->webui.version, sizeof(out->webui.version), "%s", webuiVersion);
+                snprintf(out->webui.design, sizeof(out->webui.design), "%s", design);
+                out->webui.apiVersion = apiVersion->valueint;
+                snprintf(out->webui.minFirmwareVersion, sizeof(out->webui.minFirmwareVersion), "%s", minimumFirmware);
+                snprintf(out->webui.downloadUrl, sizeof(out->webui.downloadUrl), "%s", webuiUrl);
+                snprintf(out->webui.sha256, sizeof(out->webui.sha256), "%s", webuiSha);
+                out->webui.size = static_cast<uint32_t>(imageSize->valuedouble);
+                snprintf(out->webui.partition, sizeof(out->webui.partition), "%s", partition ? partition : "spiffs");
+                out->webui.format = format->valueint;
+                if (webuiReleaseUrl) snprintf(out->webui.releaseUrl, sizeof(out->webui.releaseUrl), "%s", webuiReleaseUrl);
+                if (webuiPublishedAt) snprintf(out->webui.publishedAt, sizeof(out->webui.publishedAt), "%s", webuiPublishedAt);
+            }
+        }
     }
 
     cJSON_Delete(root);
@@ -276,35 +401,51 @@ UpdateCheck::UpdateCheck(Settings* settings, SysInfo* sysInfo, LED *statusLED)
     if (!_stateMutex || !_fetchLock) {
         ESP_LOGE(TAG, "Failed to allocate UpdateCheck synchronization objects");
     }
+
+    ReleaseInfo cached = {};
+    if (load_cached_release(&cached)) {
+        _release = cached;
+        snprintf(_latestVersion, sizeof(_latestVersion), "%s", cached.version);
+        ESP_LOGI(TAG, "Loaded cached %s update manifest: %s",
+                 cached.betaChannel ? "beta" : "stable", cached.version);
+    }
 }
 
 void UpdateCheck::start()
 {
     if (_periodicTimer) return;
 
-    // One-shot timer: fire the first check 30 s after boot so the network /
-    // Ethernet link is up. Subsequent checks run on the periodic timer below.
+    const uint32_t staggerSeconds = update_check_stagger_seconds(_sysInfo);
+    ESP_LOGI(TAG, "Update checks staggered by %u minutes for this device",
+             (unsigned)((staggerSeconds + 59) / 60));
+
+    // One-shot timer: evaluate the persistent 24 h window after the per-device
+    // stagger. It performs a network fetch only when due; rebooting cannot
+    // force another request inside the stored 24-hour window.
     if (!_initialTimer) {
         esp_timer_create_args_t initArgs = {};
         initArgs.callback = _periodic_timer_callback;
         initArgs.arg = this;
         initArgs.name = "updchk_init";
         if (esp_timer_create(&initArgs, &_initialTimer) == ESP_OK) {
-            esp_timer_start_once(_initialTimer, 30 * 1000000ULL);  // 30 s
+            esp_timer_start_once(_initialTimer,
+                                 static_cast<uint64_t>(staggerSeconds) * 1000000ULL);
         } else {
             ESP_LOGE(TAG, "Failed to create initial update-check timer");
         }
     }
 
-    // Periodic timer: re-check every 24 h. Replaces the former always-running
-    // background task that spent 12 KB of stack permanently in vTaskDelay.
+    // Periodic timer: never more often than once per 24 h. The same stable
+    // per-device offset is added to the period so fleets do not gradually
+    // converge on one check time. refreshIfDue() additionally enforces the
+    // persistent 24-hour lock across reboots.
     esp_timer_create_args_t periodicArgs = {};
     periodicArgs.callback = _periodic_timer_callback;
     periodicArgs.arg = this;
     periodicArgs.name = "updchk_24h";
     if (esp_timer_create(&periodicArgs, &_periodicTimer) == ESP_OK) {
-        // 24 h in microseconds.
-        esp_timer_start_periodic(_periodicTimer, 24ULL * 60 * 60 * 1000000ULL);
+        const uint64_t periodSeconds = 24ULL * 60 * 60 + staggerSeconds;
+        esp_timer_start_periodic(_periodicTimer, periodSeconds * 1000000ULL);
     } else {
         ESP_LOGE(TAG, "Failed to create periodic update-check timer");
     }
@@ -359,6 +500,42 @@ VersionSnapshot UpdateCheck::getVersionSnapshot()
     return s;
 }
 
+bool UpdateCheck::refreshIfDue()
+{
+    const int64_t now = current_epoch_seconds();
+    const int64_t lastAttempt = load_last_attempt();
+    const int64_t uptimeUs = esp_timer_get_time();
+
+    bool due = lastAttempt == 0;
+    if (!due && now >= VALID_EPOCH_THRESHOLD && lastAttempt >= VALID_EPOCH_THRESHOLD) {
+        const int64_t age = now - lastAttempt;
+        due = age >= UPDATE_INTERVAL_SECONDS;
+        if (!due) {
+            ESP_LOGI(TAG, "Update check skipped: next online check in %lld minutes",
+                     (long long)((UPDATE_INTERVAL_SECONDS - age + 59) / 60));
+        }
+    } else if (!due) {
+        // Clock is not reliable yet, or the previous attempt used the no-clock
+        // sentinel. Do not let reboots bypass the 24 h policy. Once the device
+        // has stayed up for 24 h the periodic timer is allowed to try again.
+        due = uptimeUs >= UPDATE_INTERVAL_SECONDS * 1000000LL;
+        if (!due) {
+            ESP_LOGI(TAG, "Update check skipped: persistent 24 h window not due");
+        }
+    }
+
+    if (!due) return false;
+
+    // Mark the attempt before opening TLS. Failed DNS/TLS attempts are also
+    // limited to once per 24 h, exactly like successful checks.
+    save_last_attempt(now >= VALID_EPOCH_THRESHOLD ? now : 1);
+    const bool ok = refresh();
+    if (ok) {
+        save_cached_release(getReleaseInfo());
+    }
+    return ok;
+}
+
 bool UpdateCheck::refresh()
 {
     // Refuse to stack fetches - a single GitHub request can take several
@@ -380,7 +557,8 @@ bool UpdateCheck::refresh()
 
     ReleaseInfo fresh = {};
     bool ok = _doFetch(&fresh);
-    int64_t now = esp_timer_get_time() / 1000;
+    const int64_t epoch = current_epoch_seconds();
+    int64_t now = epoch ? epoch * 1000 : esp_timer_get_time() / 1000;
 
     // Publish atomically. On failure we keep the last-known-good snapshot
     // (version, URLs, body) so the WebUI continues to show useful data,
@@ -604,6 +782,7 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
                  (unsigned)(heapBeforeParse / 1024));
 
         parsedOk = _parseUpdateManifest(resp.buf, out);
+        if (parsedOk) out->betaChannel = beta;
 
         ESP_LOGI(TAG, "Parse %s (heap free %u KB)",
                  parsedOk ? "ok" : "failed",

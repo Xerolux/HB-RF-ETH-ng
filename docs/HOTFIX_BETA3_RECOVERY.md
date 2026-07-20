@@ -16,3 +16,13 @@ compact external WebUI. The updated WebUI version is `1.0.0-Beta.2`.
 
 Existing custom DNS values remain unchanged. Only missing or legacy `0.0.0.0`
 primary DNS values are initialized to `1.1.1.1`.
+
+
+## Update-check policy
+
+Firmware and WebUI metadata come from one combined manifest cache owned by the
+ESP32. The browser only reads `/api/check_update`; it never contacts GitHub for
+update metadata. A persistent NVS timestamp limits online update-manifest
+requests to exactly one attempt per 24 hours, including across device reboots.
+Page visits, local refresh buttons and MQTT status publication only read the
+cached snapshot.

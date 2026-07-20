@@ -595,8 +595,8 @@ const acceptFirmwareFile = (selectedFile) => {
     clearFile()
     uiStore.pushToast({
       type: 'warning',
-      title: 'WebUI-Datei erkannt',
-      message: 'Diese Datei unter System → WebUI installieren, nicht als Firmware.',
+      title: t('firmware.webuiFileDetectedTitle'),
+      message: t('firmware.webuiFileDetectedMessage'),
       duration: 7000
     })
     return

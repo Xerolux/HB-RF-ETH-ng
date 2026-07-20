@@ -5,7 +5,6 @@ import axios from 'axios'
 import { useLoginStore, useThemeStore, useUiStore } from './stores.js'
 
 import 'bootstrap/dist/css/bootstrap.css'
-import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 
 // Current New Design system
 import './styles/main.css'
@@ -146,20 +145,11 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
-// Create Bootstrap Vue Next
-import { createBootstrap } from 'bootstrap-vue-next'
+// Lightweight Bootstrap-compatible Vue components
 import {
-  BAlert,
-  BButton,
-  BCard,
-  BForm,
-  BFormGroup,
-  BFormInput,
-  BFormInvalidFeedback,
-  BFormSelect,
-  BFormSelectOption,
-  BModal
-} from 'bootstrap-vue-next'
+  BAlert, BButton, BCard, BForm, BFormGroup, BFormInput,
+  BFormInvalidFeedback, BFormSelect, BFormSelectOption, BModal
+} from './components/BootstrapLite.js'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -167,10 +157,6 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
-app.use(createBootstrap({
-  components: false,
-  directives: true,
-}))
 
 app.component('BAlert', BAlert)
 app.component('BButton', BButton)

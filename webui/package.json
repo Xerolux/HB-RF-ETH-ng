@@ -16,7 +16,6 @@
     "@vuelidate/validators": "^2.0.4",
     "axios": "^1.18.1",
     "bootstrap": "^5.3.8",
-    "bootstrap-vue-next": "^0.45.8",
     "marked": "^18.0.6",
     "pinia": "^3.0.4",
     "vue": "^3.5.39",
@@ -27,7 +26,6 @@
     "@playwright/test": "^1.61.1",
     "@vitejs/plugin-vue": "^6.0.7",
     "esbuild": "^0.28.1",
-    "vite": "^8.1.4",
-    "vite-plugin-compression2": "^2.5.3"
+    "vite": "^8.1.4"
   }
 }

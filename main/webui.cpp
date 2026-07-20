@@ -1487,6 +1487,14 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     }
 
     int content_length = req->content_len;
+    if (content_length == 0x50000) {
+        ESP_LOGW(TAG, "Rejected 320 KiB WebUI image on firmware endpoint");
+        free(ota_buff);
+        _ota_status = OTA_FAILED;
+        _updateCheck->finishOtaOperation();
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+            "Falsche Datei: WebUI-Abbild erkannt. Unter System -> WebUI installieren.");
+    }
     int content_received = 0;
     int recv_len;
     int timeout_retries = 5;
@@ -1532,6 +1540,14 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         if (!is_req_body_started)
         {
             is_req_body_started = true;
+
+            if (recv_len <= 0 || static_cast<unsigned char>(ota_buff[0]) != 0xE9) {
+                ESP_LOGW(TAG, "Rejected non-ESP firmware image (magic 0x%02x)",
+                         recv_len > 0 ? static_cast<unsigned char>(ota_buff[0]) : 0);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                    "Falsche Datei: kein gueltiges ESP32-Firmware-Abbild. WebUI unter System -> WebUI installieren.");
+                goto err;
+            }
 
             // Only raw binary uploads are supported (the WebUI posts the file
             // as the request body). The previous multipart/form-data path was
@@ -2350,25 +2366,46 @@ static void send_release_info_response(httpd_req_t *req)
 
     ReleaseInfo info = _updateCheck->getReleaseInfo();
     const char *currentVersion = _sysInfo->getCurrentVersion();
+    const bool configuredBeta = _settings->getBetaChannel();
+    const bool cacheMatchesChannel = info.valid && info.betaChannel == configuredBeta;
 
     bool updateAvailable = false;
-    if (info.valid && currentVersion && strcmp(info.version, "n/a") != 0) {
+    if (cacheMatchesChannel && currentVersion && strcmp(info.version, "n/a") != 0) {
         updateAvailable = (compareVersions(currentVersion, info.version) < 0);
     }
 
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "currentVersion", currentVersion ? currentVersion : "");
-    cJSON_AddStringToObject(root, "latestVersion", info.valid ? info.version : "n/a");
+    cJSON_AddStringToObject(root, "latestVersion", cacheMatchesChannel ? info.version : "n/a");
     cJSON_AddBoolToObject(root, "updateAvailable", updateAvailable);
     cJSON_AddBoolToObject(root, "isPrerelease", info.isPrerelease);
-    cJSON_AddStringToObject(root, "releaseNotes", info.valid ? info.body : "");
-    cJSON_AddStringToObject(root, "releaseUrl", info.releaseUrl);
-    cJSON_AddStringToObject(root, "downloadUrl", info.downloadUrl);
-    cJSON_AddStringToObject(root, "sha256", info.sha256);
-    cJSON_AddStringToObject(root, "publishedAt", info.publishedAt);
+    cJSON_AddStringToObject(root, "releaseNotes", cacheMatchesChannel ? info.body : "");
+    cJSON_AddStringToObject(root, "releaseUrl", cacheMatchesChannel ? info.releaseUrl : "");
+    cJSON_AddStringToObject(root, "downloadUrl", cacheMatchesChannel ? info.downloadUrl : "");
+    cJSON_AddStringToObject(root, "sha256", cacheMatchesChannel ? info.sha256 : "");
+    cJSON_AddStringToObject(root, "publishedAt", cacheMatchesChannel ? info.publishedAt : "");
     cJSON_AddNumberToObject(root, "fetchedAt", (double)info.fetchedAtMs);
-    cJSON_AddBoolToObject(root, "betaChannel", _settings->getBetaChannel());
+    cJSON_AddBoolToObject(root, "betaChannel", configuredBeta);
+    cJSON_AddNumberToObject(root, "checkIntervalSeconds", 24 * 60 * 60);
     cJSON_AddBoolToObject(root, "fetchInProgress", _updateCheck->isFetchInProgress());
+    if (cacheMatchesChannel && info.webui.valid) {
+        cJSON *webui = cJSON_AddObjectToObject(root, "webui");
+        if (webui) {
+            cJSON_AddStringToObject(webui, "version", info.webui.version);
+            cJSON_AddStringToObject(webui, "design", info.webui.design);
+            cJSON_AddNumberToObject(webui, "apiVersion", info.webui.apiVersion);
+            cJSON_AddStringToObject(webui, "minFirmwareVersion", info.webui.minFirmwareVersion);
+            cJSON_AddStringToObject(webui, "downloadUrl", info.webui.downloadUrl);
+            cJSON_AddStringToObject(webui, "sha256", info.webui.sha256);
+            cJSON_AddNumberToObject(webui, "size", info.webui.size);
+            cJSON_AddStringToObject(webui, "partition", info.webui.partition);
+            cJSON_AddNumberToObject(webui, "format", info.webui.format);
+            cJSON_AddStringToObject(webui, "releaseUrl", info.webui.releaseUrl);
+            cJSON_AddStringToObject(webui, "publishedAt", info.webui.publishedAt);
+        }
+    } else {
+        cJSON_AddNullToObject(root, "webui");
+    }
     if (!info.valid && info.error[0]) {
         cJSON_AddStringToObject(root, "error", info.error);
     } else {
@@ -2396,9 +2433,9 @@ esp_err_t get_check_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // GET returns the cached snapshot only - no network fetch. The WebUI
-    // uses POST /api/check_update to trigger a refresh; this keeps GET cheap
-    // for polling and avoids redundant manifest requests.
+    // GET returns the persistent cached snapshot only. No browser, MQTT
+    // command or page visit can trigger an online request; the backend timer
+    // enforces the single 24-hour update window.
     send_release_info_response(req);
     return ESP_OK;
 }

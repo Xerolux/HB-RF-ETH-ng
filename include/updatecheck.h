@@ -32,6 +32,21 @@
 #include "settings.h"
 #include <atomic>
 
+struct WebUIReleaseInfo {
+    bool valid = false;
+    char version[32] = {0};
+    char design[16] = {0};
+    int apiVersion = 0;
+    char minFirmwareVersion[32] = {0};
+    char downloadUrl[256] = {0};
+    char sha256[65] = {0};
+    uint32_t size = 0;
+    char partition[16] = {0};
+    int format = 0;
+    char releaseUrl[256] = {0};
+    char publishedAt[32] = {0};
+};
+
 // Snapshot of the latest release known to the firmware.
 // All fields are safe to copy by value.
 struct ReleaseInfo {
@@ -42,6 +57,8 @@ struct ReleaseInfo {
     char releaseUrl[256];       // html_url of the release (view on GitHub)
     char publishedAt[32];       // ISO timestamp from GitHub
     bool isPrerelease;          // matches GitHub "prerelease" flag
+    bool betaChannel;           // channel used to populate this cache
+    WebUIReleaseInfo webui;     // optional WebUI block from the same manifest
     char body[4096];            // release notes markdown (truncated if too long)
     int64_t fetchedAtMs;        // epoch millis of the last successful fetch
     char error[128];            // human-readable last error (empty when valid)
@@ -129,6 +146,10 @@ public:
     // on success, false on network/parse failure or if another fetch is in
     // progress. Respects the configured beta channel setting.
     bool refresh();
+
+    // Performs an online fetch only when the persistent 24 h window is due.
+    // Reboots and page visits cannot bypass this limit.
+    bool refreshIfDue();
 
     // Compares the cached release against the running version and drives the
     // status LED (update-available blink). Public because it is called by the

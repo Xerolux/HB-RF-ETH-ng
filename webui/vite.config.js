@@ -4,7 +4,6 @@ import { resolve } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { createHash } from 'crypto'
 import { join } from 'path'
-import { compression } from 'vite-plugin-compression2'
 
 /**
  * Cache-busting for the embedded ESP32 WebUI.
@@ -65,8 +64,7 @@ function cacheBustingPlugin() {
 export default defineConfig({
   plugins: [
     vue(),
-    cacheBustingPlugin(),
-    compression({ algorithm: 'brotliCompress', exclude: [/\.(br)$/, /\.(gz)$/], threshold: 0 })
+    cacheBustingPlugin()
   ],
   resolve: {
     alias: {

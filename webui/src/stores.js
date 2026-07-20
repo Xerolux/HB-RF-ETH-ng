@@ -647,7 +647,7 @@ export const useUpdateStore = defineStore('update', {
         this.publishedAt = data.publishedAt || ''
         this.betaChannel = !!data.betaChannel
         this.fetchInProgress = !!data.fetchInProgress
-        this.lastCheck = new Date().toISOString()
+        this.lastCheck = data.fetchedAt ? new Date(Number(data.fetchedAt)).toISOString() : null
 
         if (data.error) {
           this.checkError = data.error

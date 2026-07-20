@@ -134,7 +134,7 @@ const translations = {
     externalHint: 'Firmware und WebUI können getrennt aktualisiert werden.', fallbackHint: 'Sicherer Übergangs- und Wiederherstellungsmodus.',
     version: 'Installierte WebUI-Version', storage: 'WWW-Speicher', recommended: 'Empfohlen', onlineTitle: 'Online-Update',
     onlineHint: 'Release laden und direkt auf das Gerät übertragen. Der ESP prüft SHA-256 vor der Aktivierung.',
-    available: 'Verfügbare Version', imageSize: 'Image-Größe', installOnline: 'WebUI online aktualisieren', refresh: 'Neu prüfen',
+    available: 'Verfügbare Version', imageSize: 'Image-Größe', installOnline: 'WebUI online aktualisieren', refresh: 'Status aktualisieren',
     expert: 'Expertenmodus', manualTitle: 'WWW-Image manuell hochladen', manualHint: 'Nur das für HB-RF-ETH-ng erzeugte spiffs.bin verwenden.',
     choose: 'spiffs.bin auswählen', upload: 'Image hochladen', safetyTitle: 'Sicherer Fallback',
     safety: 'Bei einem fehlerhaften oder unvollständigen WWW-Update bleibt das eingebettete New Design erreichbar. NVS-Einstellungen werden nicht verändert.',
@@ -142,7 +142,7 @@ const translations = {
     noManifest: 'Dieses Release enthält noch kein separates New-Design-Image.', wrongDesign: 'Das Release-Manifest ist nicht für das New Design bestimmt.',
     sizeMismatch: 'Die Image-Größe passt nicht zur WWW-Partition.', hashMismatch: 'SHA-256-Prüfung fehlgeschlagen.',
     incompatibleApi: 'Diese WebUI benötigt eine andere Firmware-API.', tooOldFirmware: 'Die installierte Firmware ist für diese WebUI zu alt.',
-    invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', failed: 'WebUI-Update fehlgeschlagen.'
+    invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', wrongFirmwareFile: 'Falsche Datei: Das ist eine Firmware-Datei. Bitte unter System → Firmware installieren.', failed: 'WebUI-Update fehlgeschlagen.'
   },
   en: {
     title: 'Update Web Interface', subtitle: 'The New Design is updated independently from the firmware.',
@@ -151,7 +151,7 @@ const translations = {
     externalHint: 'Firmware and WebUI can be updated independently.', fallbackHint: 'Safe transition and recovery mode.',
     version: 'Installed WebUI version', storage: 'WWW storage', recommended: 'Recommended', onlineTitle: 'Online update',
     onlineHint: 'Download the release and transfer it to the device. The ESP verifies SHA-256 before activation.',
-    available: 'Available version', imageSize: 'Image size', installOnline: 'Update WebUI online', refresh: 'Check again',
+    available: 'Available version', imageSize: 'Image size', installOnline: 'Update WebUI online', refresh: 'Refresh status',
     expert: 'Expert mode', manualTitle: 'Upload WWW image manually', manualHint: 'Only use the spiffs.bin generated for HB-RF-ETH-ng.',
     choose: 'Select spiffs.bin', upload: 'Upload image', safetyTitle: 'Safe fallback',
     safety: 'If a WWW update is corrupt or incomplete, the embedded New Design remains available. NVS settings are not modified.',
@@ -159,7 +159,7 @@ const translations = {
     noManifest: 'This release does not include a separate New Design image yet.', wrongDesign: 'The release manifest is not intended for the New Design.',
     sizeMismatch: 'The image size does not match the WWW partition.', hashMismatch: 'SHA-256 verification failed.',
     incompatibleApi: 'This WebUI requires a different firmware API.', tooOldFirmware: 'The installed firmware is too old for this WebUI.',
-    invalidFile: 'The file must exactly match the WWW partition.', failed: 'WebUI update failed.'
+    invalidFile: 'The file must exactly match the WWW partition.', wrongFirmwareFile: 'Wrong file: this is a firmware image. Install it under System → Firmware.', failed: 'WebUI update failed.'
   }
 }
 
@@ -234,9 +234,7 @@ const loadReleaseManifest = async () => {
   release.value = {}
   try {
     const info = await axios.get('/api/check_update', { timeout: 15000, silent: true })
-    const channel = info.data?.betaChannel ? 'beta' : 'latest'
-    const manifest = await axios.get(`https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/${channel}.json?t=${Date.now()}`, { timeout: 15000, headers: { 'Cache-Control': 'no-cache' } })
-    const item = manifest.data?.webui
+    const item = info.data?.webui
     if (!item) return void (manifestError.value = text.value.noManifest)
     if (item.design !== 'newdesign') return void (manifestError.value = text.value.wrongDesign)
     release.value = item
@@ -301,7 +299,10 @@ const installOnline = async () => {
 const selectFile = event => {
   fileError.value = ''
   selectedFile.value = event.target.files?.[0] || null
-  if (selectedFile.value && Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
+  const name = String(selectedFile.value?.name || '').toLowerCase()
+  if (name.startsWith('firmware_')) {
+    fileError.value = text.value.wrongFirmwareFile
+  } else if (selectedFile.value && Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
     fileError.value = `${text.value.invalidFile} (${formatBytes(status.value.partitionSize)})`
   }
 }
