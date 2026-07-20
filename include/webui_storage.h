@@ -28,7 +28,10 @@ struct WebUIStorageStatus
  * Mount the existing `spiffs` partition without formatting it.
  *
  * The function deliberately never formats a failed or empty partition. Existing
- * devices therefore keep the embedded New Design as recovery fallback.
+ * devices therefore keep the embedded New Design as recovery fallback. A
+ * persistent NVS transaction marker is checked before mounting; after a reboot
+ * caused by an interrupted update, the unverified SPIFFS header is invalidated
+ * and the device safely continues with the embedded New Design.
  */
 esp_err_t webui_storage_init();
 
@@ -43,7 +46,8 @@ bool webui_storage_is_valid();
  *
  * expectedSha256Hex may be null or empty. If supplied, it must contain exactly
  * 64 hexadecimal characters. The embedded New Design remains available while
- * the separate partition is erased and written.
+ * the separate partition is erased and written. The persistent transaction
+ * marker is committed before the first destructive flash operation.
  */
 esp_err_t webui_storage_update_begin(size_t expectedSize,
                                      const char *expectedSha256Hex);
