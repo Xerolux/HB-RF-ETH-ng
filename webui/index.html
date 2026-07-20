@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 
 <head>
     <title>HB-RF-ETH-ng</title>
@@ -32,6 +32,31 @@
     <meta http-equiv="Expires" content="0" />
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+
+    <!-- New Design and restart sync are permanent defaults. Keep the legacy
+         controls out of the rendered settings page while old firmware/API
+         fields remain accepted for backward compatibility. -->
+    <style>
+      .experimental-switch-row { display: none !important; }
+      .experimental-warning { align-items: flex-start !important; }
+      .experimental-warning > .app-icon { display: none !important; }
+      .experimental-warning strong,
+      .experimental-warning p { font-size: 0 !important; }
+      .experimental-warning strong::after {
+        content: "Derzeit nichts vorhanden";
+        display: block;
+        font-size: 1rem;
+        color: var(--color-text);
+      }
+      .experimental-warning p::after {
+        content: "Aktuell sind keine experimentellen Funktionen verfügbar. Das New Design und der Neustart-Sync sind feste Standards für alle Geräte.";
+        display: block;
+        margin-top: .45rem;
+        font-size: .9rem;
+        line-height: 1.5;
+        color: var(--color-text-secondary);
+      }
+    </style>
 </head>
 <body class="newdesign-active">
   <!-- The New Design is now the only supported WebUI. The class is fixed in
