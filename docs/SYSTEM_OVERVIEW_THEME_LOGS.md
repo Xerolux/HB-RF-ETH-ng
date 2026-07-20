@@ -76,3 +76,9 @@ existing WebSocket live-log and syslog subscriber behavior.
 The System Overview displays the same ring-buffer state without allocating a
 log snapshot. Crash-tail presence is checked through the NVS blob length only;
 the crash tail is not loaded or erased until the user explicitly requests it.
+
+## Validation
+
+Automated firmware, WebUI, size, security, and documentation checks are required
+before merge. Physical 4 MiB ESP32-WROOM-32 validation is deferred to the first
+beta test cycle and must be completed before promoting the feature to stable.
