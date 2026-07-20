@@ -165,7 +165,7 @@ const translations = {
   }
 }
 
-const copy = computed(() => translations[locale.value] || translations.en)
+const copy = computed(() => translations[locale.value] || translations.de)
 const usageWidth = computed(() => Math.min(100, Math.max(0, Number(data.value.internalHeapUsagePercent) || 0)))
 
 const formatBytes = (value) => {

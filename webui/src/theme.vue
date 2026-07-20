@@ -120,7 +120,7 @@ const translations = {
   }
 }
 
-const copy = computed(() => translations[locale.value] || translations.en)
+const copy = computed(() => translations[locale.value] || translations.de)
 const schemes = computed(() => [
   { value: 'system', label: copy.value.system, icon: 'settings' },
   { value: 'light', label: copy.value.light, icon: 'sun' },
