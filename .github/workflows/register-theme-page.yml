@@ -1,0 +1,56 @@
+name: Register theme configuration page
+
+on:
+  push:
+    branches:
+      - feature/system-overview-theme-logs
+
+permissions:
+  contents: write
+
+jobs:
+  register-theme-page:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add theme route and navigation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          main = Path('webui/src/main.js')
+          text = main.read_text(encoding='utf-8')
+          old = "import SystemOverview from './systemoverview.vue'\n"
+          new = old + "import ThemeSettings from './theme.vue'\n"
+          if text.count(old) != 1:
+              raise SystemExit('system overview import anchor not unique')
+          text = text.replace(old, new, 1)
+
+          old = "    { path: '/system-overview', component: SystemOverview, meta: { requiresAuth: true } },\n"
+          new = (old + "    { path: '/theme', component: ThemeSettings, meta: { requiresAuth: true } },\n")
+          if text.count(old) != 1:
+              raise SystemExit('system overview route anchor not unique')
+          main.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          nav = Path('webui/src/composables/useHeaderNavigation.js')
+          text = nav.read_text(encoding='utf-8')
+          old = "    { to: '/system-overview', icon: 'cpu', label: t('sysinfo.system'), group: 'system' },\n"
+          new = old + "    { to: '/theme', icon: 'sun', label: t('nav.toggleTheme'), group: 'system' },\n"
+          if text.count(old) != 1:
+              raise SystemExit('system overview navigation anchor not unique')
+          nav.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Remove helper and push result
+        run: |
+          rm .github/workflows/register-theme-page.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add webui/src/main.js webui/src/composables/useHeaderNavigation.js .github/workflows/register-theme-page.yml
+          git commit -m 'feat(theme): add theme configuration navigation'
+          git push origin HEAD:feature/system-overview-theme-logs
