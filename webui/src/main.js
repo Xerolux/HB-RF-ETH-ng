@@ -12,15 +12,15 @@ import './styles/main.css'
 
 import App from './app.vue'
 import Home from './home.vue'
-import Settings from "./settings.vue"
-import FirmwareUpdate from "./firmwareupdate.vue"
+import Settings from './settings.vue'
+import FirmwareUpdate from './firmwareupdate.vue'
+import WebUIUpdate from './webuiupdate.vue'
 import Login from './login.vue'
 import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import SystemLog from './systemlog.vue'
 import AppIcon from './components/AppIcon.vue'
-
 
 // Router
 const router = createRouter({
@@ -29,6 +29,7 @@ const router = createRouter({
     { path: '/', component: Home },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
+    { path: '/webui', component: WebUIUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
@@ -42,7 +43,6 @@ const router = createRouter({
 import { createI18n } from 'vue-i18n'
 import { messages, getBrowserLocale } from './locales/index.js'
 
-// Get stored locale or use browser locale
 const storedLocale = localStorage.getItem('locale') || getBrowserLocale()
 
 const i18n = createI18n({
@@ -52,8 +52,6 @@ const i18n = createI18n({
   messages: messages
 })
 
-// Network-error toasts fired from the axios interceptor run outside a Vue
-// component, so use the global i18n instance.
 const translate = (key, params) => i18n.global.t(key, params)
 
 // Axios interceptors
@@ -76,9 +74,6 @@ axios.interceptors.response.use(
   error => {
     const uiStore = useUiStore()
     const loginStore = useLoginStore()
-
-    // Background polling requests set `silent: true` so an offline/rebooting
-    // device does not create an endless toast stream.
     const silent = error.config?.silent === true
 
     if (error.response) {
@@ -122,14 +117,12 @@ axios.interceptors.response.use(
 router.beforeEach((to, from, next) => {
   const loginStore = useLoginStore()
 
-  if (loginStore.isLoggedIn) {
-    if (loginStore.checkActivity()) {
-      next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-      return
-    }
+  if (loginStore.isLoggedIn && loginStore.checkActivity()) {
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath }
+    })
+    return
   }
 
   if (to.matched.some(r => r.meta.requiresAuth)) {
@@ -164,7 +157,6 @@ import {
   BModal
 } from 'bootstrap-vue-next'
 
-// Create and mount app
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -172,8 +164,8 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 app.use(createBootstrap({
-    components: false,
-    directives: true,
+  components: false,
+  directives: true,
 }))
 
 app.component('BAlert', BAlert)
@@ -188,14 +180,12 @@ app.component('BFormSelectOption', BFormSelectOption)
 app.component('BModal', BModal)
 app.component('AppIcon', AppIcon)
 
-// Initialize theme
 const themeStore = useThemeStore()
 themeStore.init()
 
 // The New Design is no longer experimental or optional. Keep the historical
-// store temporarily for compatibility with existing components/settings data,
-// but force its state to true before App mounts and after every legacy action or
-// server synchronization. This makes the retired header/layout unreachable.
+// store temporarily for compatibility with existing device settings, but make
+// the retired layout unreachable.
 const experimentalStore = useExperimentalStore()
 const enforceNewDesign = () => {
   if (!experimentalStore.testDesignEnabled) {
@@ -205,8 +195,7 @@ const enforceNewDesign = () => {
   try {
     localStorage.setItem('hb-rf-eth-ng-test-design', '1')
   } catch (e) {
-    // Storage may be unavailable in private/embedded browsers; runtime state is
-    // still authoritative for the current session.
+    // Runtime state remains authoritative if browser storage is unavailable.
   }
 }
 
@@ -243,10 +232,8 @@ for (const eventName of activityEvents) {
 
 idleCheckInterval = window.setInterval(() => {
   const loginStore = useLoginStore()
-  if (loginStore.isLoggedIn) {
-    if (loginStore.checkActivity()) {
-      router.push('/login')
-    }
+  if (loginStore.isLoggedIn && loginStore.checkActivity()) {
+    router.push('/login')
   }
 }, 30000)
 
