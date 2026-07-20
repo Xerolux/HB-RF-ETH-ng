@@ -23,13 +23,13 @@ jobs:
           cache: 'npm'
           cache-dependency-path: webui/package-lock.json
 
-      - name: Build WebUI
+      - name: Build New Design WebUI
         run: |
           cd webui
           npm ci
           npm run build
 
-      - name: Rename WebUI files
+      - name: Prepare embedded and standalone WebUI assets
         run: python3 rename_webui_files.py
 
       - name: Setup Python
@@ -38,9 +38,6 @@ jobs:
           python-version: '3.13'
 
       - name: Regenerate embedded firmware archive
-        # Produces main/generated/archive.json.gz from the committed archive.json
-        # so the firmware build always embeds a current archive. Fails the build
-        # if archive.json is missing or invalid (strict mode).
         run: python3 scripts/update_archive.py
 
       - name: Setup ESP-IDF v6.1-beta1
@@ -50,36 +47,68 @@ jobs:
           git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
           "$HOME/esp-idf/install.sh" esp32
 
-      - name: Build firmware
+      - name: Build firmware and standalone WWW image
         run: |
+          set -o pipefail
           . "$HOME/esp-idf/export.sh"
           export IDF_TARGET=esp32
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
-          idf.py build
+          mkdir -p build
+          idf.py build 2>&1 | tee build/build-output.log
+
+      - name: Upload compiler log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-log-${{ github.sha }}
+          path: build/build-output.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Validate standalone New Design image
+        run: |
+          set -euo pipefail
+          image="build/spiffs.bin"
+          expected_size=$((0x50000))
+          test -f "$image"
+          actual_size=$(stat -c '%s' "$image")
+          if [ "$actual_size" -ne "$expected_size" ]; then
+            echo "Expected $expected_size-byte SPIFFS image, got $actual_size bytes" >&2
+            exit 1
+          fi
+          grep -q '"design":"newdesign"' webui/spiffs_image/webui-manifest.json
+          sha256sum "$image" | tee build/spiffs.bin.sha256
+          echo "### Standalone New Design image" >> "$GITHUB_STEP_SUMMARY"
+          echo "- File: \`spiffs.bin\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $actual_size bytes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- SHA-256: \`$(cut -d' ' -f1 build/spiffs.bin.sha256)\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report firmware size
         run: |
           . "$HOME/esp-idf/export.sh"
           export IDF_TARGET=esp32
           export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.hb-rf-eth-ng"
-          echo "### Firmware Size Report" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          idf.py size >> $GITHUB_STEP_SUMMARY 2>&1 || true
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Firmware Size Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+          idf.py size >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload firmware artifacts
+      - name: Upload firmware and WWW artifacts
         uses: actions/upload-artifact@v7
         with:
           name: firmware
           path: |
             build/*.bin
+            build/*.sha256
             build/bootloader/bootloader.bin
             build/partition_table/partition-table.bin
           retention-days: 30
 
-      - name: Upload WebUI artifacts
+      - name: Upload New Design WebUI artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: webui-dist
-          path: webui/dist/
-          retention-days: 7
+          name: webui-newdesign
+          path: |
+            webui/dist/
+            webui/spiffs_image/
+          retention-days: 14

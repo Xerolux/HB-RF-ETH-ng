@@ -23,11 +23,17 @@ idf_component_register(SRCS ${app_sources}
                            nvs_flash
                            lwip
                            mbedtls
+                           cjson
                            app_update
                            esp_adc
+                           esp_partition
                            spi_flash
+                           spiffs
                            )
 
+# Transition firmware: keep the New Design embedded as a guaranteed fallback
+# while the same New Design can also be served and updated independently from
+# the existing 0x50000-byte `spiffs` partition.
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.css.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/main.js.gz" BINARY)
 target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/index.html.gz" BINARY)
@@ -41,3 +47,10 @@ target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/icon-256.png.gz" BINAR
 # whenever archive.json changes (release process). Served from flash by
 # /api/firmware_archive so the WebUI never has to fetch it live from GitHub.
 target_add_binary_data(${COMPONENT_TARGET} "generated/archive.json.gz" BINARY)
+
+# Build the raw WWW image from the minimal Brotli-compressed New Design shell.
+# Optional PWA/icon assets stay embedded and are served through the fallback
+# handlers, preserving functionality while fitting the existing 320 KiB SPIFFS.
+# The resulting build/spiffs.bin is accepted by POST /api/webui/update and
+# published as the independent New Design release asset.
+spiffs_create_partition_image(spiffs "../webui/spiffs_image" FLASH_IN_PROJECT)

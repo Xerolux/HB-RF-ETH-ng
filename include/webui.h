@@ -42,3 +42,20 @@ public:
     void start();
     void stop();
 };
+
+/**
+ * Registration shim used by webui.cpp.
+ *
+ * It transparently replaces only the static New Design asset handlers with
+ * SPIFFS-aware handlers and adds the separate WWW update API. Every other route
+ * is forwarded unchanged to ESP-IDF's httpd_register_uri_handler().
+ */
+esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
+                                        const httpd_uri_t *uri_handler);
+
+// Keep the existing large webui.cpp untouched while allowing the separate WWW
+// layer to intercept its route registrations. Other translation units can opt
+// out by defining HB_WEBUI_BYPASS_REGISTER_WRAPPER before including this file.
+#ifndef HB_WEBUI_BYPASS_REGISTER_WRAPPER
+#define httpd_register_uri_handler hb_webui_register_uri_handler
+#endif

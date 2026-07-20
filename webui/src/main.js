@@ -2,25 +2,25 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import axios from 'axios'
-import { useExperimentalStore, useLoginStore, useThemeStore, useUiStore } from './stores.js'
+import { useLoginStore, useThemeStore, useUiStore } from './stores.js'
 
 import 'bootstrap/dist/css/bootstrap.css'
 import 'bootstrap-vue-next/dist/bootstrap-vue-next.css'
 
-// Custom design system
+// Current New Design system
 import './styles/main.css'
 
 import App from './app.vue'
 import Home from './home.vue'
-import Settings from "./settings.vue"
-import FirmwareUpdate from "./firmwareupdate.vue"
+import Settings from './settings.vue'
+import FirmwareUpdate from './firmwareupdate.vue'
+import WebUIUpdate from './webuiupdate.vue'
 import Login from './login.vue'
 import ChangePassword from './change-password.vue'
 import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import SystemLog from './systemlog.vue'
 import AppIcon from './components/AppIcon.vue'
-
 
 // Router
 const router = createRouter({
@@ -29,14 +29,12 @@ const router = createRouter({
     { path: '/', component: Home },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
+    { path: '/webui', component: WebUIUpdate, meta: { requiresAuth: true } },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },
     // bareLayout: rendered WITHOUT the app shell (no sidebar header, no footer).
-    // Login is a full-screen standalone page — the shell's 384px sidebar + footer
-    // make no sense on an auth page, and the previous CSS hack (position:fixed
-    // to escape the sidebar padding) was brittle. See app.vue.
     { path: '/login', component: Login, meta: { bareLayout: true } },
   ]
 })
@@ -45,7 +43,6 @@ const router = createRouter({
 import { createI18n } from 'vue-i18n'
 import { messages, getBrowserLocale } from './locales/index.js'
 
-// Get stored locale or use browser locale
 const storedLocale = localStorage.getItem('locale') || getBrowserLocale()
 
 const i18n = createI18n({
@@ -55,9 +52,6 @@ const i18n = createI18n({
   messages: messages
 })
 
-// Network-error toasts fired from the axios interceptor run *outside* a Vue
-// component, so useI18n() is not available. Reach for the global instance
-// instead and translate through it so the messages honour the active locale.
 const translate = (key, params) => i18n.global.t(key, params)
 
 // Axios interceptors
@@ -67,7 +61,6 @@ axios.interceptors.request.use(
     if (loginStore.isLoggedIn) {
       request.headers['Authorization'] = 'Token ' + loginStore.token
     }
-    // Set default timeout if not already set
     if (!request.timeout) {
       request.timeout = 10000
     }
@@ -81,23 +74,13 @@ axios.interceptors.response.use(
   error => {
     const uiStore = useUiStore()
     const loginStore = useLoginStore()
-
-    // Background polling requests set `silent: true` in their config so a
-    // rebooting/offline device doesn't produce an endless toast stream from
-    // the periodic sysinfo/log/status pollers.
     const silent = error.config?.silent === true
 
     if (error.response) {
-      // Handle 401 Unauthorized.
-      // Respect the `silent` flag: background polls (e.g. the sysinfo refresh
-      // fired from app.vue on every page, including public ones like /about)
-      // must not log the user out and bounce to /login when the visitor is
-      // simply not authenticated. Only foreground requests revoke the session.
       if (error.response.status === 401 && !silent) {
         loginStore.logout()
         router.push('/login')
       }
-      // Handle network/server errors
       else if (error.response.status >= 500 && !silent) {
         uiStore.pushToast({
           type: 'error',
@@ -134,15 +117,12 @@ axios.interceptors.response.use(
 router.beforeEach((to, from, next) => {
   const loginStore = useLoginStore()
 
-  // Check activity on navigation
-  if (loginStore.isLoggedIn) {
-    if (loginStore.checkActivity()) {
-      next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-      return
-    }
+  if (loginStore.isLoggedIn && loginStore.checkActivity()) {
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath }
+    })
+    return
   }
 
   if (to.matched.some(r => r.meta.requiresAuth)) {
@@ -154,7 +134,6 @@ router.beforeEach((to, from, next) => {
       return
     }
 
-    // Force password change if required
     if (!loginStore.passwordChanged && to.path !== '/change-password') {
       next({ path: '/change-password' })
       return
@@ -178,7 +157,6 @@ import {
   BModal
 } from 'bootstrap-vue-next'
 
-// Create and mount app
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -186,8 +164,8 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 app.use(createBootstrap({
-    components: false,
-    directives: true,
+  components: false,
+  directives: true,
 }))
 
 app.component('BAlert', BAlert)
@@ -202,20 +180,18 @@ app.component('BFormSelectOption', BFormSelectOption)
 app.component('BModal', BModal)
 app.component('AppIcon', AppIcon)
 
-// Initialize theme
 const themeStore = useThemeStore()
 themeStore.init()
 
-// Initialize optional experimental UI features
-const experimentalStore = useExperimentalStore()
-experimentalStore.init()
+// The New Design is the only application shell.
+document.body.classList.add('newdesign-active')
 
 // Activity tracking for idle timeout
 let lastUpdate = 0
 let idleCheckInterval = null
 const updateActivity = () => {
   const now = Date.now()
-  if (now - lastUpdate > 1000) { // Throttle updates to once per second
+  if (now - lastUpdate > 1000) {
     const loginStore = useLoginStore()
     if (loginStore.isLoggedIn) {
       loginStore.updateActivity()
@@ -229,13 +205,10 @@ for (const eventName of activityEvents) {
   window.addEventListener(eventName, updateActivity)
 }
 
-// Check for inactivity every 30 seconds
 idleCheckInterval = window.setInterval(() => {
   const loginStore = useLoginStore()
-  if (loginStore.isLoggedIn) {
-    if (loginStore.checkActivity()) {
-      router.push('/login')
-    }
+  if (loginStore.isLoggedIn && loginStore.checkActivity()) {
+    router.push('/login')
   }
 }, 30000)
 
