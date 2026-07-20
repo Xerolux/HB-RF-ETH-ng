@@ -1,0 +1,49 @@
+name: Apply device-synced theme store
+
+on:
+  push:
+    branches:
+      - feature/system-overview-theme-logs
+
+permissions:
+  contents: write
+
+jobs:
+  apply-theme-store:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Replace local-only theme store
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('webui/src/stores.js')
+          text = path.read_text(encoding='utf-8')
+
+          anchor = '''const getStoredLastActivity = () => {\n  const stored = Number(safeSession.get("hb-rf-eth-ng-last-activity"))\n  return Number.isFinite(stored) && stored > 0 ? stored : Date.now()\n}\n\n'''
+          helpers = '''const getStoredLastActivity = () => {\n  const stored = Number(safeSession.get("hb-rf-eth-ng-last-activity"))\n  return Number.isFinite(stored) && stored > 0 ? stored : Date.now()\n}\n\nconst DEFAULT_PRIMARY_COLOR = '#f26a3d'\nconst isHexColor = (value) => /^#[0-9a-f]{6}$/i.test(value || '')\nconst shiftColor = (hex, amount) => {\n  const value = parseInt(hex.slice(1), 16)\n  const clamp = (part) => Math.max(0, Math.min(255, part + amount))\n  const red = clamp((value >> 16) & 0xff)\n  const green = clamp((value >> 8) & 0xff)\n  const blue = clamp(value & 0xff)\n  return `#${[red, green, blue].map((part) => part.toString(16).padStart(2, '0')).join('')}`\n}\nconst rgbaColor = (hex, alpha) => {\n  const value = parseInt(hex.slice(1), 16)\n  return `rgba(${(value >> 16) & 0xff}, ${(value >> 8) & 0xff}, ${value & 0xff}, ${alpha})`\n}\n\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('theme helper anchor not unique')
+          text = text.replace(anchor, helpers, 1)
+
+          old = '''export const useThemeStore = defineStore('theme', {\n  state: () => ({\n    theme: safeLocal.get('theme') || 'light'\n  }),\n  actions: {\n    setTheme(newTheme) {\n      this.theme = newTheme\n      safeLocal.set('theme', newTheme)\n      document.documentElement.setAttribute('data-bs-theme', newTheme)\n    },\n    toggleTheme() {\n      const newTheme = this.theme === 'light' ? 'dark' : 'light'\n      this.setTheme(newTheme)\n    },\n    init() {\n      document.documentElement.setAttribute('data-bs-theme', this.theme)\n    }\n  }\n})\n'''
+          new = '''export const useThemeStore = defineStore('theme', {\n  state: () => ({\n    theme: safeLocal.get('theme') || 'system',\n    primaryColor: isHexColor(safeLocal.get('primaryColor'))\n      ? safeLocal.get('primaryColor')\n      : DEFAULT_PRIMARY_COLOR,\n    loadedFromDevice: false\n  }),\n  actions: {\n    apply() {\n      const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches\n      const resolved = this.theme === 'system'\n        ? (prefersDark ? 'dark' : 'light')\n        : this.theme\n      document.documentElement.setAttribute('data-bs-theme', resolved)\n\n      const color = isHexColor(this.primaryColor) ? this.primaryColor : DEFAULT_PRIMARY_COLOR\n      const root = document.documentElement.style\n      root.setProperty('--color-primary', color)\n      root.setProperty('--color-primary-hover', shiftColor(color, -20))\n      root.setProperty('--color-primary-strong', shiftColor(color, -42))\n      root.setProperty('--color-primary-dark', shiftColor(color, -42))\n      root.setProperty('--color-primary-soft', rgbaColor(color, resolved === 'dark' ? 0.16 : 0.12))\n      root.setProperty('--color-primary-light', rgbaColor(color, resolved === 'dark' ? 0.16 : 0.12))\n    },\n    persist() {\n      axios.post('/api/theme', {\n        colorScheme: this.theme,\n        primaryColor: this.primaryColor\n      }, { timeout: 5000, silent: true }).catch(() => {})\n    },\n    setTheme(newTheme, persist = true) {\n      if (!['system', 'light', 'dark'].includes(newTheme)) return\n      this.theme = newTheme\n      safeLocal.set('theme', newTheme)\n      this.apply()\n      if (persist) this.persist()\n    },\n    setPrimaryColor(newColor, persist = true) {\n      if (!isHexColor(newColor)) return\n      this.primaryColor = newColor.toLowerCase()\n      safeLocal.set('primaryColor', this.primaryColor)\n      this.apply()\n      if (persist) this.persist()\n    },\n    toggleTheme() {\n      const currentlyDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'\n      this.setTheme(currentlyDark ? 'light' : 'dark')\n    },\n    init() {\n      this.apply()\n      window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {\n        if (this.theme === 'system') this.apply()\n      })\n      axios.get('/api/theme', { timeout: 5000, silent: true })\n        .then((response) => {\n          const scheme = response.data?.colorScheme\n          const color = response.data?.primaryColor\n          if (['system', 'light', 'dark'].includes(scheme)) this.theme = scheme\n          if (isHexColor(color)) this.primaryColor = color.toLowerCase()\n          safeLocal.set('theme', this.theme)\n          safeLocal.set('primaryColor', this.primaryColor)\n          this.loadedFromDevice = true\n          this.apply()\n        })\n        .catch(() => {})\n    }\n  }\n})\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'old theme store matches: {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Remove helper and push result
+        run: |
+          rm .github/workflows/apply-device-theme-store.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add webui/src/stores.js .github/workflows/apply-device-theme-store.yml
+          git commit -m 'feat(theme): sync scheme and accent with device'
+          git push origin HEAD:feature/system-overview-theme-logs
