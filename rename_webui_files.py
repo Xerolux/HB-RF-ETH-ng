@@ -36,8 +36,12 @@ def build_spiffs_source(dist_dir: Path) -> None:
     optional_assets = [
         "favicon.ico.gz",
         "manifest.webmanifest.gz",
-        "icon-256.png.gz",
     ]
+
+    # icon-256.png.gz is intentionally NOT copied to the 320 KiB WWW image. It
+    # is comparatively large and remains available through the embedded New
+    # Design fallback handler. This leaves enough SPIFFS headroom for future JS
+    # and CSS growth without changing the existing 4 MB partition table.
 
     missing = [name for name in mandatory_assets if not (dist_dir / name).is_file()]
     if missing:
@@ -68,6 +72,7 @@ def build_spiffs_source(dist_dir: Path) -> None:
                 "design": "newdesign",
                 "version": version,
                 "assets": copied,
+                "embeddedFallbackAssets": ["icon-256.png.gz"],
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -182,8 +187,8 @@ def rename_webui_files():
         elif not target.exists():
             print(f"WARNING: {filename} not found in dist")
 
-    # PWA assets. PNG is already compressed, but the firmware consistently
-    # serves the packaged variant with Content-Encoding: gzip.
+    # PWA assets remain embedded in the transition firmware. Only the compact
+    # manifest is also copied into the standalone SPIFFS source above.
     for filename in ["manifest.webmanifest", "icon-256.png"]:
         source = dist_dir / filename
         target = dist_dir / f"{filename}.gz"
