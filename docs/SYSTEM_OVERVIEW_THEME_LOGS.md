@@ -32,7 +32,8 @@ again when the user presses **Refresh**.
 
 `GET /recovery` serves a small standalone HTML page embedded in the firmware. It
 does not depend on Vue, Bootstrap, the SPIFFS WebUI image, external assets, or a
-background task.
+background task. It adds one route to the existing HTTP server and does not
+create a second server instance.
 
 The page uses the normal `/login.json` authentication flow and existing
 `Authorization: Token ...` contract. After login it can:
