@@ -127,7 +127,11 @@ const schemes = computed(() => [
   { value: 'dark', label: copy.value.dark, icon: 'moon' }
 ])
 const presets = ['#f26a3d', '#3971e8', '#1ca971', '#8b5cf6', '#e89a24']
-const resolvedDark = computed(() => document.documentElement.getAttribute('data-bs-theme') === 'dark')
+const resolvedDark = computed(() => {
+  if (themeStore.theme === 'dark') return true
+  if (themeStore.theme === 'light') return false
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches || false
+})
 const themeLabel = computed(() => schemes.value.find((item) => item.value === themeStore.theme)?.label || copy.value.system)
 
 const previewColor = (event) => {
