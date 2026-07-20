@@ -1,4 +1,4 @@
-name: Query Recovery Hotfix Status
+name: Query Recovery Hotfix Failure
 
 on:
   push:
@@ -20,22 +20,20 @@ jobs:
           ref: ops/beta3-release-status
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Query hotfix workflow
+      - name: Capture failed job log
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh run list \
+          gh run view 29741647493 \
             --repo "${{ github.repository }}" \
-            --workflow apply-recovery-hotfix.yml \
-            --limit 10 \
-            --json databaseId,status,conclusion,createdAt,displayTitle,event,headSha,url \
-            > recovery-hotfix-status.json
+            --log-failed \
+            > recovery-hotfix-failed.log
 
-      - name: Commit status report
+      - name: Commit failure report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add recovery-hotfix-status.json
-          git commit -m "ci: record recovery hotfix status"
+          git add recovery-hotfix-failed.log
+          git commit -m "ci: record recovery hotfix failure"
           git push origin HEAD:ops/beta3-release-status
