@@ -5,10 +5,14 @@ This hotfix addresses issues found during the first hardware test of firmware
 
 - the standalone Recovery page did not execute its inline JavaScript because the
   normal Content Security Policy blocked it;
-- the server sent Brotli assets even when the browser did not advertise Brotli support;
+- the server sent Brotli assets even when the browser did not advertise Brotli
+  support;
 - an external WebUI image could be selected on the firmware upload page;
 - an empty primary IPv4 DNS setting prevented hostname-based NTP and OTA access.
 
-The server now uses the embedded gzip assets whenever a browser does not advertise Brotli support. The updated WebUI version is `1.0.0-Beta.2`. Existing custom
-DNS values remain unchanged; only missing or legacy `0.0.0.0` primary DNS values
-are initialized to `1.1.1.1`.
+The server now uses the embedded gzip assets whenever a browser does not
+advertise Brotli support. Browsers that advertise Brotli continue to use the
+compact external WebUI. The updated WebUI version is `1.0.0-Beta.2`.
+
+Existing custom DNS values remain unchanged. Only missing or legacy `0.0.0.0`
+primary DNS values are initialized to `1.1.1.1`.
