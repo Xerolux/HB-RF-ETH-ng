@@ -3,82 +3,82 @@
     <section class="page-hero">
       <div class="hero-copy">
         <span class="hero-eyebrow"><AppIcon name="firmware" /> WebUI</span>
-        <h1 class="hero-title">{{ text.title }}</h1>
-        <p class="hero-subtitle">{{ text.subtitle }}</p>
+        <h1 class="hero-title">Weboberfläche aktualisieren</h1>
+        <p class="hero-subtitle">Firmware und WebUI besitzen getrennte Versionen. Die Installation erfolgt ausschließlich über ein manuell ausgewähltes 320-KB-WWW-Image.</p>
       </div>
       <div class="hero-meta">
-        <span class="meta-chip"><AppIcon name="check" /> New Design</span>
-        <span class="meta-chip"><AppIcon name="firmware" /> {{ currentVersion }}</span>
+        <span class="meta-chip"><AppIcon name="firmware" /> WebUI: {{ installedVersion }}</span>
+        <span class="meta-chip"><AppIcon name="firmware" /> Firmware: {{ firmwareVersion || '—' }}</span>
         <span class="meta-chip" :class="status.valid ? 'success-chip' : 'warning-chip'">
-          <AppIcon :name="status.valid ? 'check' : 'alert'" />
-          {{ status.valid ? text.externalActive : text.fallbackActive }}
+          <AppIcon :name="status.valid ? 'check' : 'shield'" />
+          {{ status.valid ? 'Separate WebUI aktiv' : 'Eingebetteter Fallback aktiv' }}
         </span>
       </div>
     </section>
 
-    <div v-if="loading" class="panel loading-panel">
-      <span class="spinner-border spinner-border-sm"></span>
-      {{ text.loading }}
-    </div>
+    <section class="status-grid">
+      <article class="panel status-card">
+        <span class="label">Installierte WebUI-Version</span>
+        <strong>{{ installedVersion }}</strong>
+        <small>{{ status.valid ? 'Aus der separaten WWW-Partition' : 'In der Firmware eingebettet' }}</small>
+      </article>
+      <article class="panel status-card">
+        <span class="label">WWW-Speicher</span>
+        <strong>{{ formatBytes(status.usedBytes) }} / {{ formatBytes(status.partitionSize) }}</strong>
+        <div class="track"><span :style="{ width: storagePercent + '%' }"></span></div>
+      </article>
+      <article class="panel status-card">
+        <span class="label">Update-Prüfung</span>
+        <strong>{{ lastCheckText }}</strong>
+        <small>Online-Abfrage höchstens einmal innerhalb von 24 Stunden</small>
+      </article>
+    </section>
 
-    <template v-else>
-      <section class="status-grid">
-        <article class="panel status-card">
-          <span class="label">{{ text.source }}</span>
-          <strong>{{ status.valid ? text.external : text.embedded }}</strong>
-          <small>{{ status.valid ? text.externalHint : text.fallbackHint }}</small>
-        </article>
-        <article class="panel status-card">
-          <span class="label">{{ text.version }}</span>
-          <strong>{{ currentVersion }}</strong>
-          <small>design: newdesign</small>
-        </article>
-        <article class="panel status-card">
-          <span class="label">{{ text.storage }}</span>
-          <strong>{{ formatBytes(status.usedBytes) }} / {{ formatBytes(status.partitionSize) }}</strong>
-          <div class="track"><span :style="{ width: storagePercent + '%' }"></span></div>
-        </article>
-      </section>
-
-      <BAlert v-if="status.lastError && !status.valid" variant="info" :model-value="true">
-        {{ status.lastError }}
-      </BAlert>
-
-      <section class="panel update-card primary-card">
+    <div class="content-grid">
+      <section class="panel update-card">
         <div class="card-heading">
           <div>
-            <span class="kicker">{{ text.recommended }}</span>
-            <h2>{{ text.onlineTitle }}</h2>
-            <p>{{ text.onlineHint }}</p>
+            <span class="kicker">Verfügbare WebUI</span>
+            <h2>WebUI-Datei herunterladen</h2>
+            <p>Der ESP lädt nur das kleine gemeinsame Update-Manifest. Die BIN-Datei wird direkt von deinem Browser heruntergeladen.</p>
           </div>
           <span v-if="release.version" class="version-badge">v{{ release.version }}</span>
         </div>
 
-        <BAlert v-if="manifestError" variant="warning" :model-value="true">
-          {{ manifestError }}
-        </BAlert>
+        <BAlert v-if="manifestError" variant="warning" :model-value="true">{{ manifestError }}</BAlert>
 
         <div v-if="release.version" class="release-grid">
-          <div><span>{{ text.available }}</span><strong>{{ release.version }}</strong></div>
-          <div><span>SHA-256</span><code>{{ shortHash(release.sha256) }}</code></div>
-          <div><span>{{ text.imageSize }}</span><strong>{{ formatBytes(release.size) }}</strong></div>
+          <div><span>Installiert</span><strong>{{ installedVersion }}</strong></div>
+          <div><span>Verfügbar</span><strong>{{ release.version }}</strong></div>
+          <div><span>Image-Größe</span><strong>{{ formatBytes(release.size) }}</strong></div>
+          <div><span>Firmware mindestens</span><strong>{{ release.minFirmwareVersion || '—' }}</strong></div>
         </div>
-        <p v-if="release.version" class="compatibility-note">
-          API {{ release.apiVersion ?? '—' }} · Firmware ≥ {{ release.minFirmwareVersion || '—' }}
-        </p>
 
-        <div v-if="busy" class="progress-panel">
-          <div class="progress-copy"><span>{{ progressLabel }}</span><strong>{{ progress }}%</strong></div>
-          <div class="track"><span :style="{ width: progress + '%' }"></span></div>
-        </div>
+        <BAlert v-if="release.version && !updateAvailable" variant="success" :model-value="true">
+          Die installierte WebUI ist aktuell.
+        </BAlert>
 
         <div class="actions">
-          <BButton variant="primary" :disabled="busy || !onlineReady" @click="installOnline">
-            <span v-if="busy" class="spinner-border spinner-border-sm me-2"></span>
-            <AppIcon v-else name="download" /> {{ text.installOnline }}
-          </BButton>
-          <BButton variant="outline-secondary" :disabled="busy" @click="refreshAll">
-            <AppIcon name="refresh" /> {{ text.refresh }}
+          <a
+            v-if="updateAvailable && release.downloadUrl"
+            class="btn btn-success action-btn"
+            :href="release.downloadUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <AppIcon name="download" /> WebUI-BIN herunterladen
+          </a>
+          <a
+            v-if="release.releaseUrl"
+            class="btn btn-outline-secondary action-btn"
+            :href="release.releaseUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <AppIcon name="externalLink" /> Release auf GitHub
+          </a>
+          <BButton variant="outline-secondary" :disabled="loading" @click="refreshCachedStatus">
+            <AppIcon name="refresh" /> Gespeicherten Status neu laden
           </BButton>
         </div>
       </section>
@@ -86,103 +86,95 @@
       <section class="panel update-card">
         <div class="card-heading">
           <div>
-            <span class="kicker">{{ text.expert }}</span>
-            <h2>{{ text.manualTitle }}</h2>
-            <p>{{ text.manualHint }}</p>
+            <span class="kicker">Manuelle Installation</span>
+            <h2>WWW-Image hochladen</h2>
+            <p>Hier ausschließlich <code>webui_*.bin</code> oder <code>spiffs.bin</code> mit exakt {{ formatBytes(status.partitionSize) }} verwenden.</p>
           </div>
         </div>
 
-        <label class="file-drop" :class="{ disabled: busy }">
-          <input type="file" accept=".bin,application/octet-stream" :disabled="busy" @change="selectFile" />
-          <AppIcon name="firmware" />
-          <span>{{ selectedFile ? selectedFile.name : text.choose }}</span>
+        <label class="file-drop" :class="{ disabled: busy, invalid: !!fileError }">
+          <input type="file" accept=".bin,application/octet-stream" :disabled="busy" @change="selectFile">
+          <AppIcon name="upload" />
+          <span>{{ selectedFile ? selectedFile.name : 'WebUI-BIN auswählen' }}</span>
           <small v-if="selectedFile">{{ formatBytes(selectedFile.size) }}</small>
         </label>
 
         <BAlert v-if="fileError" variant="danger" :model-value="true">{{ fileError }}</BAlert>
 
+        <div v-if="busy" class="progress-panel">
+          <div class="progress-copy"><span>WebUI wird übertragen …</span><strong>{{ progress }}%</strong></div>
+          <div class="track"><span :style="{ width: progress + '%' }"></span></div>
+        </div>
+
+        <BAlert variant="info" :model-value="true">
+          Das Gerät prüft Partitionsgröße, internes Manifest und optional SHA-256. Ist das Image ungültig oder unvollständig, bleibt das eingebettete New Design als Fallback aktiv.
+        </BAlert>
+
         <div class="actions">
-          <BButton variant="outline-primary" :disabled="busy || !selectedFile || !!fileError" @click="installManual">
-            <AppIcon name="upload" /> {{ text.upload }}
+          <BButton variant="primary" :disabled="busy || !selectedFile || !!fileError" @click="installManual">
+            <span v-if="busy" class="spinner-border spinner-border-sm me-2"></span>
+            <AppIcon v-else name="upload" /> {{ busy ? 'WebUI wird installiert …' : 'WebUI installieren' }}
+          </BButton>
+          <BButton v-if="selectedFile" variant="outline-secondary" :disabled="busy" @click="clearFile">
+            <AppIcon name="close" /> Auswahl entfernen
           </BButton>
         </div>
       </section>
-
-      <section class="panel safety-card">
-        <AppIcon name="shield" />
-        <div><strong>{{ text.safetyTitle }}</strong><p>{{ text.safety }}</p></div>
-      </section>
-    </template>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useUiStore } from './stores.js'
 
 const WEBUI_API_VERSION = 1
-const { locale } = useI18n()
+const EMBEDDED_WEBUI_VERSION = typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : 'unbekannt'
+
 const uiStore = useUiStore()
-
-const translations = {
-  de: {
-    title: 'Weboberfläche aktualisieren', subtitle: 'Das New Design wird unabhängig von der Firmware aktualisiert.',
-    loading: 'WebUI-Status wird geladen …', externalActive: 'Extern aktiv', fallbackActive: 'Fallback aktiv',
-    source: 'Aktive Oberfläche', external: 'Separate WWW-Partition', embedded: 'Eingebettetes New Design',
-    externalHint: 'Firmware und WebUI können getrennt aktualisiert werden.', fallbackHint: 'Sicherer Übergangs- und Wiederherstellungsmodus.',
-    version: 'Installierte WebUI-Version', storage: 'WWW-Speicher', recommended: 'Empfohlen', onlineTitle: 'Online-Update',
-    onlineHint: 'Release laden und direkt auf das Gerät übertragen. Der ESP prüft SHA-256 vor der Aktivierung.',
-    available: 'Verfügbare Version', imageSize: 'Image-Größe', installOnline: 'WebUI online aktualisieren', refresh: 'Status aktualisieren',
-    expert: 'Expertenmodus', manualTitle: 'WWW-Image manuell hochladen', manualHint: 'Nur das für HB-RF-ETH-ng erzeugte spiffs.bin verwenden.',
-    choose: 'spiffs.bin auswählen', upload: 'Image hochladen', safetyTitle: 'Sicherer Fallback',
-    safety: 'Bei einem fehlerhaften oder unvollständigen WWW-Update bleibt das eingebettete New Design erreichbar. NVS-Einstellungen werden nicht verändert.',
-    downloading: 'WWW-Image wird geladen', verifying: 'SHA-256 wird geprüft', uploading: 'WWW-Image wird übertragen', completed: 'New Design wurde aktualisiert',
-    noManifest: 'Dieses Release enthält noch kein separates New-Design-Image.', wrongDesign: 'Das Release-Manifest ist nicht für das New Design bestimmt.',
-    sizeMismatch: 'Die Image-Größe passt nicht zur WWW-Partition.', hashMismatch: 'SHA-256-Prüfung fehlgeschlagen.',
-    incompatibleApi: 'Diese WebUI benötigt eine andere Firmware-API.', tooOldFirmware: 'Die installierte Firmware ist für diese WebUI zu alt.',
-    invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', wrongFirmwareFile: 'Falsche Datei: Das ist eine Firmware-Datei. Bitte unter System → Firmware installieren.', failed: 'WebUI-Update fehlgeschlagen.'
-  },
-  en: {
-    title: 'Update Web Interface', subtitle: 'The New Design is updated independently from the firmware.',
-    loading: 'Loading WebUI status …', externalActive: 'External active', fallbackActive: 'Fallback active',
-    source: 'Active interface', external: 'Separate WWW partition', embedded: 'Embedded New Design',
-    externalHint: 'Firmware and WebUI can be updated independently.', fallbackHint: 'Safe transition and recovery mode.',
-    version: 'Installed WebUI version', storage: 'WWW storage', recommended: 'Recommended', onlineTitle: 'Online update',
-    onlineHint: 'Download the release and transfer it to the device. The ESP verifies SHA-256 before activation.',
-    available: 'Available version', imageSize: 'Image size', installOnline: 'Update WebUI online', refresh: 'Refresh status',
-    expert: 'Expert mode', manualTitle: 'Upload WWW image manually', manualHint: 'Only use the spiffs.bin generated for HB-RF-ETH-ng.',
-    choose: 'Select spiffs.bin', upload: 'Upload image', safetyTitle: 'Safe fallback',
-    safety: 'If a WWW update is corrupt or incomplete, the embedded New Design remains available. NVS settings are not modified.',
-    downloading: 'Downloading WWW image', verifying: 'Verifying SHA-256', uploading: 'Uploading WWW image', completed: 'New Design updated',
-    noManifest: 'This release does not include a separate New Design image yet.', wrongDesign: 'The release manifest is not intended for the New Design.',
-    sizeMismatch: 'The image size does not match the WWW partition.', hashMismatch: 'SHA-256 verification failed.',
-    incompatibleApi: 'This WebUI requires a different firmware API.', tooOldFirmware: 'The installed firmware is too old for this WebUI.',
-    invalidFile: 'The file must exactly match the WWW partition.', wrongFirmwareFile: 'Wrong file: this is a firmware image. Install it under System → Firmware.', failed: 'WebUI update failed.'
-  }
-}
-
-const text = computed(() => translations[locale.value] || translations.de)
 const loading = ref(true)
 const busy = ref(false)
 const progress = ref(0)
-const progressPhase = ref('')
 const manifestError = ref('')
 const fileError = ref('')
 const selectedFile = ref(null)
 const release = ref({})
-const status = ref({ partitionFound: false, mounted: false, valid: false, updateActive: false, partitionSize: 0, totalBytes: 0, usedBytes: 0, bytesWritten: 0, version: '', firmwareVersion: '', design: 'newdesign', lastError: '' })
+const firmwareVersion = ref('')
+const updateFetchedAt = ref(null)
+const status = ref({
+  partitionFound: false,
+  mounted: false,
+  valid: false,
+  updateActive: false,
+  partitionSize: 0,
+  totalBytes: 0,
+  usedBytes: 0,
+  bytesWritten: 0,
+  version: '',
+  effectiveVersion: '',
+  design: 'newdesign',
+  lastError: ''
+})
 
-const currentVersion = computed(() => status.value.version || 'embedded')
+const installedVersion = computed(() => status.value.effectiveVersion || status.value.version || EMBEDDED_WEBUI_VERSION)
 const storagePercent = computed(() => {
   const total = status.value.totalBytes || status.value.partitionSize || 0
   return total ? Math.min(100, Math.round((status.value.usedBytes || 0) * 100 / total)) : 0
 })
+const updateAvailable = computed(() => !!release.value.version && compareVersions(installedVersion.value, release.value.version) < 0)
+const lastCheckText = computed(() => updateFetchedAt.value ? new Date(Number(updateFetchedAt.value)).toLocaleString() : 'Noch nicht geprüft')
+
+const formatBytes = bytes => {
+  const value = Number(bytes) || 0
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / 1024 / 1024).toFixed(2)} MB`
+}
 
 const compareVersions = (left = '', right = '') => {
   const parse = value => {
-    const [core, pre = ''] = String(value).split('-', 2)
+    const [core, pre = ''] = String(value).replace(/^v/i, '').split('-', 2)
     const numbers = core.split('.').map(part => Number(part) || 0)
     return { numbers: [numbers[0] || 0, numbers[1] || 0, numbers[2] || 0], pre }
   }
@@ -197,113 +189,70 @@ const compareVersions = (left = '', right = '') => {
   return a.pre.localeCompare(b.pre, undefined, { numeric: true, sensitivity: 'base' })
 }
 
-const onlineReady = computed(() => release.value?.design === 'newdesign' && release.value.downloadUrl && /^[0-9a-f]{64}$/i.test(release.value.sha256 || '') && Number(release.value.size) === Number(status.value.partitionSize) && Number(release.value.apiVersion) === WEBUI_API_VERSION && compareVersions(status.value.firmwareVersion, release.value.minFirmwareVersion) >= 0 && status.value.partitionSize > 0)
-const progressLabel = computed(() => ({ download: text.value.downloading, verify: text.value.verifying, upload: text.value.uploading, done: text.value.completed })[progressPhase.value] || text.value.completed)
-
-const formatBytes = (bytes) => {
-  const value = Number(bytes) || 0
-  if (value < 1024) return `${value} B`
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
-  return `${(value / 1024 / 1024).toFixed(2)} MB`
-}
-const shortHash = (hash) => hash ? `${hash.slice(0, 12)}…${hash.slice(-8)}` : '—'
-
-// SubtleCrypto is unavailable on many HTTP-only private-LAN origins. It is an
-// optional browser-side extra; the ESP always calculates the image hash and
-// compares it with the release hash before mounting the New Design.
-const optionalBrowserSha256 = async (buffer) => {
-  if (!globalThis.crypto?.subtle) return null
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer)
-  return Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, '0')).join('')
-}
-
 const loadStatus = async () => {
   const [storageResponse, systemResponse] = await Promise.all([
     axios.get('/api/webui/status', { timeout: 8000, silent: true }),
     axios.get('/sysinfo.json', { timeout: 8000, silent: true })
   ])
-  status.value = {
-    ...status.value,
-    ...storageResponse.data,
-    firmwareVersion: systemResponse.data?.sysInfo?.currentVersion || ''
-  }
+  status.value = { ...status.value, ...storageResponse.data }
+  firmwareVersion.value = systemResponse.data?.sysInfo?.currentVersion || ''
 }
 
-const loadReleaseManifest = async () => {
+const loadCachedRelease = async () => {
   manifestError.value = ''
   release.value = {}
   try {
-    const info = await axios.get('/api/check_update', { timeout: 15000, silent: true })
-    const item = info.data?.webui
-    if (!item) return void (manifestError.value = text.value.noManifest)
-    if (item.design !== 'newdesign') return void (manifestError.value = text.value.wrongDesign)
+    const response = await axios.get('/api/check_update', { timeout: 8000, silent: true })
+    updateFetchedAt.value = response.data?.fetchedAt || null
+    const item = response.data?.webui
+    if (!item) {
+      manifestError.value = 'Im gespeicherten Update-Manifest ist noch keine separate WebUI-Datei enthalten.'
+      return
+    }
+    if (item.design !== 'newdesign') {
+      manifestError.value = 'Das bereitgestellte WebUI-Image gehört nicht zum New Design.'
+      return
+    }
     release.value = item
-    if (Number(item.size) !== Number(status.value.partitionSize)) manifestError.value = text.value.sizeMismatch
-    else if (Number(item.apiVersion) !== WEBUI_API_VERSION) manifestError.value = text.value.incompatibleApi
-    else if (compareVersions(status.value.firmwareVersion, item.minFirmwareVersion) < 0) manifestError.value = `${text.value.tooOldFirmware} (≥ ${item.minFirmwareVersion})`
+    if (Number(item.size) !== Number(status.value.partitionSize)) {
+      manifestError.value = `Die angebotene WebUI hat eine falsche Größe. Erwartet werden ${formatBytes(status.value.partitionSize)}.`
+    } else if (Number(item.apiVersion) !== WEBUI_API_VERSION) {
+      manifestError.value = 'Diese WebUI benötigt eine andere Firmware-API.'
+    } else if (compareVersions(firmwareVersion.value, item.minFirmwareVersion) < 0) {
+      manifestError.value = `Die Firmware ist zu alt. Benötigt wird mindestens ${item.minFirmwareVersion}.`
+    }
   } catch (error) {
-    manifestError.value = error.response?.data?.message || error.message || text.value.noManifest
+    manifestError.value = error.response?.data?.message || error.message || 'Gespeicherter Update-Status konnte nicht geladen werden.'
   }
 }
 
-const refreshAll = async () => {
+const refreshCachedStatus = async () => {
   loading.value = true
-  try { await loadStatus(); await loadReleaseManifest() } finally { loading.value = false }
-}
-
-const uploadBuffer = async (buffer, expectedHash = '') => {
-  progressPhase.value = 'upload'
-  progress.value = 50
-  const headers = { 'Content-Type': 'application/octet-stream' }
-  if (expectedHash) headers['X-WebUI-SHA256'] = expectedHash
-  await axios.post('/api/webui/update', buffer, {
-    timeout: 120000,
-    headers,
-    onUploadProgress: event => {
-      if (event.total) progress.value = 50 + Math.round(event.loaded * 50 / event.total)
-    }
-  })
-  progress.value = 100
-  progressPhase.value = 'done'
-  await loadStatus()
-  uiStore.pushToast({ type: 'success', title: text.value.completed, message: `v${status.value.version || ''}` })
-  window.setTimeout(() => window.location.reload(), 1000)
-}
-
-const errorMessage = error => typeof error.response?.data === 'string' ? error.response.data : (error.response?.data?.message || error.message || text.value.failed)
-
-const installOnline = async () => {
-  if (!onlineReady.value || busy.value) return
-  busy.value = true
-  progress.value = 0
   try {
-    const item = release.value
-    progressPhase.value = 'download'
-    const response = await axios.get(item.downloadUrl, {
-      responseType: 'arraybuffer', timeout: 120000,
-      onDownloadProgress: event => { if (event.total) progress.value = Math.min(45, Math.round(event.loaded * 45 / event.total)) }
-    })
-    const buffer = response.data
-    if (buffer.byteLength !== Number(status.value.partitionSize)) throw new Error(text.value.sizeMismatch)
-    progressPhase.value = 'verify'
-    progress.value = 47
-    const browserHash = await optionalBrowserSha256(buffer)
-    if (browserHash && browserHash.toLowerCase() !== item.sha256.toLowerCase()) throw new Error(text.value.hashMismatch)
-    progress.value = 50
-    await uploadBuffer(buffer, item.sha256)
-  } catch (error) {
-    uiStore.pushToast({ type: 'error', title: text.value.failed, message: errorMessage(error), duration: 7000 })
-  } finally { busy.value = false }
+    await loadStatus()
+    await loadCachedRelease()
+  } finally {
+    loading.value = false
+  }
+}
+
+const clearFile = () => {
+  selectedFile.value = null
+  fileError.value = ''
 }
 
 const selectFile = event => {
   fileError.value = ''
   selectedFile.value = event.target.files?.[0] || null
-  const name = String(selectedFile.value?.name || '').toLowerCase()
-  if (name.startsWith('firmware_')) {
-    fileError.value = text.value.wrongFirmwareFile
-  } else if (selectedFile.value && Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
-    fileError.value = `${text.value.invalidFile} (${formatBytes(status.value.partitionSize)})`
+  if (!selectedFile.value) return
+
+  const name = String(selectedFile.value.name || '').toLowerCase()
+  if (!name.endsWith('.bin')) {
+    fileError.value = 'Ungültige Datei: Es wird ein WebUI-Image mit der Endung .bin benötigt.'
+  } else if (name.startsWith('firmware_')) {
+    fileError.value = 'Falsche Datei: Das ist eine Firmware-Datei. Bitte unter System → Firmware installieren.'
+  } else if (Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
+    fileError.value = `Falsche Image-Größe: Erwartet werden exakt ${formatBytes(status.value.partitionSize)} (${status.value.partitionSize} Byte).`
   }
 }
 
@@ -312,49 +261,58 @@ const installManual = async () => {
   busy.value = true
   progress.value = 0
   try {
-    const buffer = await selectedFile.value.arrayBuffer()
-    progressPhase.value = 'verify'
-    progress.value = 25
-    const optionalHash = await optionalBrowserSha256(buffer)
-    progress.value = 50
-    await uploadBuffer(buffer, optionalHash || '')
+    await axios.post('/api/webui/update', selectedFile.value, {
+      timeout: 180000,
+      headers: { 'Content-Type': 'application/octet-stream' },
+      onUploadProgress: event => {
+        if (event.total) progress.value = Math.round(event.loaded * 100 / event.total)
+      }
+    })
+    progress.value = 100
+    await loadStatus()
+    uiStore.pushToast({ type: 'success', title: 'WebUI installiert', message: `Aktive WebUI-Version: ${installedVersion.value}`, duration: 3500 })
+    window.setTimeout(() => window.location.reload(), 1200)
   } catch (error) {
-    uiStore.pushToast({ type: 'error', title: text.value.failed, message: errorMessage(error), duration: 7000 })
-  } finally { busy.value = false }
+    const message = typeof error.response?.data === 'string'
+      ? error.response.data
+      : (error.response?.data?.message || error.message || 'WebUI-Upload fehlgeschlagen.')
+    uiStore.pushToast({ type: 'error', title: 'WebUI-Upload fehlgeschlagen', message, duration: 7000 })
+  } finally {
+    busy.value = false
+    progress.value = 0
+  }
 }
 
-onMounted(refreshAll)
+onMounted(refreshCachedStatus)
 </script>
 
 <style scoped>
-.www-page { display: flex; flex-direction: column; gap: 20px; }
-.panel { border: 1px solid var(--color-border-light); background: var(--color-surface); box-shadow: var(--shadow-sm); }
-.success-chip { color: var(--color-success); }
-.warning-chip { color: var(--color-warning); }
-.loading-panel { padding: 24px; border-radius: var(--radius-lg); display: flex; gap: 12px; align-items: center; }
-.status-grid, .release-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.status-card { padding: 20px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; }
-.status-card small, .label, .release-grid span, .compatibility-note { color: var(--color-text-secondary); }
-.label, .kicker { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
-.kicker { color: var(--color-primary); }
-.update-card { border-radius: var(--radius-xl); padding: 24px; }
-.primary-card { border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border-light)); }
-.card-heading { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
-.card-heading h2 { margin: 4px 0 6px; font-size: 1.35rem; }
-.card-heading p, .safety-card p { margin: 0; color: var(--color-text-secondary); }
-.version-badge { border-radius: var(--radius-full); background: var(--color-primary-soft); color: var(--color-primary); padding: 8px 12px; font-weight: 700; height: fit-content; }
-.release-grid { margin-bottom: 10px; }
-.release-grid > div { border-radius: var(--radius-md); background: var(--color-background); padding: 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.release-grid code { overflow: hidden; text-overflow: ellipsis; }
-.compatibility-note { margin: 0; font-size: .86rem; }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.progress-copy { display: flex; justify-content: space-between; margin: 16px 0 8px; }
-.track { height: 7px; border-radius: var(--radius-full); background: var(--color-border-light); overflow: hidden; }
-.track span { display: block; height: 100%; background: var(--color-primary); transition: width .2s ease; }
-.file-drop { min-height: 120px; border: 1.5px dashed var(--color-border); border-radius: var(--radius-lg); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 7px; cursor: pointer; padding: 20px; text-align: center; }
-.file-drop:hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
-.file-drop.disabled { opacity: .6; cursor: not-allowed; }
-.file-drop input { display: none; }
-.safety-card { border-radius: var(--radius-lg); padding: 18px 20px; display: flex; gap: 14px; align-items: flex-start; }
-@media (max-width: 800px) { .status-grid, .release-grid { grid-template-columns: 1fr; } .card-heading { flex-direction: column; } }
+.status-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:18px; }
+.content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.panel { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); }
+.status-card { padding:16px; display:flex; flex-direction:column; gap:5px; }
+.status-card .label,.status-card small { color:var(--color-text-secondary); font-size:.82rem; }
+.status-card strong { font-size:1rem; overflow-wrap:anywhere; }
+.update-card { padding:20px; display:flex; flex-direction:column; gap:16px; }
+.card-heading { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+.card-heading h2 { margin:.25rem 0; font-size:1.15rem; }
+.card-heading p { margin:0; color:var(--color-text-secondary); }
+.kicker { color:var(--color-primary-strong); font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.version-badge { padding:5px 9px; border-radius:999px; background:var(--color-primary-soft); font-weight:800; white-space:nowrap; }
+.release-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.release-grid div { padding:12px; border-radius:10px; background:var(--color-bg-alt); display:flex; flex-direction:column; gap:4px; }
+.release-grid span { color:var(--color-text-secondary); font-size:.8rem; }
+.release-grid strong { overflow-wrap:anywhere; }
+.actions { display:flex; flex-wrap:wrap; gap:10px; }
+.action-btn { display:inline-flex; gap:8px; align-items:center; text-decoration:none; }
+.file-drop { min-height:145px; border:2px dashed var(--color-border-strong); border-radius:14px; display:flex; flex-direction:column; gap:7px; align-items:center; justify-content:center; text-align:center; cursor:pointer; padding:18px; }
+.file-drop input { display:none; }
+.file-drop.invalid { border-color:var(--color-danger); }
+.file-drop.disabled { opacity:.6; cursor:not-allowed; }
+.file-drop small { color:var(--color-text-secondary); }
+.track { height:10px; border-radius:999px; background:var(--color-bg-alt); overflow:hidden; }
+.track span { display:block; height:100%; background:var(--color-primary); }
+.progress-panel { display:flex; flex-direction:column; gap:8px; }
+.progress-copy { display:flex; justify-content:space-between; gap:12px; }
+@media(max-width:900px){ .status-grid,.content-grid { grid-template-columns:1fr; } }
 </style>
