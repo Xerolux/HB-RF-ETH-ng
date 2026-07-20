@@ -6,71 +6,9 @@ on:
     types: [ opened, synchronize, reopened ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-pr387-refactor:
-    name: Apply guarded PR 387 refactor
-    if: >-
-      github.event.pull_request.number == 387 &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'fix/recovery-dns-webui-gzip' &&
-      github.event.pull_request.user.login == 'Xerolux'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout guarded head branch
-        uses: actions/checkout@v7
-        with:
-          repository: Xerolux/HB-RF-ETH-ng
-          ref: fix/recovery-dns-webui-gzip
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
-      - name: Keep unreachable legacy functions for safe linker GC
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('scripts/apply_pr387_refactor.py')
-          text = path.read_text(encoding='utf-8')
-          text = text.replace('text = text.replace("                            esp_https_ota\\n", "")\n', '')
-          text = text.replace('text = text.replace("    void performOnlineUpdate();\\n", "")\n', '')
-          text = text.replace('text = remove_function(text, "void UpdateCheck::performOnlineUpdate()", path)\n', '')
-          text = text.replace('text = text.replace(\'#include "esp_https_ota.h"\\n\', \'\')\n', '')
-          text = text.replace('text = remove_function(text, "static esp_err_t post_ota_url_handler_func", path)\n', '')
-          text = text.replace('for inc in [\'#include "esp_https_ota.h"\\n\', \'#include "esp_crt_bundle.h"\\n\', \'#include "ota_config.h"\\n\']:', 'for inc in []:')
-          path.write_text(text, encoding='utf-8')
-          PY
-
-      - name: Apply checked-in refactor
-        id: apply
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          test -f scripts/apply_pr387_refactor.py
-          python3 scripts/apply_pr387_refactor.py 2>&1 | tee refactor-error.log
-
-      - name: Upload refactor diagnostics
-        if: steps.apply.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: pr387-refactor-error
-          path: refactor-error.log
-          retention-days: 3
-
-      - name: Stop after refactor failure
-        if: steps.apply.outcome == 'failure'
-        run: exit 1
-
-      - name: Commit guarded branch
-        if: steps.apply.outcome == 'success'
-        run: |
-          rm scripts/apply_pr387_refactor.py refactor-error.log
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "refactor: keep update checks informational and manual"
-          git push origin HEAD:fix/recovery-dns-webui-gzip
-
   validate-pr:
     name: Validate Pull Request
     runs-on: ubuntu-latest
