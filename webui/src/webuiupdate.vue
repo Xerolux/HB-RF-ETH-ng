@@ -63,6 +63,9 @@
           <div><span>SHA-256</span><code>{{ shortHash(release.sha256) }}</code></div>
           <div><span>{{ text.imageSize }}</span><strong>{{ formatBytes(release.size) }}</strong></div>
         </div>
+        <p v-if="release.version" class="compatibility-note">
+          API {{ release.apiVersion ?? '—' }} · Firmware ≥ {{ release.minFirmwareVersion || '—' }}
+        </p>
 
         <div v-if="busy" class="progress-panel">
           <div class="progress-copy"><span>{{ progressLabel }}</span><strong>{{ progress }}%</strong></div>
@@ -119,6 +122,7 @@ import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useUiStore } from './stores.js'
 
+const WEBUI_API_VERSION = 1
 const { locale } = useI18n()
 const uiStore = useUiStore()
 
@@ -137,6 +141,7 @@ const translations = {
     downloading: 'WWW-Image wird geladen', verifying: 'SHA-256 wird geprüft', uploading: 'WWW-Image wird übertragen', completed: 'New Design wurde aktualisiert',
     noManifest: 'Dieses Release enthält noch kein separates New-Design-Image.', wrongDesign: 'Das Release-Manifest ist nicht für das New Design bestimmt.',
     sizeMismatch: 'Die Image-Größe passt nicht zur WWW-Partition.', hashMismatch: 'SHA-256-Prüfung fehlgeschlagen.',
+    incompatibleApi: 'Diese WebUI benötigt eine andere Firmware-API.', tooOldFirmware: 'Die installierte Firmware ist für diese WebUI zu alt.',
     invalidFile: 'Die Datei muss exakt zur WWW-Partition passen.', failed: 'WebUI-Update fehlgeschlagen.'
   },
   en: {
@@ -153,6 +158,7 @@ const translations = {
     downloading: 'Downloading WWW image', verifying: 'Verifying SHA-256', uploading: 'Uploading WWW image', completed: 'New Design updated',
     noManifest: 'This release does not include a separate New Design image yet.', wrongDesign: 'The release manifest is not intended for the New Design.',
     sizeMismatch: 'The image size does not match the WWW partition.', hashMismatch: 'SHA-256 verification failed.',
+    incompatibleApi: 'This WebUI requires a different firmware API.', tooOldFirmware: 'The installed firmware is too old for this WebUI.',
     invalidFile: 'The file must exactly match the WWW partition.', failed: 'WebUI update failed.'
   }
 }
@@ -166,14 +172,32 @@ const manifestError = ref('')
 const fileError = ref('')
 const selectedFile = ref(null)
 const release = ref({})
-const status = ref({ partitionFound: false, mounted: false, valid: false, updateActive: false, partitionSize: 0, totalBytes: 0, usedBytes: 0, bytesWritten: 0, version: '', design: 'newdesign', lastError: '' })
+const status = ref({ partitionFound: false, mounted: false, valid: false, updateActive: false, partitionSize: 0, totalBytes: 0, usedBytes: 0, bytesWritten: 0, version: '', firmwareVersion: '', design: 'newdesign', lastError: '' })
 
 const currentVersion = computed(() => status.value.version || 'embedded')
 const storagePercent = computed(() => {
   const total = status.value.totalBytes || status.value.partitionSize || 0
   return total ? Math.min(100, Math.round((status.value.usedBytes || 0) * 100 / total)) : 0
 })
-const onlineReady = computed(() => release.value?.design === 'newdesign' && release.value.downloadUrl && /^[0-9a-f]{64}$/i.test(release.value.sha256 || '') && Number(release.value.size) === Number(status.value.partitionSize) && status.value.partitionSize > 0)
+
+const compareVersions = (left = '', right = '') => {
+  const parse = value => {
+    const [core, pre = ''] = String(value).split('-', 2)
+    const numbers = core.split('.').map(part => Number(part) || 0)
+    return { numbers: [numbers[0] || 0, numbers[1] || 0, numbers[2] || 0], pre }
+  }
+  const a = parse(left)
+  const b = parse(right)
+  for (let index = 0; index < 3; index += 1) {
+    if (a.numbers[index] !== b.numbers[index]) return a.numbers[index] > b.numbers[index] ? 1 : -1
+  }
+  if (!a.pre && !b.pre) return 0
+  if (!a.pre) return 1
+  if (!b.pre) return -1
+  return a.pre.localeCompare(b.pre, undefined, { numeric: true, sensitivity: 'base' })
+}
+
+const onlineReady = computed(() => release.value?.design === 'newdesign' && release.value.downloadUrl && /^[0-9a-f]{64}$/i.test(release.value.sha256 || '') && Number(release.value.size) === Number(status.value.partitionSize) && Number(release.value.apiVersion) === WEBUI_API_VERSION && compareVersions(status.value.firmwareVersion, release.value.minFirmwareVersion) >= 0 && status.value.partitionSize > 0)
 const progressLabel = computed(() => ({ download: text.value.downloading, verify: text.value.verifying, upload: text.value.uploading, done: text.value.completed })[progressPhase.value] || text.value.completed)
 
 const formatBytes = (bytes) => {
@@ -194,8 +218,15 @@ const optionalBrowserSha256 = async (buffer) => {
 }
 
 const loadStatus = async () => {
-  const response = await axios.get('/api/webui/status', { timeout: 8000, silent: true })
-  status.value = { ...status.value, ...response.data }
+  const [storageResponse, systemResponse] = await Promise.all([
+    axios.get('/api/webui/status', { timeout: 8000, silent: true }),
+    axios.get('/sysinfo.json', { timeout: 8000, silent: true })
+  ])
+  status.value = {
+    ...status.value,
+    ...storageResponse.data,
+    firmwareVersion: systemResponse.data?.sysInfo?.currentVersion || ''
+  }
 }
 
 const loadReleaseManifest = async () => {
@@ -210,6 +241,8 @@ const loadReleaseManifest = async () => {
     if (item.design !== 'newdesign') return void (manifestError.value = text.value.wrongDesign)
     release.value = item
     if (Number(item.size) !== Number(status.value.partitionSize)) manifestError.value = text.value.sizeMismatch
+    else if (Number(item.apiVersion) !== WEBUI_API_VERSION) manifestError.value = text.value.incompatibleApi
+    else if (compareVersions(status.value.firmwareVersion, item.minFirmwareVersion) < 0) manifestError.value = `${text.value.tooOldFirmware} (≥ ${item.minFirmwareVersion})`
   } catch (error) {
     manifestError.value = error.response?.data?.message || error.message || text.value.noManifest
   }
@@ -259,7 +292,6 @@ const installOnline = async () => {
     const browserHash = await optionalBrowserSha256(buffer)
     if (browserHash && browserHash.toLowerCase() !== item.sha256.toLowerCase()) throw new Error(text.value.hashMismatch)
     progress.value = 50
-    // Always pass the trusted release hash. The ESP performs the mandatory check.
     await uploadBuffer(buffer, item.sha256)
   } catch (error) {
     uiStore.pushToast({ type: 'error', title: text.value.failed, message: errorMessage(error), duration: 7000 })
@@ -301,7 +333,7 @@ onMounted(refreshAll)
 .loading-panel { padding: 24px; border-radius: var(--radius-lg); display: flex; gap: 12px; align-items: center; }
 .status-grid, .release-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .status-card { padding: 20px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; }
-.status-card small, .label, .release-grid span { color: var(--color-text-secondary); }
+.status-card small, .label, .release-grid span, .compatibility-note { color: var(--color-text-secondary); }
 .label, .kicker { font-size: .76rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
 .kicker { color: var(--color-primary); }
 .update-card { border-radius: var(--radius-xl); padding: 24px; }
@@ -310,9 +342,10 @@ onMounted(refreshAll)
 .card-heading h2 { margin: 4px 0 6px; font-size: 1.35rem; }
 .card-heading p, .safety-card p { margin: 0; color: var(--color-text-secondary); }
 .version-badge { border-radius: var(--radius-full); background: var(--color-primary-soft); color: var(--color-primary); padding: 8px 12px; font-weight: 700; height: fit-content; }
-.release-grid { margin-bottom: 20px; }
+.release-grid { margin-bottom: 10px; }
 .release-grid > div { border-radius: var(--radius-md); background: var(--color-background); padding: 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .release-grid code { overflow: hidden; text-overflow: ellipsis; }
+.compatibility-note { margin: 0; font-size: .86rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 .progress-copy { display: flex; justify-content: space-between; margin: 16px 0 8px; }
 .track { height: 7px; border-radius: var(--radius-full); background: var(--color-border-light); overflow: hidden; }
