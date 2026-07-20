@@ -45,6 +45,6 @@ export function getBrowserLocale() {
     return langCode
   }
 
-  // Default to English
-  return 'en'
+  // Default to German
+  return 'de'
 }

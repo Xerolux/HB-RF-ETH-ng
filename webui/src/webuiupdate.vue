@@ -163,7 +163,7 @@ const translations = {
   }
 }
 
-const text = computed(() => translations[locale.value] || translations.en)
+const text = computed(() => translations[locale.value] || translations.de)
 const loading = ref(true)
 const busy = ref(false)
 const progress = ref(0)
