@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.5] - 2026-07-20
+
+### Changes
+- docs(changelog): record recovery, webui and mqtt fixes under [Unreleased]
+- fix(mqtt): drop duplicate version topics that produced two HA 'Firmware Version' sensors
+- refactor(webui): migrate 154 font-size declarations to type scale tokens
+- fix(webui): route header supporter chip to /settings?tab=license
+- fix(webui): recenter brand mark in BrandLogo.vue
+- refactor(webui): fix accent color picker and introduce type scale in main.css
+- fix(diag): unblock /recovery login by removing duplicate CSP header
+- chore: update manifests for v2.2.5-Beta.4
+
 ### Changes
 - fix: recovery page login was silently non-functional due to duplicate Content-Security-Policy headers. `httpd_resp_set_hdr()` appends rather than overwrites, so the recovery route emitted two CSP headers (one strict `script-src 'self'`, one permissive `'unsafe-inline'`); browsers enforce the intersection and blocked the page's inline script. Added `add_security_headers_inline_script()` in `security_headers.h` and switched the `/recovery` handler to use it instead of stacking both CSPs.
 - fix(webui): accent color picker in /theme now affects the whole New Design UI. Previously the three `body.newdesign-active` blocks in `main.css` hardcoded `--color-primary` to emerald green, which won the CSS cascade over the theme store's inline style on `<html>`. Removed the hardcoded overrides (light, dark, dark-shell); the subtree now inherits the value the store sets via `shiftColor()` / `rgbaColor()`. The hardcoded green login glow and hover-border literals were also replaced with `var(--color-primary-soft)`.

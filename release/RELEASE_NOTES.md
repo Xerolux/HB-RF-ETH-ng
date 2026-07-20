@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.5-Beta.4
+# 🚀 HB-RF-ETH-ng v2.2.5-Beta.5
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,46 +11,25 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.5-Beta.4?
+## 🆕 Was ist neu in v2.2.5-Beta.5?
 
 ### Changes
-- ci: remove Beta.4 release dispatcher
-- ci: trigger Beta.4 release
-- ci: prepare Beta.4 release dispatch
-- fix: recover WebUI and switch to safe manual updates
-- ci: remove completed manual-model trigger
-- ci: remove completed fixed-default workflow
-- ci: remove completed PR 387 refactor workflow
-- ci: remove obsolete firmware archive workflow
-- ci: remove obsolete New Design test workflow
-- ci: remove firmware archive generation from builds
-- ci: remove completed PR 387 maintenance job
-- ci: make guarded refactor failure diagnosable
-- ci: add guarded PR 387 refactor job
-- ci: add guarded PR 387 refactor runner
-- ci: trigger fixed UI defaults
-- ci: apply fixed New Design and restart sync defaults
-- ci: trigger final manual update model
-- ci: apply final manual update and fixed UI model
-- ci: trigger final gzip hotfix cleanup
-- ci: finalize gzip hotfix cleanup
-- ci: trigger corrected gzip hotfix
-- ci: fix gzip patch documentation path
-- ci: capture gzip patch diagnostics
-- ci: include staggered update-check guard
-- ci: prepare gzip and strict 24h hotfix
-- ci: remove completed Brotli fallback trigger
-- ci: remove completed Brotli fallback runner
-- ci: trigger Brotli fallback revision
-- ci: add Brotli fallback revision runner
-- ci: remove completed recovery hotfix trigger
-- ci: remove completed recovery hotfix runner
-- ci: trigger minimal recovery hotfix runner
-- ci: add minimal recovery hotfix runner
-- ci: remove broken recovery hotfix workflow
-- ci: trigger Beta.3 recovery hotfix
-- ci: apply Beta.3 recovery hotfix
-- chore: update manifests for v2.2.5-Beta.3
+- docs(changelog): record recovery, webui and mqtt fixes under [Unreleased]
+- fix(mqtt): drop duplicate version topics that produced two HA 'Firmware Version' sensors
+- refactor(webui): migrate 154 font-size declarations to type scale tokens
+- fix(webui): route header supporter chip to /settings?tab=license
+- fix(webui): recenter brand mark in BrandLogo.vue
+- refactor(webui): fix accent color picker and introduce type scale in main.css
+- fix(diag): unblock /recovery login by removing duplicate CSP header
+- chore: update manifests for v2.2.5-Beta.4
+
+### Changes
+- fix: recovery page login was silently non-functional due to duplicate Content-Security-Policy headers. `httpd_resp_set_hdr()` appends rather than overwrites, so the recovery route emitted two CSP headers (one strict `script-src 'self'`, one permissive `'unsafe-inline'`); browsers enforce the intersection and blocked the page's inline script. Added `add_security_headers_inline_script()` in `security_headers.h` and switched the `/recovery` handler to use it instead of stacking both CSPs.
+- fix(webui): accent color picker in /theme now affects the whole New Design UI. Previously the three `body.newdesign-active` blocks in `main.css` hardcoded `--color-primary` to emerald green, which won the CSS cascade over the theme store's inline style on `<html>`. Removed the hardcoded overrides (light, dark, dark-shell); the subtree now inherits the value the store sets via `shiftColor()` / `rgbaColor()`. The hardcoded green login glow and hover-border literals were also replaced with `var(--color-primary-soft)`.
+- fix(webui): the "Projekt unterstützen" / supporter chip in `NewDesignHeader.vue` now routes to `/settings?tab=license` (matching the hero chip on the dashboard) instead of the generic `/settings` landing on the "Allgemein" tab.
+- fix(webui): centered the brand mark in `BrandLogo.vue`. The three leaves' bounding box (incl. Bezier control points) was centred near (241.5, 263.5) within the 512×512 viewBox; a `transform="translate(15, -7)"` on the group recentres it without altering leaf geometry.
+- refactor(webui): introduced a unified type scale (`--fs-2xs` … `--fs-3xl`) and font-family tokens (`--font-sans`, `--font-mono`) in `main.css`. Migrated 154 ad-hoc `font-size: Xrem` declarations across 18 files to the scale, eliminating the dense 12.48/12.8/13.12/13.28/13.6/13.76/14.08px collision band. Consolidated four divergent monospace stacks (Consolas / Cascadia / SFMono / ui-monospace) plus two references to an undefined `--font-mono` onto the single token, and replaced one non-standard `font-weight: 650` with `600`.
+- fix(mqtt): removed duplicate version topics that produced two Home Assistant sensors named "Firmware Version". The legacy short topics `status/version` / `status/latest_version` (plus their HA discovery announcements) duplicated the explicit `firmware_version` / `latest_firmware_version` 1:1 after the dual-version refactor. Empty retained discovery payloads are now published for `sensor.version` and `sensor.latest_version` so HA deletes the duplicate entities automatically on the next status publish. The explicit set (`firmware_version`, `webui_version`, `latest_firmware_version`, `latest_webui_version`) is unchanged.
 
 ## ✨ Hauptfunktionen
 
@@ -90,7 +69,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.5-Beta.4.bin`)
+- **Firmware-Binary** (`firmware_2.2.5-Beta.5.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
