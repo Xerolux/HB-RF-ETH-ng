@@ -7,9 +7,6 @@
 
 using httpd_uri_func = esp_err_t (*)(httpd_req_t *request);
 
-// Increment only when the firmware/WebUI API contract changes incompatibly.
-constexpr uint32_t HB_WEBUI_API_VERSION = 1;
-
 struct WebUIStorageStatus
 {
     bool partitionFound;
@@ -20,9 +17,7 @@ struct WebUIStorageStatus
     size_t totalBytes;
     size_t usedBytes;
     size_t bytesWritten;
-    uint32_t apiVersion;
     char version[32];
-    char minFirmwareVersion[32];
     char lastError[96];
 };
 
