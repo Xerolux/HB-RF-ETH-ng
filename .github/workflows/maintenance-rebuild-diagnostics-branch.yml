@@ -1,0 +1,82 @@
+name: Rebuild diagnostics branch on main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout old feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs
+          path: old-feature
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout clean target branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/system-overview-theme-logs-v2
+          path: new-feature
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy feature-only files
+        run: |
+          set -euo pipefail
+          files=(
+            docs/SYSTEM_OVERVIEW_THEME_LOGS.md
+            include/log_manager.h
+            include/system_overview_api.h
+            include/theme_api.h
+            main/log_manager.cpp
+            main/system_overview_api.cpp
+            main/theme_api.cpp
+            main/webui.cpp
+            webui/src/composables/useHeaderNavigation.js
+            webui/src/main.js
+            webui/src/stores.js
+            webui/src/systemoverview.vue
+            webui/src/theme.vue
+          )
+          for file in "${files[@]}"; do
+            mkdir -p "new-feature/$(dirname "$file")"
+            cp "old-feature/$file" "new-feature/$file"
+          done
+
+      - name: Commit rebuilt feature branch
+        working-directory: new-feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            docs/SYSTEM_OVERVIEW_THEME_LOGS.md \
+            include/log_manager.h include/system_overview_api.h include/theme_api.h \
+            main/log_manager.cpp main/system_overview_api.cpp main/theme_api.cpp main/webui.cpp \
+            webui/src/composables/useHeaderNavigation.js webui/src/main.js webui/src/stores.js \
+            webui/src/systemoverview.vue webui/src/theme.vue
+          git commit -m "feat: add system overview recovery themes and efficient logs"
+          git push origin HEAD:feature/system-overview-theme-logs-v2
+
+      - name: Checkout main for cleanup
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          path: main-cleanup
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove maintenance workflow
+        working-directory: main-cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/maintenance-rebuild-diagnostics-branch.yml
+          git add .github/workflows/maintenance-rebuild-diagnostics-branch.yml
+          git commit -m "ci: remove completed diagnostics maintenance workflow"
+          git push origin main
