@@ -361,6 +361,50 @@ std::string LogManager::getLogSnapshot(uint64_t offset, uint64_t *snapshot_total
     return result;
 }
 
+size_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,
+                             size_t maximum_length) {
+    if (!absolute_offset || !destination || maximum_length == 0 ||
+        !_mutex || !log_buffer || log_buffer_size == 0) {
+        return 0;
+    }
+
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        return 0;
+    }
+
+    const uint64_t local_total = total_written;
+    uint64_t requested = *absolute_offset;
+    if (requested > local_total) requested = local_total;
+
+    const uint64_t oldest = local_total > log_buffer_size
+        ? local_total - log_buffer_size
+        : 0;
+    if (requested < oldest) requested = oldest;
+
+    const uint64_t available64 = local_total - requested;
+    const size_t available = available64 > SIZE_MAX
+        ? SIZE_MAX
+        : static_cast<size_t>(available64);
+    const size_t count = available < maximum_length
+        ? available
+        : maximum_length;
+
+    if (count > 0) {
+        const size_t start = static_cast<size_t>(requested % log_buffer_size);
+        const size_t first = (count < log_buffer_size - start)
+            ? count
+            : log_buffer_size - start;
+        memcpy(destination, log_buffer + start, first);
+        if (count > first) {
+            memcpy(destination + first, log_buffer, count - first);
+        }
+    }
+
+    *absolute_offset = requested + count;
+    xSemaphoreGive(_mutex);
+    return count;
+}
+
 uint64_t LogManager::getTotalWritten() const {
     uint64_t result = 0;
     if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {

@@ -2759,10 +2759,25 @@ esp_err_t get_log_download_handler_func(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"hb-rf-eth-log.txt\"");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
-    std::string content = LogManager::instance().getLogContent();
-    httpd_resp_send(req, content.c_str(), content.length());
+    uint64_t absolute_offset = 0;
+    char chunk[1024];
+    esp_err_t result = ESP_OK;
+    while (true)
+    {
+        const size_t count = LogManager::instance().readChunk(
+            &absolute_offset, chunk, sizeof(chunk));
+        if (count == 0) break;
 
-    return ESP_OK;
+        result = httpd_resp_send_chunk(req, chunk, count);
+        if (result != ESP_OK) break;
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    if (result == ESP_OK)
+    {
+        result = httpd_resp_send_chunk(req, nullptr, 0);
+    }
+    return result;
 }
 
 httpd_uri_t get_log_download_handler = {
