@@ -23,7 +23,7 @@ idf_component_register(SRCS ${app_sources}
                            nvs_flash
                            lwip
                            mbedtls
-                           json
+                           cjson
                            app_update
                            esp_adc
                            esp_partition
@@ -49,6 +49,6 @@ target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/icon-256.png.gz" BINAR
 target_add_binary_data(${COMPONENT_TARGET} "generated/archive.json.gz" BINARY)
 
 # Build a raw WWW image containing only the compressed New Design assets. The
-# resulting build/spiffs.bin is the file accepted by POST /api/webui/update and
-# can be published as an independent release asset.
+# resulting build/spiffs.bin is accepted by POST /api/webui/update and published
+# as the independent New Design release asset.
 spiffs_create_partition_image(spiffs "../webui/spiffs_image" FLASH_IN_PROJECT)
