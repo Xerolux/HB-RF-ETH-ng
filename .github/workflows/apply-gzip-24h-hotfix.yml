@@ -1,0 +1,40 @@
+name: Apply Gzip and Strict 24h Hotfix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/recovery-dns-webui-gzip
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Load and apply patch
+        run: |
+          set -euo pipefail
+          git fetch origin ops/beta3-release-status
+          git show origin/ops/beta3-release-status:scripts/apply_gzip_and_strict_24h_updates.py > /tmp/apply_patch.py
+          python3 /tmp/apply_patch.py
+
+      - name: Refresh package lock
+        run: |
+          cd webui
+          npm install --package-lock-only --ignore-scripts
+
+      - name: Commit hotfix branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: use gzip and enforce one update check per 24h"
+          git push origin HEAD:fix/recovery-dns-webui-gzip
