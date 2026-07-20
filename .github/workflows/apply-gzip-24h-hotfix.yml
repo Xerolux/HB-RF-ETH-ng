@@ -19,40 +19,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Load and apply patches
+      - name: Finalize guarded update-check changes
         run: |
-          set -u
+          set -euo pipefail
           git fetch origin ops/beta3-release-status
-          git show origin/ops/beta3-release-status:scripts/apply_gzip_and_strict_24h_updates.py > /tmp/apply_patch.py
-          git show origin/ops/beta3-release-status:scripts/apply_update_stagger_guard.py > /tmp/apply_stagger.py
-          sed -i 's#docs/HOTFIX_BETA3.md#docs/HOTFIX_BETA3_RECOVERY.md#g' /tmp/apply_patch.py
-          {
-            python3 /tmp/apply_patch.py
-            python3 /tmp/apply_stagger.py
-          } > /tmp/gzip-patch.log 2>&1
-          rc=$?
-          cat /tmp/gzip-patch.log
-          if [ "$rc" -ne 0 ]; then
-            git reset --hard
-            git checkout -B ops/beta3-release-status origin/ops/beta3-release-status
-            cp /tmp/gzip-patch.log gzip-patch-error.log
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add gzip-patch-error.log
-            git commit -m "ci: record gzip patch failure" || true
-            git push origin HEAD:ops/beta3-release-status
-            exit "$rc"
-          fi
-
-      - name: Refresh package lock
-        run: |
-          cd webui
-          npm install --package-lock-only --ignore-scripts
+          git show origin/ops/beta3-release-status:scripts/finalize_gzip_24h_hotfix.py > /tmp/finalize.py
+          python3 /tmp/finalize.py
 
       - name: Commit hotfix branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "fix: use gzip and enforce safe staggered 24h checks"
+          git commit -m "fix: compact and guard the daily update check"
           git push origin HEAD:fix/recovery-dns-webui-gzip
