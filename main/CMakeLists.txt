@@ -48,7 +48,9 @@ target_add_binary_data(${COMPONENT_TARGET} "../webui/dist/icon-256.png.gz" BINAR
 # /api/firmware_archive so the WebUI never has to fetch it live from GitHub.
 target_add_binary_data(${COMPONENT_TARGET} "generated/archive.json.gz" BINARY)
 
-# Build a raw WWW image containing only the compressed New Design assets. The
-# resulting build/spiffs.bin is accepted by POST /api/webui/update and published
-# as the independent New Design release asset.
+# Build the raw WWW image from the minimal Brotli-compressed New Design shell.
+# Optional PWA/icon assets stay embedded and are served through the fallback
+# handlers, preserving functionality while fitting the existing 320 KiB SPIFFS.
+# The resulting build/spiffs.bin is accepted by POST /api/webui/update and
+# published as the independent New Design release asset.
 spiffs_create_partition_image(spiffs "../webui/spiffs_image" FLASH_IN_PROJECT)
