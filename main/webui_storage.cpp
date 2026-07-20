@@ -6,20 +6,21 @@
 #include <strings.h>
 #include <sys/stat.h>
 
+#include "cJSON.h"
+#include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_partition.h"
 #include "esp_spiffs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 #include "mbedtls/md.h"
 
-#include "esp_http_server.h"
 #include "monitoring.h"
 #include "security_headers.h"
 
-// Implemented in webui.cpp. Keeping authentication in one place guarantees
-// that firmware and WWW updates use the same admin token and constant-time
-// comparison path.
+// Implemented in webui.cpp. Firmware and WWW updates intentionally share the
+// existing admin-token validation path.
 extern esp_err_t validate_auth(httpd_req_t *req);
 
 namespace
@@ -29,6 +30,8 @@ constexpr const char *PARTITION_LABEL = "spiffs";
 constexpr const char *BASE_PATH = "/www";
 constexpr size_t SHA256_HEX_LENGTH = 64;
 constexpr size_t UPDATE_BUFFER_SIZE = 2048;
+constexpr size_t INVALIDATE_SECTOR_SIZE = 0x1000;
+constexpr size_t MANIFEST_MAX_SIZE = 1024;
 
 SemaphoreHandle_t s_mutex = nullptr;
 const esp_partition_t *s_partition = nullptr;
@@ -85,29 +88,76 @@ void set_error_locked(const char *message, esp_err_t error = ESP_OK)
     ESP_LOGE(TAG, "%s", s_status.lastError);
 }
 
+void copy_json_safe(char *destination, size_t destination_size,
+                    const char *source)
+{
+    if (!destination || destination_size == 0) return;
+    destination[0] = '\0';
+    if (!source) return;
+
+    size_t out = 0;
+    for (size_t in = 0; source[in] && out + 1 < destination_size; ++in)
+    {
+        const unsigned char value = static_cast<unsigned char>(source[in]);
+        if (value < 0x20 || value == '"' || value == '\\')
+        {
+            destination[out++] = '_';
+        }
+        else
+        {
+            destination[out++] = static_cast<char>(value);
+        }
+    }
+    destination[out] = '\0';
+}
+
 bool is_regular_nonempty_file(const char *path)
 {
     struct stat st = {};
     return stat(path, &st) == 0 && S_ISREG(st.st_mode) && st.st_size > 0;
 }
 
-void read_version_locked()
+bool validate_manifest_locked()
 {
     s_status.version[0] = '\0';
 
-    FILE *file = fopen(BASE_PATH "/webui-version.txt", "r");
-    if (!file) return;
+    FILE *file = fopen(BASE_PATH "/webui-manifest.json", "rb");
+    if (!file) return false;
 
-    if (fgets(s_status.version, sizeof(s_status.version), file))
-    {
-        size_t length = strlen(s_status.version);
-        while (length > 0 &&
-               isspace(static_cast<unsigned char>(s_status.version[length - 1])))
-        {
-            s_status.version[--length] = '\0';
-        }
-    }
+    char manifest[MANIFEST_MAX_SIZE + 1] = {};
+    const size_t length = fread(manifest, 1, MANIFEST_MAX_SIZE, file);
+    const bool too_large = !feof(file);
+    const bool read_error = ferror(file);
     fclose(file);
+
+    if (read_error || too_large || length == 0) return false;
+    manifest[length] = '\0';
+
+    cJSON *root = cJSON_Parse(manifest);
+    if (!root) return false;
+
+    const cJSON *format = cJSON_GetObjectItemCaseSensitive(root, "format");
+    const cJSON *product = cJSON_GetObjectItemCaseSensitive(root, "product");
+    const cJSON *design = cJSON_GetObjectItemCaseSensitive(root, "design");
+    const cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "version");
+
+    const bool valid =
+        cJSON_IsNumber(format) && format->valueint == 1 &&
+        cJSON_IsString(product) && product->valuestring &&
+        strcmp(product->valuestring, "HB-RF-ETH-ng") == 0 &&
+        cJSON_IsString(design) && design->valuestring &&
+        strcmp(design->valuestring, "newdesign") == 0 &&
+        cJSON_IsString(version) && version->valuestring &&
+        version->valuestring[0] != '\0';
+
+    if (valid)
+    {
+        copy_json_safe(s_status.version, sizeof(s_status.version),
+                       version->valuestring);
+    }
+
+    cJSON_Delete(root);
+    return valid && s_status.version[0] != '\0';
 }
 
 bool validate_files_locked()
@@ -118,22 +168,17 @@ bool validate_files_locked()
         return false;
     }
 
-    // Only the New Design is supported. These are its mandatory build outputs;
-    // optional PWA assets may be absent without making the UI unusable.
+    // Only the New Design is accepted. The manifest prevents an old/alternate
+    // UI image from being activated even if it contains similarly named files.
     const bool valid =
         is_regular_nonempty_file(BASE_PATH "/index.html.gz") &&
         is_regular_nonempty_file(BASE_PATH "/main.js.gz") &&
-        is_regular_nonempty_file(BASE_PATH "/main.css.gz");
+        is_regular_nonempty_file(BASE_PATH "/main.css.gz") &&
+        is_regular_nonempty_file(BASE_PATH "/webui-manifest.json") &&
+        validate_manifest_locked();
 
     s_status.valid = valid;
-    if (valid)
-    {
-        read_version_locked();
-    }
-    else
-    {
-        s_status.version[0] = '\0';
-    }
+    if (!valid) s_status.version[0] = '\0';
     return valid;
 }
 
@@ -180,6 +225,39 @@ void unmount_locked()
     s_status.version[0] = '\0';
 }
 
+void sha_cleanup_locked()
+{
+    if (s_sha_ready)
+    {
+        mbedtls_md_free(&s_sha_context);
+        s_sha_ready = false;
+    }
+}
+
+void invalidate_image_locked(const char *message,
+                             esp_err_t original_error = ESP_OK)
+{
+    sha_cleanup_locked();
+    s_status.updateActive = false;
+    unmount_locked();
+
+    // Destroy the first SPIFFS sector so a partial, corrupt or hash-mismatched
+    // image can never mount on the next boot. The embedded New Design remains
+    // available as the safe recovery UI.
+    if (s_partition)
+    {
+        const esp_err_t erase_result = esp_partition_erase_range(
+            s_partition, 0, INVALIDATE_SECTOR_SIZE);
+        if (erase_result != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Could not invalidate failed WWW image: %s",
+                     esp_err_to_name(erase_result));
+        }
+    }
+
+    set_error_locked(message, original_error);
+}
+
 esp_err_t mount_locked()
 {
     find_partition_locked();
@@ -214,10 +292,20 @@ esp_err_t mount_locked()
     const esp_err_t result = esp_vfs_spiffs_register(&config);
     if (result != ESP_OK)
     {
-        // An empty partition is normal on devices upgraded from an older
-        // firmware. Never format automatically: the embedded New Design remains
-        // the recovery fallback until a verified WWW image has been installed.
-        set_error_locked("SPIFFS mount failed", result);
+        // Empty/unformatted is the expected state after upgrading an existing
+        // device. Never format automatically because the user may still be in
+        // the middle of the compatibility migration.
+        if (result == ESP_FAIL)
+        {
+            snprintf(s_status.lastError, sizeof(s_status.lastError),
+                     "Standalone New Design not installed");
+            ESP_LOGI(TAG, "%s; using embedded New Design",
+                     s_status.lastError);
+        }
+        else
+        {
+            set_error_locked("SPIFFS mount failed", result);
+        }
         return result;
     }
 
@@ -225,6 +313,12 @@ esp_err_t mount_locked()
     clear_error_locked();
     update_usage_locked();
     validate_files_locked();
+
+    if (!s_status.valid)
+    {
+        snprintf(s_status.lastError, sizeof(s_status.lastError),
+                 "No valid New Design manifest found");
+    }
 
     ESP_LOGI(TAG,
              "External New Design mounted: valid=%d, used=%u/%u bytes, version=%s",
@@ -259,15 +353,6 @@ void digest_to_hex(const unsigned char digest[32],
     output[SHA256_HEX_LENGTH] = '\0';
 }
 
-void sha_cleanup_locked()
-{
-    if (s_sha_ready)
-    {
-        mbedtls_md_free(&s_sha_context);
-        s_sha_ready = false;
-    }
-}
-
 const char *external_path_for_uri(const char *uri)
 {
     if (!uri) return nullptr;
@@ -295,13 +380,11 @@ struct WrappedRoute
     bool used = false;
     httpd_uri_t replacement = {};
     httpd_uri_func originalHandler = nullptr;
-    void *originalUserContext = nullptr;
     const char *externalPath = nullptr;
     const char *contentType = nullptr;
-    bool firmwareUpdateRoute = false;
 };
 
-WrappedRoute s_wrapped_routes[8];
+WrappedRoute s_wrapped_routes[10];
 
 WrappedRoute *allocate_route()
 {
@@ -324,8 +407,8 @@ esp_err_t stream_external_file(httpd_req_t *req, WrappedRoute *route)
     add_security_headers(req);
     httpd_resp_set_type(req, route->contentType);
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    // Asset names are currently stable rather than content-hashed. Disable
-    // browser caching so a successful WWW update is visible immediately.
+    // Stable filenames are used instead of hashes, therefore an updated WWW
+    // image must not be hidden by a stale browser cache.
     httpd_resp_set_hdr(req, "Cache-Control",
                        "no-store, no-cache, must-revalidate, max-age=0");
 
@@ -362,10 +445,8 @@ esp_err_t wrapped_asset_handler(httpd_req_t *req)
     if (webui_storage_is_valid())
     {
         const esp_err_t result = stream_external_file(req, route);
-        if (result != ESP_ERR_NOT_FOUND)
-        {
-            return result;
-        }
+        if (result != ESP_ERR_NOT_FOUND) return result;
+
         ESP_LOGW(TAG, "External asset missing despite valid image: %s",
                  route->externalPath);
     }
@@ -384,8 +465,8 @@ esp_err_t wrapped_firmware_update_handler(httpd_req_t *req)
     if (status.updateActive)
     {
         add_security_headers(req);
-        return httpd_resp_send_err(req, HTTPD_409_CONFLICT,
-                                   "WWW update already in progress");
+        return httpd_resp_send_custom_err(req, "409 Conflict",
+                                          "WWW update already in progress");
     }
     return route->originalHandler(req);
 }
@@ -399,12 +480,17 @@ esp_err_t get_webui_status_handler(httpd_req_t *req)
     }
 
     const WebUIStorageStatus status = webui_storage_get_status();
+    char safe_version[sizeof(status.version)];
+    char safe_error[sizeof(status.lastError)];
+    copy_json_safe(safe_version, sizeof(safe_version), status.version);
+    copy_json_safe(safe_error, sizeof(safe_error), status.lastError);
+
     char response[512];
     snprintf(response, sizeof(response),
              "{\"partitionFound\":%s,\"mounted\":%s,\"valid\":%s,"
              "\"updateActive\":%s,\"partitionSize\":%u,\"totalBytes\":%u,"
              "\"usedBytes\":%u,\"bytesWritten\":%u,\"version\":\"%s\","
-             "\"lastError\":\"%s\"}",
+             "\"design\":\"newdesign\",\"lastError\":\"%s\"}",
              status.partitionFound ? "true" : "false",
              status.mounted ? "true" : "false",
              status.valid ? "true" : "false",
@@ -413,8 +499,8 @@ esp_err_t get_webui_status_handler(httpd_req_t *req)
              static_cast<unsigned>(status.totalBytes),
              static_cast<unsigned>(status.usedBytes),
              static_cast<unsigned>(status.bytesWritten),
-             status.version,
-             status.lastError);
+             safe_version,
+             safe_error);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control",
@@ -447,8 +533,8 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
 
     if (net_fetch_ota_active())
     {
-        return httpd_resp_send_err(req, HTTPD_409_CONFLICT,
-                                   "Firmware OTA already in progress");
+        return httpd_resp_send_custom_err(req, "409 Conflict",
+                                          "Firmware OTA already in progress");
     }
 
     bool net_locked = false;
@@ -456,16 +542,15 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     {
         if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(1000)) != pdTRUE)
         {
-            return httpd_resp_send_err(req, HTTPD_503_SERVICE_UNAVAILABLE,
-                                       "Update subsystem busy");
+            return httpd_resp_send_custom_err(req, "503 Service Unavailable",
+                                              "Update subsystem busy");
         }
         net_locked = true;
     }
 
     char expected_sha256[SHA256_HEX_LENGTH + 1] = {};
-    const esp_err_t header_result = httpd_req_get_hdr_value_str(
-        req, "X-WebUI-SHA256", expected_sha256, sizeof(expected_sha256));
-    if (header_result != ESP_OK)
+    if (httpd_req_get_hdr_value_str(req, "X-WebUI-SHA256", expected_sha256,
+                                    sizeof(expected_sha256)) != ESP_OK)
     {
         expected_sha256[0] = '\0';
     }
@@ -475,8 +560,11 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     if (result != ESP_OK)
     {
         if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+        const WebUIStorageStatus status = webui_storage_get_status();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                   "Could not start WWW update");
+                                   status.lastError[0]
+                                       ? status.lastError
+                                       : "Could not start WWW update");
     }
 
     uint8_t buffer[UPDATE_BUFFER_SIZE];
@@ -535,10 +623,14 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     }
 
     const WebUIStorageStatus status = webui_storage_get_status();
-    char response[160];
+    char safe_version[sizeof(status.version)];
+    copy_json_safe(safe_version, sizeof(safe_version), status.version);
+
+    char response[192];
     snprintf(response, sizeof(response),
-             "{\"success\":true,\"reload\":true,\"version\":\"%s\"}",
-             status.version);
+             "{\"success\":true,\"reload\":true,\"design\":\"newdesign\","
+             "\"version\":\"%s\"}",
+             safe_version);
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, response, HTTPD_RESP_USE_STRLEN);
 }
@@ -561,6 +653,9 @@ void register_storage_endpoints_once(httpd_handle_t server)
 {
     if (s_registered_server == server) return;
 
+    // Mark first to prevent duplicate registration when one endpoint fails.
+    // The normal WebUI must continue even if the optional WWW API is unavailable.
+    s_registered_server = server;
     webui_storage_init();
 
     const esp_err_t status_result =
@@ -572,10 +667,7 @@ void register_storage_endpoints_once(httpd_handle_t server)
     {
         ESP_LOGE(TAG, "Could not register WWW update endpoints: status=%s update=%s",
                  esp_err_to_name(status_result), esp_err_to_name(update_result));
-        return;
     }
-
-    s_registered_server = server;
 }
 
 } // namespace
@@ -628,9 +720,11 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
         set_error_locked("SPIFFS partition not found");
         return ESP_ERR_NOT_FOUND;
     }
-    if (expectedSize == 0 || expectedSize > s_partition->size)
+    // spiffs_create_partition_image() produces an image exactly as large as its
+    // partition. Requiring the full size rejects arbitrary files before erase.
+    if (expectedSize != s_partition->size)
     {
-        set_error_locked("WWW image does not fit partition");
+        set_error_locked("WWW image size does not match SPIFFS partition");
         return ESP_ERR_INVALID_SIZE;
     }
     if (!valid_sha256_hex(expectedSha256Hex))
@@ -646,8 +740,7 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
         esp_partition_erase_range(s_partition, 0, s_partition->size);
     if (erase_result != ESP_OK)
     {
-        set_error_locked("Could not erase WWW partition", erase_result);
-        mount_locked();
+        invalidate_image_locked("Could not erase WWW partition", erase_result);
         return erase_result;
     }
 
@@ -659,8 +752,7 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
         mbedtls_md_starts(&s_sha_context) != 0)
     {
         mbedtls_md_free(&s_sha_context);
-        set_error_locked("Could not initialize WWW SHA-256");
-        mount_locked();
+        invalidate_image_locked("Could not initialize WWW SHA-256");
         return ESP_ERR_NO_MEM;
     }
 
@@ -678,7 +770,7 @@ esp_err_t webui_storage_update_begin(size_t expectedSize,
     s_status.valid = false;
     clear_error_locked();
 
-    ESP_LOGI(TAG, "Starting separate WWW update: %u bytes%s",
+    ESP_LOGI(TAG, "Starting separate New Design update: %u bytes%s",
              static_cast<unsigned>(expectedSize),
              s_expected_sha256[0] ? " with SHA-256 verification" : "");
     return ESP_OK;
@@ -729,20 +821,14 @@ esp_err_t webui_storage_update_finish()
     }
     if (s_status.bytesWritten != s_expected_size)
     {
-        set_error_locked("Incomplete WWW image");
-        sha_cleanup_locked();
-        s_status.updateActive = false;
-        mount_locked();
+        invalidate_image_locked("Incomplete WWW image");
         return ESP_ERR_INVALID_SIZE;
     }
 
     unsigned char digest[32] = {};
     if (mbedtls_md_finish(&s_sha_context, digest) != 0)
     {
-        set_error_locked("Could not finalize WWW SHA-256");
-        sha_cleanup_locked();
-        s_status.updateActive = false;
-        mount_locked();
+        invalidate_image_locked("Could not finalize WWW SHA-256");
         return ESP_FAIL;
     }
     sha_cleanup_locked();
@@ -752,9 +838,7 @@ esp_err_t webui_storage_update_finish()
     if (s_expected_sha256[0] &&
         strcasecmp(actual_sha256, s_expected_sha256) != 0)
     {
-        set_error_locked("WWW SHA-256 mismatch");
-        s_status.updateActive = false;
-        mount_locked();
+        invalidate_image_locked("WWW SHA-256 mismatch");
         return ESP_ERR_INVALID_CRC;
     }
 
@@ -762,16 +846,15 @@ esp_err_t webui_storage_update_finish()
     const esp_err_t mount_result = mount_locked();
     if (mount_result != ESP_OK || !validate_files_locked())
     {
-        if (!s_status.lastError[0])
-        {
-            set_error_locked("WWW image is missing mandatory New Design files");
-        }
+        invalidate_image_locked(
+            "WWW image is not a valid HB-RF-ETH-ng New Design image",
+            mount_result == ESP_OK ? ESP_ERR_INVALID_RESPONSE : mount_result);
         return mount_result == ESP_OK ? ESP_ERR_INVALID_RESPONSE : mount_result;
     }
 
     update_usage_locked();
     clear_error_locked();
-    ESP_LOGI(TAG, "Separate WWW update installed successfully, version=%s",
+    ESP_LOGI(TAG, "Separate New Design installed successfully, version=%s",
              s_status.version[0] ? s_status.version : "unknown");
     return ESP_OK;
 }
@@ -781,13 +864,8 @@ void webui_storage_update_abort()
     StorageLock lock;
     if (!lock) return;
 
-    sha_cleanup_locked();
-    s_status.updateActive = false;
-    if (!s_status.lastError[0])
-    {
-        set_error_locked("WWW update aborted");
-    }
-    mount_locked();
+    invalidate_image_locked(
+        s_status.lastError[0] ? s_status.lastError : "WWW update aborted");
 }
 
 esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
@@ -819,8 +897,6 @@ esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
 
     route->replacement = *uri_handler;
     route->originalHandler = uri_handler->handler;
-    route->originalUserContext = uri_handler->user_ctx;
-    route->firmwareUpdateRoute = firmware_update_route;
 
     if (firmware_update_route)
     {
