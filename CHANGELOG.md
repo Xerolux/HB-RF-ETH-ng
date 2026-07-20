@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+- fix: recovery page login was silently non-functional due to duplicate Content-Security-Policy headers. `httpd_resp_set_hdr()` appends rather than overwrites, so the recovery route emitted two CSP headers (one strict `script-src 'self'`, one permissive `'unsafe-inline'`); browsers enforce the intersection and blocked the page's inline script. Added `add_security_headers_inline_script()` in `security_headers.h` and switched the `/recovery` handler to use it instead of stacking both CSPs.
+- fix(webui): accent color picker in /theme now affects the whole New Design UI. Previously the three `body.newdesign-active` blocks in `main.css` hardcoded `--color-primary` to emerald green, which won the CSS cascade over the theme store's inline style on `<html>`. Removed the hardcoded overrides (light, dark, dark-shell); the subtree now inherits the value the store sets via `shiftColor()` / `rgbaColor()`. The hardcoded green login glow and hover-border literals were also replaced with `var(--color-primary-soft)`.
+- fix(webui): the "Projekt unterstützen" / supporter chip in `NewDesignHeader.vue` now routes to `/settings?tab=license` (matching the hero chip on the dashboard) instead of the generic `/settings` landing on the "Allgemein" tab.
+- fix(webui): centered the brand mark in `BrandLogo.vue`. The three leaves' bounding box (incl. Bezier control points) was centred near (241.5, 263.5) within the 512×512 viewBox; a `transform="translate(15, -7)"` on the group recentres it without altering leaf geometry.
+- refactor(webui): introduced a unified type scale (`--fs-2xs` … `--fs-3xl`) and font-family tokens (`--font-sans`, `--font-mono`) in `main.css`. Migrated 154 ad-hoc `font-size: Xrem` declarations across 18 files to the scale, eliminating the dense 12.48/12.8/13.12/13.28/13.6/13.76/14.08px collision band. Consolidated four divergent monospace stacks (Consolas / Cascadia / SFMono / ui-monospace) plus two references to an undefined `--font-mono` onto the single token, and replaced one non-standard `font-weight: 650` with `600`.
+- fix(mqtt): removed duplicate version topics that produced two Home Assistant sensors named "Firmware Version". The legacy short topics `status/version` / `status/latest_version` (plus their HA discovery announcements) duplicated the explicit `firmware_version` / `latest_firmware_version` 1:1 after the dual-version refactor. Empty retained discovery payloads are now published for `sensor.version` and `sensor.latest_version` so HA deletes the duplicate entities automatically on the next status publish. The explicit set (`firmware_version`, `webui_version`, `latest_firmware_version`, `latest_webui_version`) is unchanged.
+
 ## [2.2.5-Beta.4] - 2026-07-20
 
 ### Changes
