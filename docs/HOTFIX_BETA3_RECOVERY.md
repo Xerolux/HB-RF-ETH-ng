@@ -46,7 +46,7 @@ link. The ESP32 never downloads and installs the offered BIN file itself.
 - WebUI is installed manually under **System → WebUI**.
 - MQTT does not provide an update-install command.
 - The former URL-OTA route, install-capable Home Assistant update entity and
-  firmware archive are not exposed.
+  firmware archive are not exposed or embedded in the firmware.
 
 The firmware upload page rejects a 320-KiB WebUI image and verifies the ESP32
 image magic byte. The WebUI page rejects firmware filenames and requires the
@@ -67,3 +67,6 @@ experimental functions are currently available.
 The footer, system overview and MQTT status report firmware and WebUI versions
 separately. MQTT also publishes the latest known firmware/WebUI versions and
 separate informational update-available flags.
+
+The final verification covers the WebUI build, translation audit, gzip-only
+320-KiB WWW image, ESP-IDF firmware build, size limits and security analysis.
