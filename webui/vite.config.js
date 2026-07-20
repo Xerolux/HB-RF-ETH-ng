@@ -9,6 +9,8 @@ const packageMetadata = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 )
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 /**
  * Cache-busting for the embedded ESP32 WebUI.
  *
@@ -29,7 +31,7 @@ function cacheBustingPlugin() {
         const assetPath = join(outDir, file)
         if (!existsSync(assetPath)) continue
         const hash = createHash('sha256').update(readFileSync(assetPath)).digest('hex').slice(0, 8)
-        const escaped = file.replace(/\./g, '\\.')
+        const escaped = escapeRegExp(file)
         const refPattern = new RegExp(`(["'(=\\s]/?${escaped})\\?v=[a-f0-9]{1,16}`, 'g')
         html = html.replace(refPattern, '$1')
         const plainPattern = new RegExp(`(["'(=\\s]/?${escaped})(["'#?])`, 'g')
