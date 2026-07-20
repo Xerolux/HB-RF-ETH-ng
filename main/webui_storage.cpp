@@ -210,9 +210,9 @@ bool validate_manifest_locked()
         cJSON_IsString(version) && version->valuestring &&
         version->valuestring[0] != '\0' &&
         cJSON_IsString(js_encoding) && js_encoding->valuestring &&
-        strcmp(js_encoding->valuestring, "br") == 0 &&
+        strcmp(js_encoding->valuestring, "gzip") == 0 &&
         cJSON_IsString(css_encoding) && css_encoding->valuestring &&
-        strcmp(css_encoding->valuestring, "br") == 0;
+        strcmp(css_encoding->valuestring, "gzip") == 0;
 
     if (valid)
     {
@@ -232,12 +232,12 @@ bool validate_files_locked()
         return false;
     }
 
-    // Only the New Design is accepted. Brotli keeps the complete single-file
-    // Vue application inside the existing 320 KiB partition.
+    // Only the New Design is accepted. Gzip works reliably on the device
+    // private-LAN HTTP origin.
     const bool valid =
         is_regular_nonempty_file(BASE_PATH "/index.html.gz") &&
-        is_regular_nonempty_file(BASE_PATH "/main.js.br") &&
-        is_regular_nonempty_file(BASE_PATH "/main.css.br") &&
+        is_regular_nonempty_file(BASE_PATH "/main.js.gz") &&
+        is_regular_nonempty_file(BASE_PATH "/main.css.gz") &&
         is_regular_nonempty_file(BASE_PATH "/webui-manifest.json") &&
         validate_manifest_locked();
 
@@ -438,8 +438,8 @@ struct AssetSpec
 };
 
 constexpr AssetSpec ASSET_SPECS[] = {
-    {"/main.js", BASE_PATH "/main.js.br", "application/javascript", "br"},
-    {"/main.css", BASE_PATH "/main.css.br", "text/css", "br"},
+    {"/main.js", BASE_PATH "/main.js.gz", "application/javascript", "gzip"},
+    {"/main.css", BASE_PATH "/main.css.gz", "text/css", "gzip"},
     {"/favicon.ico", BASE_PATH "/favicon.ico.gz", "image/x-icon", "gzip"},
     {"/manifest.webmanifest", BASE_PATH "/manifest.webmanifest.gz", "application/manifest+json", "gzip"},
     {"/icon-256.png", BASE_PATH "/icon-256.png.gz", "image/png", "gzip"},

@@ -580,19 +580,35 @@ const loadFirmwareArchive = async () => {
   }
 }
 
-const handleFileSelect = (event) => {
-  const selectedFile = event.target.files[0]
-  if (selectedFile && selectedFile.name.endsWith('.bin')) {
-    file.value = selectedFile
-  }
+const WEBUI_IMAGE_SIZE = 0x50000
+const isWebUiImage = (selectedFile) => {
+  if (!selectedFile) return false
+  const name = String(selectedFile.name || '').toLowerCase()
+  return name.startsWith('webui_')
+    || name === 'spiffs.bin'
+    || Number(selectedFile.size) === WEBUI_IMAGE_SIZE
 }
+
+const acceptFirmwareFile = (selectedFile) => {
+  if (!selectedFile || !selectedFile.name.toLowerCase().endsWith('.bin')) return
+  if (isWebUiImage(selectedFile)) {
+    clearFile()
+    uiStore.pushToast({
+      type: 'warning',
+      title: 'WebUI-Datei erkannt',
+      message: 'Diese Datei unter System → WebUI installieren, nicht als Firmware.',
+      duration: 7000
+    })
+    return
+  }
+  file.value = selectedFile
+}
+
+const handleFileSelect = (event) => acceptFirmwareFile(event.target.files[0])
 
 const handleDrop = (event) => {
   isDragging.value = false
-  const selectedFile = event.dataTransfer.files[0]
-  if (selectedFile && selectedFile.name.endsWith('.bin')) {
-    file.value = selectedFile
-  }
+  acceptFirmwareFile(event.dataTransfer.files[0])
 }
 
 const clearFile = () => {

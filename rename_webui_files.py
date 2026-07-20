@@ -61,8 +61,8 @@ def build_spiffs_source(dist_dir: Path) -> None:
 
     assets = [
         "index.html.gz",
-        "main.js.br",
-        "main.css.br",
+        "main.js.gz",
+        "main.css.gz",
     ]
 
     missing = [name for name in assets if not (dist_dir / name).is_file()]
@@ -87,8 +87,8 @@ def build_spiffs_source(dist_dir: Path) -> None:
         "assets": assets,
         "encodings": {
             "index.html": "gzip",
-            "main.js": "br",
-            "main.css": "br",
+            "main.js": "gzip",
+            "main.css": "gzip",
         },
         "embeddedFallbackAssets": [
             "favicon.ico.gz",

@@ -81,6 +81,13 @@ $('restart').onclick=async()=>{if(busy)return status('Ein Update läuft bereits.
 esp_err_t get_recovery_page(httpd_req_t *req)
 {
     add_security_headers(req);
+    // Recovery is a static self-contained document. Permit only this route's
+    // own inline script; the normal New Design retains the strict global CSP.
+    httpd_resp_set_hdr(req, "Content-Security-Policy",
+                       "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                       "script-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                       "connect-src 'self'; font-src 'self' data:; object-src 'none'; "
+                       "base-uri 'self'; form-action 'self'; frame-ancestors 'self';");
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     return httpd_resp_send(req, RECOVERY_PAGE, HTTPD_RESP_USE_STRLEN);

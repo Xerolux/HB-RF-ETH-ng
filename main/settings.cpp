@@ -172,8 +172,20 @@ void Settings::load()
   GET_IP_ADDR(handle, "localIP", _localIP, IPADDR_ANY);
   GET_IP_ADDR(handle, "netmask", _netmask, IPADDR_ANY);
   GET_IP_ADDR(handle, "gateway", _gateway, IPADDR_ANY);
-  GET_IP_ADDR(handle, "dns1", _dns1, IPADDR_ANY);
+
+  // Use Cloudflare DNS when no primary DNS was stored. Existing non-empty
+  // user settings remain authoritative. Legacy 0.0.0.0 values are migrated
+  // once so static IPv4 installations can resolve NTP and OTA hosts.
+  ip4_addr_t defaultDns1;
+  IP4_ADDR(&defaultDns1, 1, 1, 1, 1);
+  GET_IP_ADDR(handle, "dns1", _dns1, defaultDns1.addr);
   GET_IP_ADDR(handle, "dns2", _dns2, IPADDR_ANY);
+  if (_dns1.addr == IPADDR_ANY || _dns1.addr == IPADDR_NONE)
+  {
+    _dns1 = defaultDns1;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, "dns1", _dns1.addr));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_commit(handle));
+  }
 
   GET_INT(handle, "timesource", _timesource, TIMESOURCE_NTP);
   if (_timesource < TIMESOURCE_NTP || _timesource > TIMESOURCE_GPS)
