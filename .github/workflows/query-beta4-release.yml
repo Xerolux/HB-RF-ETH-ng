@@ -1,0 +1,40 @@
+name: Query Beta.4 Release Status
+
+on:
+  push:
+    branches:
+      - ops/beta4-release-status
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  query:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout status branch
+        uses: actions/checkout@v7
+        with:
+          ref: ops/beta4-release-status
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Query release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run list \
+            --repo "${{ github.repository }}" \
+            --workflow release.yml \
+            --limit 10 \
+            --json databaseId,status,conclusion,createdAt,displayTitle,event,headSha,url \
+            > beta4-release-status.json
+
+      - name: Commit status report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add beta4-release-status.json
+          git commit -m "ci: record Beta.4 release status"
+          git push origin HEAD:ops/beta4-release-status
