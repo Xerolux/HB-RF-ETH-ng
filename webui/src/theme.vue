@@ -1,5 +1,84 @@
 <template>
-  <div class="page-shell theme-page">
+  <!-- When `embedded` is true (rendered inside Settings → Design tab), skip the
+       page-shell + hero wrapper and render only the grid + alert so the parent
+       page supplies the hero. Otherwise behave as the standalone /theme page. -->
+  <div v-if="embedded">
+    <section class="theme-grid">
+      <article class="theme-card">
+        <div class="card-heading">
+          <span class="icon-badge soft"><AppIcon name="moon" /></span>
+          <div><h2>{{ copy.scheme }}</h2><p>{{ copy.schemeHint }}</p></div>
+        </div>
+        <div class="scheme-selector">
+          <button
+            v-for="option in schemes"
+            :key="option.value"
+            type="button"
+            class="scheme-option"
+            :class="{ active: themeStore.theme === option.value }"
+            @click="themeStore.setTheme(option.value)"
+          >
+            <AppIcon :name="option.icon" />
+            <strong>{{ option.label }}</strong>
+          </button>
+        </div>
+      </article>
+
+      <article class="theme-card">
+        <div class="card-heading">
+          <span class="icon-badge info"><AppIcon name="sun" /></span>
+          <div><h2>{{ copy.accent }}</h2><p>{{ copy.accentHint }}</p></div>
+        </div>
+        <div class="color-presets">
+          <button
+            v-for="preset in presets"
+            :key="preset"
+            type="button"
+            class="color-preset"
+            :class="{ active: themeStore.primaryColor === preset }"
+            :style="{ background: preset }"
+            :aria-label="preset"
+            @click="themeStore.setPrimaryColor(preset)"
+          ></button>
+        </div>
+        <label class="custom-color">
+          <span>{{ copy.custom }}</span>
+          <input
+            type="color"
+            :value="themeStore.primaryColor"
+            @input="previewColor"
+            @change="saveColor"
+          />
+          <code>{{ pendingColor }}</code>
+        </label>
+      </article>
+
+      <article class="theme-card preview-card">
+        <div class="card-heading">
+          <span class="icon-badge success"><AppIcon name="check" /></span>
+          <div><h2>{{ copy.preview }}</h2><p>{{ copy.previewHint }}</p></div>
+        </div>
+        <div class="preview-panel">
+          <div class="preview-header">
+            <span class="preview-logo"></span>
+            <strong>HB-RF-ETH-ng</strong>
+            <span class="preview-status">{{ copy.online }}</span>
+          </div>
+          <div class="preview-content">
+            <div class="preview-metric"><span>CPU</span><strong>12%</strong><i style="width:12%"></i></div>
+            <div class="preview-metric"><span>RAM</span><strong>43%</strong><i style="width:43%"></i></div>
+            <button type="button" class="preview-button">{{ copy.action }}</button>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <BAlert variant="info" :model-value="true" class="theme-footnote-alert">
+      {{ copy.deviceWide }}
+    </BAlert>
+  </div>
+
+  <div v-else class="page-shell theme-page">
     <section class="page-hero">
       <div class="hero-copy">
         <span class="hero-eyebrow"><AppIcon name="sun" /> {{ copy.eyebrow }}</span>
@@ -93,6 +172,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useThemeStore } from './stores.js'
 
+defineProps({
+  // Render only the inner theme grid + footnote (no page-shell / hero), for
+  // embedding inside the Settings → Design tab (Korrekturauftrag §5).
+  embedded: { type: Boolean, default: false }
+})
+
 const { locale } = useI18n()
 const themeStore = useThemeStore()
 const pendingColor = ref(themeStore.primaryColor)
@@ -148,7 +233,7 @@ const saveColor = (event) => themeStore.setPrimaryColor(event.target.value, true
 .theme-card { border: 1px solid var(--color-border-light); background: var(--color-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-sm); padding: 24px; }
 .preview-card { grid-column: 1 / -1; }
 .card-heading { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 20px; }
-.card-heading h2 { font-size: var(--fs-xl); }
+.card-heading h2 { font-size: var(--fs-xl); font-weight: var(--font-weight-bold); }
 .card-heading p { color: var(--color-text-secondary); margin-top: 4px; }
 .scheme-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .scheme-option { border: 1px solid var(--color-border); background: var(--color-bg-alt); color: var(--color-text); border-radius: var(--radius-md); min-height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
@@ -161,11 +246,16 @@ const saveColor = (event) => themeStore.setPrimaryColor(event.target.value, true
 .preview-panel { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; background: var(--color-bg); }
 .preview-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: var(--color-surface); border-bottom: 1px solid var(--color-border-light); }
 .preview-logo { width: 24px; height: 24px; border-radius: 8px; background: var(--color-primary); }
-.preview-status { margin-left: auto; color: var(--color-success); font-size: var(--fs-xs); font-weight: 700; }
+.preview-status { margin-left: auto; color: var(--color-success); font-size: var(--fs-xs); font-weight: var(--font-weight-bold); }
 .preview-content { display: grid; grid-template-columns: repeat(2, 1fr) auto; gap: 14px; align-items: end; padding: 20px; }
 .preview-metric { position: relative; padding: 14px; border-radius: var(--radius-md); background: var(--color-surface); display: flex; justify-content: space-between; overflow: hidden; }
 .preview-metric i { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--color-primary); }
-.preview-button { border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: white; min-height: 48px; padding: 0 22px; font-weight: 700; }
+.preview-button { border: 0; border-radius: var(--radius-md); background: var(--color-primary); color: white; min-height: 48px; padding: 0 22px; font-weight: var(--font-weight-bold); }
+
+/* Embedded mode (Settings → Design tab): the footnote alert sits a bit closer
+   since there's no page-hero above it. */
+.theme-footnote-alert { margin-top: 16px; }
+
 @media (max-width: 760px) { .theme-grid { grid-template-columns: 1fr; } .preview-card { grid-column: auto; } .preview-content { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .scheme-selector { grid-template-columns: 1fr; } .custom-color { grid-template-columns: 1fr auto; } .custom-color code { grid-column: 1 / -1; } }
 </style>

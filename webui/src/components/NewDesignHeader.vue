@@ -11,7 +11,7 @@
           <span>{{ t('update.updateNow') }}</span>
         </div>
         <div class="update-banner-actions">
-          <BButton size="sm" variant="primary" to="/firmware" @click="mobileMenuOpen = false">
+          <BButton size="sm" variant="primary" to="/updates/firmware" @click="mobileMenuOpen = false">
             <AppIcon name="download" />
             {{ t('update.updateNow') }}
           </BButton>
@@ -38,18 +38,31 @@
           class="side-nav-group"
         >
           <div class="side-nav-heading">{{ group.label }}</div>
-          <router-link
-            v-for="item in group.items"
-            :key="item.to"
-            :to="item.to"
-            class="nav-item"
-            active-class="active"
-            @click="closeMobileMenu"
-          >
-            <AppIcon :name="item.icon" />
-            <span>{{ item.label }}</span>
-            <span v-if="item.to === '/firmware' && updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
-          </router-link>
+          <template v-for="item in group.items" :key="item.to">
+            <a
+              v-if="item.external"
+              :href="item.to"
+              class="nav-item nav-item-external"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="closeMobileMenu"
+            >
+              <AppIcon :name="item.icon" />
+              <span>{{ item.label }}</span>
+              <AppIcon name="externalLink" class="external-hint" />
+            </a>
+            <router-link
+              v-else
+              :to="item.to"
+              class="nav-item"
+              active-class="active"
+              @click="closeMobileMenu"
+            >
+              <AppIcon :name="item.icon" />
+              <span>{{ item.label }}</span>
+              <span v-if="item.to === '/updates/firmware' && updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
+            </router-link>
+          </template>
         </div>
       </nav>
 
@@ -156,16 +169,29 @@
               class="mobile-link-group"
             >
               <div class="mobile-section-title">{{ group.label }}</div>
-              <router-link
-                v-for="item in group.items"
-                :key="item.to"
-                :to="item.to"
-                class="mobile-link"
-                @click="closeMobileMenu"
-              >
-                <AppIcon :name="item.icon" />
-                {{ item.label }}
-              </router-link>
+              <template v-for="item in group.items" :key="item.to">
+                <a
+                  v-if="item.external"
+                  :href="item.to"
+                  class="mobile-link mobile-link-external"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  @click="closeMobileMenu"
+                >
+                  <AppIcon :name="item.icon" />
+                  <span>{{ item.label }}</span>
+                  <AppIcon name="externalLink" class="external-hint" />
+                </a>
+                <router-link
+                  v-else
+                  :to="item.to"
+                  class="mobile-link"
+                  @click="closeMobileMenu"
+                >
+                  <AppIcon :name="item.icon" />
+                  {{ item.label }}
+                </router-link>
+              </template>
             </div>
           </div>
 
@@ -388,9 +414,9 @@ onUnmounted(() => {
 
 .update-banner {
   position: fixed;
-  top: 100px;
-  left: 384px;
-  right: 24px;
+  top: calc(var(--newdesign-header-height) + 12px);
+  left: calc(var(--newdesign-sidebar-width) + var(--newdesign-content-gap));
+  right: var(--newdesign-content-gap);
   z-index: 1002;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
@@ -407,7 +433,7 @@ onUnmounted(() => {
 .desktop-sidebar {
   position: fixed;
   inset: 0 auto 0 0;
-  width: 360px;
+  width: var(--newdesign-sidebar-width);
   z-index: 1001;
   padding: 24px 12px 20px;
   background: var(--color-sidebar);
@@ -439,15 +465,15 @@ onUnmounted(() => {
 .header-nav {
   position: fixed;
   top: 0;
-  left: 360px;
+  left: var(--newdesign-sidebar-width);
   right: 0;
-  height: 88px;
+  height: var(--newdesign-header-height);
   z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 0 24px;
+  padding: 0 var(--newdesign-content-gap);
   color: var(--color-text);
   background: var(--newdesign-header, var(--color-surface));
   border-bottom: 1px solid var(--newdesign-border, var(--color-border));
@@ -473,9 +499,9 @@ onUnmounted(() => {
 
 .brand-copy strong {
   font-size: var(--fs-3xl);
-  line-height: 1;
+  line-height: var(--line-height-tight);
   letter-spacing: 0;
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
   white-space: nowrap;
 }
 
@@ -506,9 +532,9 @@ onUnmounted(() => {
   padding: 0 14px;
   color: var(--color-text-muted);
   font-size: var(--fs-2xs);
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
   letter-spacing: 0.08em;
-  line-height: 1;
+  line-height: var(--line-height-tight);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -523,7 +549,7 @@ onUnmounted(() => {
   border: 1px solid transparent;
   color: var(--color-text-secondary);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   min-width: 0;
   overflow-wrap: anywhere;
@@ -553,6 +579,31 @@ onUnmounted(() => {
 }
 
 .nav-item span:not(.mini-dot) {
+  min-width: 0;
+}
+
+/* External-link nav entries (documentation). Same shape as a regular nav
+   item so it reads as part of the navigation, but the small external-hint
+   icon (top-right of the label) signals "opens in a new tab". */
+.nav-item-external {
+  text-decoration: none;
+}
+
+.nav-item-external .external-hint,
+.mobile-link-external .external-hint {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  opacity: 0.8;
+}
+
+.mobile-link-external {
+  text-decoration: none;
+}
+
+.mobile-link-external span {
+  flex: 1;
   min-width: 0;
 }
 
@@ -1035,7 +1086,7 @@ onUnmounted(() => {
 
   .header-nav {
     left: 0;
-    height: 72px;
+    height: var(--newdesign-header-height-mobile);
     padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   }
 
@@ -1049,7 +1100,7 @@ onUnmounted(() => {
   }
 
   .update-banner {
-    top: 84px;
+    top: calc(var(--newdesign-header-height-mobile) + 12px);
     left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
     flex-direction: column;
@@ -1091,7 +1142,7 @@ onUnmounted(() => {
   }
 
   .update-banner {
-    top: 76px;
+    top: calc(var(--newdesign-header-height-mobile) + 4px);
   }
 }
 

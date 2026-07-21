@@ -43,6 +43,8 @@ export default {
     home: 'Home',
     settings: 'Instellingen',
     firmware: 'Firmware',
+    updates: 'Updates',
+    documentation: 'Documentation',
     monitoring: 'Monitoring',
     systemlog: 'Systeemlog',
     about: 'Over',
@@ -110,8 +112,15 @@ export default {
     tabNetwork: 'Netwerk',
     tabTime: 'Tijd',
     tabBackup: 'Back-up',
+    tabDesign: 'Design',
     tabLicense: 'Licentie',
     tabExperimental: 'Experimenteel',
+    advancedTitle: 'Advanced',
+    showExperimental: 'Show experimental features',
+    showExperimentalHint: 'Reveals experimental menu entries, tabs and settings. Stored experimental values are preserved when hidden again.',
+    showExperimentalWarning: 'Experimental features are unfinished and may change or not work as expected.',
+    showExperimentalOn: 'Experimental features shown',
+    showExperimentalOff: 'Experimental features hidden',
     changePassword: 'Wachtwoord wijzigen',
     repeatPassword: 'Wachtwoord herhalen',
     hostname: 'Hostnaam',
@@ -190,6 +199,8 @@ export default {
     browse: 'Bladeren',
     restoreConfirm: 'Weet u het zeker? Huidige instellingen worden overschreven en het systeem wordt opnieuw opgestart.',
     experimentalTitle: 'Experimenteel',
+    experimentalEmptyTitle: 'Nothing here yet',
+    experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
     experimentalWarningTitle: 'Werk in uitvoering',
     experimentalWarningText: 'Deze functies zijn bedoeld om te testen. Er is geen garantie voor werking of weergave.',
     experimentalDesign: 'Testontwerp',
@@ -273,6 +284,15 @@ export default {
     updateNow: 'Nu Updaten'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware and web interface have separate versions and are updated independently.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Naar OTA',
@@ -291,12 +311,16 @@ export default {
     downloadInstall: 'Download & Installeer',
     factoryReset: 'Resetten',
     factoryResetHint: 'Terugzetten naar fabrieksinstellingen',
-    factoryResetConfirm: 'Wilt u echt terugzetten naar fabrieksinstellingen? Alle instellingen gaan verloren.',
+    factoryResetTitle: 'Factory reset',
+    factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
+    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetConfirm: 'Reset to factory defaults',
+    factoryResetError: 'Factory reset failed.',
     otaProgress: 'Firmware-update downloaden...',
     otaSuccess: 'Download succesvol. Installeren...',
     currentVersion: 'Huidige Versie',
     installedVersion: 'Geïnstalleerde versie',
-    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.5 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
+    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.6 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Update beschikbaar!',
     updateAvailableMessage: 'Een update naar versie {latestVersion} is beschikbaar.',
     upToDate: 'Firmware is up-to-date',
@@ -518,7 +542,7 @@ export default {
   // About Page
   about: {
     title: 'Over',
-    version: 'Versie 2.2.3-Beta.8',
+    version: 'Versie 2.2.5-Beta.6',
     fork: 'Gemoderniseerde Fork',
     forkDescription: 'Deze versie is een gemoderniseerde fork door Xerolux (2025), gebaseerd op de originele HB-RF-ETH firmware. Geüpdatet naar ESP-IDF 6.0, moderne toolchains en huidige WebUI technologieën (Vue 3, Vite, Pinia).',
     original: 'Originele Auteur',

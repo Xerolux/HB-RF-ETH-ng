@@ -137,22 +137,46 @@
         <div class="tile-icon"><AppIcon name="refresh" /></div>
         <div class="tile-text"><h4>Neustart</h4><p>Gerät mit aktivem Neustart-Sync neu starten</p></div>
       </button>
-      <button type="button" class="action-tile danger" @click="factoryResetClick">
+      <button type="button" class="action-tile danger" @click="openFactoryResetModal">
         <div class="tile-icon"><AppIcon name="restore" /></div>
         <div class="tile-text"><h4>Werkseinstellungen</h4><p>Alle gespeicherten Einstellungen löschen</p></div>
       </button>
     </section>
+
+    <!-- Werkseinstellungen ist eine Gefahrenaktion (Korrekturauftrag §10):
+         eigener Bestätigungsdialog mit Danger-Button statt window.confirm. The
+         @ok handler calls event.preventDefault() so the modal stays open while
+         confirmFactoryReset runs; the modal is closed explicitly on success. -->
+    <BModal
+      v-model="showFactoryResetModal"
+      :title="t('firmware.factoryResetTitle')"
+      centered
+      no-close-on-backdrop
+      :ok-title="t('firmware.factoryResetConfirm')"
+      ok-variant="danger"
+      :cancel-title="t('common.cancel')"
+      @ok="onFactoryResetOk"
+      :ok-disabled="isResetting"
+      :cancel-disabled="isResetting"
+    >
+      <p>{{ t('firmware.factoryResetMessage') }}</p>
+      <BAlert variant="danger" :model-value="true" fade class="mt-2 mb-0">
+        {{ t('firmware.factoryResetWarning') }}
+      </BAlert>
+    </BModal>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, useUpdateStore } from './stores.js'
 
 const WEBUI_IMAGE_SIZE = 0x50000
 const ESP_IMAGE_MAGIC = 0xe9
 
+const { t } = useI18n()
 const firmwareUpdateStore = useFirmwareUpdateStore()
 const restartUiStore = useRestartUiStore()
 const sysInfoStore = useSysInfoStore()
@@ -166,6 +190,8 @@ const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const betaToggleSaving = ref(false)
+const showFactoryResetModal = ref(false)
+const isResetting = ref(false)
 
 const lastCheckText = computed(() => {
   if (!updateStore.lastCheck) return 'Noch nicht geprüft'
@@ -264,15 +290,38 @@ const onBetaToggle = async event => {
 }
 
 const restartClick = async () => {
-  if (!window.confirm('Gerät wirklich neu starten?')) return
+  if (!window.confirm(t('firmware.restartConfirm'))) return
   try { await axios.post('/api/restart') } catch { /* Verbindung bricht beim Neustart erwartbar ab. */ }
   restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
 }
 
-const factoryResetClick = async () => {
-  if (!window.confirm('Wirklich auf Werkseinstellungen zurücksetzen? Alle Einstellungen gehen verloren.')) return
-  try { await axios.post('/api/factory-reset') } catch { /* Verbindung bricht beim Neustart erwartbar ab. */ }
-  restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
+const openFactoryResetModal = () => {
+  showFactoryResetModal.value = true
+}
+
+// The BModal @ok handler receives the synthetic event from BModal.triggerOk;
+// calling event.preventDefault() keeps the modal open while the request runs.
+// On success we close it explicitly and start the restart-sync countdown.
+const onFactoryResetOk = (event) => {
+  event.preventDefault()
+  confirmFactoryReset()
+}
+
+const confirmFactoryReset = async () => {
+  if (isResetting.value) return
+  isResetting.value = true
+  try {
+    await axios.post('/api/factory-reset')
+    showFactoryResetModal.value = false
+    restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
+  } catch (error) {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('common.error'),
+      message: error.response?.data?.error || error.message || t('firmware.factoryResetError')
+    })
+    isResetting.value = false
+  }
 }
 
 onMounted(async () => {
@@ -285,39 +334,42 @@ onMounted(async () => {
 .content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .update-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
 .card-header { display:flex; gap:14px; align-items:flex-start; padding:20px; border-bottom:1px solid var(--color-border); }
-.header-icon { width:44px; height:44px; flex:0 0 auto; border-radius:12px; display:flex; align-items:center; justify-content:center; }
-.header-text h2 { margin:0; font-size: var(--fs-lg); }
+.header-icon { width:44px; height:44px; flex:0 0 auto; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; }
+.header-text h2 { margin:0; font-size: var(--fs-lg); font-weight: var(--font-weight-semibold); }
 .header-text p { margin:.35rem 0 0; color:var(--color-text-secondary); }
 .card-body { padding:20px; display:flex; flex-direction:column; gap:16px; }
-.release-box { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:16px; border-radius:12px; background:var(--color-success-soft); }
+.release-box { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:16px; border-radius:var(--radius-md); background:var(--color-success-soft); }
 .release-box.is-current { background:var(--color-bg-alt); }
 .release-box div { display:flex; flex-direction:column; gap:3px; }
 .release-label, .release-box small { color:var(--color-text-secondary); font-size: var(--fs-xs); }
 .release-box strong { font-size: var(--fs-lg); }
-.beta-badge { padding:4px 8px; border-radius:999px; background:var(--color-warning-soft); font-size: var(--fs-2xs); font-weight:700; }
+.beta-badge { padding:4px 8px; border-radius:var(--radius-pill); background:var(--color-warning-soft); font-size: var(--fs-2xs); font-weight: var(--font-weight-bold); }
 .actions { display:flex; flex-wrap:wrap; gap:10px; }
 .action-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; }
 .beta-toggle-row { display:flex; gap:12px; align-items:flex-start; padding-top:14px; border-top:1px solid var(--color-border); }
-.beta-toggle-label { display:flex; flex-direction:column; gap:3px; font-weight:700; }
-.beta-toggle-hint { font-size: var(--fs-xs); font-weight:400; color:var(--color-text-secondary); }
-.upload-zone { min-height:150px; border:2px dashed var(--color-border-strong); border-radius:14px; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:18px; text-align:center; }
+.beta-toggle-label { display:flex; flex-direction:column; gap:3px; font-weight: var(--font-weight-bold); }
+.beta-toggle-hint { font-size: var(--fs-xs); font-weight: var(--font-weight-normal); color:var(--color-text-secondary); }
+.upload-zone { min-height:150px; border:2px dashed var(--color-border-strong); border-radius:var(--radius-lg); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:18px; text-align:center; }
 .upload-zone.dragging { border-color:var(--color-primary); background:var(--color-primary-soft); }
 .upload-zone.invalid { border-color:var(--color-danger); }
 .hidden-input { display:none; }
 .upload-icon { font-size: var(--fs-3xl); margin-bottom:8px; }
-.upload-text { display:block; font-weight:700; }
+.upload-text { display:block; font-weight: var(--font-weight-bold); }
 .file-preview { width:100%; display:flex; gap:12px; align-items:center; text-align:left; }
 .file-details { min-width:0; flex:1; display:flex; flex-direction:column; }
-.file-name { overflow-wrap:anywhere; font-weight:700; }
+.file-name { overflow-wrap:anywhere; font-weight: var(--font-weight-bold); }
 .file-size { color:var(--color-text-secondary); font-size: var(--fs-xs); }
 .remove-file-btn { border:0; background:transparent; color:var(--color-danger); padding:8px; }
 .progress-container { display:flex; align-items:center; gap:10px; }
-.progress-bar { flex:1; height:10px; border-radius:999px; background:var(--color-bg-alt); overflow:hidden; }
+.progress-bar { flex:1; height:10px; border-radius:var(--radius-pill); background:var(--color-bg-alt); overflow:hidden; }
 .progress-value { height:100%; background:var(--color-primary); }
 .system-actions { margin-top:18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.action-tile { width:100%; display:flex; gap:12px; align-items:center; text-align:left; padding:16px; border:1px solid var(--color-border); border-radius:14px; background:var(--color-surface); color:var(--color-text); }
+.action-tile { width:100%; display:flex; gap:12px; align-items:center; text-align:left; padding:16px; border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface); color:var(--color-text); cursor: pointer; }
+.action-tile h4 { font-weight: var(--font-weight-semibold); }
 .action-tile h4,.action-tile p { margin:0; }
 .action-tile p { color:var(--color-text-secondary); font-size: var(--fs-xs); }
-.action-tile.danger { border-color:var(--color-danger); }
+.action-tile.warning { border-color: var(--color-warning); background: var(--color-warning-soft); }
+.action-tile.danger { border-color:var(--color-danger); background: var(--color-danger-soft); }
+.action-tile.danger h4 { color: var(--color-danger); }
 @media(max-width:900px){ .content-grid,.system-actions { grid-template-columns:1fr; } }
 </style>

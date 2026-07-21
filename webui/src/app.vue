@@ -73,6 +73,7 @@
       ok-variant="primary"
       no-close-on-backdrop
       @ok="showSponsorModal = true"
+      @cancel="showSupporterExpiredPrompt = false"
     >
       <div class="expired-prompt-body">
         <div class="expired-prompt-icon"><AppIcon name="heart" /></div>
@@ -272,12 +273,12 @@ onUnmounted(() => {
   min-height: 100vh;
   min-height: 100dvh;
   margin-bottom: 0;
-  padding: 112px 24px 24px 384px;
+  padding: var(--newdesign-content-top) var(--newdesign-content-gap) var(--newdesign-content-gap) var(--newdesign-sidebar-width);
 }
 
 @media (max-width: 991px) {
   .newdesign-shell .main-content {
-    padding: 96px 8px 24px;
+    padding: var(--newdesign-content-top-mobile) 8px 24px;
   }
 }
 
@@ -294,7 +295,7 @@ onUnmounted(() => {
 }
 
 .newdesign-shell .app-footer {
-  padding: 8px 24px 18px 384px;
+  padding: 8px var(--newdesign-content-gap) 18px var(--newdesign-sidebar-width);
   margin-top: 0;
 }
 

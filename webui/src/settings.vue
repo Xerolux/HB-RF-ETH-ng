@@ -9,12 +9,14 @@
         <h1 class="hero-title">{{ t('nav.settings') }}</h1>
         <p class="hero-subtitle">{{ t('settings.networkSettings') }} · {{ t('settings.timeSettings') }} · {{ t('settings.backupRestore') }}</p>
       </div>
+      <!-- Korrekturauftrag §9: the hero previously repeated every tab name as
+           a status chip, creating a second, ambiguous navigation layer. Now it
+           shows only the device hostname + a NON-interactive saved/unsaved
+           indicator that just reflects form state (the segmented control below
+           is the single navigation surface). -->
       <div class="hero-meta">
-        <span class="meta-chip"><AppIcon name="shield" /> {{ t('settings.security') }}</span>
-        <span class="meta-chip"><AppIcon name="network" /> IPv4 / IPv6</span>
-        <span class="meta-chip"><AppIcon name="backup" /> Backup</span>
-        <span class="meta-chip"><AppIcon name="alert" /> {{ t('settings.tabExperimental') }}</span>
-        <span class="meta-chip" :class="hasUnsavedChanges ? 'warning-chip' : ''">
+        <span class="meta-chip"><AppIcon name="board" /> {{ hostname || 'HB-RF-ETH-ng' }}</span>
+        <span class="save-state" :class="hasUnsavedChanges ? 'is-unsaved' : 'is-saved'" aria-live="polite">
           <AppIcon :name="hasUnsavedChanges ? 'alert' : 'check'" />
           {{ hasUnsavedChanges ? t('settings.unsavedChanges') : t('settings.allSaved') }}
         </span>
@@ -144,6 +146,36 @@
                 <div class="form-text mt-2">
                   <small>{{ t('settings.ledProgramsHelp') }}</small>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Korrekturauftrag §7: opt-in to experimental features. Hidden by
+               default; enabling reveals the experimental tab + any experimental
+               nav entries. Stored experimental values are NOT deleted on
+               disable (we only hide the UI). -->
+          <div class="settings-card">
+            <div class="card-header">
+              <h3>{{ t('settings.advancedTitle') }}</h3>
+            </div>
+            <div class="card-body">
+              <BAlert variant="warning" :model-value="true" fade class="mb-3">
+                {{ t('settings.showExperimentalWarning') }}
+              </BAlert>
+              <div class="switch-row">
+                <label class="switch-label">{{ t('settings.showExperimental') }}</label>
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    :checked="experimentalStore.showExperimental"
+                    @change="onToggleExperimental($event.target.checked)"
+                  >
+                </div>
+              </div>
+              <div class="form-text mt-2">
+                <small>{{ t('settings.showExperimentalHint') }}</small>
               </div>
             </div>
           </div>
@@ -507,9 +539,21 @@
         </div>
       </Transition>
 
-      <!-- Experimental Tab -->
+      <!-- Design Tab (Korrekturauftrag §5): embeds the same ThemeSettings the
+           standalone /theme page renders, so the header theme toggle and the
+           settings page stay in sync via useThemeStore. -->
       <Transition name="fade" mode="out-in">
-        <div v-if="activeTab === 'experimental'" class="tab-panel">
+        <div v-if="activeTab === 'design'" class="tab-panel">
+          <ThemeSettings embedded />
+        </div>
+      </Transition>
+
+      <!-- Experimental Tab (Korrekturauftrag §7): only rendered when the user
+           opted in via Settings → Allgemein. The tab is included in the
+           segmented control conditionally, but guard the panel too so a stale
+           activeTab=experimental can never render an orphan panel. -->
+      <Transition name="fade" mode="out-in">
+        <div v-if="activeTab === 'experimental' && experimentalStore.showExperimental" class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3>{{ t('settings.experimentalTitle') }}</h3>
@@ -612,8 +656,9 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore } from './stores.js'
+import { useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
+import ThemeSettings from './theme.vue'
 import { validateSupporterKey, normalizeSupporterKey } from './composables/supporterKey.js'
 
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -624,6 +669,7 @@ const loginStore = useLoginStore()
 const uiStore = useUiStore()
 const sysInfoStore = useSysInfoStore()
 const restartUiStore = useRestartUiStore()
+const experimentalStore = useExperimentalStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -633,26 +679,42 @@ const showPasswordModal = ref(false)
 // Tab management
 const activeTab = ref(route.query.tab || 'general')
 
+const tabs = computed(() => {
+  const base = [
+    { id: 'general', label: t('settings.tabGeneral'), icon: 'shield' },
+    { id: 'network', label: t('settings.tabNetwork'), icon: 'network' },
+    { id: 'time', label: t('settings.tabTime'), icon: 'clock' },
+    { id: 'backup', label: t('settings.tabBackup'), icon: 'backup' },
+    { id: 'design', label: t('settings.tabDesign'), icon: 'sun' },
+    { id: 'license', label: t('settings.tabLicense'), icon: 'heart' }
+  ]
+  // Experimental tab is gated behind the opt-in flag (Korrekturauftrag §7).
+  // Stored experimental values are preserved when the flag is off — we just
+  // hide the entry. The tab itself renders an empty-state; concrete
+  // experimental toggles would live here when one ships.
+  if (experimentalStore.showExperimental) {
+    base.push({ id: 'experimental', label: t('settings.tabExperimental'), icon: 'alert' })
+  }
+  return base
+})
+
 // Sync URL with tab change
 watch(activeTab, (newTab) => {
   router.replace({ query: { ...route.query, tab: newTab } })
 })
 
-// Sync tab with URL change
+// Sync tab with URL change. Bounce unknown / hidden tabs (e.g. ?tab=experimental
+// when the opt-in flag is off) back to General so a stale link can't strand
+// the user on an orphan panel. `immediate: true` covers the very first mount
+// where `route.query.tab` may already point at a hidden tab — `tabs` is
+// declared above so the immediate callback can read it safely.
 watch(() => route.query.tab, (newTab) => {
-  if (newTab && tabs.value.some(t => t.id === newTab)) {
+  if (newTab && tabs.value.some(tab => tab.id === newTab)) {
     activeTab.value = newTab
+  } else if (newTab && !tabs.value.some(tab => tab.id === newTab)) {
+    activeTab.value = 'general'
   }
-})
-
-const tabs = computed(() => [
-  { id: 'general', label: t('settings.tabGeneral'), icon: 'shield' },
-  { id: 'network', label: t('settings.tabNetwork'), icon: 'network' },
-  { id: 'time', label: t('settings.tabTime'), icon: 'clock' },
-  { id: 'backup', label: t('settings.tabBackup'), icon: 'backup' },
-  { id: 'license', label: t('settings.tabLicense'), icon: 'heart' },
-  { id: 'experimental', label: t('settings.tabExperimental'), icon: 'alert' }
-])
+}, { immediate: true })
 
 const timeSources = computed(() => [
   { value: 0, icon: 'globe', label: t('settings.ntp') },
@@ -752,6 +814,24 @@ async function removeSupporterKey() {
   } catch (e) {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('supporter.activateFailed') })
   }
+}
+
+// Korrekturauftrag §7: persist + immediately apply the experimental-visibility
+// flag. Stored experimental values are untouched — we only flip the client
+// gate, which the header nav + this tab list read reactively.
+function onToggleExperimental(value) {
+  experimentalStore.setShowExperimental(value)
+  // If the user just disabled the flag while sitting on the experimental tab,
+  // bounce them back to General so they don't see an empty panel.
+  if (!value && activeTab.value === 'experimental') {
+    activeTab.value = 'general'
+  }
+  uiStore.pushToast({
+    type: 'info',
+    title: t('common.success'),
+    message: value ? t('settings.showExperimentalOn') : t('settings.showExperimentalOff'),
+    duration: 2200
+  })
 }
 
 // LED Programs
@@ -1016,16 +1096,14 @@ const loadSettings = () => {
     ipv6Dns2.value = settingsStore.ipv6Dns2 || ''
   }
 
-  // Flash pause (experimental) - keep the toggle in sync with the persisted
-  // store value. Without this the local ref stays at its default and the
-  // dirty-tracker / save-payload would silently rewrite the stored flag.
-  if (settingsStore.flashPause !== undefined) {
-    }
   // NOTE: testDesignEnabled is intentionally NOT synced here. It is owned by
   // useExperimentalStore (single source of truth) and persisted device-wide on
   // every flip via that store. Re-syncing it on every settingsStore watcher
   // fire was the "toggle springs back" bug. The initial device value reaches
   // the experimental store via syncFromServer() inside settingsStore.load().
+  // flashPause is also intentionally not synced into a local ref — it is read
+  // straight from the store by the restart-confirmation modals, which is the
+  // only place it surfaces.
 
   // Pre-fill the supporter key input from the stored value (formatted), and
   // make sure the header badge reflects the current device state.
@@ -1633,6 +1711,39 @@ hr {
 
 .warning-chip {
   color: var(--color-warning);
+}
+
+/* Korrekturauftrag §9: the "saved / unsaved" indicator in the hero is a
+   NON-interactive status badge (not a tab). It mirrors the form dirty-state
+   without looking clickable. */
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--font-weight-bold);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  color: var(--color-text-secondary);
+}
+
+.save-state .app-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.save-state.is-saved {
+  color: var(--color-success);
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.save-state.is-unsaved {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
 }
 
 /* Transitions */

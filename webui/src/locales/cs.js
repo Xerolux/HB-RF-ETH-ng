@@ -43,6 +43,8 @@ export default {
     home: 'Domů',
     settings: 'Nastavení',
     firmware: 'Firmware',
+    updates: 'Updates',
+    documentation: 'Documentation',
     monitoring: 'Monitorování',
     systemlog: 'Systémový protokol',
     about: 'O programu',
@@ -110,8 +112,15 @@ export default {
     tabNetwork: 'Síť',
     tabTime: 'Čas',
     tabBackup: 'Záloha',
+    tabDesign: 'Design',
     tabLicense: 'Licence',
     tabExperimental: 'Experimentální',
+    advancedTitle: 'Advanced',
+    showExperimental: 'Show experimental features',
+    showExperimentalHint: 'Reveals experimental menu entries, tabs and settings. Stored experimental values are preserved when hidden again.',
+    showExperimentalWarning: 'Experimental features are unfinished and may change or not work as expected.',
+    showExperimentalOn: 'Experimental features shown',
+    showExperimentalOff: 'Experimental features hidden',
     changePassword: 'Změnit heslo',
     repeatPassword: 'Opakovat heslo',
     hostname: 'Název hostitele',
@@ -190,6 +199,8 @@ export default {
     browse: 'Procházet',
     restoreConfirm: 'Jste si jisti? Současné nastavení bude přepsáno a systém se restartuje.',
     experimentalTitle: 'Experimentální',
+    experimentalEmptyTitle: 'Nothing here yet',
+    experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
     experimentalWarningTitle: 'Probíhá vývoj',
     experimentalWarningText: 'Tyto funkce jsou určeny k testování. Funkčnost ani vzhled nejsou zaručeny.',
     experimentalDesign: 'Testovací design',
@@ -273,6 +284,15 @@ export default {
     updateNow: 'Aktualizovat nyní'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware and web interface have separate versions and are updated independently.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Přejít na OTA',
@@ -291,12 +311,16 @@ export default {
     downloadInstall: 'Stáhnout a nainstalovat',
     factoryReset: 'Obnovit',
     factoryResetHint: 'Obnovit do továrního nastavení',
-    factoryResetConfirm: 'Opravdu chcete obnovit tovární nastavení? Všechna nastavení budou ztracena.',
+    factoryResetTitle: 'Factory reset',
+    factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
+    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetConfirm: 'Reset to factory defaults',
+    factoryResetError: 'Factory reset failed.',
     otaProgress: 'Stahování aktualizace firmwaru...',
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.2.5-Beta.5 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.2.5-Beta.6 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Aktualizace k dispozici!',
     updateAvailableMessage: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     upToDate: 'Firmware je aktuální',
@@ -518,7 +542,7 @@ export default {
   // About Page
   about: {
     title: 'O programu',
-    version: 'Verze 2.2.3-Beta.8',
+    version: 'Verze 2.2.5-Beta.6',
     fork: 'Modernizovaný Fork',
     forkDescription: 'Tato verze je modernizovaný fork od Xerolux (2025), založený na původním firmwaru HB-RF-ETH. Aktualizováno na ESP-IDF 6.0, moderní toolchainy a současné technologie WebUI (Vue 3, Vite, Pinia).',
     original: 'Původní Autor',

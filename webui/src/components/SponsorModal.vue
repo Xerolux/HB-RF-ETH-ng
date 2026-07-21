@@ -3,8 +3,11 @@
     v-model="showModal"
     centered
     hide-header
-    hide-footer
     content-class="sponsor-modal-content"
+    body-class="sponsor-modal-body-wrap"
+    footer-class="sponsor-modal-footer"
+    :ok-title="t('common.close')"
+    ok-only
   >
     <div class="sponsor-modal-body">
 
@@ -79,6 +82,16 @@ watch(showModal, (newVal) => {
   box-shadow: var(--shadow-lg);
 }
 
+:deep(.sponsor-modal-body-wrap) {
+  padding: 0;
+}
+
+:deep(.sponsor-modal-footer) {
+  border-top: 1px solid var(--color-border);
+  padding: 14px 20px;
+  justify-content: flex-end;
+}
+
 .sponsor-modal-body {
   padding: 32px;
   text-align: center;
@@ -105,7 +118,7 @@ watch(showModal, (newVal) => {
 
 .title {
   font-size: var(--fs-xl);
-  font-weight: 800;
+  font-weight: var(--font-weight-heavy);
   margin-bottom: var(--spacing-sm);
   color: var(--color-text);
 }
@@ -114,7 +127,7 @@ watch(showModal, (newVal) => {
   color: var(--color-text-secondary);
   margin-bottom: var(--spacing-xl);
   font-size: var(--fs-md);
-  line-height: 1.6;
+  line-height: var(--line-height-normal);
 }
 
 .options-grid {
@@ -131,7 +144,7 @@ watch(showModal, (newVal) => {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: var(--fs-md);
   transition: background 0.2s, border-color 0.2s, color 0.2s;
   border: 1px solid var(--color-border-strong);
@@ -169,7 +182,7 @@ watch(showModal, (newVal) => {
 .footer-text {
   font-size: var(--fs-xs);
   color: var(--color-text-secondary);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
 }
 
 @media (max-width: 576px) {

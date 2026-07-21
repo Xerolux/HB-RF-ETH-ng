@@ -43,6 +43,8 @@ export default {
     home: 'Status',
     settings: 'Einstellungen',
     firmware: 'Firmware',
+    updates: 'Updates',
+    documentation: 'Dokumentation',
     monitoring: 'Monitoring',
     systemlog: 'System-Log',
     about: 'Über',
@@ -123,8 +125,15 @@ export default {
     tabNetwork: 'Netzwerk',
     tabTime: 'Zeit',
     tabBackup: 'Backup',
+    tabDesign: 'Design',
     tabLicense: 'Lizenz',
     tabExperimental: 'Experimentell',
+    advancedTitle: 'Erweitert',
+    showExperimental: 'Experimentelle Funktionen anzeigen',
+    showExperimentalHint: 'Blendet experimentelle Menüpunkte, Tabs und Einstellungen ein. Bereits gespeicherte experimentelle Werte bleiben beim Ausblenden erhalten.',
+    showExperimentalWarning: 'Experimentelle Funktionen sind unfertig und können sich ändern oder nicht wie erwartet funktionieren.',
+    showExperimentalOn: 'Experimentelle Funktionen eingeblendet',
+    showExperimentalOff: 'Experimentelle Funktionen ausgeblendet',
     changePassword: 'Passwort ändern',
     repeatPassword: 'Passwort wiederholen',
     hostname: 'Hostname',
@@ -288,6 +297,15 @@ export default {
     boardSenseHint: 'Roh-Wert des ADC vom Board-Rev-Sense-Pin. Vergleich mit den vier nominalen Spannungsteiler-Werten liefert die Board-Revision: Rev 1.10/1.11 PUB ≈ 550 mV, Rev 1.8 SK ≈ 1650 mV, Rev 1.8 PUB ≈ 2750 mV, Rev 1.10/1.11 SK ≈ 3050 mV.'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware und Weboberfläche besitzen getrennte Versionen und werden separat aktualisiert.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Zum OTA-Bereich',
@@ -310,12 +328,16 @@ export default {
     lastCheck: 'Zuletzt geprüft',
     factoryReset: 'Zurücksetzen',
     factoryResetHint: 'Auf Werkseinstellungen zurücksetzen',
-    factoryResetConfirm: 'Möchten Sie wirklich auf Werkseinstellungen zurücksetzen? Alle Einstellungen gehen verloren.',
+    factoryResetTitle: 'Werkseinstellungen',
+    factoryResetMessage: 'Möchten Sie wirklich alle Einstellungen auf Werkseinstellungen zurücksetzen?',
+    factoryResetWarning: 'Alle gespeicherten Einstellungen gehen verloren. Das Gerät startet danach automatisch neu.',
+    factoryResetConfirm: 'Auf Werkseinstellungen zurücksetzen',
+    factoryResetError: 'Zurücksetzen auf Werkseinstellungen fehlgeschlagen.',
     otaProgress: 'Firmware-Update wird heruntergeladen...',
     otaSuccess: 'Download erfolgreich. Installation...',
     currentVersion: 'Aktuelle Version',
     installedVersion: 'Installierte Version',
-    versionInfo: 'Modernisierte Fork v2.2.5-Beta.5 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
+    versionInfo: 'Modernisierte Fork v2.2.5-Beta.6 von Xerolux (2025) - Basierend auf der Original-Arbeit von Alexander Reinert.',
     updateAvailableMessage: 'Ein Update auf Version {latestVersion} ist verfügbar.',
     newVersionAvailable: 'Neue Version {version} ist verfügbar!',
     viewUpdate: 'Ansehen',
@@ -533,7 +555,7 @@ export default {
   // About Page
   about: {
     title: 'Über',
-    version: 'Version 2.2.3-Beta.8',
+    version: 'Version 2.2.5-Beta.6',
     fork: 'Modernisierte Fork',
     forkDescription: 'Diese Version ist eine modernisierte Fork von Xerolux (2025), basierend auf der originalen HB-RF-ETH Firmware. Aktualisiert auf ESP-IDF 6.0, moderne Toolchains und aktuelle WebUI-Technologien (Vue 3, Vite, Pinia).',
     original: 'Original-Autor',

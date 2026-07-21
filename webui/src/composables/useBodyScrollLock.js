@@ -11,6 +11,13 @@
  * counterpart. A depth counter guards nested callers (menu open while a modal
  * is already locking). The module keeps a single record of the saved scroll
  * position so unlock fully restores the page.
+ *
+ * This is the SINGLE source of truth for body scroll locking in the app. Both
+ * the mobile menu / restart modal (via setBodyScrollLock) AND BootstrapLite's
+ * BModal (via lockBodyScroll / unlockBodyScroll) go through the same depth
+ * counter, so a modal opened on top of a menu (or vice versa) unlocks cleanly
+ * when the inner one closes — previously BModal kept its own separate
+ * `overflow:hidden` state and the two systems could leave the page stuck.
  */
 
 let lockDepth = 0
@@ -51,6 +58,12 @@ export function unlockBodyScroll() {
     savedBodyStyle = ''
     savedBodyTop = ''
   }
+}
+
+/** Current lock depth — useful for diagnostics and for callers that want to
+ *  check whether they are nested inside another lock. */
+export function bodyScrollLockDepth() {
+  return lockDepth
 }
 
 // Convenience: bind to a ref<boolean>. Returns a watcher-friendly pair.

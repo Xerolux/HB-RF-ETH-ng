@@ -43,6 +43,8 @@ export default {
     home: 'Inicio',
     settings: 'Configuración',
     firmware: 'Firmware',
+    updates: 'Updates',
+    documentation: 'Documentation',
     monitoring: 'Monitoreo',
     systemlog: 'Registro del sistema',
     about: 'Acerca de',
@@ -110,8 +112,15 @@ export default {
     tabNetwork: 'Red',
     tabTime: 'Hora',
     tabBackup: 'Copia de seguridad',
+    tabDesign: 'Design',
     tabLicense: 'Licencia',
     tabExperimental: 'Experimental',
+    advancedTitle: 'Advanced',
+    showExperimental: 'Show experimental features',
+    showExperimentalHint: 'Reveals experimental menu entries, tabs and settings. Stored experimental values are preserved when hidden again.',
+    showExperimentalWarning: 'Experimental features are unfinished and may change or not work as expected.',
+    showExperimentalOn: 'Experimental features shown',
+    showExperimentalOff: 'Experimental features hidden',
     changePassword: 'Cambiar contraseña',
     repeatPassword: 'Repetir contraseña',
     hostname: 'Nombre de host',
@@ -190,6 +199,8 @@ export default {
     browse: 'Examinar',
     restoreConfirm: '¿Está seguro? La configuración actual se sobrescribirá y el sistema se reiniciará.',
     experimentalTitle: 'Experimental',
+    experimentalEmptyTitle: 'Nothing here yet',
+    experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
     experimentalWarningTitle: 'Trabajo en curso',
     experimentalWarningText: 'Estas funciones están pensadas para pruebas. No hay garantía de funcionamiento ni de visualización.',
     experimentalDesign: 'Diseño de prueba',
@@ -273,6 +284,15 @@ export default {
     updateNow: 'Actualizar ahora'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware and web interface have separate versions and are updated independently.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Ir a OTA',
@@ -291,12 +311,16 @@ export default {
     downloadInstall: 'Descargar e instalar',
     factoryReset: 'Restablecer',
     factoryResetHint: 'Restablecer a valores de fábrica',
-    factoryResetConfirm: '¿Realmente desea restablecer a los valores de fábrica? Se perderán todas las configuraciones.',
+    factoryResetTitle: 'Factory reset',
+    factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
+    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetConfirm: 'Reset to factory defaults',
+    factoryResetError: 'Factory reset failed.',
     otaProgress: 'Descargando actualización de firmware...',
     otaSuccess: 'Descarga exitosa. Instalando...',
     currentVersion: 'Versión actual',
     installedVersion: 'Versión instalada',
-    versionInfo: 'Fork modernizado v2.2.5-Beta.5 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    versionInfo: 'Fork modernizado v2.2.5-Beta.6 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: '¡Actualización disponible!',
     updateAvailableMessage: 'Hay una actualización disponible para la versión {latestVersion}.',
     upToDate: 'El firmware está actualizado',
@@ -518,7 +542,7 @@ export default {
   // About Page
   about: {
     title: 'Acerca de',
-    version: 'Versión 2.2.3-Beta.8',
+    version: 'Versión 2.2.5-Beta.6',
     fork: 'Fork Modernizado',
     forkDescription: 'Esta versión es un fork modernizado por Xerolux (2025), basado en el firmware original HB-RF-ETH. Actualizado a ESP-IDF 6.0, cadenas de herramientas modernas y tecnologías WebUI actuales (Vue 3, Vite, Pinia).',
     original: 'Autor original',

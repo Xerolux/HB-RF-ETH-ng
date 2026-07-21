@@ -445,6 +445,33 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 
+/* Detail cards (System / Network / Radio) always span the full content width
+   so long values (uptime, hostnames, IPv6, "Letzter Neustart") have room and
+   labels+values stay aligned. Side-by-side layout squeezed them and produced
+   ugly wraps — see Korrekturauftrag §3. The summary stat cards above stay on
+   the responsive .stats-grid (≤4 per row desktop, 2 tablet, 1 mobile). */
+.dashboard .info-grid > article {
+  grid-column: 1 / -1;
+}
+
+/* Status summary cards: cap at 4 columns on wide viewports (Korrekturauftrag
+   says "Desktop: maximal vier Statuskarten pro Reihe"), then collapse 2→1. */
+.dashboard .stats-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+}
+
+@media (min-width: 1280px) {
+  .dashboard .stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .radio-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));

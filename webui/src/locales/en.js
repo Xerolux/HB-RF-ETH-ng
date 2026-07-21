@@ -43,6 +43,8 @@ export default {
     home: 'Home',
     settings: 'Settings',
     firmware: 'Firmware',
+    updates: 'Updates',
+    documentation: 'Documentation',
     monitoring: 'Monitoring',
     systemlog: 'System Log',
     about: 'About',
@@ -123,8 +125,15 @@ export default {
     tabNetwork: 'Network',
     tabTime: 'Time',
     tabBackup: 'Backup',
+    tabDesign: 'Design',
     tabLicense: 'License',
     tabExperimental: 'Experimental',
+    advancedTitle: 'Advanced',
+    showExperimental: 'Show experimental features',
+    showExperimentalHint: 'Reveals experimental menu entries, tabs and settings. Stored experimental values are preserved when hidden again.',
+    showExperimentalWarning: 'Experimental features are unfinished and may change or not work as expected.',
+    showExperimentalOn: 'Experimental features shown',
+    showExperimentalOff: 'Experimental features hidden',
     changePassword: 'Change Password',
     repeatPassword: 'Repeat Password',
     hostname: 'Hostname',
@@ -203,6 +212,8 @@ export default {
     browse: 'Browse',
     restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
     experimentalTitle: 'Experimental',
+    experimentalEmptyTitle: 'Nothing here yet',
+    experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
     experimentalWarningTitle: 'Work in progress',
     experimentalWarningText: 'These features are intended for testing. There is no guarantee for function or appearance.',
     experimentalDesign: 'Test design',
@@ -286,6 +297,15 @@ export default {
     updateNow: 'Update Now'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware and web interface have separate versions and are updated independently.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Jump to OTA',
@@ -308,12 +328,16 @@ export default {
     lastCheck: 'Last checked',
     factoryReset: 'Reset',
     factoryResetHint: 'Reset to factory defaults',
-    factoryResetConfirm: 'Do you really want to reset to factory defaults? All settings will be lost.',
+    factoryResetTitle: 'Factory reset',
+    factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
+    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetConfirm: 'Reset to factory defaults',
+    factoryResetError: 'Factory reset failed.',
     otaProgress: 'Downloading firmware update...',
     otaSuccess: 'Download successful. Installing...',
     currentVersion: 'Current Version',
     installedVersion: 'Installed version',
-    versionInfo: 'Modernized fork v2.2.5-Beta.5 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
+    versionInfo: 'Modernized fork v2.2.5-Beta.6 by Xerolux (2025) - Based on the original work by Alexander Reinert.',
     updateAvailableMessage: 'An update to version {latestVersion} is available.',
     newVersionAvailable: 'New version {version} is available!',
     viewUpdate: 'View',
@@ -531,7 +555,7 @@ export default {
   // About Page
   about: {
     title: 'About',
-    version: 'Version 2.2.3-Beta.8',
+    version: 'Version 2.2.5-Beta.6',
     fork: 'Modernized Fork',
     forkDescription: 'This version is a modernized fork by Xerolux (2025), based on the original HB-RF-ETH firmware. Updated to ESP-IDF 6.0, modern toolchains and current WebUI technologies (Vue 3, Vite, Pinia).',
     original: 'Original Author',

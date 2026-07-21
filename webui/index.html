@@ -33,30 +33,15 @@
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
 
-    <!-- New Design and restart sync are permanent defaults. Keep the legacy
-         controls out of the rendered settings page while old firmware/API
-         fields remain accepted for backward compatibility. -->
-    <style>
-      .experimental-switch-row { display: none !important; }
-      .experimental-warning { align-items: flex-start !important; }
-      .experimental-warning > .app-icon { display: none !important; }
-      .experimental-warning strong,
-      .experimental-warning p { font-size: 0 !important; }
-      .experimental-warning strong::after {
-        content: "Derzeit nichts vorhanden";
-        display: block;
-        font-size: 1rem;
-        color: var(--color-text);
-      }
-      .experimental-warning p::after {
-        content: "Aktuell sind keine experimentellen Funktionen verfügbar. Das New Design und der Neustart-Sync sind feste Standards für alle Geräte.";
-        display: block;
-        margin-top: .45rem;
-        font-size: .9rem;
-        line-height: 1.5;
-        color: var(--color-text-secondary);
-      }
-    </style>
+    <!-- Inter typeface (primary font family; loaded preconnect+swap so there
+         is no FOIT, and the system-ui fallback chain in main.css renders
+         cleanly while Inter loads or if the CDN is unreachable). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
 </head>
 <body class="newdesign-active">
   <!-- The New Design is now the only supported WebUI. The class is fixed in

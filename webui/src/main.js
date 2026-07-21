@@ -12,6 +12,7 @@ import './styles/main.css'
 import App from './app.vue'
 import Home from './home.vue'
 import Settings from './settings.vue'
+import UpdatesPage from './updates.vue'
 import FirmwareUpdate from './firmwareupdate.vue'
 import WebUIUpdate from './webuiupdate.vue'
 import Login from './login.vue'
@@ -29,8 +30,21 @@ const router = createRouter({
   routes: [
     { path: '/', component: Home },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
-    { path: '/firmware', component: FirmwareUpdate, meta: { requiresAuth: true } },
-    { path: '/webui', component: WebUIUpdate, meta: { requiresAuth: true } },
+    // Firmware + WebUI merged under /updates (Korrekturauftrag §6). Legacy
+    // /firmware and /webui URLs redirect to the matching sub-tab so existing
+    // bookmarks and the update-banner CTA keep working.
+    {
+      path: '/updates',
+      component: UpdatesPage,
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', redirect: '/updates/firmware' },
+        { path: 'firmware', component: FirmwareUpdate },
+        { path: 'webui', component: WebUIUpdate }
+      ]
+    },
+    { path: '/firmware', redirect: '/updates/firmware' },
+    { path: '/webui', redirect: '/updates/webui' },
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
     { path: '/system-overview', component: SystemOverview, meta: { requiresAuth: true } },

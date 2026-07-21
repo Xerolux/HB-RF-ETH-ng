@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.6] - 2026-07-21
+
+### Changes
+- fix(webui): Supporter-Key-Dialog blockiert die Seite nach dem Schließen nicht mehr. BModal (BootstrapLite) rendert jetzt sichtbare OK-/Cancel-Buttons, unterstützt Escape und Hintergrund-Klick und nutzt einen gemeinsamen Body-Scroll-Lock mit dem Mobile-Menü, so dass nie ein hängenbleibendes Overlay zurückbleibt.
+- fix(webui): Inhalte werden vom fixierten Header nicht mehr überdeckt. Neue Layout-Tokens (--newdesign-header-height, --newdesign-content-top, --newdesign-sidebar-width) ersetzen hartcodierte 112/168/384px-Offsets in app.vue und NewDesignHeader.vue.
+- fix(webui): System- und Netzwerkkarten auf der Statusseite werden nicht mehr gequetscht nebeneinander dargestellt; sie nutzen die volle Inhaltsbreite. Status-Sammelkarten oben bleiben responsiv (≤4 Desktop / 2 Tablet / 1 Mobil).
+- feat(webui): Firmware- und WebUI-Updates sind unter einem gemeinsamen Menüpunkt „Updates" zusammengefasst. Neue verschachtelte Routen /updates/firmware und /updates/webui mit Untermenü; /firmware und /webui bleiben als Redirects erhalten.
+- feat(webui): Einstellungen neu strukturiert — neue Tab-Reihenfolge Allgemein · Netzwerk · Zeit · Backup · Design · Lizenz; Design-Tab bettet die Theme-Auswahl ein; doppelte Status-Chips im Header entfernt und durch eine nicht-anklickbare „Gespeichert"-Anzeige ersetzt.
+- feat(webui): Experimentelle Funktionen sind standardmäßig ausgeblendet und werden nur nach aktivierbarer Expertenoption unter Einstellungen → Allgemein eingeblendet. Gespeicherte Werte bleiben beim Ausblenden erhalten.
+- feat(webui): Link zur Projektdokumentation im linken Menü; URL zentral in useDocsLink.js konfiguriert, öffnet in neuem Tab mit External-Link-Icon.
+- refactor(webui): Typografie auf eine Schriftfamilie (Inter via Google Fonts) und zentrale Tokens (--font-weight-*, --line-height-*, --space-*, --card-padding, --section-gap) vereinheitlicht; hartcodierte px-Schriftgrößen durch Tokens ersetzt.
+- fix(webui): Werkseinstellungen auf der Firmware-Seite sind jetzt als Gefahrenaktion mit eigenem Bestätigungsdialog markiert (vorher window.confirm).
+- fix(webui): Index.html bereinigt — hartcodiertes deutsches experimental-Style-Override entfernt, Inter-Schrift über Google Fonts mit display=swap eingebunden.
+- chore(webui): Neue UI-Strings (updates.*, nav.updates, nav.documentation, settings.tabDesign, settings.advancedTitle, settings.showExperimental*, firmware.factoryReset*) in allen 10 Sprachen hinzugefügt; fehlende experimentalEmpty* Schlüssel ergänzt.
+
 ## [2.2.5-Beta.5] - 2026-07-20
 
 ### Changes

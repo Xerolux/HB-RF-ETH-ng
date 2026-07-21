@@ -183,12 +183,24 @@ export const useRestartUiStore = defineStore('restartUi', {
 })
 
 export const useExperimentalStore = defineStore('experimental', {
-  state: () => ({ testDesignEnabled: true }),
+  state: () => ({
+    testDesignEnabled: true,
+    // Client-side visibility flag for experimental features (Korrekturauftrag
+    // §7). Persisted per-browser in localStorage (NOT on the device, because
+    // that would require a firmware-side field). Default false: experimental
+    // entries are hidden until the user opts in via Settings → Allgemein.
+    // Toggling only hides the UI — any stored experimental values remain.
+    showExperimental: safeLocal.get('showExperimental') === '1'
+  }),
   actions: {
     applyDesignClass() { document.body.classList.add('newdesign-active') },
     setTestDesignEnabled() { this.testDesignEnabled = true; this.applyDesignClass() },
     syncFromServer() { this.testDesignEnabled = true; this.applyDesignClass() },
-    init() { this.applyDesignClass() }
+    init() { this.applyDesignClass() },
+    setShowExperimental(value) {
+      this.showExperimental = !!value
+      safeLocal.set('showExperimental', this.showExperimental ? '1' : '0')
+    }
   }
 })
 

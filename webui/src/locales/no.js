@@ -43,6 +43,8 @@ export default {
     home: 'Hjem',
     settings: 'Innstillinger',
     firmware: 'Fastvare',
+    updates: 'Updates',
+    documentation: 'Documentation',
     monitoring: 'Overvåking',
     systemlog: 'Systemlogg',
     about: 'Om',
@@ -110,8 +112,15 @@ export default {
     tabNetwork: 'Nettverk',
     tabTime: 'Tid',
     tabBackup: 'Sikkerhetskopi',
+    tabDesign: 'Design',
     tabLicense: 'Lisens',
     tabExperimental: 'Eksperimentelt',
+    advancedTitle: 'Advanced',
+    showExperimental: 'Show experimental features',
+    showExperimentalHint: 'Reveals experimental menu entries, tabs and settings. Stored experimental values are preserved when hidden again.',
+    showExperimentalWarning: 'Experimental features are unfinished and may change or not work as expected.',
+    showExperimentalOn: 'Experimental features shown',
+    showExperimentalOff: 'Experimental features hidden',
     changePassword: 'Endre Passord',
     repeatPassword: 'Gjenta Passord',
     hostname: 'Vertsnavn',
@@ -190,6 +199,8 @@ export default {
     browse: 'Bla gjennom',
     restoreConfirm: 'Er du sikker? Gjeldende innstillinger vil bli overskrevet og systemet vil starte på nytt.',
     experimentalTitle: 'Eksperimentelt',
+    experimentalEmptyTitle: 'Nothing here yet',
+    experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
     experimentalWarningTitle: 'Under arbeid',
     experimentalWarningText: 'Disse funksjonene er ment for testing. Det gis ingen garanti for funksjon eller utseende.',
     experimentalDesign: 'Testdesign',
@@ -273,6 +284,15 @@ export default {
     updateNow: 'Oppdater Nå'
   },
 
+  // Updates page (merged Firmware + WebUI entry, Korrekturauftrag §6)
+  updates: {
+    eyebrow: 'Updates',
+    title: 'Updates',
+    subtitle: 'Firmware and web interface have separate versions and are updated independently.',
+    firmware: 'Firmware',
+    webui: 'WebUI'
+  },
+
   // Firmware Update
   firmware: {
     jumpToOta: 'Gå til OTA',
@@ -291,12 +311,16 @@ export default {
     downloadInstall: 'Last ned og Installer',
     factoryReset: 'Tilbakestill',
     factoryResetHint: 'Tilbakestill til fabrikkinnstillinger',
-    factoryResetConfirm: 'Vil du virkelig tilbakestille til fabrikkinnstillinger? Alle innstillinger vil gå tapt.',
+    factoryResetTitle: 'Factory reset',
+    factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
+    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetConfirm: 'Reset to factory defaults',
+    factoryResetError: 'Factory reset failed.',
     otaProgress: 'Laster ned fastvareoppdatering...',
     otaSuccess: 'Nedlasting vellykket. Installerer...',
     currentVersion: 'Nåværende Versjon',
     installedVersion: 'Installert versjon',
-    versionInfo: 'Modernisert fork v2.2.5-Beta.5 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
+    versionInfo: 'Modernisert fork v2.2.5-Beta.6 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'Oppdatering tilgjengelig!',
     updateAvailableMessage: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
     upToDate: 'Fastvaren er oppdatert',
@@ -518,7 +542,7 @@ export default {
   // About Page
   about: {
     title: 'Om',
-    version: 'Versjon 2.2.3-Beta.8',
+    version: 'Versjon 2.2.5-Beta.6',
     fork: 'Modernisert Fork',
     forkDescription: 'Denne versjonen er en modernisert fork av Xerolux (2025), basert på den originale HB-RF-ETH-fastvaren. Oppdatert til ESP-IDF 6.0, moderne verktøykjeder og nåværende WebUI-teknologier (Vue 3, Vite, Pinia).',
     original: 'Original Forfatter',
