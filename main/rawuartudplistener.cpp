@@ -145,7 +145,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             {
                 // Client has a stale identifier (e.g. after device reboot). Accept the reconnect
                 // by adopting the client's identifier so the CCU can reconnect without restart.
-                ESP_LOGW(TAG, "Received raw-uart reconnect packet with unexpected endpoint identifier %d (expected %d) - adopting client identifier", data[3], endpointConnectionIdentifier);
+                // Logged at INFO: this is expected once per boot and semantically safe.
+                ESP_LOGI(TAG, "Received raw-uart reconnect packet with unexpected endpoint identifier %d (expected %d) - adopting client identifier", data[3], endpointConnectionIdentifier);
                 endpointConnectionIdentifier = data[3];
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
                 atomic_store(&_connectionStarted, false);

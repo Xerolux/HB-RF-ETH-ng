@@ -204,7 +204,8 @@ bool supporter_crl_refresh()
 
         if (status != 200 || total == 0) {
             // 404 is normal when nobody has been revoked yet — not an error.
-            ESP_LOGI(TAG, "CRL fetch returned status %d, len %d (keeping cached list)", status, total);
+            // Logged at DEBUG so the default log doesn't show a non-issue every refresh.
+            ESP_LOGD(TAG, "CRL fetch returned status %d, len %d (keeping cached list)", status, total);
             goto done;
         }
     }
