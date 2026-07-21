@@ -26,6 +26,19 @@
             Update-Prüfung fehlgeschlagen: {{ updateStore.checkError }}
           </BAlert>
 
+          <!-- Manual "search for updates now" (Korrekturauftrag §6.2/§6.3).
+               The on-device fetch runs off the httpd thread; the store polls
+               fetchInProgress until it clears, so the spinner reflects the real
+               check. The automatic 24 h cycle is untouched (§6.4). -->
+          <div class="check-now-row">
+            <BButton variant="outline-primary" class="action-btn check-now-btn"
+                     :disabled="updateStore.isChecking" @click="onCheckNow">
+              <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm me-2"></span>
+              <AppIcon v-else name="refresh" />
+              {{ updateStore.isChecking ? t('updates.checkingNow') : t('updates.checkNow') }}
+            </BButton>
+          </div>
+
           <div v-if="updateStore.updateAvailable" class="release-box">
             <div>
               <span class="release-label">Neue Version</span>
@@ -289,6 +302,44 @@ const onBetaToggle = async event => {
   }
 }
 
+// Manual update search (Korrekturauftrag §6.2/§6.3). The store handles the
+// POST + polling and returns one of: 'updated' | 'no-update' | 'cooldown' |
+// 'error'. Each outcome surfaces a clear toast so the user always knows the
+// result of clicking "search now".
+const onCheckNow = async () => {
+  if (updateStore.isChecking) return
+  const outcome = await updateStore.checkNow(sysInfoStore.currentVersion)
+  if (outcome === 'updated') {
+    uiStore.pushToast({
+      type: 'success',
+      title: t('updates.checkResultUpdatedTitle'),
+      message: t('updates.checkResultUpdated', { version: updateStore.latestVersion }),
+      duration: 5000
+    })
+  } else if (outcome === 'no-update') {
+    uiStore.pushToast({
+      type: 'info',
+      title: t('updates.checkResultNoUpdateTitle'),
+      message: t('updates.checkResultNoUpdate'),
+      duration: 4000
+    })
+  } else if (outcome === 'cooldown') {
+    uiStore.pushToast({
+      type: 'info',
+      title: t('updates.checkResultCooldownTitle'),
+      message: t('updates.checkResultCooldown'),
+      duration: 4000
+    })
+  } else {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('updates.checkResultErrorTitle'),
+      message: updateStore.checkError || t('updates.checkResultError'),
+      duration: 6000
+    })
+  }
+}
+
 const restartClick = async () => {
   if (!window.confirm(t('firmware.restartConfirm'))) return
   try { await axios.post('/api/restart') } catch { /* Verbindung bricht beim Neustart erwartbar ab. */ }
@@ -346,6 +397,11 @@ onMounted(async () => {
 .beta-badge { padding:4px 8px; border-radius:var(--radius-pill); background:var(--color-warning-soft); font-size: var(--fs-2xs); font-weight: var(--font-weight-bold); }
 .actions { display:flex; flex-wrap:wrap; gap:10px; }
 .action-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; }
+/* Manual "search now" sits above the release status so the primary action is
+   reachable before the user reads the cached result. Reuses .action-btn so it
+   shares size/alignment with the download + GitHub buttons below. */
+.check-now-row { display:flex; }
+.check-now-btn { width:auto; }
 .beta-toggle-row { display:flex; gap:12px; align-items:flex-start; padding-top:14px; border-top:1px solid var(--color-border); }
 .beta-toggle-label { display:flex; flex-direction:column; gap:3px; font-weight: var(--font-weight-bold); }
 .beta-toggle-hint { font-size: var(--fs-xs); font-weight: var(--font-weight-normal); color:var(--color-text-secondary); }

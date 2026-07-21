@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.7] - 2026-07-21
+
+### Changes
+- feat(webui): Manuelle Updatesuche über „Jetzt nach Updates suchen" wiederhergestellt. Neuer Backend-Endpunkt POST /api/check_update löst sofortigen Manifest-Abruf aus (läuft außerhalb des httpd-Threads), 60-Sekunden-Cooldown verhindert Missbrauch; die automatische 24-Stunden-Prüfung bleibt unberührt. Die Schaltfläche erscheint konsistent auf den Firmware- und WebUI-Update-Tabs und zeigt Lade-, Update-, Aktuell- und Fehlerzustände an.
+- refactor(webui): Eigenständiger Menüpunkt „Design wechseln" entfernt. Die Theme-Auswahl ist ausschließlich unter Einstellungen → Design erreichbar; der Header-Sonne/Mond-Schnellwechsler bleibt, und die /theme-Route bleibt für Lesezeichen erreichbar.
+- fix(webui): Fokus- und Hover-Zustände nutzen jetzt Design-Tokens (var(--color-primary) / var(--color-primary-soft) / var(--shadow-md)) statt hartcodierter Glass-UI-Orange-Tokens — Login-Eingaben, Login-Button, Passwort-Änderungs-Modal und Selbsttest-Test-Button erscheinen damit nicht mehr orange im grünen NewDesign.
+- fix(webui): Dashboard-Zeile „Letzter Neustart" in „Neustartgrund" umbenannt (Wert ist die Ursache, keine Zeitangabe); alle 10 Sprachen aktualisiert.
+- docs: POST /api/check_update in API.md und openapi.yaml dokumentiert (202 Accepted, {triggered, fetchInProgress}, Client-Polling).
+
 ## [2.2.5-Beta.6] - 2026-07-21
 
 ### Changes

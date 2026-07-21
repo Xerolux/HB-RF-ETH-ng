@@ -547,14 +547,25 @@ export const useUpdateStore = defineStore('update', {
   },
   actions: {
     // Reads the cached release info from the device. The device refreshes its
-    // release snapshot automatically every 24 h (UpdateCheck esp_timer); there
-    // is no longer a manual "check now" trigger.
+    // release snapshot automatically every 24 h (UpdateCheck esp_timer) and on
+    // demand via checkNow() (POST /api/check_update). Safe to poll.
     async checkForUpdate(currentVersion) {
       if (this.isChecking) return
 
       this.isChecking = true
       this.checkError = null
+      try {
+        await this._loadSnapshot(currentVersion)
+      } finally {
+        this.isChecking = false
+      }
+    },
 
+    // Fetches GET /api/check_update and writes the snapshot into the store.
+    // Shared by checkForUpdate() and checkNow() so the manual path can reload
+    // the snapshot without going through the isChecking-guarded public action
+    // (which would early-return because checkNow() already holds the flag).
+    async _loadSnapshot(currentVersion) {
       try {
         const response = await axios.get('/api/check_update', {
           params: { t: Date.now() },
@@ -585,8 +596,6 @@ export const useUpdateStore = defineStore('update', {
       } catch (error) {
         console.error('Update check failed:', error)
         this.checkError = error.response?.data?.error || error.message || 'Unknown error'
-      } finally {
-        this.isChecking = false
       }
     },
 
@@ -628,6 +637,62 @@ export const useUpdateStore = defineStore('update', {
         return ap[i] < bp[i] ? -1 : 1
       }
       return 0
+    },
+
+    // Manual "search for updates now" (Korrekturauftrag §6.2/§6.3). Posts to
+    // /api/check_update which arms an immediate on-device manifest fetch (60 s
+    // cooldown enforced server-side); the device answers 202 immediately and
+    // the actual GitHub request runs off the httpd thread. We then poll GET
+    // until fetchInProgress clears and reload the snapshot. Resolves to an
+    // outcome string so callers can show a definitive result toast.
+    // Returns: 'updated' | 'no-update' | 'cooldown' | 'error'
+    async checkNow(currentVersion) {
+      if (this.isChecking) return 'cooldown'
+      this.isChecking = true
+      this.checkError = null
+      try {
+        const post = await axios.post('/api/check_update', {}, {
+          params: { t: Date.now() }
+        })
+        // triggered=false means the device refused: either a fetch is already
+        // running or the 60 s manual cooldown is still active. We still reload
+        // the snapshot (it may have just been refreshed) and report 'cooldown'
+        // so the UI can explain why nothing new happened.
+        const triggered = !!post.data?.triggered
+        await this._pollUntilSettled()
+        await this._loadSnapshot(currentVersion)
+        if (this.checkError) return 'error'
+        if (this.updateAvailable) return 'updated'
+        if (!triggered) return 'cooldown'
+        return 'no-update'
+      } catch (error) {
+        console.error('Manual update check failed:', error)
+        this.checkError = error.response?.data?.error || error.message || 'Unknown error'
+        return 'error'
+      } finally {
+        this.isChecking = false
+      }
+    },
+
+    // Polls GET /api/check_update while the device reports fetchInProgress.
+    // Caps at ~20s so a stalled fetch never wedges the button spinner; the
+    // cached snapshot is still re-read by the following _loadSnapshot() call.
+    async _pollUntilSettled() {
+      const maxTicks = 20
+      for (let i = 0; i < maxTicks; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        try {
+          const response = await axios.get('/api/check_update', {
+            params: { t: Date.now() }
+          })
+          if (!response.data?.fetchInProgress) return
+        } catch (error) {
+          // A transient poll failure doesn't abort the whole check — the final
+          // checkForUpdate() call will surface a persistent error.
+          console.warn('Update poll failed:', error.response?.status || error.message)
+          return
+        }
+      }
     }
   }
 })

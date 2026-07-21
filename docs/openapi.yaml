@@ -253,6 +253,79 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/check_update:
+    get:
+      tags:
+        - Firmware
+      summary: Get cached release snapshot
+      description: >
+        Return the cached snapshot of the latest release known to the firmware.
+        Refreshed automatically every 24 h by a background timer and on demand
+        via POST /api/check_update. This handler never opens a network
+        connection, so it is safe to poll.
+      responses:
+        '200':
+          description: Cached release snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currentVersion:
+                    type: string
+                  latestVersion:
+                    type: string
+                  updateAvailable:
+                    type: boolean
+                  isPrerelease:
+                    type: boolean
+                  fetchedAt:
+                    type: number
+                    description: Unix epoch millis of the last successful fetch
+                  betaChannel:
+                    type: boolean
+                  fetchInProgress:
+                    type: boolean
+                  error:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Firmware
+      summary: Trigger an immediate release-check fetch
+      description: >
+        Arm an immediate online manifest fetch on the device (the WebUI
+        "Jetzt nach Updates suchen" button). Ignores the 24 h automatic window
+        but enforces a 60 s cooldown and never stacks onto a running fetch.
+        The actual GitHub request runs in a detached task; this handler
+        returns 202 immediately. Poll GET /api/check_update (fetchInProgress)
+        until it clears, then read the refreshed snapshot.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '202':
+          description: Fetch armed (or refused due to cooldown / in-flight fetch)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  triggered:
+                    type: boolean
+                    description: true when a new fetch was armed
+                  fetchInProgress:
+                    type: boolean
+                    description: true while a fetch is in flight
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     TokenAuth:

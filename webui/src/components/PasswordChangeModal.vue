@@ -280,8 +280,8 @@ const handleSubmit = async () => {
 }
 
 .password-change-modal :deep(.form-control:focus) {
-  border-color: rgba(242, 106, 61, 0.38);
-  box-shadow: 0 0 0 4px rgba(242, 106, 61, 0.12);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-soft);
 }
 
 .alert-icon {

@@ -11,7 +11,11 @@ export const useHeaderNavigation = (t, loginStore) => {
       { to: '/monitoring', icon: 'monitoring', label: t('nav.monitoring'), group: 'overview' },
       { to: '/settings', icon: 'settings', label: t('nav.settings'), group: 'system' },
       { to: '/system-overview', icon: 'cpu', label: t('sysinfo.system'), group: 'system' },
-      { to: '/theme', icon: 'sun', label: t('nav.toggleTheme'), group: 'system' },
+      // The standalone "Design wechseln" menu item is intentionally removed
+      // (Korrekturauftrag §5): theme selection lives only under Settings →
+      // Design (embedded ThemeSettings). The header sun/moon toggle button
+      // still flips light/dark quickly and is unaffected; /theme remains a
+      // reachable route for bookmarks but is not advertised in the sidebar.
       // Firmware + WebUI merged under /updates (Korrekturauftrag §6).
       { to: '/updates/firmware', icon: 'firmware', label: t('nav.updates'), group: 'system' },
       { to: '/systemlog', icon: 'logs', label: t('nav.systemlog'), group: 'system' },

@@ -252,7 +252,10 @@ export default {
     hostname: 'Hostname',
     boardRevision: 'Board-Revision',
     uptime: 'Laufzeit',
-    resetReason: 'Letzter Neustart',
+    // The value is the cause of the most recent reboot (e.g. "Power on",
+    // "Task watchdog"), not a timestamp — so the label names the cause
+    // explicitly and does not mix time and reason (Korrekturauftrag §1.5).
+    resetReason: 'Neustartgrund',
     cpuUsage: 'CPU Auslastung',
     memoryUsage: 'Speicherauslastung',
     ethernetStatus: 'Ethernet-Verbindung',
@@ -303,7 +306,18 @@ export default {
     title: 'Updates',
     subtitle: 'Firmware und Weboberfläche besitzen getrennte Versionen und werden separat aktualisiert.',
     firmware: 'Firmware',
-    webui: 'WebUI'
+    webui: 'WebUI',
+    checkNow: 'Jetzt nach Updates suchen',
+    checkingNow: 'Suche läuft …',
+    // Result toasts after a manual "search now" (Korrekturauftrag §6.3).
+    checkResultUpdatedTitle: 'Update verfügbar',
+    checkResultUpdated: 'Version {version} ist verfügbar.',
+    checkResultNoUpdateTitle: 'Alles aktuell',
+    checkResultNoUpdate: 'Es ist keine neuere Version vorhanden.',
+    checkResultErrorTitle: 'Prüfung fehlgeschlagen',
+    checkResultError: 'Die Update-Prüfung konnte nicht durchgeführt werden.',
+    checkResultCooldownTitle: 'Kurz gewartet',
+    checkResultCooldown: 'Es läuft bereits eine Prüfung oder die 60-Sekunden-Sperre ist noch aktiv.'
   },
 
   // Firmware Update

@@ -246,7 +246,9 @@ export default {
     hostname: 'Hostname',
     boardRevision: 'Board revision',
     uptime: 'Uptime',
-    resetReason: 'Last reboot',
+    // Value is the cause of the last reboot, not a timestamp — name the cause
+    // explicitly and keep it separate from the uptime row (Korrekturauftrag §1.5).
+    resetReason: 'Restart reason',
     cpuUsage: 'CPU usage',
     memoryUsage: 'Memory usage',
     ethernetStatus: 'Ethernet connection',
@@ -303,7 +305,18 @@ export default {
     title: 'Updates',
     subtitle: 'Firmware and web interface have separate versions and are updated independently.',
     firmware: 'Firmware',
-    webui: 'WebUI'
+    webui: 'WebUI',
+    checkNow: 'Search for updates now',
+    checkingNow: 'Searching …',
+    // Result toasts after a manual "search now".
+    checkResultUpdatedTitle: 'Update available',
+    checkResultUpdated: 'Version {version} is available.',
+    checkResultNoUpdateTitle: 'Everything is up to date',
+    checkResultNoUpdate: 'No newer version is available.',
+    checkResultErrorTitle: 'Check failed',
+    checkResultError: 'The update check could not be completed.',
+    checkResultCooldownTitle: 'Just a moment',
+    checkResultCooldown: 'A check is already running or the 60-second cooldown is still active.'
   },
 
   // Firmware Update
