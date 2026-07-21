@@ -233,7 +233,8 @@ export default {
     hostname: 'Nome Host',
     boardRevision: 'Revisione Scheda',
     uptime: 'Tempo di attività',
-    resetReason: 'Ultimo Riavvio',
+     // Value is the cause of the last reboot, not a timestamp (Korrekturauftrag §1.5).
+     resetReason: 'Motivo riavvio',
     cpuUsage: 'Utilizzo CPU',
     memoryUsage: 'Utilizzo memoria',
     ethernetStatus: 'Connessione Ethernet',
@@ -290,7 +291,17 @@ export default {
     title: 'Updates',
     subtitle: 'Firmware and web interface have separate versions and are updated independently.',
     firmware: 'Firmware',
-    webui: 'WebUI'
+    webui: 'WebUI',
+    checkNow: 'Search for updates now',
+    checkingNow: 'Searching …',
+    checkResultUpdatedTitle: 'Update available',
+    checkResultUpdated: 'Version {version} is available.',
+    checkResultNoUpdateTitle: 'Everything is up to date',
+    checkResultNoUpdate: 'No newer version is available.',
+    checkResultErrorTitle: 'Check failed',
+    checkResultError: 'The update check could not be completed.',
+    checkResultCooldownTitle: 'Just a moment',
+    checkResultCooldown: 'A check is already running or the 60-second cooldown is still active.'
   },
 
   // Firmware Update

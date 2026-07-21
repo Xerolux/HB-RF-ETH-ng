@@ -452,8 +452,8 @@ const loginClick = async () => {
 
 .modern-input:focus {
   background: var(--color-surface);
-  border-color: rgba(242, 106, 61, 0.38);
-  box-shadow: 0 0 0 4px rgba(242, 106, 61, 0.12);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-soft);
   outline: none;
 }
 
@@ -480,13 +480,16 @@ const loginClick = async () => {
   font-weight: 600;
   font-size: var(--fs-lg);
   margin-top: 8px;
-  box-shadow: 0 14px 28px rgba(242, 106, 61, 0.22);
+  /* Neutral elevation shadow (token-driven) so the glow follows the active
+     theme instead of hardcoding the Glass-UI orange. The accent colour comes
+     from the button fill, not the shadow. */
+  box-shadow: var(--shadow-md);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .login-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 32px rgba(242, 106, 61, 0.28);
+  box-shadow: var(--shadow-lg);
 }
 
 .login-btn:active:not(:disabled) {

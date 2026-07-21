@@ -161,6 +161,51 @@ static void _periodic_timer_callback(void *arg)
   }
 }
 
+// Short-lived task spawned by _manual_fetch_callback. Identical to the daily
+// path except it calls refresh() unconditionally (the user explicitly asked for
+// a check, so the 24 h window does not apply — only the 60 s manual cooldown,
+// enforced in triggerManualFetch() before arming this task, gates it).
+static void _manual_fetch_task(void *parameter)
+{
+  UpdateCheck *uc = static_cast<UpdateCheck *>(parameter);
+  ESP_LOGI(TAG, "Manual update check starting (heap free: %u KB)",
+           (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+  const bool ok = uc->refresh();
+  if (ok) {
+    save_cached_release(uc->getReleaseInfo());
+  }
+  uc->_evaluateReleaseInfo();
+  vTaskDelete(NULL);
+}
+
+// esp_timer callback for the manual "check now" path. Runs in the high-priority
+// timer task (3-4 KB stack) — too small for refresh() — so we only spawn the
+// real worker here and return immediately, mirroring _periodic_timer_callback.
+static void _manual_fetch_callback(void *arg)
+{
+  UpdateCheck *uc = static_cast<UpdateCheck *>(arg);
+
+  // Same heap guard as the daily check: never destabilise Homematic/MQTT for a
+  // manual refresh. The cached snapshot stays available and the user can retry.
+  const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+  const size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+  constexpr size_t MIN_FREE_HEAP = 72 * 1024;
+  constexpr size_t MIN_LARGEST_BLOCK = 18 * 1024;
+  if (free_heap < MIN_FREE_HEAP || largest_block < MIN_LARGEST_BLOCK) {
+    ESP_LOGW(TAG,
+             "Manual update check skipped (low heap): free=%u KB largest=%u KB",
+             (unsigned)(free_heap / 1024),
+             (unsigned)(largest_block / 1024));
+    return;
+  }
+
+  BaseType_t created = xTaskCreate(_manual_fetch_task, "upd_man", 9216,
+                                   uc, 2, NULL);
+  if (created != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create manual update-check task");
+  }
+}
+
 static uint32_t update_check_stagger_seconds(SysInfo *sysInfo)
 {
   // Stable FNV-1a hash of the device serial. Devices updated or rebooted at the
@@ -449,6 +494,19 @@ void UpdateCheck::start()
     } else {
         ESP_LOGE(TAG, "Failed to create periodic update-check timer");
     }
+
+    // One-shot timer for the manual "check now" button (POST /api/check_update).
+    // Created once, armed by triggerManualFetch() on each click; never runs on a
+    // schedule. The 24 h automatic timer above is completely independent.
+    if (!_manualFetchTimer) {
+        esp_timer_create_args_t manualArgs = {};
+        manualArgs.callback = _manual_fetch_callback;
+        manualArgs.arg = this;
+        manualArgs.name = "updchk_man";
+        if (esp_timer_create(&manualArgs, &_manualFetchTimer) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create manual update-check timer");
+        }
+    }
 }
 
 void UpdateCheck::stop()
@@ -464,6 +522,14 @@ void UpdateCheck::stop()
         esp_timer_stop(_initialTimer);
         esp_timer_delete(_initialTimer);
         _initialTimer = NULL;
+    }
+    // A manual fetch may have just been armed (e.g. OTA heap preparation right
+    // after the user clicked "search now"). Cancel it so it cannot fire during
+    // shutdown / OTA and contend for the TLS heap.
+    if (_manualFetchTimer) {
+        esp_timer_stop(_manualFetchTimer);
+        esp_timer_delete(_manualFetchTimer);
+        _manualFetchTimer = NULL;
     }
 }
 
@@ -602,6 +668,56 @@ bool UpdateCheck::isFetchInProgress()
     // xSemaphoreGetMutexHolder returns the owning task handle or NULL. We
     // don't care who owns it - any non-NULL value means "busy".
     return xSemaphoreGetMutexHolder(_fetchLock) != NULL;
+}
+
+bool UpdateCheck::triggerManualFetch()
+{
+    // 60 s cooldown measured in epoch millis. A manual "search now" click
+    // intentionally bypasses the 24 h automatic window, but must still protect
+    // the GitHub manifest and the ESP32 TLS heap from rapid repeat clicks.
+    static constexpr int64_t MANUAL_FETCH_COOLDOWN_MS = 60 * 1000;
+
+    if (!_manualFetchTimer) {
+        ESP_LOGW(TAG, "triggerManualFetch: timer not initialised");
+        return false;
+    }
+
+    // Reject if a fetch is already running (background timer or a previous
+    // manual trigger). refresh() would return false anyway; we just avoid
+    // arming a redundant worker task.
+    if (isFetchInProgress()) {
+        ESP_LOGD(TAG, "triggerManualFetch: a fetch is already in progress");
+        return false;
+    }
+
+    const int64_t nowMs = current_epoch_seconds() > 0
+        ? current_epoch_seconds() * 1000
+        : (esp_timer_get_time() / 1000);
+
+    if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+        const int64_t elapsed = nowMs - _lastManualFetchMs;
+        if (_lastManualFetchMs != 0 && elapsed < MANUAL_FETCH_COOLDOWN_MS) {
+            xSemaphoreGive(_stateMutex);
+            ESP_LOGI(TAG,
+                     "triggerManualFetch: cooldown active, next manual check in %lld s",
+                     (long long)((MANUAL_FETCH_COOLDOWN_MS - elapsed + 999) / 1000));
+            return false;
+        }
+        _lastManualFetchMs = nowMs;
+        xSemaphoreGive(_stateMutex);
+    }
+
+    // Arm the one-shot timer; it spawns the real worker off the httpd thread.
+    // A short 200 ms delay lets the POST response leave the device first.
+    esp_timer_stop(_manualFetchTimer);
+    const esp_err_t err = esp_timer_start_once(_manualFetchTimer, 200 * 1000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "triggerManualFetch: failed to arm timer (%s)", esp_err_to_name(err));
+        return false;
+    }
+    ESP_LOGI(TAG, "Manual update check armed (cooldown %lld ms)",
+             (long long)MANUAL_FETCH_COOLDOWN_MS);
+    return true;
 }
 
 void UpdateCheck::_setOtaStateLocked(ota_state_t state)

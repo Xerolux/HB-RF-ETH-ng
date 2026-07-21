@@ -110,6 +110,16 @@ private:
     esp_timer_handle_t _periodicTimer = NULL;
     esp_timer_handle_t _initialTimer = NULL;
 
+    // One-shot timer armed by triggerManualFetch(). It defers the real fetch
+    // off the httpd worker thread (a GitHub TLS handshake can take several
+    // seconds) so POST /api/check_update can answer immediately while the
+    // manifest fetch runs on its own short-lived task like the daily check.
+    esp_timer_handle_t _manualFetchTimer = NULL;
+    // Epoch millis of the last accepted manual trigger, guarded by _stateMutex.
+    // Enforces a 60 s manual cooldown independently of the 24 h automatic
+    // window so the WebUI "search now" button cannot hammer the manifest.
+    int64_t _lastManualFetchMs = 0;
+
     // Serializes writes/reads of the cached _release snapshot.
     SemaphoreHandle_t _stateMutex = NULL;
     // Held while a network fetch is in progress; prevents concurrent fetches
@@ -150,6 +160,15 @@ public:
     // Performs an online fetch only when the persistent 24 h window is due.
     // Reboots and page visits cannot bypass this limit.
     bool refreshIfDue();
+
+    // Arm an immediate online fetch from a manual WebUI/MQTT request. Bypasses
+    // the 24 h window (the user explicitly asked) but enforces a 60 s manual
+    // cooldown and never stacks onto a fetch already in progress. The actual
+    // GitHub request is deferred to a short-lived task so this never blocks the
+    // httpd worker. Returns true when a new fetch was armed, false if one is
+    // already running or the cooldown has not elapsed. The 24 h automatic
+    // timer is not affected.
+    bool triggerManualFetch();
 
     // Compares the cached release against the running version and drives the
     // status LED (update-available blink). Public because it is called by the

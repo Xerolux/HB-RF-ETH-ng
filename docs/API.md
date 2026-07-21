@@ -563,24 +563,48 @@ curl http://192.168.1.100/api/check_update \
 
 ### POST /api/check_update
 
-Trigger an immediate refresh from the static update manifest. Returns the same
-JSON shape as `GET /api/check_update` once the fetch completes. The endpoint
-runs the fetch in a detached task so the single-threaded HTTP server stays
-responsive; the response is sent after the fetch finishes (typically 3–10 s).
-Concurrent requests coalesce onto the in-flight fetch rather than spawning
-duplicate manifest requests.
+Trigger an immediate refresh from the static update manifest. This is the
+backend behind the WebUI "Jetzt nach Updates suchen" button. It **ignores the
+24 h automatic window** (the user explicitly asked for a check) but enforces a
+60 s cooldown and refuses to stack onto a fetch that is already running, so
+the GitHub manifest and the ESP32 TLS heap stay protected.
+
+The actual manifest fetch runs in a detached task (a GitHub TLS handshake can
+take several seconds); this handler therefore returns **202 Accepted
+immediately** and the client polls `GET /api/check_update` (`fetchInProgress`)
+until it clears, then reads the updated snapshot.
 
 **Authentication:** Required
 
 **Request:** Empty body accepted (`{}` is also fine).
 
-**Response (200 OK):** Same shape as `GET /api/check_update`.
+**Response (202 Accepted):**
+```json
+{
+  "triggered": true,
+  "fetchInProgress": true
+}
+```
+
+**Fields:**
+- `triggered`: `true` when a new fetch was armed. `false` if a fetch is
+  already running, or the 60 s manual cooldown has not elapsed — in either
+  case the cached snapshot remains available via `GET /api/check_update`.
+- `fetchInProgress`: `true` while a manifest fetch (manual or automatic) is in
+  flight. Clients should poll `GET /api/check_update` until this becomes
+  `false`.
 
 **Example:**
 ```bash
-curl -X POST http://192.168.1.100/api/check_update \
+curl -i -X POST http://192.168.1.100/api/check_update \
   -H "Authorization: Token YOUR_TOKEN_HERE"
+# HTTP/1.1 202 Accepted
+# {"triggered":true,"fetchInProgress":true}
 ```
+
+**Client flow:** POST → poll GET every ~1 s until `fetchInProgress == false`
+(≤ 20 s) → read the refreshed snapshot. The automatic 24 h check timer is not
+affected by manual triggers.
 
 ---
 

@@ -2269,9 +2269,11 @@ esp_err_t get_check_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // GET returns the persistent cached snapshot only. No browser, MQTT
-    // command or page visit can trigger an online request; the backend timer
-    // enforces the single 24-hour update window.
+    // GET returns the persistent cached snapshot. The snapshot is refreshed
+    // automatically every 24 h by the UpdateCheck timer, and additionally on
+    // demand via POST /api/check_update (manual "search now"); this handler
+    // itself never opens a network connection. `fetchInProgress` in the JSON
+    // body tells the caller whether a manual fetch is currently running.
     send_release_info_response(req);
     return ESP_OK;
 }
@@ -2280,6 +2282,54 @@ httpd_uri_t get_check_update_handler = {
     .uri = "/api/check_update",
     .method = HTTP_GET,
     .handler = get_check_update_handler_func,
+    .user_ctx = NULL};
+
+// POST /api/check_update — arms an immediate online manifest fetch on the
+// device (the "Jetzt nach Updates suchen" button). The actual GitHub request
+// is deferred to a short-lived task so this handler returns 202 right away;
+// the client then polls GET /api/check_update (fetchInProgress) until it
+// clears and reads the updated snapshot. triggerManualFetch() enforces a 60 s
+// cooldown and refuses to stack onto a running fetch, so the 24 h automatic
+// timer and the ESP32 TLS heap stay protected.
+esp_err_t post_check_update_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    httpd_resp_set_type(req, "application/json");
+
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    const bool accepted = _updateCheck->triggerManualFetch();
+    const bool fetchInProgress = _updateCheck->isFetchInProgress();
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddBoolToObject(root, "triggered", accepted);
+    cJSON_AddBoolToObject(root, "fetchInProgress", fetchInProgress);
+    // accepted=false with fetchInProgress=true means "a check is already
+    // running" (the client should just keep polling). accepted=false with
+    // fetchInProgress=false means "cooldown active" (the client shows the
+    // cached result). Either way the response is 202: the request was
+    // understood, the latest snapshot remains available via GET.
+    httpd_resp_set_status(req, "202 Accepted");
+    const char *json = cJSON_PrintUnformatted(root);
+    if (json) {
+        httpd_resp_sendstr(req, json);
+        free((void *)json);
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
+    }
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
+httpd_uri_t post_check_update_handler = {
+    .uri = "/api/check_update",
+    .method = HTTP_POST,
+    .handler = post_check_update_handler_func,
     .user_ctx = NULL};
 
 esp_err_t get_log_handler_func(httpd_req_t *req)
@@ -2691,6 +2741,7 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
         httpd_register_uri_handler(_httpd_handle, &get_check_update_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_log_enable_handler);

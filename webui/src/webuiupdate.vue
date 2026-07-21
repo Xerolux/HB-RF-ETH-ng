@@ -47,6 +47,18 @@
 
         <BAlert v-if="manifestError" variant="warning" :model-value="true">{{ manifestError }}</BAlert>
 
+        <!-- Manual "search for updates now" (Korrekturauftrag §6.2/§6.3). Shares
+             the on-device fetch with the Firmware tab; after it settles we reload
+             the WebUI-specific release block. -->
+        <div class="check-now-row">
+          <BButton variant="outline-primary" class="action-btn check-now-btn"
+                   :disabled="checkNowBusy" @click="onCheckNow">
+            <span v-if="checkNowBusy" class="spinner-border spinner-border-sm me-2"></span>
+            <AppIcon v-else name="refresh" />
+            {{ checkNowBusy ? checkNowLabel : checkNowIdleLabel }}
+          </BButton>
+        </div>
+
         <div v-if="release.version" class="release-grid">
           <div><span>Installiert</span><strong>{{ installedVersion }}</strong></div>
           <div><span>Verfügbar</span><strong>{{ release.version }}</strong></div>
@@ -127,12 +139,13 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
-import { useUiStore } from './stores.js'
+import { useUiStore, useUpdateStore } from './stores.js'
 
 const WEBUI_API_VERSION = 1
 const EMBEDDED_WEBUI_VERSION = typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : 'unbekannt'
 
 const uiStore = useUiStore()
+const updateStore = useUpdateStore()
 const loading = ref(true)
 const busy = ref(false)
 const progress = ref(0)
@@ -142,6 +155,11 @@ const selectedFile = ref(null)
 const release = ref({})
 const firmwareVersion = ref('')
 const updateFetchedAt = ref(null)
+// Manual update search (Korrekturauftrag §6.2/§6.3). This page does not use
+// vue-i18n (German-only like the rest of the file); the labels stay local.
+const checkNowBusy = ref(false)
+const checkNowIdleLabel = 'Jetzt nach Updates suchen'
+const checkNowLabel = 'Suche läuft …'
 const status = ref({
   partitionFound: false,
   mounted: false,
@@ -226,6 +244,30 @@ const loadCachedRelease = async () => {
   }
 }
 
+// Manual update search (Korrekturauftrag §6.2/§6.3). Delegates the POST +
+// polling to the shared update store, then reloads the WebUI release block so
+// the result (new version / current / error) is reflected in this tab. The
+// outcome drives a definitive toast per §6.3.
+const onCheckNow = async () => {
+  if (checkNowBusy.value) return
+  checkNowBusy.value = true
+  try {
+    const outcome = await updateStore.checkNow(firmwareVersion.value)
+    await loadCachedRelease()
+    if (outcome === 'updated' && updateAvailable.value) {
+      uiStore.pushToast({ type: 'success', title: 'Update verfügbar', message: `WebUI-Version ${release.value.version} ist verfügbar.`, duration: 5000 })
+    } else if (outcome === 'no-update' || outcome === 'updated') {
+      uiStore.pushToast({ type: 'info', title: 'Alles aktuell', message: 'Es ist keine neuere WebUI vorhanden.', duration: 4000 })
+    } else if (outcome === 'cooldown') {
+      uiStore.pushToast({ type: 'info', title: 'Kurz gewartet', message: 'Es läuft bereits eine Prüfung oder die 60-Sekunden-Sperre ist noch aktiv.', duration: 4000 })
+    } else {
+      uiStore.pushToast({ type: 'error', title: 'Prüfung fehlgeschlagen', message: updateStore.checkError || 'Die Update-Prüfung konnte nicht durchgeführt werden.', duration: 6000 })
+    }
+  } finally {
+    checkNowBusy.value = false
+  }
+}
+
 const refreshCachedStatus = async () => {
   loading.value = true
   try {
@@ -305,6 +347,10 @@ onMounted(refreshCachedStatus)
 .release-grid strong { overflow-wrap:anywhere; }
 .actions { display:flex; flex-wrap:wrap; gap:10px; }
 .action-btn { display:inline-flex; gap:8px; align-items:center; text-decoration:none; }
+/* Manual "search now" row — mirrors the Firmware tab so both sub-tabs share
+   the same primary action placement (Korrekturauftrag §6.5). */
+.check-now-row { display:flex; margin-bottom:4px; }
+.check-now-btn { width:auto; }
 .file-drop { min-height:145px; border:2px dashed var(--color-border-strong); border-radius:14px; display:flex; flex-direction:column; gap:7px; align-items:center; justify-content:center; text-align:center; cursor:pointer; padding:18px; }
 .file-drop input { display:none; }
 .file-drop.invalid { border-color:var(--color-danger); }

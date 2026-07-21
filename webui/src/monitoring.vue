@@ -1003,7 +1003,7 @@ const runDiagnostic = async (target) => {
 
 .diag-test-btn:hover:not(:disabled) {
   background: var(--color-primary-soft);
-  border-color: rgba(242, 106, 61, 0.32);
+  border-color: var(--color-primary);
   color: var(--color-primary-strong);
   transform: translateY(-1px);
 }
