@@ -271,15 +271,15 @@ const onCheckNow = async () => {
     const outcome = await updateStore.checkNow(firmwareVersion.value)
     await loadCachedRelease()
     if (outcome === 'updated' && updateAvailable.value) {
-      uiStore.pushToast({ type: 'success', title: t('webuiUpdate.updateAvailableTitle'), message: t('webuiUpdate.updateAvailableMessage', { version: release.value.version }), duration: 5000 })
+      uiStore.pushToast({ type: 'success', title: t('updates.checkResultUpdatedTitle'), message: t('updates.checkResultUpdated', { version: release.value.version }), duration: 5000 })
     } else if (outcome === 'skipped') {
-      uiStore.pushToast({ type: 'warning', title: t('webuiUpdate.skippedTitle'), message: updateStore.lastSkipReason || t('webuiUpdate.skippedMessage'), duration: 8000 })
+      uiStore.pushToast({ type: 'warning', title: t('updates.checkResultSkippedTitle'), message: updateStore.lastSkipReason || t('updates.checkResultSkipped'), duration: 8000 })
     } else if (outcome === 'no-update' || outcome === 'updated') {
-      uiStore.pushToast({ type: 'info', title: t('webuiUpdate.upToDateTitle'), message: t('webuiUpdate.upToDateMessage'), duration: 4000 })
+      uiStore.pushToast({ type: 'info', title: t('updates.checkResultNoUpdateTitle'), message: t('updates.checkResultNoUpdate'), duration: 4000 })
     } else if (outcome === 'cooldown') {
-      uiStore.pushToast({ type: 'info', title: t('webuiUpdate.cooldownTitle'), message: t('webuiUpdate.cooldownMessage'), duration: 4000 })
+      uiStore.pushToast({ type: 'info', title: t('updates.checkResultCooldownTitle'), message: t('updates.checkResultCooldown'), duration: 4000 })
     } else {
-      uiStore.pushToast({ type: 'error', title: t('webuiUpdate.checkFailedTitle'), message: updateStore.checkError || t('webuiUpdate.checkFailedMessage'), duration: 6000 })
+      uiStore.pushToast({ type: 'error', title: t('updates.checkResultErrorTitle'), message: updateStore.checkError || t('updates.checkResultError'), duration: 6000 })
     }
   } finally {
     checkNowBusy.value = false
