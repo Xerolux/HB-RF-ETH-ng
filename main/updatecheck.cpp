@@ -29,6 +29,7 @@
 #include "esp_timer.h"
 #include "esp_system.h"
 #include <sys/time.h>
+#include <stdlib.h>
 #include "string.h"
 #include "reset_info.h"
 #include "system_reset.h"
@@ -174,10 +175,7 @@ static void _manual_fetch_task(void *parameter)
   UpdateCheck *uc = static_cast<UpdateCheck *>(parameter);
   ESP_LOGI(TAG, "Manual update check starting (heap free: %u KB)",
            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
-  const bool ok = uc->refresh();
-  if (ok) {
-    save_cached_release(uc->getReleaseInfo());
-  }
+  uc->refresh();
   uc->_evaluateReleaseInfo();
   vTaskDelete(NULL);
 }
@@ -609,11 +607,7 @@ bool UpdateCheck::refreshIfDue()
     // Mark the attempt before opening TLS. Failed DNS/TLS attempts are also
     // limited to once per 24 h, exactly like successful checks.
     save_last_attempt(now >= VALID_EPOCH_THRESHOLD ? now : 1);
-    const bool ok = refresh();
-    if (ok) {
-        save_cached_release(getReleaseInfo());
-    }
-    return ok;
+    return refresh();
 }
 
 bool UpdateCheck::refresh()
@@ -635,8 +629,24 @@ bool UpdateCheck::refresh()
         xSemaphoreGive(_stateMutex);
     }
 
-    ReleaseInfo fresh = {};
-    bool ok = _doFetch(&fresh);
+    // Keep the large ReleaseInfo snapshot off the worker stack. Manual update
+    // checks run in a short-lived task; placing this ~2 KB object on that
+    // stack has caused stack-canary panics on WROOM-32 devices while cJSON/TLS
+    // helper frames are active.
+    ReleaseInfo *fresh = static_cast<ReleaseInfo *>(calloc(1, sizeof(ReleaseInfo)));
+    if (!fresh) {
+        if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
+            snprintf(_release.error, sizeof(_release.error), "out of memory");
+            if (_otaState == OTA_STATE_CHECKING) {
+                _setOtaStateLocked(OTA_STATE_IDLE);
+            }
+            xSemaphoreGive(_stateMutex);
+        }
+        xSemaphoreGive(_fetchLock);
+        return false;
+    }
+
+    bool ok = _doFetch(fresh);
     const int64_t epoch = current_epoch_seconds();
     int64_t now = epoch ? epoch * 1000 : esp_timer_get_time() / 1000;
 
@@ -645,9 +655,10 @@ bool UpdateCheck::refresh()
     // and just surface the error + retry timestamp.
     if (_stateMutex && xSemaphoreTake(_stateMutex, portMAX_DELAY) == pdTRUE) {
         if (ok) {
-            fresh.fetchedAtMs = now;
-            _release = fresh;
-            strncpy(_latestVersion, fresh.version, sizeof(_latestVersion) - 1);
+            fresh->fetchedAtMs = now;
+            _release = *fresh;
+            save_cached_release(_release);
+            strncpy(_latestVersion, fresh->version, sizeof(_latestVersion) - 1);
             _latestVersion[sizeof(_latestVersion) - 1] = 0;
             // A successful fetch supersedes any earlier skip reason so the
             // WebUI stops showing the low-heap hint after the next retry.
@@ -655,8 +666,8 @@ bool UpdateCheck::refresh()
             _lastSkipReasonMs = 0;
         } else {
             _release.fetchedAtMs = now;
-            if (fresh.error[0]) {
-                strncpy(_release.error, fresh.error, sizeof(_release.error) - 1);
+            if (fresh->error[0]) {
+                strncpy(_release.error, fresh->error, sizeof(_release.error) - 1);
                 _release.error[sizeof(_release.error) - 1] = 0;
             }
             // If we've never had a valid snapshot, keep the "n/a" default
@@ -674,6 +685,7 @@ bool UpdateCheck::refresh()
         xSemaphoreGive(_stateMutex);
     }
 
+    free(fresh);
     xSemaphoreGive(_fetchLock);
     return ok;
 }
@@ -941,7 +953,6 @@ bool UpdateCheck::_doFetch(ReleaseInfo *out)
                  (unsigned)(heapBeforeParse / 1024));
 
         parsedOk = _parseUpdateManifest(resp.buf, out);
-        if (parsedOk) out->betaChannel = beta;
         if (parsedOk) out->betaChannel = beta;
 
         ESP_LOGI(TAG, "Parse %s (heap free %u KB)",
