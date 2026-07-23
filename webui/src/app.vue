@@ -21,7 +21,7 @@
       </main>
       <footer class="app-footer">
         <div class="footer-content">
-          <small class="text-muted">Firmware v{{ sysInfoStore.currentVersion || '—' }} · WebUI v{{ webUiVersion }} © 2025-2026 Xerolux</small>
+          <small class="text-muted">{{ t('app.footerCopyright', { version: sysInfoStore.currentVersion || '...' }) }} · WebUI v{{ webUiVersion }}</small>
           <div class="footer-actions">
             <a
               class="follow-x-btn"

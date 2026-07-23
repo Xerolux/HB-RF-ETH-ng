@@ -45,6 +45,7 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
     
     struct addrinfo hint;
     memset(&hint, 0, sizeof(hint));
+    hint.ai_family = AF_INET;
     struct addrinfo *res = NULL;
     if (getaddrinfo(target, NULL, &hint, &res) != 0 || res == NULL) {
         ESP_LOGE(TAG, "DNS lookup failed for %s", target);
@@ -76,12 +77,18 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
         .on_ping_end = cmd_ping_on_ping_end
     };
 
-    esp_ping_handle_t ping;
-    esp_ping_new_session(&config, &cbs, &ping);
+    esp_ping_handle_t ping = NULL;
+    esp_err_t err = esp_ping_new_session(&config, &cbs, &ping);
+    if (err != ESP_OK || ping == NULL) {
+        ESP_LOGE(TAG, "Failed to create ping session: %s", esp_err_to_name(err));
+        vEventGroupDelete(ctx.event_group);
+        return -1;
+    }
+
     esp_ping_start(ping);
 
     EventBits_t bits = xEventGroupWaitBits(ctx.event_group, PING_SUCCESS_BIT | PING_END_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(timeout_ms + 1000));
-    
+
     esp_ping_stop(ping);
     esp_ping_delete_session(ping);
     vEventGroupDelete(ctx.event_group);

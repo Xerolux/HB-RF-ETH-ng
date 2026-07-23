@@ -376,7 +376,7 @@ void app_main()
             else
                 ESP_LOGE(TAG, "Deferred log-buffer retry also failed — heap still too low");
             vTaskDelete(NULL);
-        }, "log_retry", 2048, NULL, 2, NULL);
+        }, "log_retry", 3072, NULL, 2, NULL);
     }
 
     powerLED.setState(LED_STATE_ON);

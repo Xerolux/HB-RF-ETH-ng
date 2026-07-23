@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Opravte zvýrazněná pole.'
+    },
+    ping: {
+      title: 'Diagnostika sítě',
+      target: 'Cíl pingu (IP nebo název hostitele)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping úspěšný. Latence: {latency} ms',
+      failure: 'Ping selhal nebo vypršel časový limit.'
     }
   },
 
@@ -304,7 +312,9 @@ export default {
     title: 'Aktualizace',
     subtitle: 'Firmware a webové rozhraní mají samostatné verze a aktualizují se nezávisle.',
     firmware: 'Firmware',
+    firmwareDescription: 'ESP32, network and radio',
     webui: 'WebUI',
+    webuiDescription: 'Browser-based controls',
     checkNow: 'Hledat aktualizace nyní',
     checkingNow: 'Hledání …',
     checkResultUpdatedTitle: 'Aktualizace k dispozici',
@@ -399,7 +409,7 @@ export default {
     otaSuccess: 'Stažení úspěšné. Instalace...',
     currentVersion: 'Současná verze',
     installedVersion: 'Nainstalovaná verze',
-    versionInfo: 'Modernizovaný fork v2.2.5-Beta.9 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
+    versionInfo: 'Modernizovaný fork v2.2.5-Beta.10 od Xerolux (2025) - Založeno na původní práci Alexandra Reinerta.',
     updateAvailable: 'Aktualizace k dispozici!',
     updateAvailableMessage: 'Je k dispozici aktualizace na verzi {latestVersion}.',
     upToDate: 'Firmware je aktuální',
@@ -556,8 +566,19 @@ export default {
       port: 'Port',
       portHelp: 'Výchozí: 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Min. závažnost',
       minSeverityHelp: 'Přesměrovávat pouze zprávy od této závažnosti výše',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Přepsání hostitele',
       hostnameHelp: 'Prázdné = použít hostitele zařízení'
     },

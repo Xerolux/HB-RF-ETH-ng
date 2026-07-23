@@ -11,7 +11,7 @@
         <span class="meta-chip"><AppIcon name="board" /> {{ data.target || 'ESP32' }}</span>
         <span class="meta-chip" :class="data.webui?.valid ? 'success-chip' : 'warning-chip'">
           <AppIcon :name="data.webui?.valid ? 'check' : 'alert'" />
-          {{ data.webui?.source || 'embedded' }}
+          {{ data.webui?.source || copy.embedded }}
         </span>
       </div>
     </section>
@@ -91,11 +91,11 @@
         <article class="detail-card">
           <div class="detail-heading">
             <span class="icon-badge info"><AppIcon name="globe" /></span>
-            <div><h2>WebUI</h2><p>{{ copy.webuiHint }}</p></div>
+            <div><h2>{{ copy.webui }}</h2><p>{{ copy.webuiHint }}</p></div>
           </div>
           <div class="kv-list">
-            <div class="kv-row"><span>{{ copy.source }}</span><strong>{{ data.webui?.source || 'embedded' }}</strong></div>
-            <div class="kv-row"><span>{{ copy.version }}</span><strong class="mono">{{ data.webui?.version || 'embedded' }}</strong></div>
+            <div class="kv-row"><span>{{ copy.source }}</span><strong>{{ data.webui?.source || copy.embedded }}</strong></div>
+            <div class="kv-row"><span>{{ copy.version }}</span><strong class="mono">{{ data.webui?.version || copy.embedded }}</strong></div>
             <div class="kv-row"><span>{{ copy.partitionSize }}</span><strong>{{ formatBytes(data.webui?.partitionBytes) }}</strong></div>
             <div class="kv-row"><span>{{ copy.used }}</span><strong>{{ formatBytes(data.webui?.usedBytes) }}</strong></div>
           </div>
@@ -144,6 +144,9 @@ const translations = {
     eyebrow: 'Diagnose',
     title: 'Systemübersicht',
     subtitle: 'RAM, Flash, Partitionen, Logs und aktive Weboberfläche auf einen Blick.',
+    webui: 'WebUI',
+    embedded: 'embedded',
+    errorUnavailable: 'Systemübersicht nicht verfügbar',
     freeRam: 'RAM frei',
     usedRam: 'RAM belegt',
     totalRam: 'RAM gesamt',
@@ -195,6 +198,9 @@ const translations = {
     eyebrow: 'Diagnostics',
     title: 'System Overview',
     subtitle: 'RAM, flash, partitions, logs and the active web interface at a glance.',
+    webui: 'WebUI',
+    embedded: 'embedded',
+    errorUnavailable: 'System overview unavailable',
     freeRam: 'Free RAM',
     usedRam: 'Used RAM',
     totalRam: 'Total RAM',
@@ -273,7 +279,7 @@ const loadOverview = async () => {
     error.value = responseData?.error
       || (typeof responseData === 'string' ? responseData : '')
       || requestError.message
-      || 'System overview unavailable'
+      || copy.value.errorUnavailable
   } finally {
     loading.value = false
   }
