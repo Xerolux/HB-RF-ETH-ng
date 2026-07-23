@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Correggi i campi evidenziati.'
+    },
+    ping: {
+      title: 'Diagnostica di rete',
+      target: 'Destinazione ping (IP o hostname)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping riuscito. Latenza: {latency} ms',
+      failure: 'Ping fallito o timeout.'
     }
   },
 
@@ -304,7 +312,9 @@ export default {
     title: 'Aggiornamenti',
     subtitle: 'Il firmware e l\'interfaccia web hanno versioni separate e vengono aggiornati in modo indipendente.',
     firmware: 'Firmware',
+    firmwareDescription: 'ESP32, network and radio',
     webui: 'WebUI',
+    webuiDescription: 'Browser-based controls',
     checkNow: 'Cerca aggiornamenti ora',
     checkingNow: 'Ricerca in corso …',
     checkResultUpdatedTitle: 'Aggiornamento disponibile',
@@ -399,7 +409,7 @@ export default {
     otaSuccess: 'Download completato. Installazione in corso...',
     currentVersion: 'Versione Attuale',
     installedVersion: 'Versione Installata',
-    versionInfo: 'Fork modernizzato v2.2.5-Beta.9 di Xerolux (2025) - Basato sul lavoro originale di Alexander Reinert.',
+    versionInfo: 'Fork modernizzato v2.2.5-Beta.10 di Xerolux (2025) - Basato sul lavoro originale di Alexander Reinert.',
     updateAvailable: 'Aggiornamento disponibile!',
     updateAvailableMessage: 'È disponibile un aggiornamento alla versione {latestVersion}.',
     upToDate: 'Il firmware è aggiornato',
@@ -556,8 +566,19 @@ export default {
       port: 'Porta',
       portHelp: 'Predefinito: 514',
       transport: 'Trasporto',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Gravità min.',
       minSeverityHelp: 'Inoltra solo i messaggi a partire da questo livello di gravità',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Override hostname',
       hostnameHelp: 'Vuoto = usa l\'hostname del dispositivo'
     },

@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Maks 128',
       fixErrors: 'Korriger de markerte feltene.'
+    },
+    ping: {
+      title: 'Nettverksdiagnostikk',
+      target: 'Ping-mål (IP eller vertsnavn)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping vellykket. Forsinkelse: {latency} ms',
+      failure: 'Ping mislyktes eller tidsavbrudd.'
     }
   },
 
@@ -401,7 +409,7 @@ export default {
     otaSuccess: 'Nedlasting vellykket. Installerer...',
     currentVersion: 'Nåværende Versjon',
     installedVersion: 'Installert versjon',
-    versionInfo: 'Modernisert fork v2.2.5-Beta.9 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
+    versionInfo: 'Modernisert fork v2.2.5-Beta.10 av Xerolux (2025) - Basert på originalarbeidet til Alexander Reinert.',
     updateAvailable: 'Oppdatering tilgjengelig!',
     updateAvailableMessage: 'En oppdatering til versjon {latestVersion} er tilgjengelig.',
     upToDate: 'Fastvaren er oppdatert',
@@ -558,8 +566,19 @@ export default {
       port: 'Port',
       portHelp: 'Standard: 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Min. alvorlighetsgrad',
       minSeverityHelp: 'Videresend kun meldinger fra denne alvorlighetsgraden og opp',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Vertsnavn-overskriving',
       hostnameHelp: 'Tom = bruk enhetens vertsnavn'
     },

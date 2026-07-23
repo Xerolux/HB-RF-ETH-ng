@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Corrigez les champs signalés.'
+    },
+    ping: {
+      title: 'Diagnostics réseau',
+      target: 'Cible du ping (IP ou nom d\'hôte)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping réussi. Latence : {latency} ms',
+      failure: 'Ping échoué ou délai dépassé.'
     }
   },
 
@@ -401,7 +409,7 @@ export default {
     otaSuccess: 'Téléchargement réussi. Installation...',
     currentVersion: 'Version actuelle',
     installedVersion: 'Version installée',
-    versionInfo: 'Fork modernisé v2.2.5-Beta.9 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
+    versionInfo: 'Fork modernisé v2.2.5-Beta.10 par Xerolux (2025) - Basé sur le travail original d\'Alexander Reinert.',
     updateAvailable: 'Mise à jour disponible !',
     updateAvailableMessage: 'Une mise à jour vers la version {latestVersion} est disponible.',
     upToDate: 'Le firmware est à jour',
@@ -558,8 +566,19 @@ export default {
       port: 'Port',
       portHelp: 'Par défaut : 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Sévérité min.',
       minSeverityHelp: 'Transférer uniquement les messages à partir de cette sévérité',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Remplacement du nom d\'hôte',
       hostnameHelp: 'Vide = utiliser le nom d\'hôte de l\'appareil'
     },

@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min. 1',
       maxPrefix: 'Maks. 128',
       fixErrors: 'Popraw zaznaczone pola.'
+    },
+    ping: {
+      title: 'Diagnostyka sieci',
+      target: 'Cel ping (IP lub nazwa hosta)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping udany. Opóźnienie: {latency} ms',
+      failure: 'Ping nieudany lub przekroczenie czasu.'
     }
   },
 
@@ -304,7 +312,9 @@ export default {
     title: 'Aktualizacje',
     subtitle: 'Firmware i interfejs webowy mają osobne wersje i są aktualizowane niezależnie.',
     firmware: 'Firmware',
+    firmwareDescription: 'ESP32, network and radio',
     webui: 'WebUI',
+    webuiDescription: 'Browser-based controls',
     checkNow: 'Szukaj aktualizacji teraz',
     checkingNow: 'Wyszukiwanie …',
     // Result toasts after a manual "search now".
@@ -400,7 +410,7 @@ export default {
     otaSuccess: 'Pobieranie udane. Instalowanie...',
     currentVersion: 'Obecna Wersja',
     installedVersion: 'Zainstalowana wersja',
-    versionInfo: 'Zmodernizowany fork v2.2.5-Beta.9 autorstwa Xerolux (2025) - Na podstawie oryginalnej pracy Alexandra Reinerta.',
+    versionInfo: 'Zmodernizowany fork v2.2.5-Beta.10 autorstwa Xerolux (2025) - Na podstawie oryginalnej pracy Alexandra Reinerta.',
     updateAvailable: 'Dostępna aktualizacja!',
     updateAvailableMessage: 'Dostępna jest aktualizacja do wersji {latestVersion}.',
     upToDate: 'Oprogramowanie jest aktualne',
@@ -557,8 +567,19 @@ export default {
       port: 'Port',
       portHelp: 'Domyślnie: 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Min. ważność',
       minSeverityHelp: 'Przekazuj tylko komunikaty od tego poziomu ważności',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Nadpisanie nazwy hosta',
       hostnameHelp: 'Puste = użyj nazwy hosta urządzenia'
     },

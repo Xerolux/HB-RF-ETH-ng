@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Mín 1',
       maxPrefix: 'Máx 128',
       fixErrors: 'Corrige los campos resaltados.'
+    },
+    ping: {
+      title: 'Diagnóstico de red',
+      target: 'Destino del ping (IP o nombre de host)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping exitoso. Latencia: {latency} ms',
+      failure: 'Ping fallido o tiempo de espera agotado.'
     }
   },
 
@@ -401,7 +409,7 @@ export default {
     otaSuccess: 'Descarga exitosa. Instalando...',
     currentVersion: 'Versión actual',
     installedVersion: 'Versión instalada',
-    versionInfo: 'Fork modernizado v2.2.5-Beta.9 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
+    versionInfo: 'Fork modernizado v2.2.5-Beta.10 por Xerolux (2025) - Basado en el trabajo original de Alexander Reinert.',
     updateAvailable: '¡Actualización disponible!',
     updateAvailableMessage: 'Hay una actualización disponible para la versión {latestVersion}.',
     upToDate: 'El firmware está actualizado',
@@ -558,8 +566,19 @@ export default {
       port: 'Puerto',
       portHelp: 'Predeterminado: 514',
       transport: 'Transporte',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Severidad mín.',
       minSeverityHelp: 'Solo reenviar mensajes a partir de este nivel de severidad',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Sobrescribir hostname',
       hostnameHelp: 'Vacío = usar el hostname del dispositivo'
     },

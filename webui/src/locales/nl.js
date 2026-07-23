@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Corrigeer de gemarkeerde velden.'
+    },
+    ping: {
+      title: 'Netwerkdiagnose',
+      target: 'Ping-doel (IP of hostnaam)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping gelukt. Latentie: {latency} ms',
+      failure: 'Ping mislukt of timeout.'
     }
   },
 
@@ -304,7 +312,9 @@ export default {
     title: 'Updates',
     subtitle: 'Firmware en webinterface hebben afzonderlijke versies en worden onafhankelijk bijgewerkt.',
     firmware: 'Firmware',
+    firmwareDescription: 'ESP32, network and radio',
     webui: 'WebUI',
+    webuiDescription: 'Browser-based controls',
     checkNow: 'Nu naar updates zoeken',
     checkingNow: 'Zoeken …',
     checkResultUpdatedTitle: 'Update beschikbaar',
@@ -399,7 +409,7 @@ export default {
     otaSuccess: 'Download succesvol. Installeren...',
     currentVersion: 'Huidige Versie',
     installedVersion: 'Geïnstalleerde versie',
-    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.9 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
+    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.10 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Update beschikbaar!',
     updateAvailableMessage: 'Een update naar versie {latestVersion} is beschikbaar.',
     upToDate: 'Firmware is up-to-date',
@@ -556,8 +566,19 @@ export default {
       port: 'Poort',
       portHelp: 'Standaard: 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Min. ernst',
       minSeverityHelp: 'Alleen berichten vanaf dit ernstniveau doorsturen',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Hostnaam overschrijven',
       hostnameHelp: 'Leeg = hostnaam van apparaat gebruiken'
     },

@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Korrigera de markerade fälten.'
+    },
+    ping: {
+      title: 'Nätverksdiagnostik',
+      target: 'Ping-mål (IP eller värdnamn)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping lyckades. Fördröjning: {latency} ms',
+      failure: 'Ping misslyckades eller timeout.'
     }
   },
 
@@ -402,7 +410,7 @@ export default {
     otaSuccess: 'Nedladdning lyckades. Installerar...',
     currentVersion: 'Nuvarande Version',
     installedVersion: 'Installerad version',
-    versionInfo: 'Moderniserad fork v2.2.5-Beta.9 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
+    versionInfo: 'Moderniserad fork v2.2.5-Beta.10 av Xerolux (2025) - Baserad på originalarbetet av Alexander Reinert.',
     updateAvailable: 'Uppdatering tillgänglig!',
     updateAvailableMessage: 'En uppdatering till version {latestVersion} finns tillgänglig.',
     upToDate: 'Den fasta programvaran är uppdaterad',
@@ -559,8 +567,19 @@ export default {
       port: 'Port',
       portHelp: 'Standard: 514',
       transport: 'Transport',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Min. allvarlighetsgrad',
       minSeverityHelp: 'Vidarebefordra endast meddelanden från denna allvarlighetsgrad och uppåt',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Värdnamn-överskrivning',
       hostnameHelp: 'Tomt = använd enhetens värdnamn'
     },
