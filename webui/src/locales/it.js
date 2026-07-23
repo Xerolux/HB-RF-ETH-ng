@@ -229,6 +229,14 @@ export default {
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Correggi i campi evidenziati.'
+    },
+    ping: {
+      title: 'Diagnostica di rete',
+      target: 'Destinazione ping (IP o hostname)',
+      placeholder: '192.168.1.1',
+      button: 'Ping',
+      success: 'Ping riuscito. Latenza: {latency} ms',
+      failure: 'Ping fallito o timeout.'
     }
   },
 
@@ -592,8 +600,19 @@ webuiUpdate: {
       port: 'Porta',
       portHelp: 'Predefinito: 514',
       transport: 'Trasporto',
+      transportUdp: 'UDP',
+      transportTcp: 'TCP',
+      transportTls: 'TLS',
       minSeverity: 'Gravità min.',
       minSeverityHelp: 'Inoltra solo i messaggi a partire da questo livello di gravità',
+      severityEmerg: 'EMERG',
+      severityAlert: 'ALERT',
+      severityCrit: 'CRIT',
+      severityErr: 'ERR',
+      severityWarning: 'WARNING',
+      severityNotice: 'NOTICE',
+      severityInfo: 'INFO',
+      severityDebug: 'DEBUG',
       hostname: 'Override hostname',
       hostnameHelp: 'Vuoto = usa l\'hostname del dispositivo'
     },

@@ -270,6 +270,9 @@ void Ethernet::start()
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_eth_start(_eth_handle));
     ESP_LOGI(TAG, "Ethernet start() called, waiting for link...");
 
+    // Start the DNS cleanup task (purges expired TTL entries every 60 s).
+    xTaskCreate(&dnsCleanupTask, "dns_clean", 3072, NULL, 1, NULL);
+
     // Register the link-down callback so full_system_restart() can cleanly
     // stop the MAC before toggling the PHY reset pin.
     s_pause_eth_handle = _eth_handle;
@@ -353,6 +356,14 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
         ESP_LOGI(TAG, "Link Up");
         ESP_LOGI(TAG, "HW Addr %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
         ESP_LOGI(TAG, "Speed %dMbps, %s duplex", linkSpeed == ETH_SPEED_100M ? 100 : 10, duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
+        // Restart DHCP on link-up to ensure IP renewal after cabling events
+        // or a temporary DHCP server outage. Without this the device can stay
+        // offline permanently after a link flap.
+        if (_settings && _settings->getUseDHCP()) {
+            esp_netif_dhcpc_stop(_eth_netif);
+            esp_netif_dhcpc_start(_eth_netif);
+            ESP_LOGI(TAG, "DHCP client restarted on link-up");
+        }
         }
         break;
     case ETHERNET_EVENT_DISCONNECTED:

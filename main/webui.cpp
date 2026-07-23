@@ -580,7 +580,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"latestVersion\":\"%s\",\"memoryUsage\":%.1f,\"cpuUsage\":%.1f,",
-             _updateCheck->getLatestVersion(), _sysInfo->getMemoryUsage(), _sysInfo->getCpuUsage());
+             _updateCheck ? _updateCheck->getLatestVersion() : "n/a", _sysInfo->getMemoryUsage(), _sysInfo->getCpuUsage());
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"supplyVoltage\":null,\"temperature\":null,\"uptimeSeconds\":%" PRIu32 ",",
@@ -1477,6 +1477,11 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
+    if (!_updateCheck) {
+        httpd_resp_send_err(req, HTTPD_503_SERVICE_UNAVAILABLE, "OTA not available");
+        return ESP_OK;
+    }
+
     if (!_updateCheck->tryBeginOtaOperation())
     {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "OTA update already in progress");
@@ -1865,6 +1870,12 @@ static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
+    if (!_updateCheck) {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA not available\"}");
+        return ESP_OK;
+    }
+
     // Read request body to get URL
     char buffer[512];
     int len = recv_full_body(req, buffer, sizeof(buffer));
@@ -2212,6 +2223,12 @@ static void send_release_info_response(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
 
+    if (!_updateCheck) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "{\"error\":\"Update check not initialised\"}");
+        return;
+    }
+
     ReleaseInfo info = _updateCheck->getReleaseInfo();
     const char *currentVersion = _sysInfo->getCurrentVersion();
     const bool configuredBeta = _settings->getBetaChannel();
@@ -2326,6 +2343,11 @@ esp_err_t post_check_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
+    if (!_updateCheck) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "503 Service Unavailable");
+        return ESP_OK;
+    }
     const bool accepted = _updateCheck->triggerManualFetch();
     const bool fetchInProgress = _updateCheck->isFetchInProgress();
 

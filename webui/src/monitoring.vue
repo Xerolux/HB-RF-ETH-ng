@@ -368,22 +368,22 @@
             <div class="col-md-4">
               <label class="form-label">{{ t('monitoring.syslog.transport') }}</label>
               <select class="form-select" v-model.number="syslogConfig.transport">
-                <option :value="0">UDP</option>
-                <option :value="1">TCP</option>
-                <option :value="2">TLS</option>
+                <option :value="0">{{ t('monitoring.syslog.transportUdp') }}</option>
+                <option :value="1">{{ t('monitoring.syslog.transportTcp') }}</option>
+                <option :value="2">{{ t('monitoring.syslog.transportTls') }}</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">{{ t('monitoring.syslog.minSeverity') }}</label>
               <select class="form-select" v-model.number="syslogConfig.minSeverity">
-                <option :value="0">EMERG</option>
-                <option :value="1">ALERT</option>
-                <option :value="2">CRIT</option>
-                <option :value="3">ERR</option>
-                <option :value="4">WARNING</option>
-                <option :value="5">NOTICE</option>
-                <option :value="6">INFO</option>
-                <option :value="7">DEBUG</option>
+                <option :value="0">{{ t('monitoring.syslog.severityEmerg') }}</option>
+                <option :value="1">{{ t('monitoring.syslog.severityAlert') }}</option>
+                <option :value="2">{{ t('monitoring.syslog.severityCrit') }}</option>
+                <option :value="3">{{ t('monitoring.syslog.severityErr') }}</option>
+                <option :value="4">{{ t('monitoring.syslog.severityWarning') }}</option>
+                <option :value="5">{{ t('monitoring.syslog.severityNotice') }}</option>
+                <option :value="6">{{ t('monitoring.syslog.severityInfo') }}</option>
+                <option :value="7">{{ t('monitoring.syslog.severityDebug') }}</option>
               </select>
               <div class="form-text">{{ t('monitoring.syslog.minSeverityHelp') }}</div>
             </div>

@@ -408,29 +408,29 @@
 
           <div class="settings-card mt-3">
             <div class="card-header">
-              <h3>Network Diagnostics</h3>
+              <h3>{{ t('settings.ping.title') }}</h3>
             </div>
             <div class="card-body">
               <div class="form-group mb-3">
-                <label class="form-label">Ping Target (IP or Hostname)</label>
+                <label class="form-label">{{ t('settings.ping.target') }}</label>
                 <div class="d-flex">
                   <BFormInput
                     type="text"
                     v-model="pingTarget"
                     trim
-                    placeholder="192.168.1.1"
+                    :placeholder="t('settings.ping.placeholder')"
                     class="me-2"
                     @keyup.enter="runPing"
                   />
                   <BButton variant="primary" @click="runPing" :disabled="pingLoading || !pingTarget">
                     <span v-if="pingLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span v-else>Ping</span>
+                    <span v-else>{{ t('settings.ping.button') }}</span>
                   </BButton>
                 </div>
               </div>
               <div v-if="pingResult !== null" :class="['alert', pingResult >= 0 ? 'alert-success' : 'alert-danger']">
-                <span v-if="pingResult >= 0">Ping successful. Latency: {{ pingResult }} ms</span>
-                <span v-else>Ping failed or timeout.</span>
+                <span v-if="pingResult >= 0">{{ t('settings.ping.success', { latency: pingResult }) }}</span>
+                <span v-else>{{ t('settings.ping.failure') }}</span>
               </div>
             </div>
           </div>

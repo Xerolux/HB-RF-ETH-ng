@@ -57,7 +57,7 @@
               <strong>v{{ updateStore.latestVersion }}</strong>
               <small v-if="updateStore.publishedAt">{{ t('firmware.publishedAt', { time: formatDate(updateStore.publishedAt) }) }}</small>
             </div>
-            <span v-if="updateStore.isPrerelease" class="beta-badge">Beta</span>
+            <span v-if="updateStore.isPrerelease" class="beta-badge">{{ t('firmware.beta') }}</span>
           </div>
           <div v-else class="release-box is-current">
             <div>
