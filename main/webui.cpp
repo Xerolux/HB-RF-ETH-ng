@@ -1478,7 +1478,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     }
 
     if (!_updateCheck) {
-        httpd_resp_send_err(req, HTTPD_503_SERVICE_UNAVAILABLE, "OTA not available");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "OTA not available");
         return ESP_OK;
     }
 

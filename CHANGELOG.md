@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.12] - 2026-07-24
+
+### Changes
+- fix(build): unblock firmware build on ESP-IDF v6.1
+
 ### Changes
 - fix(webui): Firmware- und WebUI-Update-Seiten vereinheitlicht; manuelle Prüfungen zeigen „aktuell“, Cooldown, Überspringen und Fehler dauerhaft und eindeutig an.
 - fix(webui): Firmware-Seite vollständig internationalisiert, einschließlich Status, Datumsformatierung, Datei-Validierung und Toast-Meldungen.

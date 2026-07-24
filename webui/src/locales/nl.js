@@ -409,7 +409,7 @@ export default {
     otaSuccess: 'Download succesvol. Installeren...',
     currentVersion: 'Huidige Versie',
     installedVersion: 'Geïnstalleerde versie',
-    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.10 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
+    versionInfo: 'Gemoderniseerde fork v2.2.5-Beta.12 door Xerolux (2025) - Gebaseerd op het originele werk van Alexander Reinert.',
     updateAvailable: 'Update beschikbaar!',
     updateAvailableMessage: 'Een update naar versie {latestVersion} is beschikbaar.',
     upToDate: 'Firmware is up-to-date',

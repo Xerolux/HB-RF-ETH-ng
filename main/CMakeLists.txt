@@ -22,7 +22,6 @@ idf_component_register(SRCS ${app_sources}
                            esp_timer
                            nvs_flash
                            lwip
-                           esp_ping
                            mbedtls
                            cjson
                            app_update

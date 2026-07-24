@@ -1,7 +1,36 @@
 {
   "schema": 1,
-  "updatedAt": "2026-07-22T17:22:57Z",
+  "updatedAt": "2026-07-24T04:14:22Z",
   "releases": [
+    {
+      "version": "2.2.5-Beta.12",
+      "channel": "beta",
+      "isPrerelease": true,
+      "publishedAt": "2026-07-24T04:14:22Z",
+      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.12/firmware_2.2.5-Beta.12.bin",
+      "sha256": "b2885ff54d5de749eea10dbf037d140dcdd46e9fc4e491103e04de4e37d9d557",
+      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.12",
+      "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.12",
+      "webui": {
+        "version": "1.0.0-Beta.8",
+        "design": "newdesign",
+        "apiVersion": 1,
+        "minFirmwareVersion": "2.2.5-Beta.1",
+        "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.12/webui_1.0.0-Beta.8.bin",
+        "sha256": "cb8e63a342e6f0e22e65f48816d601b234800e4fd10c0fd1d2430c4e91422ed1",
+        "size": 327680,
+        "partition": "spiffs",
+        "format": 1,
+        "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.12",
+        "publishedAt": "2026-07-24T04:14:22Z"
+      },
+      "tagName": "v2.2.5-Beta.12",
+      "name": "HB-RF-ETH-ng v2.2.5-Beta.12",
+      "prerelease": true,
+      "assetName": "firmware_2.2.5-Beta.12.bin",
+      "webuiAssetName": "webui_1.0.0-Beta.8.bin",
+      "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.2.5-Beta.12 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) > \u26a0\ufe0f **Pre-Release** - Testversion, Nutzung auf ei\u2026"
+    },
     {
       "version": "2.2.5-Beta.9",
       "channel": "beta",
