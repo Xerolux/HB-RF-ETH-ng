@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.13] - 2026-07-24
+
+### Changes
+- feat: enforce WebUI compatibility and protect factory reset
+- chore: update WebUI manifest for webui-v1.0.0-Beta.10
+
 ## [2.2.5-Beta.12] - 2026-07-24
 
 ### Changes
