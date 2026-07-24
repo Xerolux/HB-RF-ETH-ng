@@ -1,7 +1,25 @@
 {
   "schema": 1,
-  "updatedAt": "2026-07-22T19:55:10Z",
+  "updatedAt": "2026-07-24T04:19:48Z",
   "releases": [
+    {
+      "version": "1.0.0-Beta.9",
+      "design": "newdesign",
+      "apiVersion": 1,
+      "minFirmwareVersion": "2.2.5-Beta.1",
+      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/webui-v1.0.0-Beta.9/webui_1.0.0-Beta.9.bin",
+      "sha256": "be15ece1657f3d6e28d381803763cc93db717ec68a65df80f2257688e345f00e",
+      "size": 327680,
+      "partition": "spiffs",
+      "format": 1,
+      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/webui-v1.0.0-Beta.9",
+      "publishedAt": "2026-07-24T04:19:48Z",
+      "tagName": "webui-v1.0.0-Beta.9",
+      "name": "HB-RF-ETH-ng WebUI v1.0.0-Beta.9",
+      "prerelease": true,
+      "channel": "beta",
+      "assetName": "webui_1.0.0-Beta.9.bin"
+    },
     {
       "version": "1.0.0-Beta.8",
       "design": "newdesign",
