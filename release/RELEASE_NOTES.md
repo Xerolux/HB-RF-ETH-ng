@@ -20,7 +20,7 @@ an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
 ## ✨ Hauptfunktionen
 
-- **Moderne WebUI** mit Responsive Design, Dark/Light Theme und 10 Sprachen
+- **Moderne WebUI** mit Responsive Design, Dark/Light Theme und 4 Sprachen
 - **Online-Updates** - Firmware direkt ueber den integrierten Update-Dienst herunterladen
 - **MQTT-Support** mit Home Assistant Auto-Discovery
 - **CheckMK Monitoring** für Integration in Monitoringsysteme

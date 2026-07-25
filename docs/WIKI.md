@@ -86,7 +86,8 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * **Backup & Restore** der Einstellungen über die WebUI
   * Der Administrator-Benutzername wird im Backup gespeichert und beim Restore wiederhergestellt
   * Die System-Log-Aktivierung wird im Backup gespeichert und beim Restore wiederhergestellt
-  * Das Administrator-Passwort wird aus Sicherheitsgründen nicht exportiert; beim Restore bleibt das aktuelle Passwort des Zielgeräts erhalten
+  * Administrator-Passwort, MQTT-/Benachrichtigungs-Zugangsdaten, Tokens, Zertifikate und private Schlüssel werden für eine vollständige Wiederherstellung im Klartext exportiert. Die JSON-Datei muss wie ein Passwort geschützt und darf nicht veröffentlicht werden
+  * Die JSON-Datei kann als Vorlage mit einem Texteditor angepasst und auf weitere Geräte eingespielt werden. Vorher insbesondere Hostname, statische IP, Administrator-Passwort und gerätespezifische MQTT-Werte ändern, um Konflikte zu vermeiden
 
 ### Netzwerk-Optimierung
 * **DNS-Caching** für schnellere Verbindungen und reduzierten Netzwerk-Traffic

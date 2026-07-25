@@ -124,7 +124,7 @@ def generate_release_notes(version: str) -> str:
     # Key features
     notes.append("## ✨ Hauptfunktionen")
     notes.append("")
-    notes.append("- **Moderne WebUI** mit Responsive Design, Dark/Light Theme und 10 Sprachen")
+    notes.append("- **Moderne WebUI** mit Responsive Design, Dark/Light Theme und 4 Sprachen")
     notes.append("- **Online-Updates** - Firmware direkt ueber den integrierten Update-Dienst herunterladen")
     notes.append("- **MQTT-Support** mit Home Assistant Auto-Discovery")
     notes.append("- **CheckMK Monitoring** für Integration in Monitoringsysteme")

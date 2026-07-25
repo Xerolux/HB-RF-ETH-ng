@@ -124,7 +124,7 @@ export default {
     tabGeneral: 'General',
     tabNetwork: 'Network',
     tabTime: 'Time',
-    tabBackup: 'Backup',
+    tabBackup: 'Backup & Reset',
     tabDesign: 'Design',
     tabLicense: 'License',
     tabExperimental: 'Experimental',
@@ -202,7 +202,12 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Backup & Restore',
-    backupInfo: 'Complete backup of all user settings, including credentials, monitoring, certificates, network, time, LEDs and design. The file contains sensitive data and must be stored securely.',
+    backupInfo: 'Complete, unencrypted backup of all user settings, including credentials, monitoring, certificates, network, time, LEDs and design.',
+    backupSecurityTitle: 'Warning: plaintext credentials',
+    backupSecurityText: 'Passwords, tokens, certificates and private keys are stored unencrypted in the JSON file. Treat the backup like a password and never publish it.',
+    backupTemplateInfo: 'The JSON file can be edited in a text editor and imported on additional devices. First change at least the hostname, static IP, administrator password and device-specific MQTT values to prevent conflicts.',
+    backupFileWarning: 'This unencrypted backup contains passwords, tokens, certificates and private keys in plaintext. Store it like a password and never publish it.',
+    backupFileTemplateWarning: 'Before importing on another device, review and adjust the hostname, static IP, administrator password and device-specific MQTT values.',
     restoreInfo: 'Restores the complete backup, including credentials, monitoring, certificates and design. The system will restart afterwards.',
     downloadBackup: 'Download Backup',
     restore: 'Restore',

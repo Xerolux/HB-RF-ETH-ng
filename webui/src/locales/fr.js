@@ -124,7 +124,7 @@ export default {
     tabGeneral: 'Général',
     tabNetwork: 'Réseau',
     tabTime: 'Heure',
-    tabBackup: 'Sauvegarde',
+    tabBackup: 'Sauvegarde et réinitialisation',
     tabDesign: 'Design',
     tabLicense: 'Licence',
     tabExperimental: 'Expérimental',
@@ -202,7 +202,12 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Sauvegarde et restauration',
-    backupInfo: 'Sauvegarde complète de tous les paramètres utilisateur, y compris les identifiants, la supervision, les certificats, le réseau, l’heure, les LED et le design. Le fichier contient des données sensibles et doit être conservé en lieu sûr.',
+    backupInfo: 'Sauvegarde complète et non chiffrée de tous les paramètres utilisateur, y compris les identifiants, la supervision, les certificats, le réseau, l’heure, les LED et le design.',
+    backupSecurityTitle: 'Attention : identifiants en clair',
+    backupSecurityText: 'Les mots de passe, jetons, certificats et clés privées sont stockés sans chiffrement dans le fichier JSON. Traitez la sauvegarde comme un mot de passe et ne la publiez jamais.',
+    backupTemplateInfo: 'Le fichier JSON peut être modifié avec un éditeur de texte puis importé sur d’autres appareils. Modifiez au minimum le nom d’hôte, l’adresse IP statique, le mot de passe administrateur et les valeurs MQTT propres à l’appareil afin d’éviter les conflits.',
+    backupFileWarning: 'Cette sauvegarde non chiffrée contient des mots de passe, jetons, certificats et clés privées en clair. Conservez-la comme un mot de passe et ne la publiez jamais.',
+    backupFileTemplateWarning: 'Avant l’importation sur un autre appareil, vérifiez et adaptez le nom d’hôte, l’adresse IP statique, le mot de passe administrateur et les valeurs MQTT propres à l’appareil.',
     restoreInfo: 'Restaure la sauvegarde complète, y compris les identifiants, la supervision, les certificats et le design. Le système redémarrera ensuite.',
     downloadBackup: 'Télécharger la sauvegarde',
     restore: 'Restaurer',

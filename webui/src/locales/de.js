@@ -124,7 +124,7 @@ export default {
     tabGeneral: 'Allgemein',
     tabNetwork: 'Netzwerk',
     tabTime: 'Zeit',
-    tabBackup: 'Backup',
+    tabBackup: 'Backup & Reset',
     tabDesign: 'Design',
     tabLicense: 'Lizenz',
     tabExperimental: 'Experimentell',
@@ -202,7 +202,12 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Sichern & Wiederherstellen',
-    backupInfo: 'Vollständige Sicherung aller Benutzereinstellungen einschließlich Zugangsdaten, Monitoring, Zertifikaten, Netzwerk, Zeit, LED und Design. Die Datei enthält sensible Daten und muss sicher verwahrt werden.',
+    backupInfo: 'Vollständige, unverschlüsselte Sicherung aller Benutzereinstellungen einschließlich Zugangsdaten, Monitoring, Zertifikaten, Netzwerk, Zeit, LED und Design.',
+    backupSecurityTitle: 'Achtung: Zugangsdaten im Klartext',
+    backupSecurityText: 'Passwörter, Tokens, Zertifikate und private Schlüssel stehen unverschlüsselt in der JSON-Datei. Behandeln Sie das Backup wie ein Passwort und veröffentlichen Sie es niemals.',
+    backupTemplateInfo: 'Die JSON-Datei kann mit einem Texteditor angepasst und auf weitere Geräte eingespielt werden. Ändern Sie vorher mindestens Hostname, statische IP, Administrator-Passwort und gerätespezifische MQTT-Werte, damit keine Konflikte entstehen.',
+    backupFileWarning: 'Diese unverschlüsselte Sicherung enthält Passwörter, Tokens, Zertifikate und private Schlüssel im Klartext. Wie ein Passwort sicher verwahren und niemals veröffentlichen.',
+    backupFileTemplateWarning: 'Vor dem Import auf einem weiteren Gerät Hostname, statische IP, Administrator-Passwort und gerätespezifische MQTT-Werte prüfen und anpassen.',
     restoreInfo: 'Stellt die vollständige Sicherung einschließlich Zugangsdaten, Monitoring, Zertifikaten und Design wieder her. Das System wird danach neu gestartet.',
     downloadBackup: 'Sicherung herunterladen',
     restore: 'Wiederherstellen',

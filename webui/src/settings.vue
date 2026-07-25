@@ -543,6 +543,13 @@
               <h3>{{ t('settings.backupRestore') }}</h3>
             </div>
             <div class="card-body">
+              <div class="backup-guidance">
+                <div class="backup-security-warning" role="alert">
+                  <strong>{{ t('settings.backupSecurityTitle') }}</strong>
+                  <p>{{ t('settings.backupSecurityText') }}</p>
+                </div>
+                <p class="backup-template-info">{{ t('settings.backupTemplateInfo') }}</p>
+              </div>
               <div class="backup-grid">
                 <div class="action-tile" @click="downloadBackup">
                   <span class="tile-icon"><AppIcon name="download" /></span>
@@ -1420,6 +1427,16 @@ const downloadBackup = async () => {
     const response = await axios.get('/api/backup')
     const backup = {
       ...response.data,
+      _security: {
+        ...response.data?._security,
+        containsPlaintextSecrets: true,
+        warning: t('settings.backupFileWarning')
+      },
+      _portability: {
+        ...response.data?._portability,
+        editable: true,
+        warning: t('settings.backupFileTemplateWarning')
+      },
       browserPreferences: {
         locale: safeLocal.get('locale') || 'en',
         showExperimental: experimentalStore.showExperimental
@@ -1812,6 +1829,36 @@ hr {
 .backup-grid {
   display: grid;
   gap: var(--spacing-md);
+}
+
+.backup-guidance {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.backup-security-warning {
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-soft);
+  color: var(--color-text);
+  padding: var(--spacing-md);
+}
+
+.backup-security-warning strong {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+}
+
+.backup-security-warning p,
+.backup-template-info {
+  margin: 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.backup-template-info {
+  padding-inline: var(--spacing-xs);
 }
 
 .action-tile {

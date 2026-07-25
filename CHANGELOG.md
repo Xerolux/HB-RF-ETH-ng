@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- feat(backup): Vollständige JSON-Sicherungen kennzeichnen Klartext-Zugangsdaten nun sowohl in der WebUI als auch direkt in der Datei. Die Datei bleibt bewusst editierbar und kann nach Anpassung von Hostname, IP, Administrator-Passwort und gerätespezifischen MQTT-Werten als Vorlage für weitere Geräte verwendet werden.
+- feat(recovery): Die stets sichtbare Schaltfläche „Zur normalen WebUI“ führt sowohl von der Recovery-Ansicht als auch von deren Notfall-Anmeldung zurück zur regulären Oberfläche.
+- fix(webui): Der Einstellungspunkt „Backup“ heißt nun in allen vier unterstützten Sprachen „Backup & Reset“ beziehungsweise die jeweilige Übersetzung.
+- docs(i18n): README, Changelog, Wiki und Release-Notes nennen konsistent die vier unterstützten Sprachen Deutsch, Englisch, Französisch und Italienisch.
+
 ## [2.2.5-Beta.15] - 2026-07-25
 
 ### Changes
@@ -56,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix(firmware): Updatesuche — Heap-Grenze von 72 KB auf 56 KB gesenkt (mDNS ist in Beta.8 weggefallen, ~30 KB zusätzlicher Spielraum). Bisher wurde die manuelle „Jetzt nach Updates suchen“-Anfrage bei aktiver CCU-Sitzung still verworfen, sobald der freie Heap unter 72 KB fiel — das Gerät zeigte dann fälschlich „kein Update“ statt „übersprungen“. Jetzt: niedrigere Grenze macht die Suche zuverlässiger, UND wenn der Heap trotzdem zu niedrig ist, bekommt die WebUI über ein neues `lastSkipReason`-Feld in `GET /api/check_update` den Grund gemeldet und zeigt einen klaren Toast („Prüfung übersprungen — zu wenig freier Arbeitsspeicher, meist bei aktiver CCU-Sitzung, später erneut versuchen“). Kommt ins nächste Firmware-Release.
 - fix(webui): Schriftgrößenmix beseitigt. `.hero-title` (bisher raw `clamp(1.6rem,4vw,2.5rem)` → auf Token-Skala gebunden), `.metric-value` (raw clamp → Tokens), `theme.vue .card-heading h2` (fs-xl → fs-lg, angleichen an die anderen Seiten), `login-btn`/`monitoring save-btn` (fs-lg → fs-sm, angleichen an den globalen `.btn`), `ChangelogModal code` (0.875em → fs-sm). Sichtbare Drifts zwischen Seiten und zwischen Glass-/NewDesign-Theme beim Hero-Titel sind damit verschwunden.
 - feat(webui): `fallbackLocale` von `de` auf `en` geändert. Fehlende Übersetzungs-Keys fallen jetzt auf Englisch zurück (international verständlicher) statt auf Deutsch.
-- feat(webui): `webuiupdate.vue` und `systemoverview.vue` vollständig auf i18n migriert. Bisher waren diese beiden Seiten für nicht-deutsche Sprachen komplett deutsch (hartcodierte Strings). Jetzt: ~110 neue i18n-Keys (`webuiUpdate.*`, `systemOverview.*`) in allen 10 Sprachen, beide Seiten rendern in der gewählten UI-Sprache.
+- feat(webui): `webuiupdate.vue` und `systemoverview.vue` vollständig auf i18n migriert. Bisher waren diese beiden Seiten für nicht-deutsche Sprachen komplett deutsch (hartcodierte Strings). Jetzt: ~110 neue i18n-Keys (`webuiUpdate.*`, `systemOverview.*`) in allen vier unterstützten Sprachen, beide Seiten rendern in der gewählten UI-Sprache.
 - fix(security): `/api/ping` erfordert jetzt Authentifizierung. Bisher konnte jeder LAN-Client (und jeder, der das Gerät via MQTT-Konfiguration als Ping-Sonde nutzen konnte) ungeauthet `{"target":"<beliebig>"}` POSTen — ein SSRF-Vektor plus httpd-Worker-Starvation (jeder Aufruf blockiert bis zu 4 Sekunden einen Worker). Die Validierung entspricht jetzt den anderen state-changing POST-Handlern (restart, factory-reset, ota_update, change-password, restore). Kommt ins nächste Firmware-Release.
 - fix(webui): `webuiupdate.vue` — `loadStatus()` hat kein try/catch; bei Netzwerkfehler beim Laden der Seite (Gerät mid-reboot, schlechtes WLAN, 500) blieb der "Neu laden"-Button deaktiviert, und `partitionSize` blieb bei 0 → jede hochgeladene Datei scheiterte mit "Falsche Image-Größe: 0 B erwartet". Jetzt: sauberer catch, klare Fehlermeldung + Retry-Banner, und `selectFile` gibt einen verständlichen Hinweis statt der 0-Byte-Falle.
 - fix(webui): `monitoring.vue` — Mount-Fehler beim Laden der Monitoring-Konfiguration wurde still geschluckt (`catch {}`); das Form zeigte dann die Store-Defaults, als wären sie die echte Geräte-Konfiguration. Jetzt: Fehler-Toast + Banner, und `hasChanges` bleibt false (Save-Button erscheint nicht), sodass keine Default-Werte versehentlich über die echte Konfiguration geschrieben werden.
@@ -64,11 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - fix(webui): `firmwareupdate.vue` — Beta-Kanal-Toggle löst bei Fehler nicht mehr zwei überlappende Toasts aus (zentraler Interceptor + lokaler Handler). Die Anfrage ist jetzt `silent: true`; der lokale Handler zeigt die maßgeschneiderte Fehlermeldung.
 - fix(webui): `app.vue` — Supporter-Expired-Prompt kann im Safari-Privatmodus nicht mehr bei jedem sysinfo-Poll neu aufklappen. sessionStorage ist dort schreibgeschützt (wird still ignoriert); ein zusätzlicher in-memory Dedup-Ref blockt Re-Triggers innerhalb der Session zuverlässig.
 - chore(docs): Phantom-Referenzen auf einen nie existierenden "changelog proxy" in 5 Kommentaren/Docs korrigiert (`include/monitoring.h`, `main/updatecheck.cpp`, `main/log_manager.cpp`, `main/supporter_crl.cpp`, `sdkconfig.defaults`, `CLAUDE.md`). Verhindert zukünftige Verwirrung.
-- fix(webui): Übersetzungsvollständigkeit hergestellt. Alle 10 Sprachen (cs, de, en, es, fr, it, nl, no, pl, sv) haben jetzt identische Key-Sets (647 Leaf-Keys pro Sprache, vorher 13 fehlend in jeder Nicht-de/en-Sprache). Betroffen waren v.a. die `login.passwordReset*`-Keys (Passwort-zurücksetzen-Flow) und `systemlog.crashTitle`/`crashHint` (Crash-Log-Hinweis).
-- fix(webui): Bisher unübersetzte Werte (noch englischsprachig) in cs/es/fr/it/nl/no/pl/sv durch echte Übersetzungen ersetzt. Betroffen waren `nav.documentation`, `settings.advancedTitle`, `settings.showExperimental*` (6 Keys), `settings.experimentalEmpty*` (2 Keys), `updates.*` (Eyebrow/Titel/Subtitle/checkNow/checkingNow + alle `checkResult*` 10 Keys), `firmware.factoryReset*` (5 Keys), `monitoring.resourceWarningTitle/Text`. Diese Texte erschienen vorher bei nicht-de/en-Sprachen englischsprachig; jetzt sind sie konsistent in der jeweiligen UI-Sprache.
+- fix(webui): Übersetzungsvollständigkeit hergestellt. Die vier unterstützten Sprachen (de, en, fr, it) haben identische Key-Sets. Betroffen waren v.a. die `login.passwordReset*`-Keys (Passwort-zurücksetzen-Flow) und `systemlog.crashTitle`/`crashHint` (Crash-Log-Hinweis).
+- fix(webui): Bisher unübersetzte Werte in den unterstützten Nicht-de/en-Sprachen fr/it durch echte Übersetzungen ersetzt. Betroffen waren `nav.documentation`, `settings.advancedTitle`, `settings.showExperimental*`, `settings.experimentalEmpty*`, `updates.*`, `firmware.factoryReset*` und `monitoring.resourceWarningTitle/Text`.
 - feat(release): WebUI-Release-Notes werden automatisch aus der `[Unreleased]`-Sektion des `CHANGELOG.md` generiert (neues Skript `generate_webui_release_notes.py`, integriert in `release-webui.yml`). Zuvor enthielten WebUI-Releases auf GitHub nur Boilerplate ohne Änderungsbeschreibung.
 - refactor(webui): Visuelles Design über alle Seiten vereinheitlicht. Hartcodierte Schrift-Gewichte (400/500/600/700/800) in allen Vue-Komponenten durch Tokens (`var(--font-weight-*)`) ersetzt; hartcodierte px-Padding-/Gap-/Radius-Werte auf `--space-*`/`--card-padding`/`--radius-*`-Tokens migriert. Dies ist die Fortsetzung des in Beta.6 begonnenen Typo-Refactors und schließt die letzten inkonsistenten Seiten (settings, monitoring, systemlog, login, app, sysinfo, NewDesignHeader, theme, webuiupdate, firmwareupdate, ChangelogModal, PasswordChangeModal) ab.
-- feat(webui): About- und Passwort-Ändern-Seiten erhalten denselben kanonischen Page-Hero (`.page-hero` + `.hero-eyebrow` + `.hero-title` + `.hero-subtitle`) wie alle anderen Inhaltsseiten. Vorher hatte About nur eine flache `.section-header` und Passwort-Ändern einen abweichenden Bootstrap-BCard-Gradient-Header. Neuer i18n-Key `changePassword.eyebrow` in allen 10 Sprachen.
+- feat(webui): About- und Passwort-Ändern-Seiten erhalten denselben kanonischen Page-Hero (`.page-hero` + `.hero-eyebrow` + `.hero-title` + `.hero-subtitle`) wie alle anderen Inhaltsseiten. Vorher hatte About nur eine flache `.section-header` und Passwort-Ändern einen abweichenden Bootstrap-BCard-Gradient-Header. Neuer i18n-Key `changePassword.eyebrow` in allen vier unterstützten Sprachen.
 - refactor(webui): Section-Titel-Typografie auf `settings.vue` an den kanonischen `.card-section-title`-Stil angeglichen (vorher uppercase + letter-spaced + sekundärfarbig).
 - refactor(webui): Karten-Tiefe vereinheitlicht. `systemoverview.vue` (`.overview-card`/`.detail-card`) und `theme.vue` (`.theme-card`) nutzen jetzt `--shadow-md` statt `--shadow-sm` und wirken damit nicht mehr flacher als alle anderen Seiten.
 - fix(webui): Drei undefinierte CSS-Tokens (`--color-bg-secondary`, `--color-text-inverse`, `--color-warning-strong`) in `main.css` für Hell- und Dunkel-Modus definiert. Die crash-tail-Box in `systemlog.vue` renderte vorher immer in dunklen VSCode-Farben (die Fallbacks griffen unkonditional); Warning-Texte in `monitoring.vue`/`sysinfo.vue` waren nicht theme-konform.
@@ -88,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - feat(webui): Manuelle Updatesuche über „Jetzt nach Updates suchen" wiederhergestellt. Neuer Backend-Endpunkt POST /api/check_update löst sofortigen Manifest-Abruf aus (läuft außerhalb des httpd-Threads), 60-Sekunden-Cooldown verhindert Missbrauch; die automatische 24-Stunden-Prüfung bleibt unberührt. Die Schaltfläche erscheint konsistent auf den Firmware- und WebUI-Update-Tabs und zeigt Lade-, Update-, Aktuell- und Fehlerzustände an.
 - refactor(webui): Eigenständiger Menüpunkt „Design wechseln" entfernt. Die Theme-Auswahl ist ausschließlich unter Einstellungen → Design erreichbar; der Header-Sonne/Mond-Schnellwechsler bleibt, und die /theme-Route bleibt für Lesezeichen erreichbar.
 - fix(webui): Fokus- und Hover-Zustände nutzen jetzt Design-Tokens (var(--color-primary) / var(--color-primary-soft) / var(--shadow-md)) statt hartcodierter Glass-UI-Orange-Tokens — Login-Eingaben, Login-Button, Passwort-Änderungs-Modal und Selbsttest-Test-Button erscheinen damit nicht mehr orange im grünen NewDesign.
-- fix(webui): Dashboard-Zeile „Letzter Neustart" in „Neustartgrund" umbenannt (Wert ist die Ursache, keine Zeitangabe); alle 10 Sprachen aktualisiert.
+- fix(webui): Dashboard-Zeile „Letzter Neustart" in „Neustartgrund" umbenannt (Wert ist die Ursache, keine Zeitangabe); alle vier unterstützten Sprachen aktualisiert.
 - docs: POST /api/check_update in API.md und openapi.yaml dokumentiert (202 Accepted, {triggered, fetchInProgress}, Client-Polling).
 
 ## [2.2.5-Beta.6] - 2026-07-21
@@ -104,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - refactor(webui): Typografie auf eine Schriftfamilie (Inter via Google Fonts) und zentrale Tokens (--font-weight-*, --line-height-*, --space-*, --card-padding, --section-gap) vereinheitlicht; hartcodierte px-Schriftgrößen durch Tokens ersetzt.
 - fix(webui): Werkseinstellungen auf der Firmware-Seite sind jetzt als Gefahrenaktion mit eigenem Bestätigungsdialog markiert (vorher window.confirm).
 - fix(webui): Index.html bereinigt — hartcodiertes deutsches experimental-Style-Override entfernt, Inter-Schrift über Google Fonts mit display=swap eingebunden.
-- chore(webui): Neue UI-Strings (updates.*, nav.updates, nav.documentation, settings.tabDesign, settings.advancedTitle, settings.showExperimental*, firmware.factoryReset*) in allen 10 Sprachen hinzugefügt; fehlende experimentalEmpty* Schlüssel ergänzt.
+- chore(webui): Neue UI-Strings (updates.*, nav.updates, nav.documentation, settings.tabDesign, settings.advancedTitle, settings.showExperimental*, firmware.factoryReset*) in allen vier unterstützten Sprachen hinzugefügt; fehlende experimentalEmpty* Schlüssel ergänzt.
 
 ## [2.2.5-Beta.5] - 2026-07-20
 
@@ -424,7 +429,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - WiFi dauerhaft deaktiviert (~30 KB RAM zurückgewonnen), da das Gerät über Ethernet läuft.
 - `update_headers.py` scannt jetzt `main/` (statt `src/`).
-- i18n: Übersetzungen in 10 Sprachen, dynamische Locale-Erkennung, fehlende Keys ergänzt.
+- i18n: Übersetzungen in vier Sprachen, dynamische Locale-Erkennung, fehlende Keys ergänzt.
 - Build/CI: Vite 8.1.3, Dependabot-Bumps (actions/setup-node 6, actions/labeler 6, github/codeql-action 4).
 - Mobile-Action-Buttons (Restart/Logout/Login) einheitlich dunkel mit weißer Schrift im NewDesign.
 
@@ -671,7 +676,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0-Beta.6] - 2026-06-28
 
 ### Fixed
-- **WebUI falsely showed "Firmware is up to date" when the update check failed**: when the GitHub fetch errored (e.g. the beta-channel parse bug on Beta.4), the firmware reported `updateAvailable: false` and the firmware-update page fell back to "aktuell"/"up to date" instead of the actual error. The page now surfaces the real error ("Update-Prüfung fehlgeschlagen: …") with a retry button. New `firmware.checkFailed` translations added for all 10 locales.
+- **WebUI falsely showed "Firmware is up to date" when the update check failed**: when the GitHub fetch errored (e.g. the beta-channel parse bug on Beta.4), the firmware reported `updateAvailable: false` and the firmware-update page fell back to "aktuell"/"up to date" instead of the actual error. The page now surfaces the real error ("Update-Prüfung fehlgeschlagen: …") with a retry button. New `firmware.checkFailed` translations added for all four supported locales.
 
 ## [2.2.0-Beta.5] - 2026-06-28
 
@@ -910,7 +915,7 @@ Experimental feature release (later rolled back; re-stabilized in 2.1.2 on 2026-
 - WebUI: auto-logout and manual logout redirect; login button when unauthenticated.
 
 ### Changed
-- i18n: translations updated for all 10 languages; openCCU compatibility and i18n language switching.
+- i18n: translations updated for all four supported languages; openCCU compatibility and i18n language switching.
 - Increased the max URI handlers for the WebUI.
 
 ### Fixed

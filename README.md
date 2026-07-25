@@ -34,7 +34,7 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 
 ### Kurzüberblick
 - Firmware für HB-RF-ETH mit Unterstützung für `HM-MOD-RPI-PCB`, `RPI-RF-MOD` und `HmIP-RFUSB`
-- Moderne WebUI auf Basis von Vue 3, Vite und Bootstrap 5 (Dark/Light, 10 Sprachen)
+- Moderne WebUI auf Basis von Vue 3, Vite und Bootstrap 5 (Dark/Light; Deutsch, Englisch, Französisch und Italienisch)
 - Login mit Benutzername und Passwort: Standard-Benutzername `admin`, das bestehende Administrator-Passwort bleibt nach Updates erhalten und der Benutzername kann in den Einstellungen geändert werden.
 - Dashboard, Kopfzeile und Browser-Tab zeigen den unter Einstellungen/Netzwerk gesetzten Hostnamen, damit mehrere HB-RF-ETH-ng Geräte sofort unterscheidbar sind.
 - System-Log bleibt nach Aktivierung auch über einen Reboot aktiv; beim Deaktivieren bleibt es nach dem nächsten Start wieder aus.
@@ -49,6 +49,8 @@ Nach dem Update auf eine Version mit Benutzername-Pflicht muss die Anmeldung ein
 Backups enthalten vollständig alle wiederherstellbaren Benutzereinstellungen: Administrator-Zugangsdaten, Netzwerk, Zeit, LED, Design/Akzentfarbe, Supporter-Key sowie sämtliche Monitoring-Konfigurationen einschließlich MQTT-/Benachrichtigungs-Zugangsdaten, Zertifikaten und privaten Schlüsseln. Die WebUI ergänzt die gewählte Sprache und die Experimentell-Präferenz.
 
 > **Sicherheit:** Die JSON-Sicherung enthält Passwörter, Tokens, Zertifikate und gegebenenfalls private Schlüssel im Klartext. Die Datei muss wie ein Passwort sicher verwahrt und darf nicht veröffentlicht werden. Flüchtige Laufzeitdaten wie Sitzungs-Token, Update-Cache, Crash-Snapshot und letzter Resetgrund werden bewusst nicht gesichert.
+
+> **Mehrere Geräte:** Die JSON-Datei darf mit einem Texteditor angepasst und anschließend auf weiteren Geräten eingespielt werden. Vor dem Import müssen insbesondere Hostname, statische IP-Adresse, Administrator-Passwort und gerätespezifische MQTT-Werte geprüft werden, damit keine Adress-, Login- oder Topic-Konflikte entstehen.
 
 > Die vollständige MQTT-API-Referenz (alle Status-, Event- und Command-Topics,
 > HA-Entitäten, TLS-Konfiguration, Sicherheitsmodell) findet sich im

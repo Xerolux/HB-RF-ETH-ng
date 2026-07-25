@@ -1674,6 +1674,36 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(root, "_format", "hb-rf-eth-ng-backup");
     cJSON_AddNumberToObject(root, "_version", 2);
 
+    // A complete, text-editable JSON backup necessarily contains secrets in
+    // plaintext. Keep this warning inside the file so it remains visible even
+    // when the backup is copied or opened outside the WebUI.
+    cJSON *security = cJSON_AddObjectToObject(root, "_security");
+    if (!security) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Out of memory");
+    }
+    cJSON_AddBoolToObject(security, "containsPlaintextSecrets", true);
+    cJSON_AddStringToObject(
+        security, "warning",
+        "This unencrypted backup contains passwords, tokens, certificates and "
+        "private keys in plaintext. Store it like a password and never publish it.");
+
+    // Unknown metadata keys are intentionally ignored by the restore parser.
+    // This makes the file useful as a manually edited multi-device template
+    // without weakening validation of the actual configuration fields.
+    cJSON *portability = cJSON_AddObjectToObject(root, "_portability");
+    if (!portability) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Out of memory");
+    }
+    cJSON_AddBoolToObject(portability, "editable", true);
+    cJSON_AddStringToObject(
+        portability, "warning",
+        "Before importing on another device, review hostname, static IP, "
+        "administrator password and device-specific MQTT values.");
+
     add_settings(root);
 
     // Merge settings object into root if add_settings creates a sub-object

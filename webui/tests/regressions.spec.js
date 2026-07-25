@@ -356,6 +356,8 @@ test('downloaded backup keeps all sensitive device settings and browser preferen
   })
 
   await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await expect(page.locator('.segment-btn', { hasText: 'Backup e reset' })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('credenziali in chiaro')
   const downloadPromise = page.waitForEvent('download')
   await page.locator('.backup-grid .action-tile').first().click()
   const download = await downloadPromise
@@ -368,6 +370,10 @@ test('downloaded backup keeps all sensitive device settings and browser preferen
   expect(downloadedBackup.monitoring.mqtt).toEqual(completeDeviceBackup.monitoring.mqtt)
   expect(downloadedBackup.monitoring.notify.smtpPassword).toBe('smtp-secret')
   expect(downloadedBackup.theme).toEqual(completeDeviceBackup.theme)
+  expect(downloadedBackup._security.containsPlaintextSecrets).toBe(true)
+  expect(downloadedBackup._security.warning).toContain('in chiaro')
+  expect(downloadedBackup._portability.editable).toBe(true)
+  expect(downloadedBackup._portability.warning).toContain('hostname')
   expect(downloadedBackup.browserPreferences).toEqual({
     locale: 'it',
     showExperimental: true
@@ -410,8 +416,17 @@ test('settings restore is guarded against duplicates and enters restart synchron
   let restoredPayload = null
   const completeBackup = {
     ...settings,
+    hostname: 'template-device-02',
     adminPassword: 'Backup123',
     passwordChanged: true,
+    _security: {
+      containsPlaintextSecrets: true,
+      warning: 'Contains plaintext credentials'
+    },
+    _portability: {
+      editable: true,
+      warning: 'Review device-specific values'
+    },
     theme: {
       colorScheme: 'dark',
       primaryColor: '#3971e8'
@@ -460,12 +475,46 @@ test('settings restore is guarded against duplicates and enters restart synchron
   expect(restoredPayload.adminPassword).toBe('Backup123')
   expect(restoredPayload.monitoring.mqtt.password).toBe('mqtt-secret')
   expect(restoredPayload.theme).toEqual(completeBackup.theme)
+  expect(restoredPayload.hostname).toBe('template-device-02')
+  expect(restoredPayload._portability.editable).toBe(true)
   expect(await page.evaluate(() => ({
     locale: localStorage.getItem('locale'),
     showExperimental: localStorage.getItem('showExperimental')
   }))).toEqual({ locale: 'de', showExperimental: '1' })
   await expect(page.locator('.restart-countdown-overlay')).toBeVisible()
   await expect(page.locator('.restart-countdown-overlay')).toContainText('Restart Sync')
+})
+
+test('recovery login and tools always link back to the normal WebUI', async () => {
+  const source = await readFile('../main/system_overview_api.cpp', 'utf8')
+  const recoveryPage = source.slice(
+    source.indexOf('constexpr char RECOVERY_PAGE[]'),
+    source.indexOf(')HTML\";')
+  )
+  const backLink = '<a class=\"back-link\" href=\"/\">← Zur normalen WebUI</a>'
+
+  expect(recoveryPage).toContain(backLink)
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"loginCard\"'))
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"tools\"'))
+})
+
+test('project documentation advertises exactly the four shipped locales', async () => {
+  const localeIndex = await readFile('src/locales/index.js', 'utf8')
+  const localeCodes = [...localeIndex.matchAll(/\{ code: '([a-z]{2})'/g)].map(match => match[1])
+  expect(localeCodes).toEqual(['de', 'en', 'fr', 'it'])
+
+  const documentation = await Promise.all([
+    readFile('../README.md', 'utf8'),
+    readFile('../CHANGELOG.md', 'utf8'),
+    readFile('../docs/WIKI.md', 'utf8'),
+    readFile('../generate_release_notes.py', 'utf8'),
+    readFile('../release/RELEASE_NOTES.md', 'utf8')
+  ])
+  const combined = documentation.join('\n')
+
+  expect(combined).not.toMatch(/10[ -]?(?:Sprachen|languages|locales)/i)
+  expect(documentation[0]).toContain('Deutsch, Englisch, Französisch und Italienisch')
+  expect(documentation[2]).toContain('4 Sprachen: Deutsch, Englisch, Französisch und Italienisch')
 })
 
 test('settings and system actions do not overflow a mobile viewport', async ({ page }) => {
