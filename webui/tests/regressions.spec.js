@@ -676,6 +676,32 @@ test('MQTT defers every publish until the broker connection is established', asy
   )
 })
 
+test('MQTT startup waits for Ethernet IPv4 readiness without losing the GOT_IP race', async () => {
+  const monitoringSource = await readFile('../main/monitoring.cpp', 'utf8')
+  const init = monitoringSource.slice(
+    monitoringSource.indexOf('esp_err_t monitoring_init'),
+    monitoringSource.indexOf('// Update configuration')
+  )
+  const networkReadyHandler = monitoringSource.slice(
+    monitoringSource.indexOf('static void mqtt_network_ready_handler'),
+    monitoringSource.indexOf('// Initialize monitoring subsystem')
+  )
+
+  expect(monitoringSource).toContain('static std::atomic<bool> mqtt_start_deferred{false}')
+  expect(monitoringSource).toContain('static void start_mqtt_when_network_ready')
+  expect(monitoringSource).toContain('IP_EVENT_ETH_GOT_IP')
+  expect(monitoringSource).toContain('MQTT start deferred until IPv4 is ready')
+  expect(monitoringSource).toContain('starting MQTT with reconnect fallback')
+  expect(networkReadyHandler).toContain('mqtt_start_deferred.exchange(false)')
+  expect(networkReadyHandler).toContain('malloc(sizeof(mqtt_config_t))')
+  expect(networkReadyHandler).not.toContain('mqtt_config_t mqtt_config;')
+  expect(networkReadyHandler).toContain('mqtt_handler_start(mqtt_config)')
+  expect(networkReadyHandler).toContain('free(mqtt_config)')
+  expect(init).toContain('esp_event_handler_instance_register(')
+  expect(init).toContain('start_mqtt_when_network_ready(&current_config.mqtt)')
+  expect(init).not.toContain('mqtt_handler_start(&current_config.mqtt)')
+})
+
 test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
   const source = await readFile('../main/rawuartudplistener.cpp', 'utf8')
 

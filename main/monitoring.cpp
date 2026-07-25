@@ -74,8 +74,10 @@ static monitoring_config_t current_config = {};
 static SemaphoreHandle_t config_mutex = NULL;
 static std::atomic<bool> checkmk_running{false};
 static std::atomic<bool> update_in_progress{false};
+static std::atomic<bool> mqtt_start_deferred{false};
 static std::atomic<TaskHandle_t> checkmk_task_handle{NULL};
 static std::atomic<int> checkmk_listen_sock{-1};
+static esp_event_handler_instance_t mqtt_ip_event_instance = NULL;
 // Currently-connected client socket, or -1. Tracked atomically so that
 // checkmk_stop() can close it before force-deleting the task. Without this,
 // if vTaskDelete() strikes between accept() returning a fd and close() being
@@ -827,6 +829,67 @@ static void heap_watchdog_task(void *pvParameters)
     }
 }
 
+// Arm the deferred flag before checking the link state. This ordering closes
+// the race where GOT_IP arrives between the check and arming the callback:
+// either this function or mqtt_network_ready_handler() consumes the flag and
+// starts MQTT exactly once.
+static void start_mqtt_when_network_ready(const mqtt_config_t *mqtt_config)
+{
+    if (mqtt_config == NULL || !mqtt_config->enabled) {
+        mqtt_start_deferred.store(false);
+        return;
+    }
+
+    mqtt_start_deferred.store(true);
+    if (g_ethernet == NULL || !g_ethernet->isConnected()) {
+        if (mqtt_ip_event_instance == NULL) {
+            mqtt_start_deferred.store(false);
+            ESP_LOGW(TAG, "IPv4-ready handler unavailable; starting MQTT with reconnect fallback");
+            mqtt_handler_start(mqtt_config);
+            return;
+        }
+        ESP_LOGI(TAG, "MQTT start deferred until IPv4 is ready");
+        return;
+    }
+
+    if (mqtt_start_deferred.exchange(false)) {
+        mqtt_handler_start(mqtt_config);
+    }
+}
+
+static void mqtt_network_ready_handler(void *handler_args,
+                                       esp_event_base_t event_base,
+                                       int32_t event_id,
+                                       void *event_data)
+{
+    (void)handler_args;
+    (void)event_data;
+
+    if (event_base != IP_EVENT || event_id != IP_EVENT_ETH_GOT_IP ||
+        !mqtt_start_deferred.exchange(false) || config_mutex == NULL) {
+        return;
+    }
+
+    // mqtt_config_t contains up to 6 KB of TLS certificates. The default ESP
+    // event-loop task has a small stack, so take the snapshot on the heap.
+    mqtt_config_t *mqtt_config = (mqtt_config_t *)malloc(sizeof(mqtt_config_t));
+    if (mqtt_config == NULL) {
+        mqtt_start_deferred.store(true);
+        ESP_LOGE(TAG, "Failed to allocate deferred MQTT configuration");
+        return;
+    }
+
+    xSemaphoreTake(config_mutex, portMAX_DELAY);
+    memcpy(mqtt_config, &current_config.mqtt, sizeof(*mqtt_config));
+    xSemaphoreGive(config_mutex);
+
+    if (mqtt_config->enabled) {
+        ESP_LOGI(TAG, "IPv4 ready; starting deferred MQTT client");
+        mqtt_handler_start(mqtt_config);
+    }
+    free(mqtt_config);
+}
+
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
 {
@@ -861,6 +924,17 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         save_config_to_nvs(&current_config);
     }
 
+    esp_err_t mqtt_ip_event_result = esp_event_handler_instance_register(
+        IP_EVENT,
+        IP_EVENT_ETH_GOT_IP,
+        mqtt_network_ready_handler,
+        NULL,
+        &mqtt_ip_event_instance);
+    if (mqtt_ip_event_result != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register MQTT IPv4-ready handler: %s",
+                 esp_err_to_name(mqtt_ip_event_result));
+    }
+
     // Start CheckMK if enabled
     if (current_config.checkmk.enabled) {
         checkmk_start(&current_config.checkmk);
@@ -882,10 +956,10 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
         events_start(&current_config.notify);
     }
 
-    // Start MQTT if enabled
-    if (current_config.mqtt.enabled) {
-        mqtt_handler_start(&current_config.mqtt);
-    }
+    // MQTT must not connect before the Ethernet netif owns an IPv4 address.
+    // If GOT_IP already fired, isConnected() starts it here; otherwise the
+    // registered event handler starts it as soon as the address is available.
+    start_mqtt_when_network_ready(&current_config.mqtt);
 
     // Heap watchdog runs regardless of monitoring config - it's a safety
     // net for the whole firmware, not a monitoring feature.
@@ -939,7 +1013,7 @@ esp_err_t monitoring_update_config(const monitoring_config_t *config)
     if (prometheus_changed && current_config.prometheus.enabled) prometheus_start(&current_config.prometheus);
     if (syslog_changed     && current_config.syslog.enabled)     syslog_start(&current_config.syslog);
     if (notify_changed     && current_config.notify.enabled)     events_start(&current_config.notify);
-    if (mqtt_changed       && current_config.mqtt.enabled)       mqtt_handler_start(&current_config.mqtt);
+    if (mqtt_changed)                                             start_mqtt_when_network_ready(&current_config.mqtt);
 
     return ESP_OK;
 }
@@ -961,6 +1035,7 @@ uint32_t monitoring_pause_for_ota(void)
              (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
 
     if (mqtt_enabled) {
+        mqtt_start_deferred.store(false);
         mqtt_handler_stop();
         paused |= OTA_PAUSED_MQTT;
     }
@@ -1012,7 +1087,7 @@ void monitoring_resume_after_ota(uint32_t paused_mask)
         events_start(&cfg.notify);
     }
     if ((paused_mask & OTA_PAUSED_MQTT) && cfg.mqtt.enabled) {
-        mqtt_handler_start(&cfg.mqtt);
+        start_mqtt_when_network_ready(&cfg.mqtt);
     }
 }
 
