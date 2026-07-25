@@ -1,0 +1,2 @@
+[     104ms] [ERROR] Manifest: Line: 1, column: 1, Syntax error. @ http://192.168.178.56/manifest.webmanifest?v=24562bb8:0
+[     471ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://192.168.178.56/api/webui/status:0

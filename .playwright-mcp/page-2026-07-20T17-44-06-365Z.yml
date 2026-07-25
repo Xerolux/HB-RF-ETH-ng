@@ -1,0 +1,106 @@
+- generic [ref=f2e31]:
+  - banner:
+    - complementary [ref=f2e32]:
+      - link "HB-RF-ETH-ng HB-RF-ETH-A446B8" [ref=f2e33] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f2e39]:
+          - strong [ref=f2e40]: HB-RF-ETH-ng
+          - generic [ref=f2e41]: HB-RF-ETH-A446B8
+      - navigation "Hauptmenü" [ref=f2e42]:
+        - generic [ref=f2e43]:
+          - generic [ref=f2e44]: Übersicht
+          - link "Status" [ref=f2e45] [cursor=pointer]:
+            - /url: /
+          - link "Monitoring" [ref=f2e52] [cursor=pointer]:
+            - /url: /monitoring
+        - generic [ref=f2e55]:
+          - generic [ref=f2e56]: System
+          - link "Einstellungen" [ref=f2e57] [cursor=pointer]:
+            - /url: /settings
+          - link "System" [ref=f2e65] [cursor=pointer]:
+            - /url: /system-overview
+          - link "Design wechseln" [ref=f2e70] [cursor=pointer]:
+            - /url: /theme
+          - link "Firmware" [ref=f2e78] [cursor=pointer]:
+            - /url: /firmware
+          - link "WebUI" [ref=f2e82] [cursor=pointer]:
+            - /url: /webui
+          - link "System-Log" [ref=f2e86] [cursor=pointer]:
+            - /url: /systemlog
+        - generic [ref=f2e93]:
+          - generic [ref=f2e94]: Info
+          - link "Über" [ref=f2e95] [cursor=pointer]:
+            - /url: /about
+      - generic [ref=f2e100]:
+        - button "DE" [ref=f2e102] [cursor=pointer]
+        - button "Neustart" [ref=f2e110] [cursor=pointer]
+        - button "Abmelden" [ref=f2e115] [cursor=pointer]
+    - navigation [ref=f2e120]:
+      - generic [ref=f2e121]:
+        - generic [ref=f2e122]: LAN
+        - generic [ref=f2e123]:
+          - text: "Laufzeit:"
+          - strong [ref=f2e124]: 51m
+        - link "Aktiver Supporter" [ref=f2e125] [cursor=pointer]:
+          - /url: /settings
+      - button "Design wechseln" [ref=f2e130] [cursor=pointer]
+  - main [ref=f2e137]:
+    - generic [ref=f2e138]:
+      - generic [ref=f2e139]:
+        - generic [ref=f2e140]:
+          - generic [ref=f2e141]: Darstellung
+          - heading "Theme konfigurieren" [level=1] [ref=f2e148]
+          - paragraph [ref=f2e149]: Farbschema und Akzentfarbe werden direkt auf dem Gerät gespeichert.
+        - generic [ref=f2e150]:
+          - generic [ref=f2e151]: "#3971e8"
+          - generic [ref=f2e153]: System
+      - generic [ref=f2e160]:
+        - article [ref=f2e161]:
+          - generic [ref=f2e166]:
+            - heading "Farbschema" [level=2] [ref=f2e167]
+            - paragraph [ref=f2e168]: Automatisch dem System folgen oder fest einstellen.
+          - generic [ref=f2e169]:
+            - button [ref=f2e170] [cursor=pointer]:
+              - strong [ref=f2e177]: System
+            - button [ref=f2e178] [cursor=pointer]:
+              - strong [ref=f2e185]: Hell
+            - button [ref=f2e186] [cursor=pointer]:
+              - strong [ref=f2e189]: Dunkel
+        - article [ref=f2e190]:
+          - generic [ref=f2e199]:
+            - heading "Akzentfarbe" [level=2] [ref=f2e200]
+            - paragraph [ref=f2e201]: Wird für Navigation, Buttons und Hervorhebungen verwendet.
+          - generic [ref=f2e202]:
+            - button "#f26a3d" [ref=f2e203] [cursor=pointer]
+            - button "#3971e8" [active] [ref=f2e204] [cursor=pointer]
+            - button "#1ca971" [ref=f2e205] [cursor=pointer]
+            - button "#8b5cf6" [ref=f2e206] [cursor=pointer]
+            - button "#e89a24" [ref=f2e207] [cursor=pointer]
+          - generic [ref=f2e208]:
+            - generic [ref=f2e209]: Eigene Farbe
+            - 'textbox "Eigene Farbe #3971e8" [ref=f2e250] [cursor=pointer]': "#3971e8"
+            - code [ref=f2e211]: "#3971e8"
+        - article [ref=f2e212]:
+          - generic [ref=f2e217]:
+            - heading "Vorschau" [level=2] [ref=f2e218]
+            - paragraph [ref=f2e219]: Beispiel für Karten und Aktionen.
+          - generic [ref=f2e220]:
+            - generic [ref=f2e221]:
+              - strong [ref=f2e223]: HB-RF-ETH-ng
+              - generic [ref=f2e224]: Online
+            - generic [ref=f2e225]:
+              - generic [ref=f2e226]:
+                - generic [ref=f2e227]: CPU
+                - strong [ref=f2e228]: 12%
+              - generic [ref=f2e230]:
+                - generic [ref=f2e231]: RAM
+                - strong [ref=f2e232]: 43%
+              - button "Aktion" [ref=f2e234] [cursor=pointer]
+      - alert [ref=f2e235]: Die Einstellung gilt geräteweit. Andere Browser übernehmen sie beim nächsten Öffnen automatisch.
+  - contentinfo [ref=f2e236]:
+    - generic [ref=f2e237]:
+      - generic [ref=f2e238]: Firmware v2.2.5-Beta.4 · WebUI v1.0.0-Beta.2 © 2025-2026 Xerolux
+      - generic [ref=f2e239]:
+        - link "Auf X folgen" [ref=f2e240] [cursor=pointer]:
+          - /url: https://x.com/Xerolux
+        - button "Sponsor" [ref=f2e246] [cursor=pointer]
