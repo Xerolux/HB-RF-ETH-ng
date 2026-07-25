@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include <stdlib.h>
 #include <string.h>
 
 static const char *TAG = "PingService";
@@ -61,21 +62,32 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
     }
     freeaddrinfo(res);
 
-    ping_ctx_t ctx;
-    ctx.event_group = xEventGroupCreate();
-    ctx.latency = -1;
-    if (ctx.event_group == NULL) {
+    // The ESP-IDF ping worker invokes callbacks asynchronously. Keep the
+    // callback context on the heap so an abnormal worker shutdown can never
+    // turn the HTTP handler's stack frame into a use-after-free.
+    ping_ctx_t *ctx = (ping_ctx_t *)calloc(1, sizeof(ping_ctx_t));
+    if (ctx == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate ping callback context");
+        return PING_SERVICE_INTERNAL;
+    }
+    ctx->event_group = xEventGroupCreate();
+    ctx->latency = -1;
+    if (ctx->event_group == NULL) {
         ESP_LOGE(TAG, "Failed to allocate ping event group");
+        free(ctx);
         return PING_SERVICE_INTERNAL;
     }
 
     esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
     config.target_addr = target_addr;
     config.count = 1;
+    // There is no next packet in a one-shot session. Avoid the default
+    // one-second interval delay before on_ping_end is delivered.
+    config.interval_ms = 0;
     config.timeout_ms = timeout_ms;
 
     esp_ping_callbacks_t cbs = {
-        .cb_args = &ctx,
+        .cb_args = ctx,
         .on_ping_success = cmd_ping_on_ping_success,
         .on_ping_timeout = cmd_ping_on_ping_timeout,
         .on_ping_end = cmd_ping_on_ping_end
@@ -85,20 +97,57 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
     esp_err_t err = esp_ping_new_session(&config, &cbs, &ping);
     if (err != ESP_OK || ping == NULL) {
         ESP_LOGE(TAG, "Failed to create ping session: %s", esp_err_to_name(err));
-        vEventGroupDelete(ctx.event_group);
+        vEventGroupDelete(ctx->event_group);
+        free(ctx);
         return PING_SERVICE_INTERNAL;
     }
 
-    esp_ping_start(ping);
+    err = esp_ping_start(ping);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start ping session: %s", esp_err_to_name(err));
+        esp_ping_delete_session(ping);
+        vEventGroupDelete(ctx->event_group);
+        free(ctx);
+        return PING_SERVICE_INTERNAL;
+    }
 
-    EventBits_t bits = xEventGroupWaitBits(ctx.event_group, PING_SUCCESS_BIT | PING_END_BIT, pdTRUE, pdFALSE, pdMS_TO_TICKS(timeout_ms + 1000));
+    // Do not return on PING_SUCCESS_BIT. In ESP-IDF, on_ping_success runs
+    // before on_ping_end. The old "success OR end" wait resumed immediately,
+    // deleted this event group and returned its stack callback context, then
+    // the ping task called on_ping_end with both objects already invalid. That
+    // deterministic use-after-free caused the interrupt-watchdog reboot seen
+    // in #393 and left the CCU/radio session disconnected.
+    EventBits_t bits = xEventGroupWaitBits(
+        ctx->event_group, PING_END_BIT, pdTRUE, pdTRUE,
+        pdMS_TO_TICKS(timeout_ms + 1000));
 
-    esp_ping_stop(ping);
+    if ((bits & PING_END_BIT) == 0) {
+        // Defensive cancellation path. A normal one-shot always emits END,
+        // but if the worker is delayed, stop it and keep the callback state
+        // alive until the final callback has actually completed.
+        ESP_LOGW(TAG, "Ping worker did not finish in time; requesting stop");
+        esp_ping_stop(ping);
+        bits = xEventGroupWaitBits(
+            ctx->event_group, PING_END_BIT, pdTRUE, pdTRUE,
+            pdMS_TO_TICKS(timeout_ms + 1000));
+    }
+
+    const int latency = ctx->latency;
     esp_ping_delete_session(ping);
-    vEventGroupDelete(ctx.event_group);
+    if ((bits & PING_END_BIT) == 0) {
+        // The ESP-IDF task may still deliver on_ping_end asynchronously.
+        // Preserve the small callback context rather than freeing memory that
+        // the worker can still access. This exceptional bounded leak is safer
+        // than corrupting the radio/network tasks or rebooting the device.
+        ESP_LOGE(TAG, "Ping worker did not acknowledge shutdown");
+        return PING_SERVICE_INTERNAL;
+    }
 
-    if (bits & PING_SUCCESS_BIT) {
-        return ctx.latency;
+    vEventGroupDelete(ctx->event_group);
+    free(ctx);
+
+    if (latency >= 0) {
+        return latency;
     }
 
     return PING_SERVICE_TIMEOUT;

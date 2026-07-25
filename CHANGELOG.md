@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- fix(ping): Die Ping-Diagnose wartet nun auf den finalen ESP-IDF-Ping-Callback, bevor Callback-Kontext und EventGroup freigegeben werden. Der bisherige Erfolgspfad erzeugte einen Use-after-free und konnte dadurch einen Interrupt-Watchdog-Reboot auslösen, nach dem die Funkmodul-/CCU-Verbindung bis zum OpenCCU-Neustart gestört blieb (Issue #393).
+- fix(mqtt): `command/check_update` verwendet wieder die gleiche timerbasierte, heapgeschützte und mit 60-Sekunden-Cooldown versehene Updatesuche wie die WebUI. Nach Abschluss werden die retained MQTT-Versions- und Update-Topics sofort neu veröffentlicht; Home Assistant erhält den „Check for Update“-Button wieder.
+- feat(recovery): Die eigenständige Notfallseite entspricht nun dem New Design mit Header, Page-Hero, kompakten Karten, Light-/Dark-Modus, responsivem Layout und konsistenten Fokuszuständen, bleibt aber weiterhin vollständig unabhängig vom möglicherweise beschädigten WebUI-Bundle.
+- test(stability): Ein nativer Host-Test bildet die asynchrone ESP-IDF-Callback-Reihenfolge beim Ping nach und verhindert eine erneute Freigabe vor `on_ping_end`; Build- und Release-Workflow führen ihn verpflichtend aus.
+
 ## [2.2.5-Beta.16] - 2026-07-25
 
 ### Changes

@@ -140,6 +140,30 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         mqtt_handler_publish_event("event/restart", "requested");
         vTaskDelay(pdMS_TO_TICKS(300));
         full_system_restart();
+    } else if (strcmp(command, "check_update") == 0) {
+        // Use the same timer-backed, cooldown- and heap-guarded path as the
+        // WebUI. The former MQTT implementation spawned its own large worker
+        // directly from the MQTT callback and was removed after causing OOM /
+        // stack watchdog failures. When the safe manual path was reintroduced
+        // for the WebUI, this dispatcher case was accidentally left out.
+        ESP_LOGI(TAG, "Check-update command received via MQTT");
+        UpdateCheck *updateCheck = monitoring_get_updatecheck();
+        if (!updateCheck) {
+            mqtt_handler_publish_event("event/check_update",
+                                       "updatecheck_unavailable");
+            return;
+        }
+
+        const bool accepted = updateCheck->triggerManualFetch();
+        if (accepted) {
+            mqtt_handler_publish_event("event/check_update", "requested");
+        } else if (updateCheck->isFetchInProgress()) {
+            mqtt_handler_publish_event("event/check_update",
+                                       "already_in_progress");
+        } else {
+            mqtt_handler_publish_event("event/check_update",
+                                       "cooldown_or_not_started");
+        }
     } else {
         ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
         mqtt_handler_publish_event("event/command_rejected", "reason=unknown_command");
@@ -554,6 +578,10 @@ void mqtt_handler_publish_ha_discovery(void)
     // buttons work even when a command_token is configured. Empty token ->
     // plain "restart" etc. (legacy behaviour).
     const char* restart_payload  = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "restart";
+    const char* check_update_payload =
+        current_mqtt_config.command_token[0]
+            ? current_mqtt_config.command_token
+            : "check_update";
     // Device Info — use the configurable hostname as the HA device name so
     // multiple HB-RF-ETH boards can be told apart in the UI. Fall back to a
     // generic label if the hostname is unavailable.
@@ -738,6 +766,8 @@ void mqtt_handler_publish_ha_discovery(void)
     // must NOT publish buttons that look clickable. Hide them by skipping.
     if (current_mqtt_config.command_enabled) {
         publish_button("restart", "Restart", "restart", restart_payload, "restart", "mdi:restart");
+        publish_button("check_update", "Check for Update", "check_update",
+                       check_update_payload, "update", "mdi:refresh");
     }
 
     // Remove destructive/retired entities retained by older firmware.

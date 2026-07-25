@@ -103,9 +103,9 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
   * **Command Token Security** - Optionaler Token für sichere Befehlsausführung
   * Status-Publishing für Systemmetriken (adaptives Intervall: 5s idle / 1s bei OTA)
   * **HA-Sensoren** für alle Systemmetriken (CPU, RAM, Temperatur, Spannung, Uptime)
-  * **HA-Buttons** für Restart, Factory Reset, Firmware-Updates und Update-Checks
-  * **HA-Update-Integration** - OTA-Updates direkt aus Home Assistant
-  * **Echtzeit OTA-Status** - Progress und Error-Meldungen in Echtzeit
+  * **HA-Buttons** für Restart und die geschützte Update-Suche
+  * **Getrennte Versionsanzeige** für installierte und verfügbare Firmware/WebUI
+  * Firmware-Installation und Werksreset bleiben aus Sicherheitsgründen WebUI-Aktionen
   * **TLS/mTLS Support** - Verschlüsselte Verbindungen und Client-Zertifikate
 * **Check_MK Agent**
   * Native Unterstützung für Check_MK/CheckMK Monitoring
@@ -390,12 +390,9 @@ sind punktuelle Benachrichtigungen für Automatisierungen (HA, Node-RED, …).
 | Topic | Payload | Auslöser |
 |-------|---------|----------|
 | `event/restart` | `requested` | Gerät restartet via MQTT-Kommando (vor dem tatsächlichen Reboot) |
-| `event/factory_reset` | `requested` | Werkreset via MQTT-Kommando (vor dem Löschen der NVS) |
-| `event/update_started` | `requested` | OTA-Update via MQTT `update`-Kommando gestartet |
 | `event/update_downloading` | `started` | OTA-State-Wechsel `starting` → `downloading` |
 | `event/update_finished` | `success` oder `failed: <text> (code=0x<hex>)` | OTA-State-Wechsel nach `success` oder `failed` |
-| `event/update_failed` | `task_create_failed` / `updatecheck_unavailable` | OTA konnte nicht gestartet werden (interner Fehler) |
-| `event/check_update` | `requested` / `updatecheck_unavailable` | `check_update`-Kommando erhalten (Refresh läuft asynchron) |
+| `event/check_update` | `requested`, `already_in_progress`, `cooldown_or_not_started`, `completed`, `failed`, `skipped_low_heap`, `task_create_failed` oder `updatecheck_unavailable` | Zustand der asynchronen `check_update`-Anfrage |
 | `event/command_rejected` | `rejected cmd=<name> reason=invalid_token` | Kommando mit falschem/fehendem Token empfangen |
 
 ---
@@ -409,9 +406,10 @@ angenommen – auch nicht mit korrektem Token.
 | Command-Topic | Aktion | Vorbedingung |
 |---------------|--------|--------------|
 | `command/restart` | Gerät neustarten (Reset-Grund `USER_RESTART`) | `commandEnabled` |
-| `command/factory_reset` | NVS löschen + Werkreset + Reboot | `commandEnabled` |
-| `command/update` | OTA-Update der neuesten Version triggern | `commandEnabled` |
-| `command/check_update` | GitHub Releases neu abfragen (Beta/Stable je nach Setting) | `commandEnabled` |
+| `command/check_update` | GitHub-Releases über den geschützten Timerpfad neu abfragen und MQTT-Status danach sofort aktualisieren | `commandEnabled` |
+
+Werkreset und Firmware-Installation werden bewusst nicht als MQTT-Kommandos
+angeboten. Beide Aktionen erfordern die bestätigten Abläufe der WebUI.
 
 #### Payload-Regeln
 
@@ -470,7 +468,6 @@ Alle haben `entity_category: "diagnostic"`.
 | Object ID | Name | Class | Command | Icon |
 |-----------|------|-------|---------|------|
 | `restart` | Restart | restart | `command/restart` | `mdi:restart` |
-| `factory_reset` | Factory Reset | restart | `command/factory_reset` | `mdi:lock-reset` |
 | `check_update` | Check for Update | update | `command/check_update` | `mdi:refresh` |
 
 Buttons werden **nur gepublished, wenn `commandEnabled = true`**. Ansonsten
@@ -479,15 +476,9 @@ sieht HA keinen klickbaren Button.
 `entity_category: "config"`. `payload_press` entspricht dem Token (oder dem
 Kommando-String, wenn kein Token gesetzt ist).
 
-#### Update-Entität (`update/`)
-
-| Object ID | Name | Class | State Topic | Command Topic |
-|-----------|------|-------|-------------|---------------|
-| `firmware_update` | Firmware Update | firmware | `status/latest_version` | `command/update` |
-
-Vergleicht die laufende Version mit `latest_version_template` und bietet eine
-"Install"-Aktion, die das OTA-Kommando triggert. Hat
-`enabled_by_default: false`, wenn `commandEnabled = false`.
+Die frühere installierbare MQTT-Update-Entität wird aktiv entfernt. Firmware-
+und WebUI-Versionen sowie `firmware_update_available` und
+`webui_update_available` bleiben als rein informative Sensoren verfügbar.
 
 
 ---

@@ -41,6 +41,7 @@
 #include "cJSON.h"
 #include "nvs.h"
 #include "supporter_crl.h"
+#include "mqtt_handler.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -175,8 +176,14 @@ static void _manual_fetch_task(void *parameter)
   UpdateCheck *uc = static_cast<UpdateCheck *>(parameter);
   ESP_LOGI(TAG, "Manual update check starting (heap free: %u KB)",
            (unsigned)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
-  uc->refresh();
+  const bool refreshed = uc->refresh();
   uc->_evaluateReleaseInfo();
+  // The same worker serves WebUI and MQTT requests. Wake the MQTT publisher
+  // only after the atomic release snapshot has been replaced, so retained
+  // latest-version/update-available topics never expose the old result.
+  mqtt_handler_trigger_status_publish();
+  mqtt_handler_publish_event("event/check_update",
+                             refreshed ? "completed" : "failed");
   vTaskDelete(NULL);
 }
 
@@ -206,6 +213,7 @@ static void _manual_fetch_callback(void *arg)
              (unsigned)(free_heap / 1024),
              (unsigned)(largest_block / 1024));
     uc->recordSkipReason(reason);
+    mqtt_handler_publish_event("event/check_update", "skipped_low_heap");
     return;
   }
 
@@ -213,6 +221,7 @@ static void _manual_fetch_callback(void *arg)
                                    uc, 2, NULL);
   if (created != pdPASS) {
     ESP_LOGE(TAG, "Failed to create manual update-check task");
+    mqtt_handler_publish_event("event/check_update", "task_create_failed");
   }
 }
 

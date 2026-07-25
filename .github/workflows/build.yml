@@ -42,6 +42,16 @@ jobs:
             -o build/host-tests/test_monitoring_defaults
           build/host-tests/test_monitoring_defaults
 
+      - name: Test ping callback lifecycle
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            -Wno-unused-parameter -Wno-unused-variable \
+            -Itest/host/stubs -Iinclude \
+            main/ping_service.cpp \
+            test/host/test_ping_lifecycle.cpp \
+            -o build/host-tests/test_ping_lifecycle
+          build/host-tests/test_ping_lifecycle
+
       - name: Setup Python
         uses: actions/setup-python@v7
         with:

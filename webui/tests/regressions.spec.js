@@ -496,6 +496,35 @@ test('recovery login and tools always link back to the normal WebUI', async () =
   expect(recoveryPage).toContain(backLink)
   expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"loginCard\"'))
   expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"tools\"'))
+  expect(recoveryPage).toContain('class=\"recovery-shell\"')
+  expect(recoveryPage).toContain('class=\"recovery-header\"')
+  expect(recoveryPage).toContain('class=\"page-eyebrow\"')
+  expect(recoveryPage).toContain('@media(prefers-color-scheme:dark)')
+  expect(recoveryPage).toContain('--newdesign-panel:#fff')
+  expect(recoveryPage).not.toContain('ohne New-Design-Bundle')
+})
+
+test('MQTT check_update uses the guarded manual fetch and republishes its result', async () => {
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+  const updateSource = await readFile('../main/updatecheck.cpp', 'utf8')
+  const commandHandler = mqttSource.slice(
+    mqttSource.indexOf('static void handle_mqtt_command'),
+    mqttSource.indexOf('static void mqtt_event_handler')
+  )
+  const discovery = mqttSource.slice(
+    mqttSource.indexOf('void mqtt_handler_publish_ha_discovery'),
+    mqttSource.indexOf('esp_err_t mqtt_handler_init')
+  )
+  const manualWorker = updateSource.slice(
+    updateSource.indexOf('static void _manual_fetch_task'),
+    updateSource.indexOf('static void _manual_fetch_callback')
+  )
+
+  expect(commandHandler).toContain('strcmp(command, \"check_update\")')
+  expect(commandHandler).toContain('triggerManualFetch()')
+  expect(commandHandler).toContain('event/check_update')
+  expect(discovery).toContain('publish_button(\"check_update\"')
+  expect(manualWorker).toContain('mqtt_handler_trigger_status_publish()')
 })
 
 test('project documentation advertises exactly the four shipped locales', async () => {

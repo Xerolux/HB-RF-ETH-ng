@@ -505,7 +505,8 @@ The script will authenticate, trigger the OTA update, and monitor progress until
 3. **Topic Name Check**
    - Default prefix: `hb-rf-eth`
    - Check custom prefix if changed
-   - Commands: `<prefix>/command/restart`, `<prefix>/command/factory_reset`, etc.
+   - Commands: `<prefix>/command/restart` and `<prefix>/command/check_update`
+   - Factory reset and firmware installation are intentionally WebUI-only
 
 4. **Broker ACL**
    - Ensure device user has publish rights on `<prefix>/command/#`
@@ -844,8 +845,8 @@ If problems persist:
      length 8–63. Without the token the device rejects the command and
      publishes an event to `<prefix>/event/command_rejected`.
    - **Disable commands entirely.** Uncheck *Enable* under *Command Topics*
-     to stop the device from subscribing to the command tree. Restart /
-     Factory Reset / OTA are then only possible via WebUI.
+     to stop the device from subscribing to the command tree. Restart is then
+     WebUI-only; factory reset and firmware installation are always WebUI-only.
 
    TLS / mTLS can be enabled independently in *Monitoring → MQTT → TLS / SSL*
    to encrypt the broker connection and to authenticate the device with a
