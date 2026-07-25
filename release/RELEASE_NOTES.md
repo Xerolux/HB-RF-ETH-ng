@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.5-Beta.14
+# 🚀 HB-RF-ETH-ng v2.2.5-Beta.15
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,17 +11,12 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.5-Beta.14?
+## 🆕 Was ist neu in v2.2.5-Beta.15?
 
 ### Changes
-- fix(factory-reset): Der Werksreset entfernt jetzt sämtliche Benutzerkonfigurationen aus den Einstellungen-, Monitoring-, Theme-, Reset-/Crash- und Update-Cache-Namespaces. Auch lokale Browser- und Sitzungsdaten einschließlich Theme und Akzentfarbe werden gelöscht.
-- feat(backup): Backup und Wiederherstellung sichern jetzt alle wiederherstellbaren Benutzereinstellungen einschließlich Administrator-Zugangsdaten, Netzwerk, Zeit, LEDs, Theme, Akzentfarbe, Supporter-Key, Browser-Präferenzen sowie vollständiger Monitoring-Konfiguration mit MQTT-/Benachrichtigungs-Passwörtern, Tokens, Zertifikaten und privaten Schlüsseln.
-- fix(settings): Feldgenaue Validierungsfehler für Administratorname, CCU-Adresse, Hostname, IPv4, Netzmaske, IPv6 und NTP ergänzt; ungültige Werte werden nun auch im Backend vor Änderungen vollständig abgewiesen.
-- fix(network): Die Ping-Diagnose verwendet authentifizierte Requests, meldet Latenz sowie verständliche DNS-/Timeout-Fehler und leitet nach einer statischen IP-Änderung zur neuen Geräteadresse weiter.
-- fix(restart): Wiederherstellung, manueller Neustart und MQTT-Neustart verwenden einheitlich die Neustart-Synchronisierung; doppelte Aktionen werden verhindert.
-- fix(mqtt): Unsicheren MQTT-Werksreset sowie die nicht mehr installierbare Home-Assistant-Firmware-Update-Entität entfernt.
-- fix(webui): Passwortfehler werden übersetzt, ANSI-farbige Systemlog-Zeilen korrekt gefiltert, die Recovery-Seite ist direkt verlinkt und Systemaktionen befinden sich unter „Sichern & Wiederherstellen“.
-- test: Regressionstests für vollständigen Werksreset, Backup/Restore, Neustart-Synchronisierung, Validierung, Mobile-Layout und die korrigierten Bedienabläufe ergänzt.
+- fix: recover monitoring after factory reset
+- chore: add planning and browser artifacts
+- chore: update manifests for v2.2.5-Beta.14
 
 ## ✨ Hauptfunktionen
 
@@ -61,7 +56,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.5-Beta.14.bin`)
+- **Firmware-Binary** (`firmware_2.2.5-Beta.15.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)

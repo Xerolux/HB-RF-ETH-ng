@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.15] - 2026-07-25
+
+### Changes
+- fix: recover monitoring after factory reset
+- chore: add planning and browser artifacts
+- chore: update manifests for v2.2.5-Beta.14
+
 ## [2.2.5-Beta.14] - 2026-07-25
 
 ### Changes
