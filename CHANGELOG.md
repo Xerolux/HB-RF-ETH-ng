@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.19] - 2026-07-25
+
+### Changes
+- fix: defer MQTT startup until IPv4 is ready
+- chore: update manifests for v2.2.5-Beta.18
+
 ## [2.2.5-Beta.18] - 2026-07-25
 
 ### Changes
