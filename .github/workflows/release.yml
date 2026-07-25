@@ -199,7 +199,7 @@ jobs:
         run: |
           FIRMWARE_VERSION="${{ steps.firmware.outputs.VERSION }}"
           python generate_release_notes.py "$FIRMWARE_VERSION" release/RELEASE_NOTES.md
-          cat >> release/RELEASE_NOTES.md <<EOF
+          cat >> release/RELEASE_NOTES.md <<'EOF'
 
           ## Included WebUI
 

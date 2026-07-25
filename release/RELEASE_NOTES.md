@@ -97,6 +97,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: 
-- WebUI API: 
-- Minimum firmware: 
+- WebUI version: `1.0.0-Beta.13`
+- WebUI API: `1`
+- Minimum firmware: `2.2.5-Beta.1`
