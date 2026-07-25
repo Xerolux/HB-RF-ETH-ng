@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.5-Beta.16
+# 🚀 HB-RF-ETH-ng v2.2.5-Beta.17
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,17 +11,17 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.5-Beta.16?
+## 🆕 Was ist neu in v2.2.5-Beta.17?
 
 ### Changes
-- feat: secure portable backups and improve recovery UX
-- fix: preserve WebUI release metadata
-- chore: update manifests for v2.2.5-Beta.15
+- fix: repair ping, MQTT updates and recovery UI
+- docs: align backup navigation label
+- chore: update manifests for v2.2.5-Beta.16
 
-- feat(backup): Vollständige JSON-Sicherungen kennzeichnen Klartext-Zugangsdaten nun sowohl in der WebUI als auch direkt in der Datei. Die Datei bleibt bewusst editierbar und kann nach Anpassung von Hostname, IP, Administrator-Passwort und gerätespezifischen MQTT-Werten als Vorlage für weitere Geräte verwendet werden.
-- feat(recovery): Die stets sichtbare Schaltfläche „Zur normalen WebUI“ führt sowohl von der Recovery-Ansicht als auch von deren Notfall-Anmeldung zurück zur regulären Oberfläche.
-- fix(webui): Der Einstellungspunkt „Backup“ heißt nun in allen vier unterstützten Sprachen „Backup & Reset“ beziehungsweise die jeweilige Übersetzung.
-- docs(i18n): README, Changelog, Wiki und Release-Notes nennen konsistent die vier unterstützten Sprachen Deutsch, Englisch, Französisch und Italienisch.
+- fix(ping): Die Ping-Diagnose wartet nun auf den finalen ESP-IDF-Ping-Callback, bevor Callback-Kontext und EventGroup freigegeben werden. Der bisherige Erfolgspfad erzeugte einen Use-after-free und konnte dadurch einen Interrupt-Watchdog-Reboot auslösen, nach dem die Funkmodul-/CCU-Verbindung bis zum OpenCCU-Neustart gestört blieb (Issue #393).
+- fix(mqtt): `command/check_update` verwendet wieder die gleiche timerbasierte, heapgeschützte und mit 60-Sekunden-Cooldown versehene Updatesuche wie die WebUI. Nach Abschluss werden die retained MQTT-Versions- und Update-Topics sofort neu veröffentlicht; Home Assistant erhält den „Check for Update“-Button wieder.
+- feat(recovery): Die eigenständige Notfallseite entspricht nun dem New Design mit Header, Page-Hero, kompakten Karten, Light-/Dark-Modus, responsivem Layout und konsistenten Fokuszuständen, bleibt aber weiterhin vollständig unabhängig vom möglicherweise beschädigten WebUI-Bundle.
+- test(stability): Ein nativer Host-Test bildet die asynchrone ESP-IDF-Callback-Reihenfolge beim Ping nach und verhindert eine erneute Freigabe vor `on_ping_end`; Build- und Release-Workflow führen ihn verpflichtend aus.
 
 ## ✨ Hauptfunktionen
 
@@ -61,7 +61,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.5-Beta.16.bin`)
+- **Firmware-Binary** (`firmware_2.2.5-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
