@@ -25,7 +25,7 @@
 
     <!-- Tabs Navigation (iOS Style Segmented Control) -->
     <div class="tabs-container">
-      <div class="segmented-control">
+      <div class="segmented-control" :style="{ '--settings-tab-count': tabs.length }">
         <button
           v-for="tab in tabs"
           :key="tab.id"
@@ -452,16 +452,20 @@
             <div class="card-body">
               <div class="form-group mb-3">
                 <label class="form-label">{{ t('settings.ping.target') }}</label>
-                <div class="d-flex">
+                <div class="ping-controls">
                   <BFormInput
                     type="text"
                     v-model="pingTarget"
                     trim
                     :placeholder="t('settings.ping.placeholder')"
-                    class="me-2"
                     @keyup.enter="runPing"
                   />
-                  <BButton variant="primary" @click="runPing" :disabled="pingLoading || !pingTarget">
+                  <BButton
+                    variant="primary"
+                    class="ping-action"
+                    @click="runPing"
+                    :disabled="pingLoading || !pingTarget"
+                  >
                     <span v-if="pingLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                     <span v-else>{{ t('settings.ping.button') }}</span>
                   </BButton>
@@ -1527,20 +1531,18 @@ const restoreSettings = async () => {
 }
 
 .segmented-control {
-  display: inline-flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(var(--settings-tab-count), minmax(0, 1fr));
   background-color: var(--color-border-light);
   padding: var(--space-1);
   border-radius: var(--radius-lg);
   position: relative;
   width: 100%;
-  max-width: 700px;
   gap: var(--space-1);
   min-width: 0;
 }
 
 .segment-btn {
-  flex: 1 1 min(150px, 100%);
   min-width: 0;
   border: none;
   background: transparent;
@@ -1558,14 +1560,14 @@ const restoreSettings = async () => {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .segment-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .segment-btn.active {
@@ -1601,6 +1603,19 @@ const restoreSettings = async () => {
 
 .card-body {
   padding: var(--spacing-lg);
+}
+
+.ping-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.22fr);
+  gap: var(--spacing-sm);
+  align-items: stretch;
+}
+
+.ping-controls .form-control,
+.ping-action {
+  min-width: 0;
+  height: 100%;
 }
 
 /* Security Items */
@@ -2066,13 +2081,12 @@ hr {
 
   .segmented-control {
     width: 100%;
-    flex-wrap: wrap;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .segment-btn {
     padding: 10px 16px;
     font-size: var(--fs-xs);
-    flex: 1 1 min(140px, 100%);
   }
 
   .settings-card {
@@ -2175,9 +2189,21 @@ hr {
 }
 
 @media (max-width: 576px) {
+  .segmented-control {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .segment-btn {
     padding: 8px 14px;
     font-size: var(--fs-xs);
+  }
+
+  .ping-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ping-action {
+    width: 100%;
   }
 }
 

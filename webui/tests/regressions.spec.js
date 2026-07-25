@@ -197,6 +197,58 @@ test('monitoring repairs an empty-NVS CheckMK port before MQTT is saved', async 
   await expect(page.locator('.app-toast', { hasText: 'Configuration saved successfully' })).toBeVisible()
 })
 
+test('settings tabs and ping controls use desktop and mobile space responsively', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto(`${BASE_URL}/settings?tab=network`)
+  await expect(page.getByRole('heading', { name: 'Network Settings' })).toBeVisible()
+
+  const desktopTabs = await page.locator('.segment-btn').evaluateAll(buttons =>
+    buttons.map(button => button.getBoundingClientRect().top)
+  )
+  expect(new Set(desktopTabs.map(top => Math.round(top))).size).toBe(1)
+
+  const desktopPing = await page.locator('.ping-controls').evaluate(element => {
+    const input = element.querySelector('input').getBoundingClientRect()
+    const button = element.querySelector('button').getBoundingClientRect()
+    return {
+      inputBottom: input.bottom,
+      buttonBottom: button.bottom,
+      buttonWidth: button.width
+    }
+  })
+  expect(Math.abs(desktopPing.inputBottom - desktopPing.buttonBottom)).toBeLessThan(1)
+  expect(desktopPing.buttonWidth).toBeGreaterThanOrEqual(140)
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  const mobilePing = await page.locator('.ping-controls').evaluate(element => {
+    const input = element.querySelector('input').getBoundingClientRect()
+    const button = element.querySelector('button').getBoundingClientRect()
+    return {
+      inputLeft: input.left,
+      inputWidth: input.width,
+      inputBottom: input.bottom,
+      buttonLeft: button.left,
+      buttonWidth: button.width,
+      buttonTop: button.top
+    }
+  })
+  expect(mobilePing.buttonTop).toBeGreaterThan(mobilePing.inputBottom)
+  expect(Math.abs(mobilePing.inputLeft - mobilePing.buttonLeft)).toBeLessThan(1)
+  expect(Math.abs(mobilePing.inputWidth - mobilePing.buttonWidth)).toBeLessThan(1)
+
+  const mobileTabs = await page.locator('.segment-btn').evaluateAll(buttons => ({
+    rows: new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top))).size,
+    clipped: buttons.some(button => button.scrollWidth > button.clientWidth)
+  }))
+  expect(mobileTabs.rows).toBe(3)
+  expect(mobileTabs.clipped).toBe(false)
+})
+
 test('firmware update page follows the selected language completely', async ({ page }) => {
   await page.goto(`${BASE_URL}/updates/firmware`)
 
@@ -485,7 +537,7 @@ test('settings restore is guarded against duplicates and enters restart synchron
   await expect(page.locator('.restart-countdown-overlay')).toContainText('Restart Sync')
 })
 
-test('recovery login and tools always link back to the normal WebUI', async () => {
+test('recovery mirrors the current New Design shell and links back to the normal WebUI', async () => {
   const source = await readFile('../main/system_overview_api.cpp', 'utf8')
   const recoveryPage = source.slice(
     source.indexOf('constexpr char RECOVERY_PAGE[]'),
@@ -497,11 +549,85 @@ test('recovery login and tools always link back to the normal WebUI', async () =
   expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"loginCard\"'))
   expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"tools\"'))
   expect(recoveryPage).toContain('class=\"recovery-shell\"')
-  expect(recoveryPage).toContain('class=\"recovery-header\"')
-  expect(recoveryPage).toContain('class=\"page-eyebrow\"')
+  expect(recoveryPage).toContain('class=\"desktop-sidebar\"')
+  expect(recoveryPage).toContain('class=\"header-nav\"')
+  expect(recoveryPage).toContain('class=\"brand-logo\"')
+  expect(recoveryPage).toContain('class=\"hero-eyebrow\"')
+  expect(recoveryPage).toContain('--newdesign-sidebar-width:360px')
+  expect(recoveryPage).toContain('--newdesign-header-height:88px')
+  expect(recoveryPage).toContain('--newdesign-radius-card:4px')
   expect(recoveryPage).toContain('@media(prefers-color-scheme:dark)')
   expect(recoveryPage).toContain('--newdesign-panel:#fff')
+  expect(recoveryPage).not.toContain('class=\"brand-mark\">RF')
+  expect(recoveryPage).not.toContain('class=\"recovery-header\"')
   expect(recoveryPage).not.toContain('ohne New-Design-Bundle')
+})
+
+test('embedded recovery authenticates, adopts the device theme and reveals its tools', async ({ page }) => {
+  const source = await readFile('../main/system_overview_api.cpp', 'utf8')
+  const html = source.match(/R"HTML\(([\s\S]*?)\)HTML"/)?.[1]
+  expect(html).toBeTruthy()
+
+  await page.route('http://recovery.test/recovery', route => route.fulfill({
+    contentType: 'text/html',
+    body: html
+  }))
+  await page.route('http://recovery.test/api/theme', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ colorScheme: 'light', primaryColor: '#4fa36c' })
+  }))
+  await page.route('http://recovery.test/login.json', route => {
+    expect(route.request().postDataJSON()).toEqual({
+      username: 'admin',
+      password: 'recovery-secret'
+    })
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ isAuthenticated: true, token: 'recovery-token' })
+    })
+  })
+  await page.route(/http:\/\/recovery\.test\/sysinfo\.json.*/, route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      sysInfo: {
+        hostname: 'HB-RF-ETH-Recovery',
+        currentVersion: '2.2.5-Beta.18',
+        uptimeSeconds: 600
+      }
+    })
+  }))
+  await page.route('http://recovery.test/api/system/overview', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      totalInternalHeap: 320000,
+      usedInternalHeap: 250000,
+      internalHeapUsagePercent: 78.125,
+      freeInternalHeap: 70000,
+      minimumFreeHeap: 52000,
+      largestFreeBlock: 32000,
+      resetReasonText: 'Software reset',
+      psramAvailable: false,
+      webui: { version: '1.0.0-Beta.15' },
+      logs: { crashTailAvailable: false, enabled: true, bufferBytes: 32768 }
+    })
+  }))
+
+  await page.goto('http://recovery.test/recovery')
+  await expect(page.locator('.desktop-sidebar')).toBeVisible()
+  await expect(page.locator('.header-nav')).toBeVisible()
+  await expect.poll(() => page.evaluate(
+    () => getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim()
+  )).toBe('#4fa36c')
+
+  await page.locator('#pass').fill('recovery-secret')
+  await page.locator('#login').click()
+
+  await expect(page.locator('#loginCard')).toBeHidden()
+  await expect(page.locator('#tools')).toBeVisible()
+  await expect(page.locator('#deviceName')).toHaveText('HB-RF-ETH-Recovery')
+  await expect(page.locator('#topFirmware')).toHaveText('2.2.5-Beta.18')
+  await expect(page.locator('#facts')).toContainText('32.0 KB')
+  await expect(page.locator('#status')).toHaveText('Status aktualisiert.')
 })
 
 test('MQTT check_update uses the guarded manual fetch and republishes its result', async () => {
@@ -525,6 +651,40 @@ test('MQTT check_update uses the guarded manual fetch and republishes its result
   expect(commandHandler).toContain('event/check_update')
   expect(discovery).toContain('publish_button(\"check_update\"')
   expect(manualWorker).toContain('mqtt_handler_trigger_status_publish()')
+})
+
+test('MQTT defers every publish until the broker connection is established', async () => {
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+  const publishTask = mqttSource.slice(
+    mqttSource.indexOf('void mqtt_publish_task'),
+    mqttSource.indexOf('void mqtt_handler_trigger_status_publish')
+  )
+  const connectedEvent = mqttSource.slice(
+    mqttSource.indexOf('case MQTT_EVENT_CONNECTED:'),
+    mqttSource.indexOf('case MQTT_EVENT_DISCONNECTED:')
+  )
+
+  expect(mqttSource).toContain('static bool mqtt_can_publish()')
+  expect(mqttSource).toMatch(
+    /mqtt_running\.load\(\)\s*&&\s*mqtt_connected\.load\(\)\s*&&\s*client\s*!=\s*NULL/
+  )
+  expect(mqttSource.match(/esp_mqtt_client_publish\(/g)).toHaveLength(1)
+  expect(publishTask).toContain('if (!mqtt_can_publish())')
+  expect(publishTask).toContain('vTaskDelay(')
+  expect(connectedEvent.indexOf('mqtt_connected.store(true)')).toBeLessThan(
+    connectedEvent.indexOf('mqtt_handler_publish_status()')
+  )
+})
+
+test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
+  const source = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+
+  expect(source).not.toContain('#include <vector>')
+  expect(source).not.toContain('malloc(sizeof(udp_event_t))')
+  expect(source).toContain('xQueueCreate(64, sizeof(udp_event_t))')
+  expect(source).toContain('unsigned char small_data[256]')
+  expect(source).toContain('if (length > sizeof(small_data))')
+  expect(source).toContain('if (!heap_data.value)')
 })
 
 test('project documentation advertises exactly the four shipped locales', async () => {

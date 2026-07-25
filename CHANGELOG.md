@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- fix(mqtt): Alle Status-, Event-, OTA- und Home-Assistant-Publishes werden nun zusätzlich zum Client-Lebenszyklus auf den tatsächlichen Broker-Login (`MQTT_EVENT_CONNECTED`) geprüft. Der periodische Publisher wartet während Start und Reconnect, statt komplette QoS-0-Statusblöcke an einen noch nicht verbundenen Client zu übergeben und dadurch `Publish: Losing qos0 data when client not connected` zu fluten.
+- fix(update): Die Heap-Freigabe der manuellen und täglichen Updatesuche berücksichtigt jetzt Gesamtgröße und Fragmentierung gemeinsam. Der auf einem Live-Gerät beobachtete gesunde Zustand mit 55 KB frei und 32 KB größtem Block darf die serialisierte Manifest-Abfrage starten; echte Risikozustände unter den absoluten Heap- beziehungsweise Blockgrenzen werden weiterhin abgewiesen.
+- fix(recovery): `/recovery` bildet nun die aktuelle New-Design-Shell mit echter Seitenleiste, 88-px-Statusleiste, Markenlogo, flachen Karten, responsivem Mobile-Header sowie dem auf dem Gerät gespeicherten Farbschema nach. Die Seite bleibt vollständig in der Firmware eingebettet und damit auch bei einem beschädigten externen WebUI erreichbar.
+- perf(raw-uart): Der UDP-Empfang legt Queue-Ereignisse nun direkt in der FreeRTOS-Queue ab und verarbeitet gewöhnliche Pakete in einem 256-Byte-Stackpuffer. Damit entfallen die beiden Heap-Allokationen pro Standardpaket; größere Frames bleiben über einen geprüften Fallback vollständig unterstützt. Datenformat, Timeouts und CCU-Kompatibilität ändern sich nicht.
+- fix(webui): Die Einstellungen-Navigation nutzt auf Desktop die vollständige Inhaltsbreite und bleibt in einer Zeile, statt wegen einer künstlichen 700-px-Grenze vorzeitig umzubrechen. Auf kleineren Ansichten wechselt sie kontrolliert auf drei beziehungsweise zwei Spalten; das Ping-Feld erhält einen angemessen breiten Aktionsbereich und stapelt Eingabe und Vollbreiten-Button auf Mobilgeräten.
+- release(webui): Die New-Design-Oberfläche wird wegen der sichtbaren Einstellungen-/Ping-Änderungen als eigenständig erkennbares Update `1.0.0-Beta.15` ausgeliefert.
+
 ## [2.2.5-Beta.17] - 2026-07-25
 
 ### Changes

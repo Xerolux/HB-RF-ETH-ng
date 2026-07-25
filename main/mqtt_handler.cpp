@@ -57,6 +57,25 @@ static std::atomic<bool> mqtt_publish_request{false};
 static mqtt_config_t current_mqtt_config;
 static char mqtt_lwt_topic[160];
 
+// "Running" only means the ESP-MQTT client and publisher task exist. The
+// broker may still be connecting or reconnecting. Submitting QoS 0 packets in
+// that state makes ESP-MQTT discard every packet and emit one warning per
+// status topic. Keep the broker-login check in one place so no publish path
+// can accidentally use the weaker lifecycle state.
+static bool mqtt_can_publish()
+{
+    return mqtt_running.load() && mqtt_connected.load() && client != NULL;
+}
+
+static int mqtt_publish_connected(const char *topic, const char *data,
+                                  int len, int qos, int retain)
+{
+    if (!mqtt_can_publish() || topic == NULL || data == NULL) {
+        return -1;
+    }
+    return esp_mqtt_client_publish(client, topic, data, len, qos, retain);
+}
+
 // Serializes mqtt_handler_start / mqtt_handler_stop so configuration updates
 // cannot race with the publish task or a concurrent (re)start.
 static SemaphoreHandle_t mqtt_lifecycle_mutex = NULL;
@@ -249,6 +268,15 @@ void mqtt_publish_task(void *pvParameters)
     int publish_cycle = 0;
 
     while (mqtt_running.load()) {
+        // esp_mqtt_client_start() returns before the asynchronous broker login
+        // completes. During startup or reconnect, wait without formatting or
+        // submitting a complete status batch. MQTT_EVENT_CONNECTED publishes
+        // the initial retained status and HA discovery immediately.
+        if (!mqtt_can_publish()) {
+            vTaskDelay(pdMS_TO_TICKS(250));
+            continue;
+        }
+
         if (publish_cycle == 0) {
             ESP_LOGI(TAG, "mqtt_publish stack high water mark: %u bytes free",
                      (unsigned)uxTaskGetStackHighWaterMark(NULL));
@@ -322,13 +350,13 @@ void mqtt_handler_trigger_status_publish(void)
 
 void mqtt_handler_publish_event(const char *subtopic, const char *payload)
 {
-    if (!mqtt_running.load() || client == NULL || !subtopic || !payload) {
+    if (!mqtt_can_publish() || !subtopic || !payload) {
         return;
     }
     char topic[160];
     snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic);
     // Non-retained, QoS 0: events are transient by definition.
-    esp_mqtt_client_publish(client, topic, payload, 0, 0, 0);
+    mqtt_publish_connected(topic, payload, 0, 0, 0);
 }
 
 // Publish the FreeRTOS task stack high-water marks as a single retained string.
@@ -337,7 +365,7 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload)
 // would waste bandwidth and MQTT broker storage for no diagnostic gain.
 void mqtt_handler_publish_task_stacks(void)
 {
-    if (!mqtt_running.load() || client == NULL) {
+    if (!mqtt_can_publish()) {
         return;
     }
     SysInfo *sysInfo = monitoring_get_sysinfo();
@@ -349,7 +377,7 @@ void mqtt_handler_publish_task_stacks(void)
     char topic[160];
     snprintf(topic, sizeof(topic), "%s/status/task_stacks",
              current_mqtt_config.topic_prefix);
-    esp_mqtt_client_publish(client, topic, stacks, 0, 0, 1);
+    mqtt_publish_connected(topic, stacks, 0, 0, 1);
 }
 
 // Publish one value under <prefix>/<subtopic> with retain=1, QoS=0.
@@ -357,7 +385,7 @@ void mqtt_handler_publish_task_stacks(void)
 #define PUBLISH_STR(subtopic, value) \
     do { \
         snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic); \
-        esp_mqtt_client_publish(client, topic, value, 0, 0, 1); \
+        mqtt_publish_connected(topic, value, 0, 0, 1); \
     } while (0)
 
 #define PUBLISH_INT(subtopic, value) \
@@ -380,7 +408,7 @@ void mqtt_handler_publish_task_stacks(void)
 
 void mqtt_handler_publish_status(void)
 {
-    if (!mqtt_running.load() || client == NULL) {
+    if (!mqtt_can_publish()) {
         return;
     }
 
@@ -537,7 +565,7 @@ void mqtt_handler_publish_status(void)
 // a progress bar and automations can trigger on completion.
 static void publish_ota_state(void)
 {
-    if (!mqtt_running.load() || client == NULL) return;
+    if (!mqtt_can_publish()) return;
     UpdateCheck* updateCheck = monitoring_get_updatecheck();
     if (!updateCheck) return;
 
@@ -563,7 +591,7 @@ static void publish_ota_state(void)
 
 void mqtt_handler_publish_ha_discovery(void)
 {
-    if (!mqtt_running.load() || client == NULL || !current_mqtt_config.ha_discovery_enabled) {
+    if (!mqtt_can_publish() || !current_mqtt_config.ha_discovery_enabled) {
         return;
     }
 
@@ -634,7 +662,7 @@ void mqtt_handler_publish_ha_discovery(void)
         char topic[256];
         snprintf(topic, sizeof(topic), "%s/%s/hb-rf-eth-%s/%s/config",
                  current_mqtt_config.ha_discovery_prefix, component, sysInfo->getSerialNumber(), object_id);
-        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        mqtt_publish_connected(topic, json_str, 0, 1, 1);
         free(json_str);
         cJSON_Delete(root);
     };
@@ -646,7 +674,7 @@ void mqtt_handler_publish_ha_discovery(void)
         snprintf(topic, sizeof(topic), "%s/%s/hb-rf-eth-%s/%s/config",
                  current_mqtt_config.ha_discovery_prefix, component,
                  sysInfo->getSerialNumber(), object_id);
-        esp_mqtt_client_publish(client, topic, "", 0, 1, 1);
+        mqtt_publish_connected(topic, "", 0, 1, 1);
     };
 
     // ---- Sensors: system metrics ----------------------------------------
@@ -725,7 +753,7 @@ void mqtt_handler_publish_ha_discovery(void)
         char topic[256];
         snprintf(topic, sizeof(topic), "%s/binary_sensor/hb-rf-eth-%s/update_available/config",
                  current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
-        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        mqtt_publish_connected(topic, json_str, 0, 1, 1);
         free(json_str);
         cJSON_Delete(root);
     }
@@ -757,7 +785,7 @@ void mqtt_handler_publish_ha_discovery(void)
         char topic[256];
         snprintf(topic, sizeof(topic), "%s/button/hb-rf-eth-%s/%s/config",
                  current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber(), object_id);
-        esp_mqtt_client_publish(client, topic, json_str, 0, 1, 1);
+        mqtt_publish_connected(topic, json_str, 0, 1, 1);
         free(json_str);
         cJSON_Delete(root);
     };
@@ -885,19 +913,22 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
         net_locked = true;
     }
 
+    // Publish guards must already see the correct lifecycle state if a very
+    // fast broker dispatches MQTT_EVENT_CONNECTED before start() returns.
+    mqtt_connected.store(false);
+    mqtt_running.store(true);
     esp_err_t err = esp_mqtt_client_start(client);
     if (net_locked) {
         xSemaphoreGive(g_net_fetch_mutex);
     }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start MQTT client: %s", esp_err_to_name(err));
+        mqtt_running.store(false);
         esp_mqtt_client_destroy(client);
         client = NULL;
         xSemaphoreGive(mqtt_lifecycle_mutex);
         return err;
     }
-
-    mqtt_running.store(true);
 
     // The publish task formats several JSON/status payloads and performs MQTT
     // client calls. 8 KB keeps TLS-enabled brokers stable while returning
@@ -907,6 +938,7 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
                     NULL, 4, &pub_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create MQTT publish task");
         mqtt_running.store(false);
+        mqtt_connected.store(false);
         esp_mqtt_client_stop(client);
         esp_mqtt_client_destroy(client);
         client = NULL;

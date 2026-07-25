@@ -42,6 +42,7 @@
 #include "nvs.h"
 #include "supporter_crl.h"
 #include "mqtt_handler.h"
+#include "updatecheck_heap_policy.h"
 
 static const char *TAG = "UpdateCheck";
 
@@ -142,15 +143,12 @@ static void _periodic_timer_callback(void *arg)
   // Do not create the worker stack or begin TLS when the WROOM-32 heap is
   // already fragmented. Skipping one scheduled check is safer than destabilising
   // Homematic/MQTT operation; the persistent cache remains available.
-  // mDNS was removed in 2.2.5-Beta.8, freeing ~30 KB, so the floor that used
-  // to be 72 KB (defensive against the old mDNS footprint) could be lowered
-  // to 56 KB. The daily automatic check still skips here silently; the manual
-  // "search now" path records a reason so the user sees why nothing happened.
+  // Keep the established 56 KB / 18 KB nominal boundary. A slightly lower
+  // total is admitted only when the largest block proves that fragmentation is
+  // low enough to compensate; see updatecheck_heap_policy.h.
   const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
   const size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
-  constexpr size_t MIN_FREE_HEAP = 56 * 1024;
-  constexpr size_t MIN_LARGEST_BLOCK = 18 * 1024;
-  if (free_heap < MIN_FREE_HEAP || largest_block < MIN_LARGEST_BLOCK) {
+  if (!update_check_heap_is_safe(free_heap, largest_block)) {
     ESP_LOGW(TAG,
              "Daily update check skipped before task creation: free=%u KB largest=%u KB",
              (unsigned)(free_heap / 1024),
@@ -194,15 +192,12 @@ static void _manual_fetch_callback(void *arg)
 {
   UpdateCheck *uc = static_cast<UpdateCheck *>(arg);
 
-  // Same heap guard as the daily check: never destabilise Homematic/MQTT for a
-  // manual refresh. The cached snapshot stays available and the user can retry.
-  // Unlike the daily path, a manual skip records a reason so the WebUI can
-  // show "skipped — low heap" instead of silently pretending nothing happened.
+  // Same two-dimensional heap policy as the daily check: a healthy contiguous
+  // block may compensate for a small total-heap deficit, but neither absolute
+  // floor is removed. The cached snapshot stays available when admission fails.
   const size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
   const size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
-  constexpr size_t MIN_FREE_HEAP = 56 * 1024;
-  constexpr size_t MIN_LARGEST_BLOCK = 18 * 1024;
-  if (free_heap < MIN_FREE_HEAP || largest_block < MIN_LARGEST_BLOCK) {
+  if (!update_check_heap_is_safe(free_heap, largest_block)) {
     ESP_LOGW(TAG,
              "Manual update check skipped (low heap): free=%u KB largest=%u KB",
              (unsigned)(free_heap / 1024),

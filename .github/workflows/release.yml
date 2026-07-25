@@ -114,6 +114,14 @@ jobs:
             -o build/host-tests/test_ping_lifecycle
           build/host-tests/test_ping_lifecycle
 
+      - name: Test update-check heap admission policy
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            -Iinclude \
+            test/host/test_updatecheck_heap_policy.cpp \
+            -o build/host-tests/test_updatecheck_heap_policy
+          build/host-tests/test_updatecheck_heap_policy
+
       - name: Read and validate WebUI release metadata
         id: webui
         env:

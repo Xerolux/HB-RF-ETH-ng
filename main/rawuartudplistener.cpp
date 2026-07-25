@@ -25,8 +25,8 @@
 #include "hmframe.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include <stdlib.h>
 #include <string.h>
-#include <vector>
 #include "udphelper.h"
 #include "metrics.h"
 
@@ -81,10 +81,36 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         return;
     }
 
-    std::vector<unsigned char> data(length);
+    struct HeapBufferGuard {
+        unsigned char *value = NULL;
+        ~HeapBufferGuard()
+        {
+            free(value);
+        }
+    };
+
+    // Raw-UART control packets and normal radio frames fit into this buffer,
+    // avoiding a heap allocation for every received UDP datagram. Oversized
+    // (but still valid) frames retain the existing support through a checked
+    // heap fallback.
+    unsigned char small_data[256];
+    HeapBufferGuard heap_data;
+    unsigned char *data = small_data;
+    if (length > sizeof(small_data))
+    {
+        heap_data.value = (unsigned char *)malloc(length);
+        if (!heap_data.value)
+        {
+            ESP_LOGE(TAG, "Could not allocate raw-uart packet buffer, length %zu", length);
+            g_rx_drops.inc();
+            return;
+        }
+        data = heap_data.value;
+    }
+
     unsigned char response_buffer[3];
 
-    if (pbuf_copy_partial(pb, data.data(), length, 0) != length) {
+    if (pbuf_copy_partial(pb, data, length, 0) != length) {
         ESP_LOGE(TAG, "Could not linearize raw-uart packet, length %zu", length);
         g_rx_drops.inc();
         return;
@@ -101,8 +127,8 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
      * a network pbuf and is not guaranteed to be 2-byte aligned, and casting an
      * unsigned char* to uint16_t* also violates strict aliasing. */
     uint16_t received_crc;
-    memcpy(&received_crc, data.data() + length - 2, sizeof(uint16_t));
-    if (received_crc != htons(HMFrame::crc(data.data(), length - 2)))
+    memcpy(&received_crc, data + length - 2, sizeof(uint16_t));
+    if (received_crc != htons(HMFrame::crc(data, length - 2)))
     {
         ESP_LOGE(TAG, "Received raw-uart packet with invalid crc.");
         g_rx_drops.inc();
@@ -310,7 +336,9 @@ void RawUartUdpListener::start()
 {
     if (_tHandle || _pcb || _udp_queue) return;
 
-    _udp_queue = xQueueCreate(64, sizeof(udp_event_t *));
+    // Store the small event descriptor directly in the FreeRTOS queue. This
+    // removes one malloc/free pair per UDP datagram from the LwIP callback.
+    _udp_queue = xQueueCreate(64, sizeof(udp_event_t));
     if (_udp_queue == NULL)
     {
         ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");
@@ -357,10 +385,9 @@ void RawUartUdpListener::stop()
         _tHandle = NULL;
     }
     if (_udp_queue) {
-        udp_event_t *event = NULL;
+        udp_event_t event = {};
         while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
-            pbuf_free(event->pb);
-            free(event);
+            pbuf_free(event.pb);
         }
         vQueueDelete(_udp_queue);
         _udp_queue = NULL;
@@ -369,16 +396,15 @@ void RawUartUdpListener::stop()
 
 void RawUartUdpListener::_udpQueueHandler()
 {
-    udp_event_t *event = NULL;
+    udp_event_t event = {};
     int64_t nextKeepAliveSentOut = esp_timer_get_time();
 
     for (;;)
     {
         if (xQueueReceive(_udp_queue, &event, (TickType_t)pdMS_TO_TICKS(10)) == pdTRUE)
         {
-            handlePacket(event->pb, event->addr, event->port);
-            pbuf_free(event->pb);
-            free(event);
+            handlePacket(event.pb, event.addr, event.port);
+            pbuf_free(event.pb);
         }
 
         if (atomic_load(&_remotePort) != 0)
@@ -405,24 +431,18 @@ void RawUartUdpListener::_udpQueueHandler()
 
 bool IRAM_ATTR RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
-    udp_event_t *e = (udp_event_t *)malloc(sizeof(udp_event_t));
-    if (!e)
-    {
-        return false;
-    }
-
-    e->pb = pb;
+    udp_event_t event = {};
+    event.pb = pb;
 
     // Use the source address and port provided directly by LwIP in the callback
     // instead of reading raw pbuf header memory (which is unsafe and fragile).
-    e->addr.addr = addr->u_addr.ip4.addr;
-    e->port = port;
+    event.addr.addr = addr->u_addr.ip4.addr;
+    event.port = port;
 
-    if (xQueueSend(_udp_queue, &e, 0) != pdPASS)
+    if (xQueueSend(_udp_queue, &event, 0) != pdPASS)
     {
         ESP_LOGW(TAG, "UDP queue full, dropping packet");
         g_rx_drops.inc();
-        free((void *)(e));
         return false;
     }
     return true;
