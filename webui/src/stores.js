@@ -820,7 +820,37 @@ export const useMonitoringStore = defineStore('monitoring', {
     async load() {
       try {
         const response = await axios.get("/api/monitoring")
-        Object.assign(this.$state, response.data)
+        const data = response.data || {}
+
+        // Merge section-by-section so defaults survive partial responses from
+        // older firmware. In particular, an NVS namespace left empty by a
+        // factory reset used to return CheckMK port 0; because the form saves
+        // every monitoring section together, that unrelated value blocked
+        // MQTT with "Invalid CheckMK port".
+        for (const section of ['checkmk', 'mqtt', 'prometheus', 'syslog', 'notify']) {
+          if (data[section] && typeof data[section] === 'object') {
+            Object.assign(this[section], data[section])
+          }
+        }
+
+        const validPort = (value, fallback) => {
+          const port = Number(value)
+          return Number.isInteger(port) && port >= 1 && port <= 65535
+            ? port
+            : fallback
+        }
+        this.checkmk.port = validPort(this.checkmk.port, 6556)
+        this.mqtt.port = validPort(this.mqtt.port, 1883)
+        this.prometheus.port = validPort(this.prometheus.port, 9100)
+        this.syslog.port = validPort(this.syslog.port, 514)
+        this.notify.smtpPort = validPort(this.notify.smtpPort, 587)
+        if (![0, 1, 2].includes(Number(this.syslog.transport))) this.syslog.transport = 0
+        if (!Number.isInteger(Number(this.syslog.minSeverity)) ||
+            Number(this.syslog.minSeverity) < 0 ||
+            Number(this.syslog.minSeverity) > 7) {
+          this.syslog.minSeverity = 6
+        }
+        if (![0, 1, 2].includes(Number(this.notify.smtpTls))) this.notify.smtpTls = 1
       } catch (error) {
         console.error('Failed to load monitoring config:', error.response?.status || error.message)
         throw error

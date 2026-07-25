@@ -112,6 +112,15 @@ typedef struct {
     notify_config_t notify;
 } monitoring_config_t;
 
+// Fill a complete monitoring configuration with safe factory defaults.
+// Call this before overlaying NVS values so an empty or partially populated
+// namespace cannot leave zero ports that block the combined monitoring form.
+void monitoring_config_set_defaults(monitoring_config_t *config);
+
+// Repair persisted scalar values that are outside their supported ranges
+// while preserving all unrelated valid values and secrets.
+void monitoring_config_normalize(monitoring_config_t *config);
+
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
 

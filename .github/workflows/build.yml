@@ -32,6 +32,16 @@ jobs:
       - name: Prepare embedded and standalone WebUI assets
         run: python3 rename_webui_files.py
 
+      - name: Test monitoring defaults and empty-NVS recovery
+        run: |
+          mkdir -p build/host-tests
+          g++ -std=c++17 -Wall -Wextra -Werror \
+            -Itest/host/stubs -Iinclude \
+            main/monitoring_config.cpp \
+            test/host/test_monitoring_defaults.cpp \
+            -o build/host-tests/test_monitoring_defaults
+          build/host-tests/test_monitoring_defaults
+
       - name: Setup Python
         uses: actions/setup-python@v7
         with:

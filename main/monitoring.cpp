@@ -541,67 +541,16 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
 // Load configuration from NVS
 static esp_err_t load_config_from_nvs(monitoring_config_t *config)
 {
+    // NVS namespaces survive nvs_erase_all() as empty namespaces. Always
+    // establish a complete baseline before overlaying stored keys; otherwise
+    // a factory reset leaves checkmk.port at the struct's zero-initialized
+    // value and the combined monitoring form can no longer save MQTT.
+    monitoring_config_set_defaults(config);
+
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs_handle);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "No saved configuration found, using defaults");
-        // Set defaults
-        config->checkmk.enabled = false;
-        config->checkmk.port = 6556;
-        strncpy(config->checkmk.allowed_hosts, "*", sizeof(config->checkmk.allowed_hosts) - 1);
-        config->checkmk.allowed_hosts[sizeof(config->checkmk.allowed_hosts) - 1] = '\0';
-
-        config->mqtt.enabled = false;
-        config->mqtt.port = 1883;
-        strncpy(config->mqtt.topic_prefix, "hb-rf-eth-ng", sizeof(config->mqtt.topic_prefix) - 1);
-        config->mqtt.topic_prefix[sizeof(config->mqtt.topic_prefix) - 1] = '\0';
-        config->mqtt.ha_discovery_enabled = false;
-        strncpy(config->mqtt.ha_discovery_prefix, "homeassistant", sizeof(config->mqtt.ha_discovery_prefix) - 1);
-        config->mqtt.ha_discovery_prefix[sizeof(config->mqtt.ha_discovery_prefix) - 1] = '\0';
-
-        config->mqtt.tls_enable = false;
-        config->mqtt.tls_skip_verify = false;
-        config->mqtt.tls_ca_certs[0] = '\0';
-        config->mqtt.tls_certfile[0] = '\0';
-        config->mqtt.tls_keyfile[0] = '\0';
-
-        // Phase A defaults: commands enabled, no token. This preserves the
-        // pre-Phase-A behaviour where any client with broker publish rights
-        // could trigger a restart / OTA. Operators who care should set a
-        // token or restrict the broker ACL.
-        config->mqtt.command_enabled = true;
-        config->mqtt.command_token[0] = '\0';
-
-        // Phase A: Prometheus defaults — disabled, port 9100, allow all.
-        config->prometheus.enabled = false;
-        config->prometheus.port = 9100;
-        strncpy(config->prometheus.allowed_hosts, "*", sizeof(config->prometheus.allowed_hosts) - 1);
-        config->prometheus.allowed_hosts[sizeof(config->prometheus.allowed_hosts) - 1] = '\0';
-
-        // Phase B: Syslog defaults — disabled, UDP/514, severity INFO (6).
-        config->syslog.enabled = false;
-        config->syslog.server[0] = '\0';
-        config->syslog.port = 514;
-        config->syslog.transport = 0;  // UDP
-        config->syslog.min_severity = 6;
-        config->syslog.hostname[0] = '\0';
-
-        // Phase C/D: Notification defaults — disabled, no channels, 5 min cooldown.
-        config->notify.enabled = false;
-        config->notify.channels = 0;
-        config->notify.webhook_url[0] = '\0';
-        config->notify.webhook_secret[0] = '\0';
-        config->notify.telegram_token[0] = '\0';
-        config->notify.telegram_chatid[0] = '\0';
-        config->notify.smtp_server[0] = '\0';
-        config->notify.smtp_port = 587;
-        config->notify.smtp_tls = 1;   // STARTTLS
-        config->notify.smtp_user[0] = '\0';
-        config->notify.smtp_password[0] = '\0';
-        config->notify.smtp_from[0] = '\0';
-        config->notify.smtp_to[0] = '\0';
-        config->notify.cooldown_seconds = 300;
-
         return ESP_OK;
     }
 
@@ -801,6 +750,7 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
         config->notify.cooldown_seconds = 300;
     }
 
+    monitoring_config_normalize(config);
     nvs_close(nvs_handle);
     return ESP_OK;
 }

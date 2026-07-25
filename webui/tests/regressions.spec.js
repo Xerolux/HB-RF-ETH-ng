@@ -144,6 +144,59 @@ test('monitoring diagnostic rows use one consistent grey row size', async ({ pag
   expect(rowStyles[0].backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
 })
 
+test('monitoring repairs an empty-NVS CheckMK port before MQTT is saved', async ({ page }) => {
+  let postedConfig = null
+  await page.route('**/api/monitoring', route => {
+    if (route.request().method() === 'POST') {
+      postedConfig = route.request().postDataJSON()
+      if (postedConfig.checkmk.port === 0) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Invalid CheckMK port' })
+        })
+      }
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true })
+      })
+    }
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        checkmk: { enabled: false, port: 0, allowedHosts: '' },
+        mqtt: {
+          enabled: false,
+          server: '',
+          port: 1883,
+          user: '',
+          password: '',
+          topicPrefix: 'hb-rf-eth-ng',
+          haDiscoveryEnabled: false,
+          haDiscoveryPrefix: 'homeassistant',
+          tlsEnable: false,
+          tlsSkipVerify: false,
+          commandEnabled: true
+        },
+        prometheus: { enabled: false, port: 9100, allowedHosts: '*' },
+        syslog: { enabled: false, server: '', port: 514, transport: 0, minSeverity: 6, hostname: '' },
+        notify: { enabled: false, channels: 0, smtpPort: 587, smtpTls: 1, cooldownSeconds: 300 }
+      })
+    })
+  })
+
+  await page.goto(`${BASE_URL}/monitoring`)
+  const mqttCard = page.locator('.settings-card', { has: page.getByRole('heading', { name: 'MQTT Client' }) })
+  await mqttCard.locator('input[type="checkbox"]').first().check()
+  await mqttCard.getByRole('textbox').first().fill('broker.example.test')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect.poll(() => postedConfig).not.toBeNull()
+  expect(postedConfig.checkmk.port).toBe(6556)
+  expect(postedConfig.mqtt.server).toBe('broker.example.test')
+  await expect(page.locator('.app-toast', { hasText: 'Configuration saved successfully' })).toBeVisible()
+})
+
 test('firmware update page follows the selected language completely', async ({ page }) => {
   await page.goto(`${BASE_URL}/updates/firmware`)
 
@@ -268,7 +321,20 @@ test('downloaded backup keeps all sensitive device settings and browser preferen
     },
     monitoring: {
       mqtt: {
+        enabled: true,
+        server: 'broker.example.test',
+        port: 8883,
+        user: 'mqtt-user',
         password: 'mqtt-secret',
+        topicPrefix: 'home/gateway',
+        haDiscoveryEnabled: true,
+        haDiscoveryPrefix: 'homeassistant',
+        tlsEnable: true,
+        tlsSkipVerify: false,
+        tlsCaCerts: 'CA CERTIFICATE',
+        tlsCertfile: 'CLIENT CERTIFICATE',
+        tlsKeyfile: 'CLIENT PRIVATE KEY',
+        commandEnabled: true,
         commandToken: 'Command123'
       },
       notify: {
@@ -299,7 +365,7 @@ test('downloaded backup keeps all sensitive device settings and browser preferen
 
   expect(download.suggestedFilename()).toBe('hb-rf-eth-ng-backup.json')
   expect(downloadedBackup.adminPassword).toBe('Backup123')
-  expect(downloadedBackup.monitoring.mqtt.password).toBe('mqtt-secret')
+  expect(downloadedBackup.monitoring.mqtt).toEqual(completeDeviceBackup.monitoring.mqtt)
   expect(downloadedBackup.monitoring.notify.smtpPassword).toBe('smtp-secret')
   expect(downloadedBackup.theme).toEqual(completeDeviceBackup.theme)
   expect(downloadedBackup.browserPreferences).toEqual({
