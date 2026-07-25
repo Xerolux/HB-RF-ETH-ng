@@ -54,7 +54,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## ⚠️ Wichtige Hinweise
 
-- **Backup der Einstellungen** vor dem Update erstellen (Einstellungen → Backup)
+- **Backup der Einstellungen** vor dem Update erstellen (Einstellungen → Backup & Reset)
 - **Nicht abschalten** während des Update-Vorgangs
 - Bei sehr alten Versionen kann ein **Werksreset** erforderlich sein
 - Nach erfolgreichem Update startet das Gerät **automatisch neu**

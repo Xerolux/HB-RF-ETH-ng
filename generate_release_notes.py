@@ -157,7 +157,7 @@ def generate_release_notes(version: str) -> str:
     # Important notes
     notes.append("## ⚠️ Wichtige Hinweise")
     notes.append("")
-    notes.append("- **Backup der Einstellungen** vor dem Update erstellen (Einstellungen → Backup)")
+    notes.append("- **Backup der Einstellungen** vor dem Update erstellen (Einstellungen → Backup & Reset)")
     notes.append("- **Nicht abschalten** während des Update-Vorgangs")
     notes.append("- Bei sehr alten Versionen kann ein **Werksreset** erforderlich sein")
     notes.append("- Nach erfolgreichem Update startet das Gerät **automatisch neu**")
