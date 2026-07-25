@@ -480,7 +480,7 @@ webuiUpdate: {
     otaSuccess: 'Download completato. Installazione in corso…',
     currentVersion: 'Versione attuale',
     installedVersion: 'Versione installata',
-    versionInfo: 'Fork modernizzato v2.2.5-Beta.13 di Xerolux (2025), basato sull’opera originale di Alexander Reinert.',
+    versionInfo: 'Fork modernizzato v2.2.5-Beta.14 di Xerolux (2025), basato sull’opera originale di Alexander Reinert.',
     updateAvailableMessage: 'È disponibile un aggiornamento alla versione {latestVersion}.',
     newVersionAvailable: 'È disponibile la nuova versione {version}!',
     viewUpdate: 'Visualizza',
