@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.5-Beta.15
+# 🚀 HB-RF-ETH-ng v2.2.5-Beta.16
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,12 +11,17 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.5-Beta.15?
+## 🆕 Was ist neu in v2.2.5-Beta.16?
 
 ### Changes
-- fix: recover monitoring after factory reset
-- chore: add planning and browser artifacts
-- chore: update manifests for v2.2.5-Beta.14
+- feat: secure portable backups and improve recovery UX
+- fix: preserve WebUI release metadata
+- chore: update manifests for v2.2.5-Beta.15
+
+- feat(backup): Vollständige JSON-Sicherungen kennzeichnen Klartext-Zugangsdaten nun sowohl in der WebUI als auch direkt in der Datei. Die Datei bleibt bewusst editierbar und kann nach Anpassung von Hostname, IP, Administrator-Passwort und gerätespezifischen MQTT-Werten als Vorlage für weitere Geräte verwendet werden.
+- feat(recovery): Die stets sichtbare Schaltfläche „Zur normalen WebUI“ führt sowohl von der Recovery-Ansicht als auch von deren Notfall-Anmeldung zurück zur regulären Oberfläche.
+- fix(webui): Der Einstellungspunkt „Backup“ heißt nun in allen vier unterstützten Sprachen „Backup & Reset“ beziehungsweise die jeweilige Übersetzung.
+- docs(i18n): README, Changelog, Wiki und Release-Notes nennen konsistent die vier unterstützten Sprachen Deutsch, Englisch, Französisch und Italienisch.
 
 ## ✨ Hauptfunktionen
 
@@ -56,7 +61,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.5-Beta.15.bin`)
+- **Firmware-Binary** (`firmware_2.2.5-Beta.16.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -97,6 +102,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.0-Beta.13`
+- WebUI version: `1.0.0-Beta.14`
 - WebUI API: `1`
 - Minimum firmware: `2.2.5-Beta.1`

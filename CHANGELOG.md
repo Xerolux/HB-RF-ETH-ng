@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.16] - 2026-07-25
+
+### Changes
+- feat: secure portable backups and improve recovery UX
+- fix: preserve WebUI release metadata
+- chore: update manifests for v2.2.5-Beta.15
+
 - feat(backup): Vollständige JSON-Sicherungen kennzeichnen Klartext-Zugangsdaten nun sowohl in der WebUI als auch direkt in der Datei. Die Datei bleibt bewusst editierbar und kann nach Anpassung von Hostname, IP, Administrator-Passwort und gerätespezifischen MQTT-Werten als Vorlage für weitere Geräte verwendet werden.
 - feat(recovery): Die stets sichtbare Schaltfläche „Zur normalen WebUI“ führt sowohl von der Recovery-Ansicht als auch von deren Notfall-Anmeldung zurück zur regulären Oberfläche.
 - fix(webui): Der Einstellungspunkt „Backup“ heißt nun in allen vier unterstützten Sprachen „Backup & Reset“ beziehungsweise die jeweilige Übersetzung.
