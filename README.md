@@ -46,7 +46,9 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 Nach dem Update auf eine Version mit Benutzername-Pflicht muss die Anmeldung einmalig mit dem Standard-Benutzernamen `admin` und dem bisherigen Administrator-Passwort erfolgen. Alte gespeicherte Browser-Sessions werden dabei aus Sicherheitsgründen ungültig. Der Benutzername kann anschließend unter **Einstellungen > Allgemein > Sicherheit** geändert werden, z.B. für Passwortmanager oder Installationen mit mehreren Geräten.
 
 ### Backup & Restore
-Backups enthalten den konfigurierten Administrator-Benutzernamen und die System-Log-Aktivierung, damit Login- und Diagnose-Einstellungen bei mehreren Geräten oder nach einer Wiederherstellung konsistent bleiben. Das Administrator-Passwort wird aus Sicherheitsgründen weiterhin nicht exportiert; beim Restore bleibt das aktuelle Passwort des Zielgeräts erhalten.
+Backups enthalten vollständig alle wiederherstellbaren Benutzereinstellungen: Administrator-Zugangsdaten, Netzwerk, Zeit, LED, Design/Akzentfarbe, Supporter-Key sowie sämtliche Monitoring-Konfigurationen einschließlich MQTT-/Benachrichtigungs-Zugangsdaten, Zertifikaten und privaten Schlüsseln. Die WebUI ergänzt die gewählte Sprache und die Experimentell-Präferenz.
+
+> **Sicherheit:** Die JSON-Sicherung enthält Passwörter, Tokens, Zertifikate und gegebenenfalls private Schlüssel im Klartext. Die Datei muss wie ein Passwort sicher verwahrt und darf nicht veröffentlicht werden. Flüchtige Laufzeitdaten wie Sitzungs-Token, Update-Cache, Crash-Snapshot und letzter Resetgrund werden bewusst nicht gesichert.
 
 > Die vollständige MQTT-API-Referenz (alle Status-, Event- und Command-Topics,
 > HA-Entitäten, TLS-Konfiguration, Sicherheitsmodell) findet sich im

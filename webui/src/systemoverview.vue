@@ -118,7 +118,8 @@
       </section>
 
       <BAlert variant="info" :model-value="true">
-        {{ copy.onDemandHint }} <code>/recovery</code>
+        {{ copy.onDemandHint }}
+        <a href="/recovery">{{ copy.openRecovery }}</a>
       </BAlert>
 
       <div class="action-row">
@@ -192,6 +193,7 @@ const translations = {
     available: 'Vorhanden',
     notAvailable: 'Nicht vorhanden',
     onDemandHint: 'Alle Werte werden nur beim Öffnen oder manuellen Aktualisieren gelesen. Die unabhängige Notfallseite ist erreichbar unter',
+    openRecovery: 'Notfallseite öffnen',
     refresh: 'Aktualisieren'
   },
   en: {
@@ -246,6 +248,7 @@ const translations = {
     available: 'Available',
     notAvailable: 'Not available',
     onDemandHint: 'All values are read only when this page is opened or manually refreshed. The independent emergency page is available at',
+    openRecovery: 'Open recovery page',
     refresh: 'Refresh'
   }
 }

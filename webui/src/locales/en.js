@@ -202,8 +202,8 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Backup & Restore',
-    backupInfo: 'Download a backup of your settings. The administrator username is included; the password is excluded for security.',
-    restoreInfo: 'Upload a backup file to restore settings including the administrator username. The password is preserved. The system will restart afterwards.',
+    backupInfo: 'Complete backup of all user settings, including credentials, monitoring, certificates, network, time, LEDs and design. The file contains sensitive data and must be stored securely.',
+    restoreInfo: 'Restores the complete backup, including credentials, monitoring, certificates and design. The system will restart afterwards.',
     downloadBackup: 'Download Backup',
     restore: 'Restore',
     restoreBtn: 'Restore',
@@ -211,6 +211,9 @@ export default {
     noFileChosen: 'No file chosen',
     browse: 'Browse',
     restoreConfirm: 'Are you sure? Current settings will be overwritten and the system will restart.',
+    systemActions: 'System actions',
+    openRecovery: 'Open recovery page',
+    openRecoveryHint: 'Open the independent recovery and diagnostics page.',
     experimentalTitle: 'Experimental',
     experimentalEmptyTitle: 'Nothing here yet',
     experimentalEmptyText: 'No experimental features are currently available. The New Design and Restart Sync are standard for all devices.',
@@ -224,8 +227,20 @@ export default {
     restoreError: 'Error restoring settings',
     backupError: 'Error downloading backup',
     validation: {
+      invalidUsername: 'The username may contain only letters, numbers, dots, dashes, and underscores.',
+      invalidHostname: 'Invalid hostname.',
+      invalidIpv4: 'Invalid IPv4 address.',
       invalidIpv4OrIpv6: 'Invalid IPv4 or IPv6 address',
+      invalidNetmask: 'Invalid subnet mask. Its set bits must be contiguous.',
+      invalidNetwork: 'The network settings are invalid.',
+      invalidNtpServer: 'Invalid NTP server or port.',
       invalidIpv6: 'Invalid IPv6 address',
+      invalidIpv6Prefix: 'The IPv6 prefix must be between 1 and 128.',
+      invalidIpv6Mode: 'Invalid IPv6 mode.',
+      invalidTimeSource: 'Invalid time source.',
+      invalidDcfOffset: 'Invalid DCF offset.',
+      invalidGpsBaudrate: 'Invalid GPS baud rate.',
+      invalidLedBrightness: 'LED brightness must be between 0 and 100 percent.',
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Please correct the highlighted fields.'
@@ -236,7 +251,12 @@ export default {
       placeholder: '192.168.1.1',
       button: 'Ping',
       success: 'Ping successful. Latency: {latency} ms',
-      failure: 'Ping failed or timeout.'
+      failure: 'Ping failed.',
+      invalid_target: 'The ping target is invalid.',
+      dns_failed: 'The hostname could not be resolved.',
+      timeout: 'The target did not respond before the timeout.',
+      unauthorized: 'Your session has expired. Please sign in again.',
+      internal: 'The network diagnostic could not be run.'
     }
   },
 
@@ -445,7 +465,7 @@ export default {
     factoryResetHint: 'Reset to factory defaults',
     factoryResetTitle: 'Factory reset',
     factoryResetMessage: 'Do you really want to reset all settings to factory defaults?',
-    factoryResetWarning: 'All stored settings will be lost. The device will restart automatically afterwards.',
+    factoryResetWarning: 'All user data will be erased, including credentials, network, monitoring, certificates, logs, theme, and accent color. The device will restart automatically afterwards.',
     factoryResetConfirm: 'Reset to factory defaults',
     factoryResetError: 'Factory reset failed.',
     factoryResetChallengeHelp: 'Enter the following 8-character security code exactly. It is case-sensitive; copying and pasting are disabled.',
@@ -552,20 +572,20 @@ export default {
       password: 'Password',
       passwordHelp: 'Optional: MQTT Password',
       topicPrefix: 'Topic Prefix',
-      topicPrefixHelp: 'Root segment of every MQTT topic this device publishes/subscribes. Default: hb-rf-eth-ng. Examples: “prefix/status/uptime”, “prefix/status/version”, “prefix/command/update”. Visible in your MQTT broker (e.g. MQTT Explorer), not in the WebUI.',
+      topicPrefixHelp: 'Root segment of every MQTT topic this device publishes/subscribes. Default: hb-rf-eth-ng. Examples: “prefix/status/uptime”, “prefix/status/version”, “prefix/command/restart”. Visible in your MQTT broker (e.g. MQTT Explorer), not in the WebUI.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Prefix',
       haDiscoveryPrefixHelp: 'Default: homeassistant',
       serverRequired: 'Please enter an MQTT server address when MQTT is enabled.',
       commands: {
         title: 'Command Topics',
-        enableHelp: 'Allows remote control (restart, factory reset, OTA) over MQTT. Without a token or broker ACL, any client on the network can control the device.',
+        enableHelp: 'Allows device restart over MQTT. Factory reset and OTA are intentionally unavailable as MQTT commands.',
         token: 'Command Token',
         tokenPlaceholder: 'optional – shared secret',
         tokenHelp: 'When set, command payloads must exactly match this token. Allowed: A-Z a-z 0-9 - _ .',
         tokenPresent: '✓ Present – enter new value to replace',
         clear: 'Clear',
-        aclHint: 'Note: without a broker ACL + token, any MQTT client can restart the device or trigger an OTA. Please configure an ACL on the broker that grants publish rights on the command topic only to this device.'
+        aclHint: 'Note: without a broker ACL and token, any MQTT client can restart the device. Configure an ACL that grants command-topic publish rights only to authorized clients.'
       },
       tls: {
         title: 'TLS / SSL',
@@ -737,7 +757,9 @@ export default {
     newPasswordPlaceholder: 'Enter new password',
     confirmPasswordPlaceholder: 'Confirm new password',
     currentPasswordPlaceholder: 'Enter current password',
-    currentPasswordRequired: 'Current password is required'
+    currentPasswordRequired: 'Current password is required',
+    currentPasswordIncorrect: 'The current password is incorrect.',
+    sessionExpired: 'Your session has expired. Please sign in again.',
   },
 
   // OTA Password Modal

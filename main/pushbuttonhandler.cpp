@@ -22,6 +22,7 @@
  */
 
 #include "pushbuttonhandler.h"
+#include "reset_info.h"
 
 static const char *TAG = "PushButtonHandler";
 
@@ -90,6 +91,9 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
         vTaskDelay(pdMS_TO_TICKS(100));
 
         settings->clear();
+        // Settings::clear() also removes crash/reset metadata. Preserve only
+        // the fact that this boot performed an intentional factory reset.
+        ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
         ESP_LOGI(TAG, "Factory Reset done.");
 
         powerLED->setState(LED_STATE_ON);

@@ -257,6 +257,21 @@ void test_password_change_persists(void)
     TEST_ASSERT_TRUE(settings->getPasswordChanged());
 }
 
+void test_backup_restore_preserves_default_password_state(void)
+{
+    settings->setAdminPassword("Temporary1");
+    TEST_ASSERT_TRUE(settings->getPasswordChanged());
+
+    TEST_ASSERT_TRUE(settings->restoreAdminPassword("admin", false));
+    settings->save();
+
+    delete settings;
+    settings = new Settings();
+
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
+    TEST_ASSERT_FALSE(settings->getPasswordChanged());
+}
+
 void test_password_changed_flag_persists(void)
 {
     // Initially false
@@ -311,6 +326,45 @@ void test_factory_reset_restores_default_password(void)
     // Should be back to default
     TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
     TEST_ASSERT_FALSE(settings->getPasswordChanged());
+}
+
+void test_factory_reset_erases_all_user_namespaces(void)
+{
+    const char *namespaces[] = {
+        "monitoring",
+        "ui_theme",
+        "reset_info",
+        "upd_cache",
+    };
+
+    for (const char *namespace_name : namespaces)
+    {
+        nvs_handle_t handle;
+        TEST_ASSERT_EQUAL(ESP_OK,
+                          nvs_open(namespace_name, NVS_READWRITE, &handle));
+        TEST_ASSERT_EQUAL(ESP_OK, nvs_set_str(handle, "test", "user-data"));
+        TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+        nvs_close(handle);
+    }
+
+    settings->clear();
+
+    for (const char *namespace_name : namespaces)
+    {
+        nvs_handle_t handle;
+        esp_err_t open_result = nvs_open(namespace_name, NVS_READONLY, &handle);
+        if (open_result == ESP_OK)
+        {
+            size_t size = 0;
+            TEST_ASSERT_EQUAL(ESP_ERR_NVS_NOT_FOUND,
+                              nvs_get_str(handle, "test", nullptr, &size));
+            nvs_close(handle);
+        }
+        else
+        {
+            TEST_ASSERT_EQUAL(ESP_ERR_NVS_NOT_FOUND, open_result);
+        }
+    }
 }
 
 void test_password_persists_multiple_reboots(void)
@@ -439,9 +493,11 @@ void app_main(void)
     // Password change tests
     RUN_TEST(test_default_password_is_admin);
     RUN_TEST(test_password_change_persists);
+    RUN_TEST(test_backup_restore_preserves_default_password_state);
     RUN_TEST(test_password_changed_flag_persists);
     RUN_TEST(test_password_changed_detected_by_content);
     RUN_TEST(test_factory_reset_restores_default_password);
+    RUN_TEST(test_factory_reset_erases_all_user_namespaces);
     RUN_TEST(test_password_persists_multiple_reboots);
     RUN_TEST(test_password_change_after_static_ipv4);
 

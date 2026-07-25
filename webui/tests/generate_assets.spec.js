@@ -155,6 +155,7 @@ test.describe('Generate Assets', () => {
     await page.screenshot({ path: path.join(screenshotsDir, '01_Login.png') });
 
     // 2. Perform Login
+    await page.fill('input[name="username"]', 'admin');
     await page.fill('input[type="password"]', 'Password123');
     // Button might not be type="submit", target by class or text
     await page.click('.login-btn');

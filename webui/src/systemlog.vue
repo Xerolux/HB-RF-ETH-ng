@@ -154,11 +154,14 @@ const MAX_COPY_LINES = 500
 
 // copyToClipboard is provided by ./composables/useClipboard.js (iOS-Safari-safe).
 
+const stripAnsi = value => value.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+
 const getEntryLevel = (line) => {
-  if (/\bE\s*\(/.test(line) || /\bERROR\b/i.test(line)) return 'E'
-  if (/\bW\s*\(/.test(line) || /\bWARN\b/i.test(line)) return 'W'
-  if (/\bI\s*\(/.test(line) || /\bINFO\b/i.test(line)) return 'I'
-  if (/\bD\s*\(/.test(line) || /\bDEBUG\b/i.test(line)) return 'D'
+  const normalized = stripAnsi(line)
+  if (/(?:^|\s)E\s*\(/.test(normalized) || /\bERROR\b/i.test(normalized)) return 'E'
+  if (/(?:^|\s)W\s*\(/.test(normalized) || /\bWARN\b/i.test(normalized)) return 'W'
+  if (/(?:^|\s)I\s*\(/.test(normalized) || /\bINFO\b/i.test(normalized)) return 'I'
+  if (/(?:^|\s)D\s*\(/.test(normalized) || /\bDEBUG\b/i.test(normalized)) return 'D'
   return 'N'
 }
 

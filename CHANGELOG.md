@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5-Beta.14] - 2026-07-25
+
+### Changes
+- fix(factory-reset): Der Werksreset entfernt jetzt sämtliche Benutzerkonfigurationen aus den Einstellungen-, Monitoring-, Theme-, Reset-/Crash- und Update-Cache-Namespaces. Auch lokale Browser- und Sitzungsdaten einschließlich Theme und Akzentfarbe werden gelöscht.
+- feat(backup): Backup und Wiederherstellung sichern jetzt alle wiederherstellbaren Benutzereinstellungen einschließlich Administrator-Zugangsdaten, Netzwerk, Zeit, LEDs, Theme, Akzentfarbe, Supporter-Key, Browser-Präferenzen sowie vollständiger Monitoring-Konfiguration mit MQTT-/Benachrichtigungs-Passwörtern, Tokens, Zertifikaten und privaten Schlüsseln.
+- fix(settings): Feldgenaue Validierungsfehler für Administratorname, CCU-Adresse, Hostname, IPv4, Netzmaske, IPv6 und NTP ergänzt; ungültige Werte werden nun auch im Backend vor Änderungen vollständig abgewiesen.
+- fix(network): Die Ping-Diagnose verwendet authentifizierte Requests, meldet Latenz sowie verständliche DNS-/Timeout-Fehler und leitet nach einer statischen IP-Änderung zur neuen Geräteadresse weiter.
+- fix(restart): Wiederherstellung, manueller Neustart und MQTT-Neustart verwenden einheitlich die Neustart-Synchronisierung; doppelte Aktionen werden verhindert.
+- fix(mqtt): Unsicheren MQTT-Werksreset sowie die nicht mehr installierbare Home-Assistant-Firmware-Update-Entität entfernt.
+- fix(webui): Passwortfehler werden übersetzt, ANSI-farbige Systemlog-Zeilen korrekt gefiltert, die Recovery-Seite ist direkt verlinkt und Systemaktionen befinden sich unter „Sichern & Wiederherstellen“.
+- test: Regressionstests für vollständigen Werksreset, Backup/Restore, Neustart-Synchronisierung, Validierung, Mobile-Layout und die korrigierten Bedienabläufe ergänzt.
+
 ## [2.2.5-Beta.13] - 2026-07-24
 
 ### Changes

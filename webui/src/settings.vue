@@ -64,6 +64,9 @@
                     spellcheck="false"
                     :state="v$.adminUsername.$error ? false : null"
                   />
+                  <BFormInvalidFeedback v-if="v$.adminUsername.$error">
+                    {{ t('settings.validation.invalidUsername') }}
+                  </BFormInvalidFeedback>
                   <BButton
                     variant="primary"
                     class="security-save-btn"
@@ -101,6 +104,9 @@
                   placeholder="192.168.x.x or 2001:db8::1"
                   :state="v$.ccuIP.$error ? false : null"
                 />
+                <BFormInvalidFeedback v-if="v$.ccuIP.$error">
+                  {{ t('settings.validation.invalidIpv4OrIpv6') }}
+                </BFormInvalidFeedback>
                 <div class="form-text text-warning mt-2">
                   <small>{{ t('settings.ccuIpHint') }}</small>
                 </div>
@@ -280,6 +286,9 @@
                   maxlength="63"
                   :state="v$.hostname.$error ? false : null"
                 />
+                <BFormInvalidFeedback v-if="v$.hostname.$error">
+                  {{ t('settings.validation.invalidHostname') }}
+                </BFormInvalidFeedback>
               </div>
 
               <div class="form-group mb-3">
@@ -296,22 +305,37 @@
                   <div class="col-md-6">
                     <label class="form-label">{{ t('settings.ipAddress') }}</label>
                     <BFormInput type="text" v-model="localIP" trim :state="v$.localIP.$error ? false : null" />
+                    <BFormInvalidFeedback v-if="v$.localIP.$error">
+                      {{ t('settings.validation.invalidIpv4') }}
+                    </BFormInvalidFeedback>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">{{ t('settings.netmask') }}</label>
                     <BFormInput type="text" v-model="netmask" trim :state="v$.netmask.$error ? false : null" />
+                    <BFormInvalidFeedback v-if="v$.netmask.$error">
+                      {{ t('settings.validation.invalidNetmask') }}
+                    </BFormInvalidFeedback>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">{{ t('settings.gateway') }}</label>
                     <BFormInput type="text" v-model="gateway" trim :state="v$.gateway.$error ? false : null" />
+                    <BFormInvalidFeedback v-if="v$.gateway.$error">
+                      {{ t('settings.validation.invalidIpv4') }}
+                    </BFormInvalidFeedback>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">{{ t('settings.dns1') }}</label>
                     <BFormInput type="text" v-model="dns1" trim :state="v$.dns1.$error ? false : null" />
+                    <BFormInvalidFeedback v-if="v$.dns1.$error">
+                      {{ t('settings.validation.invalidIpv4') }}
+                    </BFormInvalidFeedback>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">{{ t('settings.dns2') }}</label>
                     <BFormInput type="text" v-model="dns2" trim :state="v$.dns2.$error ? false : null" />
+                    <BFormInvalidFeedback v-if="v$.dns2.$error">
+                      {{ t('settings.validation.invalidIpv4') }}
+                    </BFormInvalidFeedback>
                   </div>
                 </div>
               </div>
@@ -358,6 +382,9 @@
                         placeholder="2001:db8::1"
                         :state="v$.ipv6Address.$error ? false : null"
                       />
+                      <BFormInvalidFeedback v-if="v$.ipv6Address.$error">
+                        {{ t('settings.validation.invalidIpv6') }}
+                      </BFormInvalidFeedback>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">{{ t('settings.ipv6PrefixLength') }}</label>
@@ -369,6 +396,9 @@
                         placeholder="64"
                         :state="v$.ipv6PrefixLength.$error ? false : null"
                       />
+                      <BFormInvalidFeedback v-if="v$.ipv6PrefixLength.$error">
+                        {{ t('settings.validation.invalidIpv6Prefix') }}
+                      </BFormInvalidFeedback>
                     </div>
                     <div class="col-md-8">
                       <label class="form-label">{{ t('settings.ipv6Gateway') }}</label>
@@ -379,6 +409,9 @@
                         placeholder="2001:db8::1"
                         :state="v$.ipv6Gateway.$error ? false : null"
                       />
+                      <BFormInvalidFeedback v-if="v$.ipv6Gateway.$error">
+                        {{ t('settings.validation.invalidIpv6') }}
+                      </BFormInvalidFeedback>
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">{{ t('settings.ipv6Dns1') }}</label>
@@ -389,6 +422,9 @@
                         placeholder="2001:4860:4860::8888"
                         :state="v$.ipv6Dns1.$error ? false : null"
                       />
+                      <BFormInvalidFeedback v-if="v$.ipv6Dns1.$error">
+                        {{ t('settings.validation.invalidIpv6') }}
+                      </BFormInvalidFeedback>
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">{{ t('settings.ipv6Dns2') }}</label>
@@ -399,6 +435,9 @@
                         placeholder="2001:4860:4860::8844"
                         :state="v$.ipv6Dns2.$error ? false : null"
                       />
+                      <BFormInvalidFeedback v-if="v$.ipv6Dns2.$error">
+                        {{ t('settings.validation.invalidIpv6') }}
+                      </BFormInvalidFeedback>
                     </div>
                   </div>
                 </template>
@@ -428,9 +467,9 @@
                   </BButton>
                 </div>
               </div>
-              <div v-if="pingResult !== null" :class="['alert', pingResult >= 0 ? 'alert-success' : 'alert-danger']">
-                <span v-if="pingResult >= 0">{{ t('settings.ping.success', { latency: pingResult }) }}</span>
-                <span v-else>{{ t('settings.ping.failure') }}</span>
+              <div v-if="pingResult !== null" :class="['alert', pingResult.success ? 'alert-success' : 'alert-danger']">
+                <span v-if="pingResult.success">{{ t('settings.ping.success', { latency: pingResult.latency }) }}</span>
+                <span v-else>{{ pingErrorMessage }}</span>
               </div>
             </div>
           </div>
@@ -467,6 +506,9 @@
                   trim
                   :state="v$.ntpServer.$error ? false : null"
                 />
+                <BFormInvalidFeedback v-if="v$.ntpServer.$error">
+                  {{ t('settings.validation.invalidNtpServer') }}
+                </BFormInvalidFeedback>
               </div>
               <div v-if="isDcfActivated" class="form-group mt-4">
                 <label class="form-label">{{ t('settings.dcfOffset') }} (µs)</label>
@@ -529,10 +571,47 @@
 
                 <div v-if="restoreFile" class="restore-confirm mt-3 p-3 bg-light rounded">
                   <p class="mb-2">{{ t('settings.selected', { name: restoreFile.name }) }}</p>
-                  <BButton variant="warning" class="w-100" @click="restoreSettings">
+                  <BButton variant="warning" class="w-100" @click="restoreSettings" :disabled="isRestoring">
+                    <span v-if="isRestoring" class="spinner-border spinner-border-sm me-2"></span>
                     {{ t('settings.restoreBtn') }}
                   </BButton>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="card-header">
+              <h3>{{ t('settings.systemActions') }}</h3>
+            </div>
+            <div class="card-body">
+              <div class="backup-grid">
+                <button type="button" class="action-tile system-action warning" @click="openManualRestart">
+                  <span class="tile-icon"><AppIcon name="refresh" /></span>
+                  <span class="tile-content">
+                    <h4>{{ t('firmware.restart') }}</h4>
+                    <p>{{ t('firmware.restartSyncHint') }}</p>
+                  </span>
+                  <span class="tile-arrow"><AppIcon name="arrowRight" /></span>
+                </button>
+
+                <a class="action-tile system-action" href="/recovery">
+                  <span class="tile-icon"><AppIcon name="restore" /></span>
+                  <span class="tile-content">
+                    <h4>{{ t('settings.openRecovery') }}</h4>
+                    <p>{{ t('settings.openRecoveryHint') }}</p>
+                  </span>
+                  <span class="tile-arrow"><AppIcon name="arrowRight" /></span>
+                </a>
+
+                <button type="button" class="action-tile system-action danger" @click="showFactoryResetModal = true">
+                  <span class="tile-icon"><AppIcon name="restore" /></span>
+                  <span class="tile-content">
+                    <h4>{{ t('firmware.factoryResetTitle') }}</h4>
+                    <p>{{ t('firmware.factoryResetActionHint') }}</p>
+                  </span>
+                  <span class="tile-arrow"><AppIcon name="arrowRight" /></span>
+                </button>
               </div>
             </div>
           </div>
@@ -610,6 +689,7 @@
 
     <!-- Password Change Modal -->
     <PasswordChangeModal v-model="showPasswordModal" :force-redirect="false" />
+    <FactoryResetModal v-model="showFactoryResetModal" />
 
     <!-- Restart Confirmation Modal -->
     <BModal
@@ -618,7 +698,7 @@
       centered
       no-fade
     >
-      <p>{{ t('settings.restartMessage') }}</p>
+      <p>{{ restartAfterSettingsSave ? t('settings.restartMessage') : t('firmware.restartConfirm') }}</p>
       <BAlert
         v-if="true"
         variant="info"
@@ -658,8 +738,10 @@ import {
 } from '@vuelidate/validators'
 import { useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
+import FactoryResetModal from './components/FactoryResetModal.vue'
 import ThemeSettings from './theme.vue'
 import { validateSupporterKey, normalizeSupporterKey } from './composables/supporterKey.js'
+import { safeLocal } from './composables/useSafeStorage.js'
 
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 
@@ -675,6 +757,7 @@ const router = useRouter()
 
 // Password modal
 const showPasswordModal = ref(false)
+const showFactoryResetModal = ref(false)
 
 // Tab management
 const activeTab = ref(route.query.tab || 'general')
@@ -880,6 +963,9 @@ const setLedProgramValue = (programId, value) => {
 const showError = ref(null)  // Can be null or a string with error message
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
+const restartAfterSettingsSave = ref(false)
+const pendingRestartUrl = ref(null)
+const isRestoring = ref(false)
 const loadedSnapshot = ref('')
 
 // Computed flags
@@ -887,6 +973,32 @@ const isNtpActivated = computed(() => timesource.value === 0)
 const isDcfActivated = computed(() => timesource.value === 1)
 const isGpsActivated = computed(() => timesource.value === 2)
 const isIPv6Static = computed(() => enableIPv6.value && ipv6Mode.value === 'static')
+const pingErrorMessage = computed(() => {
+  const error = pingResult.value?.error
+  const supportedErrors = ['invalid_target', 'dns_failed', 'timeout', 'unauthorized', 'internal']
+  return t(`settings.ping.${supportedErrors.includes(error) ? error : 'failure'}`)
+})
+const localizedApiError = (error, fallbackKey = 'settings.saveError') => {
+  const code = error?.response?.data?.error
+  const keys = {
+    invalid_username: 'settings.validation.invalidUsername',
+    invalid_password: 'changePassword.passwordTooShort',
+    invalid_hostname: 'settings.validation.invalidHostname',
+    invalid_ipv4: 'settings.validation.invalidIpv4',
+    invalid_netmask: 'settings.validation.invalidNetmask',
+    invalid_network: 'settings.validation.invalidNetwork',
+    invalid_ntp_server: 'settings.validation.invalidNtpServer',
+    invalid_ccu_address: 'settings.validation.invalidIpv4OrIpv6',
+    invalid_ipv6: 'settings.validation.invalidIpv6',
+    invalid_ipv6_prefix: 'settings.validation.invalidIpv6Prefix',
+    invalid_ipv6_mode: 'settings.validation.invalidIpv6Mode',
+    invalid_time_source: 'settings.validation.invalidTimeSource',
+    invalid_dcf_offset: 'settings.validation.invalidDcfOffset',
+    invalid_gps_baudrate: 'settings.validation.invalidGpsBaudrate',
+    invalid_led_brightness: 'settings.validation.invalidLedBrightness'
+  }
+  return t(keys[code] || fallbackKey)
+}
 
 // Keep these validators aligned with main/validation.cpp. Settings already
 // accepted by the firmware must never make an unrelated bulk save silently
@@ -902,7 +1014,22 @@ const hostname_validator = (value) => {
   return true
 }
 const username_validator = helpers.regex(/^[a-zA-Z0-9._-]{1,32}$/)
-const domainname_validator = helpers.regex(/^([a-zA-Z0-9_-]{1,63}\.)*[a-zA-Z0-9_-]{1,63}$/)
+const parseIpv4 = value => {
+  if (typeof value !== 'string') return null
+  const parts = value.split('.')
+  if (parts.length !== 4 ||
+      parts.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255)) {
+    return null
+  }
+  return parts.map(Number)
+}
+const netmask_validator = value => {
+  if (!value) return true
+  const parts = parseIpv4(value)
+  if (!parts) return false
+  const bits = parts.map(part => part.toString(2).padStart(8, '0')).join('')
+  return /^1*0*$/.test(bits)
+}
 const ipv6_validator = (value) => {
   if (!value) return true
   if (typeof value !== 'string' || value.length > 45 || value.includes(':::')) return false
@@ -927,6 +1054,45 @@ const ipv6_validator = (value) => {
 
   const count = leftParts.length + rightParts.length
   return hasCompression ? count < 8 : count === 8
+}
+const hostnameOrIpv4Validator = value => {
+  if (parseIpv4(value)) return true
+  if (typeof value !== 'string' || !value || value.length > 253) return false
+  return value.split('.').every(label =>
+    label.length >= 1 &&
+    label.length <= 63 &&
+    /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)
+  )
+}
+const ntp_server_validator = value => {
+  if (!value) return true
+  if (typeof value !== 'string' || value.length > 64) return false
+
+  let host = value
+  let port = ''
+  if (value.startsWith('[')) {
+    const bracket = value.indexOf(']')
+    if (bracket < 0) return false
+    host = value.slice(1, bracket)
+    const suffix = value.slice(bracket + 1)
+    if (suffix) {
+      if (!suffix.startsWith(':')) return false
+      port = suffix.slice(1)
+    }
+    if (!ipv6_validator(host)) return false
+  } else {
+    const colonCount = (value.match(/:/g) || []).length
+    if (colonCount > 1) return ipv6_validator(value)
+    if (colonCount === 1) {
+      const separator = value.lastIndexOf(':')
+      host = value.slice(0, separator)
+      port = value.slice(separator + 1)
+    }
+    if (!hostnameOrIpv4Validator(host)) return false
+  }
+
+  if (!port) return !value.endsWith(':')
+  return /^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535
 }
 
 // Custom validator for CCU IP that accepts both IPv4 and IPv6
@@ -961,7 +1127,8 @@ const rules = computed(() => ({
   },
   netmask: {
     required: requiredUnless(useDHCP),
-    ipAddress
+    ipAddress,
+    netmask_validator
   },
   gateway: {
     required: requiredUnless(useDHCP),
@@ -998,7 +1165,7 @@ const rules = computed(() => ({
   },
   ntpServer: {
     required: requiredIf(isNtpActivated),
-    domainname_validator,
+    ntp_server_validator,
     maxLength: maxLength(64)
   },
   dcfOffset: {
@@ -1055,6 +1222,12 @@ const buildSettingsPayload = () => ({
   // snapshot value, and the dirty-tracker would falsely flag "unsaved
   // changes" right after a flip.
 })
+
+const buildDeviceUrl = address => {
+  if (!address || typeof address !== 'string') return null
+  const port = window.location.port ? `:${window.location.port}` : ''
+  return `${window.location.protocol}//${address}${port}/`
+}
 
 const serializeSettings = () => JSON.stringify(buildSettingsPayload())
 
@@ -1148,27 +1321,19 @@ const runPing = async () => {
   pingResult.value = null
   
   try {
-    const response = await fetch('/api/ping', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ target: pingTarget.value })
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        pingResult.value = data.latency_ms
-      } else {
-        pingResult.value = -1
-      }
-    } else {
-      pingResult.value = -1
-    }
+    const response = await axios.post('/api/ping', { target: pingTarget.value })
+    const data = response.data || {}
+    pingResult.value = data.success
+      ? { success: true, latency: data.latency_ms }
+      : { success: false, error: data.error || 'internal' }
   } catch (error) {
     console.error('Ping failed:', error)
-    pingResult.value = -1
+    pingResult.value = {
+      success: false,
+      error: error.response?.status === 401
+        ? 'unauthorized'
+        : (error.response?.data?.error || 'internal')
+    }
   } finally {
     pingLoading.value = false
   }
@@ -1194,6 +1359,9 @@ const saveSettingsClick = async () => {
 
   try {
     const settings = buildSettingsPayload()
+    pendingRestartUrl.value = !settings.useDHCP
+      ? buildDeviceUrl(settings.localIP)
+      : null
 
     await settingsStore.save(settings)
     loadedSnapshot.value = serializeSettings()
@@ -1205,11 +1373,11 @@ const saveSettingsClick = async () => {
       duration: 2200
     })
     setTimeout(() => {
+      restartAfterSettingsSave.value = true
       showRestartModal.value = true
     }, 700)
   } catch (error) {
-    // Extract specific error message from backend response
-    const errorMsg = error.response?.data?.error || error.response?.data || t('settings.saveError')
+    const errorMsg = localizedApiError(error)
     showError.value = errorMsg
     uiStore.pushToast({
       type: 'error',
@@ -1224,13 +1392,22 @@ const resetToLoadedState = () => {
   loadSettings()
 }
 
+const openManualRestart = () => {
+  restartAfterSettingsSave.value = false
+  showRestartModal.value = true
+}
+
 const performRestart = async () => {
+  if (isRestarting.value) return
   isRestarting.value = true
   try {
     await axios.post('/api/restart')
     showRestartModal.value = false
     uiStore.pushToast({ type: 'info', title: t('common.success'), message: t('firmware.restartingText'), duration: 1200 })
-    restartUiStore.start({ includeFlashPause: true })
+    restartUiStore.start({
+      includeFlashPause: true,
+      reloadUrl: pendingRestartUrl.value
+    })
   } catch (e) {
     console.error("Restart request failed", e)
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restartError') })
@@ -1240,11 +1417,21 @@ const performRestart = async () => {
 
 const downloadBackup = async () => {
   try {
-    const response = await axios.get('/api/backup', { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const response = await axios.get('/api/backup')
+    const backup = {
+      ...response.data,
+      browserPreferences: {
+        locale: safeLocal.get('locale') || 'en',
+        showExperimental: experimentalStore.showExperimental
+      }
+    }
+    const url = window.URL.createObjectURL(new Blob(
+      [JSON.stringify(backup, null, 2)],
+      { type: 'application/json' }
+    ))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', 'settings.json')
+    link.setAttribute('download', 'hb-rf-eth-ng-backup.json')
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -1256,10 +1443,11 @@ const downloadBackup = async () => {
 }
 
 const restoreSettings = async () => {
-  if (!restoreFile.value) return
+  if (!restoreFile.value || isRestoring.value) return
 
   if (!confirm(t('settings.restoreConfirm'))) return
 
+  isRestoring.value = true
   try {
     const reader = new FileReader()
     reader.onload = async (e) => {
@@ -1272,18 +1460,37 @@ const restoreSettings = async () => {
         if (!json || typeof json !== 'object' || Array.isArray(json) ||
             !('hostname' in json) || !('useDHCP' in json)) {
           uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restoreError') })
+          isRestoring.value = false
           return
         }
         await axios.post('/api/restore', json)
+        const browserPreferences = json.browserPreferences
+        if (browserPreferences && typeof browserPreferences === 'object') {
+          if (['de', 'en', 'fr', 'it'].includes(browserPreferences.locale)) {
+            safeLocal.set('locale', browserPreferences.locale)
+          }
+          if (typeof browserPreferences.showExperimental === 'boolean') {
+            experimentalStore.setShowExperimental(browserPreferences.showExperimental)
+          }
+        }
         uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('settings.restoreSuccess'), duration: 1500 })
-        window.location.reload()
+        restartUiStore.start({
+          includeFlashPause: true,
+          reloadUrl: json.useDHCP ? null : buildDeviceUrl(json.localIP)
+        })
       } catch (err) {
-        uiStore.pushToast({ type: 'error', title: t('common.error'), message: `${t('settings.restoreError')}: ${err.message}` })
+        uiStore.pushToast({ type: 'error', title: t('common.error'), message: localizedApiError(err, 'settings.restoreError') })
+        isRestoring.value = false
       }
+    }
+    reader.onerror = () => {
+      uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restoreError') })
+      isRestoring.value = false
     }
     reader.readAsText(restoreFile.value)
   } catch (e) {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restoreError') })
+    isRestoring.value = false
   }
 }
 </script>
@@ -1612,14 +1819,34 @@ hr {
   align-items: center;
   padding: var(--spacing-md);
   background: var(--color-bg);
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
+  color: var(--color-text);
   cursor: pointer;
+  text-align: left;
+  text-decoration: none;
   transition: background 0.2s;
   min-width: 0;
+  width: 100%;
 }
 
 .action-tile:hover {
   background: var(--color-border-light);
+}
+
+.action-tile.warning {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.action-tile.danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.action-tile.danger .tile-icon,
+.action-tile.danger h4 {
+  color: var(--color-danger);
 }
 
 .tile-icon {

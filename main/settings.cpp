@@ -41,6 +41,9 @@ Settings::Settings()
 static const char *TAG = "Settings";
 static const char *NVS_NAMESPACE = "HB-RF-ETH";
 static const char *MONITORING_NVS_NAMESPACE = "monitoring";
+static const char *THEME_NVS_NAMESPACE = "ui_theme";
+static const char *RESET_INFO_NVS_NAMESPACE = "reset_info";
+static const char *UPDATE_CACHE_NVS_NAMESPACE = "upd_cache";
 
 static esp_err_t erase_nvs_namespace(const char *ns)
 {
@@ -369,18 +372,27 @@ void Settings::clear()
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
 
-  // Factory reset must wipe all user-configurable namespaces, not only the
-  // base settings namespace. Monitoring keeps MQTT/CheckMK/Prometheus/Syslog
-  // and notification settings in its own namespace; leaving it intact made
-  // those integrations come back after a "factory" reset.
+  // A factory reset must remove every user-controlled or user-visible value.
+  // Keep the "webui" namespace intact because it only tracks the installed
+  // WebUI image/transaction metadata; factory reset must not uninstall the
+  // firmware or the separately installed WebUI.
   esp_err_t settings_err = erase_nvs_namespace(NVS_NAMESPACE);
   esp_err_t monitoring_err = erase_nvs_namespace(MONITORING_NVS_NAMESPACE);
+  esp_err_t theme_err = erase_nvs_namespace(THEME_NVS_NAMESPACE);
+  esp_err_t reset_info_err = erase_nvs_namespace(RESET_INFO_NVS_NAMESPACE);
+  esp_err_t update_cache_err = erase_nvs_namespace(UPDATE_CACHE_NVS_NAMESPACE);
 
   if (_mutex) xSemaphoreGive(_mutex);
 
-  if (settings_err != ESP_OK || monitoring_err != ESP_OK) {
-    ESP_LOGW(TAG, "Factory reset completed with NVS erase errors (settings=%s, monitoring=%s)",
-             esp_err_to_name(settings_err), esp_err_to_name(monitoring_err));
+  if (settings_err != ESP_OK || monitoring_err != ESP_OK ||
+      theme_err != ESP_OK || reset_info_err != ESP_OK ||
+      update_cache_err != ESP_OK) {
+    ESP_LOGW(TAG,
+             "Factory reset completed with NVS erase errors "
+             "(settings=%s, monitoring=%s, theme=%s, reset_info=%s, update_cache=%s)",
+             esp_err_to_name(settings_err), esp_err_to_name(monitoring_err),
+             esp_err_to_name(theme_err), esp_err_to_name(reset_info_err),
+             esp_err_to_name(update_cache_err));
   }
 
   // Reload defaults into RAM after releasing the mutex; load() takes it again.
@@ -406,7 +418,8 @@ char *Settings::getAdminUsername()
 bool Settings::setAdminPassword(const char *adminPassword)
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  if (adminPassword == nullptr || adminPassword[0] == '\0' || strlen(adminPassword) >= sizeof(_adminPassword) - 1)
+  if (adminPassword == nullptr || adminPassword[0] == '\0' ||
+      strlen(adminPassword) >= sizeof(_adminPassword))
   {
     ESP_LOGE(TAG, "Invalid admin password length, keeping current password");
     if (_mutex) xSemaphoreGive(_mutex);
@@ -420,10 +433,28 @@ bool Settings::setAdminPassword(const char *adminPassword)
   return true;
 }
 
+bool Settings::restoreAdminPassword(const char *adminPassword,
+                                    bool passwordChanged)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (adminPassword == nullptr || adminPassword[0] == '\0' ||
+      strlen(adminPassword) >= sizeof(_adminPassword))
+  {
+    ESP_LOGE(TAG, "Invalid restored admin password length");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return false;
+  }
+
+  snprintf(_adminPassword, sizeof(_adminPassword), "%s", adminPassword);
+  _passwordChanged = passwordChanged;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return true;
+}
+
 bool Settings::setAdminUsername(const char *adminUsername)
 {
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  if (adminUsername == nullptr || adminUsername[0] == '\0' || strlen(adminUsername) >= sizeof(_adminUsername) - 1)
+  if (adminUsername == nullptr || adminUsername[0] == '\0' || strlen(adminUsername) >= sizeof(_adminUsername))
   {
     ESP_LOGE(TAG, "Invalid admin username length, keeping current username");
     if (_mutex) xSemaphoreGive(_mutex);

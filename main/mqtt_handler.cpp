@@ -26,7 +26,6 @@
 #include "sysinfo.h"
 #include "updatecheck.h"
 #include "webui_storage.h"
-#include "settings.h"
 #include "reset_info.h"
 #include "system_reset.h"
 #include "events.h"
@@ -97,30 +96,6 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
-// Forward declarations for system commands
-// esp_restart() is declared in esp_system.h; we keep the extern here for
-// backward compatibility but route restarts through full_system_restart()
-// (declared in system_reset.h) so the optional flash-pause honoured by all
-// other restart paths also applies to MQTT-triggered restarts.
-extern "C" void esp_restart(void);
-
-static void perform_factory_reset()
-{
-    ESP_LOGI(TAG, "Performing factory reset");
-
-    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
-
-    Settings* settingsPtr = monitoring_get_settings();
-    if (settingsPtr) {
-        settingsPtr->clear();
-        ESP_LOGI(TAG, "Settings NVS erased via Settings::clear()");
-    } else {
-        ESP_LOGE(TAG, "Cannot factory-reset: Settings not registered with monitoring");
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(1000));
-}
-
 // Validate the command payload against the optional shared-secret token.
 //
 // Semantics:
@@ -164,12 +139,6 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
         mqtt_handler_publish_event("event/restart", "requested");
         vTaskDelay(pdMS_TO_TICKS(300));
-        full_system_restart();
-    } else if (strcmp(command, "factory_reset") == 0) {
-        ESP_LOGI(TAG, "Factory reset command received via MQTT");
-        mqtt_handler_publish_event("event/factory_reset", "requested");
-        vTaskDelay(pdMS_TO_TICKS(300));
-        perform_factory_reset();
         full_system_restart();
     } else {
         ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
@@ -585,7 +554,6 @@ void mqtt_handler_publish_ha_discovery(void)
     // buttons work even when a command_token is configured. Empty token ->
     // plain "restart" etc. (legacy behaviour).
     const char* restart_payload  = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "restart";
-    const char* reset_payload    = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "factory_reset";
     // Device Info — use the configurable hostname as the HA device name so
     // multiple HB-RF-ETH boards can be told apart in the UI. Fall back to a
     // generic label if the hostname is unavailable.
@@ -770,10 +738,10 @@ void mqtt_handler_publish_ha_discovery(void)
     // must NOT publish buttons that look clickable. Hide them by skipping.
     if (current_mqtt_config.command_enabled) {
         publish_button("restart", "Restart", "restart", restart_payload, "restart", "mdi:restart");
-        publish_button("factory_reset", "Factory Reset", "factory_reset", reset_payload, "restart", "mdi:lock-reset");
     }
 
-    // Remove the former install-capable update entity.
+    // Remove destructive/retired entities retained by older firmware.
+    remove_config("button", "factory_reset");
     remove_config("update", "firmware_update");
 
     cJSON_Delete(device);

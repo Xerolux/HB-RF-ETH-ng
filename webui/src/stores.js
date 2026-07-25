@@ -72,6 +72,14 @@ export const useThemeStore = defineStore('theme', {
       const currentlyDark = document.documentElement.getAttribute('data-bs-theme') === 'dark'
       this.setTheme(currentlyDark ? 'light' : 'dark')
     },
+    resetForFactoryReset() {
+      this.theme = 'system'
+      this.primaryColor = DEFAULT_PRIMARY_COLOR
+      this.loadedFromDevice = false
+      safeLocal.remove('theme')
+      safeLocal.remove('primaryColor')
+      this.apply()
+    },
     init() {
       this.apply()
       window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
@@ -132,7 +140,8 @@ export const useRestartUiStore = defineStore('restartUi', {
     phaseIndex: 1,
     phaseTotal: 1,
     phaseDuration: 30,
-    timer: null
+    timer: null,
+    reloadUrl: null
   }),
   actions: {
     setPhase(phase, seconds, index, total) {
@@ -146,6 +155,7 @@ export const useRestartUiStore = defineStore('restartUi', {
       const includeFlashPause = !!options.includeFlashPause
       const restartSeconds = options.restartSeconds || 30
       const syncSeconds = options.syncSeconds || 40
+      this.reloadUrl = options.reloadUrl || null
 
       if (this.timer) {
         clearInterval(this.timer)
@@ -167,7 +177,11 @@ export const useRestartUiStore = defineStore('restartUi', {
           } else {
             clearInterval(this.timer)
             this.timer = null
-            window.location.reload()
+            if (this.reloadUrl) {
+              window.location.assign(this.reloadUrl)
+            } else {
+              window.location.reload()
+            }
           }
         }
       }, 1000)
@@ -178,6 +192,7 @@ export const useRestartUiStore = defineStore('restartUi', {
         this.timer = null
       }
       this.visible = false
+      this.reloadUrl = null
     }
   }
 })
@@ -200,6 +215,10 @@ export const useExperimentalStore = defineStore('experimental', {
     setShowExperimental(value) {
       this.showExperimental = !!value
       safeLocal.set('showExperimental', this.showExperimental ? '1' : '0')
+    },
+    resetForFactoryReset() {
+      this.showExperimental = false
+      safeLocal.remove('showExperimental')
     }
   }
 })

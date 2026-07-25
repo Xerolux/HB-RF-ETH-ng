@@ -39,26 +39,27 @@ bool valid_color(const char *value)
     return true;
 }
 
-void load_theme(char scheme[8], char color[8])
+void load_theme(char *scheme, size_t scheme_size,
+                char *color, size_t color_size)
 {
-    snprintf(scheme, 8, "%s", DEFAULT_SCHEME);
-    snprintf(color, 8, "%s", DEFAULT_COLOR);
+    snprintf(scheme, scheme_size, "%s", DEFAULT_SCHEME);
+    snprintf(color, color_size, "%s", DEFAULT_COLOR);
 
     nvs_handle_t handle = 0;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &handle) != ESP_OK) return;
 
-    size_t scheme_size = 8;
-    if (nvs_get_str(handle, NVS_SCHEME_KEY, scheme, &scheme_size) != ESP_OK ||
+    size_t stored_scheme_size = scheme_size;
+    if (nvs_get_str(handle, NVS_SCHEME_KEY, scheme, &stored_scheme_size) != ESP_OK ||
         !valid_scheme(scheme))
     {
-        snprintf(scheme, 8, "%s", DEFAULT_SCHEME);
+        snprintf(scheme, scheme_size, "%s", DEFAULT_SCHEME);
     }
 
-    size_t color_size = 8;
-    if (nvs_get_str(handle, NVS_COLOR_KEY, color, &color_size) != ESP_OK ||
+    size_t stored_color_size = color_size;
+    if (nvs_get_str(handle, NVS_COLOR_KEY, color, &stored_color_size) != ESP_OK ||
         !valid_color(color))
     {
-        snprintf(color, 8, "%s", DEFAULT_COLOR);
+        snprintf(color, color_size, "%s", DEFAULT_COLOR);
     }
     nvs_close(handle);
 }
@@ -67,7 +68,7 @@ esp_err_t send_theme(httpd_req_t *req)
 {
     char scheme[8] = {};
     char color[8] = {};
-    load_theme(scheme, color);
+    load_theme(scheme, sizeof(scheme), color, sizeof(color));
 
     char response[96];
     snprintf(response, sizeof(response),
@@ -137,12 +138,7 @@ esp_err_t post_theme(httpd_req_t *req)
                                    "Invalid theme values");
     }
 
-    nvs_handle_t handle = 0;
-    esp_err_t result = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
-    if (result == ESP_OK) result = nvs_set_str(handle, NVS_SCHEME_KEY, scheme);
-    if (result == ESP_OK) result = nvs_set_str(handle, NVS_COLOR_KEY, color);
-    if (result == ESP_OK) result = nvs_commit(handle);
-    if (handle) nvs_close(handle);
+    esp_err_t result = theme_api_set_config(scheme, color);
     cJSON_Delete(root);
 
     if (result != ESP_OK)
@@ -169,6 +165,33 @@ httpd_uri_t post_theme_uri = {
     .user_ctx = nullptr,
 };
 } // namespace
+
+esp_err_t theme_api_get_config(char *scheme, size_t scheme_size,
+                               char *color, size_t color_size)
+{
+    if (!scheme || scheme_size < 8 || !color || color_size < 8)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+    load_theme(scheme, scheme_size, color, color_size);
+    return ESP_OK;
+}
+
+esp_err_t theme_api_set_config(const char *scheme, const char *color)
+{
+    if (!valid_scheme(scheme) || !valid_color(color))
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    nvs_handle_t handle = 0;
+    esp_err_t result = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &handle);
+    if (result == ESP_OK) result = nvs_set_str(handle, NVS_SCHEME_KEY, scheme);
+    if (result == ESP_OK) result = nvs_set_str(handle, NVS_COLOR_KEY, color);
+    if (result == ESP_OK) result = nvs_commit(handle);
+    if (handle) nvs_close(handle);
+    return result;
+}
 
 esp_err_t theme_api_register(httpd_handle_t server)
 {

@@ -205,9 +205,16 @@ const handleSubmit = async () => {
       error.value = response.data.error || t('common.unknownError')
     }
   } catch (e) {
-    // The firmware sends validation errors as a plain-text body, not JSON
     const data = e.response?.data
-    error.value = (typeof data === 'string' && data) || data?.message || e.message || t('changePassword.changeError')
+    const errorKey = typeof data === 'object' ? data?.error : null
+    const translatedErrors = {
+      current_password_required: 'changePassword.currentPasswordRequired',
+      current_password_incorrect: 'changePassword.currentPasswordIncorrect',
+      invalid_new_password: 'changePassword.passwordTooShort',
+      unauthorized: 'changePassword.sessionExpired',
+      invalid_request: 'changePassword.changeError'
+    }
+    error.value = t(translatedErrors[errorKey] || 'changePassword.changeError')
   } finally {
     loading.value = false
   }

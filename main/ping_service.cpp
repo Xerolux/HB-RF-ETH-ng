@@ -22,7 +22,7 @@ static void cmd_ping_on_ping_success(esp_ping_handle_t hndl, void *args)
 {
     ping_ctx_t *ctx = (ping_ctx_t *)args;
     uint32_t elapsed_time;
-    esp_ping_get_profile(hndl, ESP_PING_PROF_TIMEGAP, &elapsed_time, sizeof(elapsed_time));
+    esp_ping_get_profile(hndl, ESP_PING_PROF_DURATION, &elapsed_time, sizeof(elapsed_time));
     ctx->latency = elapsed_time;
     xEventGroupSetBits(ctx->event_group, PING_SUCCESS_BIT);
 }
@@ -49,7 +49,7 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
     struct addrinfo *res = NULL;
     if (getaddrinfo(target, NULL, &hint, &res) != 0 || res == NULL) {
         ESP_LOGE(TAG, "DNS lookup failed for %s", target);
-        return -1;
+        return PING_SERVICE_DNS_ERROR;
     }
     if (res->ai_family == AF_INET) {
         struct sockaddr_in *p = (struct sockaddr_in *)res->ai_addr;
@@ -57,13 +57,17 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
         target_addr.type = IPADDR_TYPE_V4;
     } else {
         freeaddrinfo(res);
-        return -1; // IPv6 not supported in this simple ping
+        return PING_SERVICE_DNS_ERROR; // IPv6 is not supported by this endpoint
     }
     freeaddrinfo(res);
 
     ping_ctx_t ctx;
     ctx.event_group = xEventGroupCreate();
     ctx.latency = -1;
+    if (ctx.event_group == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate ping event group");
+        return PING_SERVICE_INTERNAL;
+    }
 
     esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
     config.target_addr = target_addr;
@@ -82,7 +86,7 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
     if (err != ESP_OK || ping == NULL) {
         ESP_LOGE(TAG, "Failed to create ping session: %s", esp_err_to_name(err));
         vEventGroupDelete(ctx.event_group);
-        return -1;
+        return PING_SERVICE_INTERNAL;
     }
 
     esp_ping_start(ping);
@@ -97,5 +101,5 @@ int ping_service_ping(const char* target, uint32_t timeout_ms)
         return ctx.latency;
     }
 
-    return -1;
+    return PING_SERVICE_TIMEOUT;
 }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
 
 const BASE_URL = 'http://127.0.0.1:1234'
 
@@ -187,9 +188,19 @@ test('factory reset requires the exact non-copyable case-sensitive challenge', a
       body: JSON.stringify({ success: true })
     })
   })
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.addInitScript(() => {
+    localStorage.setItem('theme', 'dark')
+    localStorage.setItem('primaryColor', '#3971e8')
+    localStorage.setItem('future-user-setting', 'must-be-erased')
+    sessionStorage.setItem('future-session-setting', 'must-be-erased')
+  })
 
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  await page.locator('.action-tile.danger').click()
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await page.locator('.system-action.danger').click()
 
   const dialog = page.getByRole('dialog', { name: 'Factory reset' })
   const challenge = dialog.getByTestId('factory-reset-challenge')
@@ -228,6 +239,255 @@ test('factory reset requires the exact non-copyable case-sensitive challenge', a
 
   await resetButton.click()
   await expect.poll(() => factoryResetRequests).toBe(1)
+  await expect(page.locator('.restart-countdown-overlay')).toBeVisible()
+  expect(await page.evaluate(() => ({
+    theme: localStorage.getItem('theme'),
+    primaryColor: localStorage.getItem('primaryColor'),
+    token: sessionStorage.getItem('hb-rf-eth-ng-pw'),
+    futureUserSetting: localStorage.getItem('future-user-setting'),
+    futureSessionSetting: sessionStorage.getItem('future-session-setting')
+  }))).toEqual({
+    theme: null,
+    primaryColor: null,
+    token: null,
+    futureUserSetting: null,
+    futureSessionSetting: null
+  })
+})
+
+test('downloaded backup keeps all sensitive device settings and browser preferences', async ({ page }) => {
+  const completeDeviceBackup = {
+    _format: 'hb-rf-eth-ng-backup',
+    _version: 2,
+    ...settings,
+    adminPassword: 'Backup123',
+    passwordChanged: true,
+    theme: {
+      colorScheme: 'dark',
+      primaryColor: '#3971e8'
+    },
+    monitoring: {
+      mqtt: {
+        password: 'mqtt-secret',
+        commandToken: 'Command123'
+      },
+      notify: {
+        smtpPassword: 'smtp-secret'
+      }
+    }
+  }
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.route('**/api/backup', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(completeDeviceBackup)
+  }))
+  await page.addInitScript(() => {
+    localStorage.setItem('locale', 'it')
+    localStorage.setItem('showExperimental', '1')
+  })
+
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  const downloadPromise = page.waitForEvent('download')
+  await page.locator('.backup-grid .action-tile').first().click()
+  const download = await downloadPromise
+  const downloadedBackup = JSON.parse(
+    await readFile(await download.path(), 'utf8')
+  )
+
+  expect(download.suggestedFilename()).toBe('hb-rf-eth-ng-backup.json')
+  expect(downloadedBackup.adminPassword).toBe('Backup123')
+  expect(downloadedBackup.monitoring.mqtt.password).toBe('mqtt-secret')
+  expect(downloadedBackup.monitoring.notify.smtpPassword).toBe('smtp-secret')
+  expect(downloadedBackup.theme).toEqual(completeDeviceBackup.theme)
+  expect(downloadedBackup.browserPreferences).toEqual({
+    locale: 'it',
+    showExperimental: true
+  })
+})
+
+test('manual restart sends only one request and shows the synchronization countdown', async ({ page }) => {
+  let restartRequests = 0
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.route('**/api/restart', route => {
+    restartRequests += 1
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true })
+    })
+  })
+
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await page.locator('.system-action.warning').click()
+
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: 'Restart Required' })).toBeVisible()
+  const restartButton = dialog.getByRole('button', { name: 'Restart Now' })
+  await expect(restartButton).toBeEnabled()
+  await restartButton.evaluate(button => {
+    button.click()
+    button.click()
+  })
+
+  await expect.poll(() => restartRequests).toBe(1)
+  await expect(page.locator('.restart-countdown-overlay')).toBeVisible()
+  await expect(page.locator('.restart-countdown-overlay')).toContainText('Restart Sync')
+})
+
+test('settings restore is guarded against duplicates and enters restart synchronization', async ({ page }) => {
+  let restoreRequests = 0
+  let restoredPayload = null
+  const completeBackup = {
+    ...settings,
+    adminPassword: 'Backup123',
+    passwordChanged: true,
+    theme: {
+      colorScheme: 'dark',
+      primaryColor: '#3971e8'
+    },
+    monitoring: {
+      mqtt: {
+        password: 'mqtt-secret',
+        commandToken: 'Command123'
+      }
+    },
+    browserPreferences: {
+      locale: 'de',
+      showExperimental: true
+    }
+  }
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.route('**/api/restore', route => {
+    restoreRequests += 1
+    restoredPayload = route.request().postDataJSON()
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true })
+    })
+  })
+
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await page.evaluate(() => {
+    window.confirm = () => true
+  })
+  await page.locator('input.file-input').setInputFiles({
+    name: 'settings.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(completeBackup))
+  })
+
+  const restoreButton = page.getByRole('button', { name: 'Restore', exact: true })
+  await restoreButton.evaluate(button => {
+    button.click()
+    button.click()
+  })
+
+  await expect.poll(() => restoreRequests).toBe(1)
+  expect(restoredPayload.adminPassword).toBe('Backup123')
+  expect(restoredPayload.monitoring.mqtt.password).toBe('mqtt-secret')
+  expect(restoredPayload.theme).toEqual(completeBackup.theme)
+  expect(await page.evaluate(() => ({
+    locale: localStorage.getItem('locale'),
+    showExperimental: localStorage.getItem('showExperimental')
+  }))).toEqual({ locale: 'de', showExperimental: '1' })
+  await expect(page.locator('.restart-countdown-overlay')).toBeVisible()
+  await expect(page.locator('.restart-countdown-overlay')).toContainText('Restart Sync')
+})
+
+test('settings and system actions do not overflow a mobile viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await expect(page.getByRole('heading', { name: 'System actions' })).toBeVisible()
+
+  const layout = await page.evaluate(() => ({
+    viewportWidth: window.innerWidth,
+    documentWidth: document.documentElement.scrollWidth,
+    actionBounds: [...document.querySelectorAll('.system-action')].map(element => {
+      const rect = element.getBoundingClientRect()
+      return { left: rect.left, right: rect.right }
+    })
+  }))
+
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth)
+  expect(layout.actionBounds).toHaveLength(3)
+  expect(layout.actionBounds.every(bounds =>
+    bounds.left >= 0 && bounds.right <= layout.viewportWidth
+  )).toBe(true)
+})
+
+test('network ping sends authentication and shows structured results', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  let authorization = ''
+  await page.route('**/api/ping', route => {
+    authorization = route.request().headers().authorization || ''
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, latency_ms: 7 })
+    })
+  })
+
+  await page.goto(`${BASE_URL}/settings?tab=network`)
+  await page.getByPlaceholder('192.168.1.1').fill('192.168.1.1')
+  await page.getByRole('button', { name: 'Ping', exact: true }).click()
+
+  await expect(page.getByText('Ping successful. Latency: 7 ms')).toBeVisible()
+  expect(authorization).toBe('Token device-secret-token')
+})
+
+test('settings show field-level network and NTP validation messages', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings: { ...settings, useDHCP: false } })
+  }))
+
+  await page.goto(`${BASE_URL}/settings?tab=network`)
+  const netmask = page.locator('label.form-label').filter({ hasText: /^Netmask$/ }).locator('..').locator('input')
+  await netmask.fill('255.0.255.0')
+  await page.locator('.floating-footer .save-btn').click()
+  await expect(page.getByText('Invalid subnet mask. Its set bits must be contiguous.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Time' }).click()
+  const ntp = page.locator('label.form-label').filter({ hasText: /^NTP Server$/ }).locator('..').locator('input')
+  await ntp.fill('bad host name')
+  await expect(page.getByText('Invalid NTP server or port.')).toBeVisible()
+})
+
+test('wrong current password is shown in the active locale', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.route('**/api/change-password', route => route.fulfill({
+    status: 403,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: false, error: 'current_password_incorrect' })
+  }))
+
+  await page.goto(`${BASE_URL}/settings`)
+  await page.getByRole('button', { name: 'Change Password' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.locator('input[autocomplete="current-password"]').fill('Wrong123')
+  const newPasswordInputs = dialog.locator('input[autocomplete="new-password"]')
+  await newPasswordInputs.nth(0).fill('Correct123')
+  await newPasswordInputs.nth(1).fill('Correct123')
+  await dialog.getByRole('button', { name: 'Change Password' }).click()
+  await expect(dialog.getByText('The current password is incorrect.')).toBeVisible()
 })
 
 test('updates sub-navigation uses the shared design and switches child routes', async ({ page }) => {
@@ -1075,11 +1335,34 @@ test('live log waits for the authenticated WebSocket acknowledgement and closes 
     const live = 'I (2) app: live frame\n'
     const liveEnd = backlogBytes + new TextEncoder().encode(live).length
     socket.emit(`stream data ${liveEnd}\n${live}`)
+
+    const colored = [
+      '\u001b[0;31mE (3) app: colored error\u001b[0m\n',
+      '\u001b[0;33mW (4) app: colored warning\u001b[0m\n',
+      '\u001b[0;32mI (5) app: colored info\u001b[0m\n',
+      '\u001b[0;36mD (6) app: colored debug\u001b[0m\n'
+    ]
+    let coloredEnd = liveEnd
+    for (const line of colored) {
+      coloredEnd += new TextEncoder().encode(line).length
+      socket.emit(`stream data ${coloredEnd}\n${line}`)
+    }
   })
   await expect(page.locator('.log-container')).toContainText('snapshot backlog')
   await expect(page.locator('.log-container')).toContainText('live frame')
   await expect(page.locator('.log-container')).not.toContainText('stream connected')
   await expect(page.locator('.log-container')).not.toContainText('stream snapshot')
+
+  await page.locator('.level-filter').selectOption('E')
+  await expect(page.locator('.log-container')).toContainText('colored error')
+  await expect(page.locator('.log-container')).not.toContainText('colored warning')
+  await page.locator('.level-filter').selectOption('W')
+  await expect(page.locator('.log-container')).toContainText('colored warning')
+  await page.locator('.level-filter').selectOption('I')
+  await expect(page.locator('.log-container')).toContainText('colored info')
+  await page.locator('.level-filter').selectOption('D')
+  await expect(page.locator('.log-container')).toContainText('colored debug')
+  await page.locator('.level-filter').selectOption('all')
 
   // Once acknowledged, the offset-aware stream is authoritative. The old
   // setInterval captured the initial false state and kept polling every 5s.

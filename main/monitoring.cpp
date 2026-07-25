@@ -462,10 +462,13 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
         return err;
     }
 
+    esp_err_t first_err = ESP_OK;
 #define NVS_CHECK(expr, label) \
     do { \
-        if ((err = (expr)) != ESP_OK) { \
-            ESP_LOGW(TAG, "NVS write error on %s: %s", label, esp_err_to_name(err)); \
+        const esp_err_t operation_err = (expr); \
+        if (operation_err != ESP_OK) { \
+            if (first_err == ESP_OK) first_err = operation_err; \
+            ESP_LOGW(TAG, "NVS write error on %s: %s", label, esp_err_to_name(operation_err)); \
         } \
     } while (0)
 
@@ -532,7 +535,7 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
     err = nvs_commit(nvs_handle);
     nvs_close(nvs_handle);
 
-    return err;
+    return first_err != ESP_OK ? first_err : err;
 }
 
 // Load configuration from NVS
@@ -1128,6 +1131,27 @@ esp_err_t monitoring_get_config(monitoring_config_t *config)
     xSemaphoreTake(config_mutex, portMAX_DELAY);
     memcpy(config, &current_config, sizeof(monitoring_config_t));
     xSemaphoreGive(config_mutex);
+    return ESP_OK;
+}
+
+esp_err_t monitoring_save_config_for_restore(const monitoring_config_t *config)
+{
+    if (config == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t result = save_config_to_nvs(config);
+    if (result != ESP_OK) {
+        return result;
+    }
+
+    // Keep in-memory reads coherent during the Restart Sync delay. Workers
+    // are restarted by the subsequent full device reboot.
+    if (config_mutex != NULL) {
+        xSemaphoreTake(config_mutex, portMAX_DELAY);
+        memcpy(&current_config, config, sizeof(monitoring_config_t));
+        xSemaphoreGive(config_mutex);
+    }
     return ESP_OK;
 }
 

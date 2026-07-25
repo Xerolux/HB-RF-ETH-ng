@@ -202,8 +202,8 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Backup e Ripristino',
-    backupInfo: 'Scarica un backup delle tue impostazioni per ripristinarle in seguito.',
-    restoreInfo: 'Carica un file di backup per ripristinare le impostazioni. Il sistema si riavvierà successivamente.',
+    backupInfo: 'Backup completo di tutte le impostazioni utente, incluse credenziali, monitoraggio, certificati, rete, ora, LED e design. Il file contiene dati sensibili e deve essere conservato in modo sicuro.',
+    restoreInfo: 'Ripristina il backup completo, incluse credenziali, monitoraggio, certificati e design. Il sistema verrà quindi riavviato.',
     downloadBackup: 'Scarica Backup',
     restore: 'Ripristina',
     restoreBtn: 'Ripristina',
@@ -211,6 +211,9 @@ export default {
     noFileChosen: 'Nessun file selezionato',
     browse: 'Sfoglia',
     restoreConfirm: 'Sei sicuro? Le impostazioni attuali verranno sovrascritte e il sistema si riavvierà.',
+    systemActions: 'Azioni di sistema',
+    openRecovery: 'Apri pagina di ripristino',
+    openRecoveryHint: 'Apri la pagina indipendente di ripristino e diagnostica.',
     experimentalTitle: 'Sperimentale',
     experimentalEmptyTitle: 'Niente qui per ora',
     experimentalEmptyText: 'Al momento non ci sono funzioni sperimentali disponibili. Il nuovo design e la sincronia di riavvio sono uno standard per tutti i dispositivi.',
@@ -224,8 +227,20 @@ export default {
     restoreError: 'Errore durante il ripristino delle impostazioni',
     backupError: 'Errore durante il download del backup',
     validation: {
+      invalidUsername: 'Il nome utente può contenere solo lettere, numeri, punti, trattini e trattini bassi.',
+      invalidHostname: 'Hostname non valido.',
+      invalidIpv4: 'Indirizzo IPv4 non valido.',
       invalidIpv4OrIpv6: 'Indirizzo IPv4 o IPv6 non valido',
+      invalidNetmask: 'Maschera di rete non valida. I bit impostati devono essere contigui.',
+      invalidNetwork: 'Le impostazioni di rete non sono valide.',
+      invalidNtpServer: 'Server NTP o porta non validi.',
       invalidIpv6: 'Indirizzo IPv6 non valido',
+      invalidIpv6Prefix: 'Il prefisso IPv6 deve essere compreso tra 1 e 128.',
+      invalidIpv6Mode: 'Modalità IPv6 non valida.',
+      invalidTimeSource: 'Sorgente oraria non valida.',
+      invalidDcfOffset: 'Offset DCF non valido.',
+      invalidGpsBaudrate: 'Baudrate GPS non valido.',
+      invalidLedBrightness: 'La luminosità LED deve essere compresa tra 0 e 100 percento.',
       minPrefix: 'Min 1',
       maxPrefix: 'Max 128',
       fixErrors: 'Correggi i campi evidenziati.'
@@ -236,7 +251,12 @@ export default {
       placeholder: '192.168.1.1',
       button: 'Ping',
       success: 'Ping riuscito. Latenza: {latency} ms',
-      failure: 'Ping fallito o timeout.'
+      failure: 'Ping fallito.',
+      invalid_target: 'La destinazione del ping non è valida.',
+      dns_failed: 'Non è stato possibile risolvere il nome host.',
+      timeout: 'La destinazione non ha risposto entro il timeout.',
+      unauthorized: 'La sessione è scaduta. Accedi nuovamente.',
+      internal: 'Non è stato possibile eseguire la diagnostica di rete.'
     }
   },
 
@@ -446,7 +466,7 @@ webuiUpdate: {
     factoryResetHint: 'Ripristina le impostazioni di fabbrica',
     factoryResetTitle: 'Impostazioni di fabbrica',
     factoryResetMessage: 'Vuoi davvero ripristinare tutte le impostazioni ai valori di fabbrica?',
-    factoryResetWarning: 'Tutte le impostazioni salvate andranno perse. Il dispositivo verrà riavviato automaticamente.',
+    factoryResetWarning: 'Tutti i dati utente verranno eliminati, incluse credenziali, rete, monitoraggio, certificati, registri, tema e colore principale. Il dispositivo verrà riavviato automaticamente.',
     factoryResetConfirm: 'Ripristina impostazioni di fabbrica',
     factoryResetError: 'Ripristino delle impostazioni di fabbrica non riuscito.',
     factoryResetChallengeHelp: 'Inserisci esattamente il seguente codice di sicurezza di 8 caratteri. Fa distinzione tra maiuscole e minuscole; copia e incolla sono disabilitati.',
@@ -553,19 +573,19 @@ webuiUpdate: {
       password: 'Password',
       passwordHelp: 'Opzionale: Password MQTT',
       topicPrefix: 'Prefisso Topic',
-      topicPrefixHelp: 'Segmento radice di ogni topic MQTT pubblicato/sottoscritto da questo dispositivo. Predefinito: hb-rf-eth-ng. Esempi: "prefisso/status/uptime", "prefisso/status/version", "prefisso/command/update". Visibile nel broker MQTT (es. MQTT Explorer), non nell\'interfaccia Web.',
+      topicPrefixHelp: 'Segmento radice di ogni topic MQTT pubblicato/sottoscritto da questo dispositivo. Predefinito: hb-rf-eth-ng. Esempi: "prefisso/status/uptime", "prefisso/status/version", "prefisso/command/restart". Visibile nel broker MQTT, non nell\'interfaccia Web.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Prefisso Discovery',
       haDiscoveryPrefixHelp: 'Predefinito: homeassistant',
       commands: {
         title: 'Topic dei comandi',
-        enableHelp: 'Consente il controllo remoto (riavvio, ripristino di fabbrica, OTA) tramite MQTT. Senza token o ACL del broker, qualsiasi client sulla rete può controllare il dispositivo.',
+        enableHelp: 'Consente il riavvio del dispositivo tramite MQTT. Il ripristino di fabbrica e OTA non sono disponibili come comandi MQTT.',
         token: 'Token comando',
         tokenPlaceholder: 'opzionale – segreto condiviso',
         tokenHelp: 'Se impostato, il payload del comando deve corrispondere esattamente a questo token. Consentiti: A-Z a-z 0-9 - _ .',
         tokenPresent: '✓ Presente – inserisci un nuovo valore per sostituire',
         clear: 'Cancella',
-        aclHint: 'Nota: senza ACL del broker e token, qualsiasi client MQTT può riavviare il dispositivo o avviare un aggiornamento OTA. Configura sul broker un\'ACL che conceda i diritti di pubblicazione sul topic dei comandi solo agli host autorizzati.',
+        aclHint: 'Nota: senza ACL del broker e token, qualsiasi client MQTT può riavviare il dispositivo. Consenti la pubblicazione sul topic dei comandi solo ai client autorizzati.',
       },
       serverRequired: 'Inserire un indirizzo server MQTT quando MQTT è abilitato.',
       tls: {
@@ -738,6 +758,8 @@ webuiUpdate: {
     newPasswordPlaceholder: 'Inserisci nuova password',
     currentPasswordPlaceholder: 'Inserisci password attuale',
     currentPasswordRequired: 'La password attuale è richiesta',
+    currentPasswordIncorrect: 'La password attuale non è corretta.',
+    sessionExpired: 'La sessione è scaduta. Accedi nuovamente.',
     confirmPasswordPlaceholder: 'Conferma nuova password'
   },
 

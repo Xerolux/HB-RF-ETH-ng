@@ -102,6 +102,7 @@ public:
   char *getAdminPassword();
   char *getAdminUsername();
   bool setAdminPassword(const char* password);
+  bool restoreAdminPassword(const char* password, bool passwordChanged);
   bool setAdminUsername(const char* username);
   bool getPasswordChanged();
 

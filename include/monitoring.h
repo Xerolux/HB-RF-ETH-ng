@@ -124,9 +124,8 @@ void monitoring_set_providers(Ethernet* ethernet,
                               RadioModuleDetector* radioModuleDetector,
                               SystemClock* systemClock);
 
-// Register the Settings instance so MQTT-initiated factory-reset can use
-// Settings::clear() instead of direct NVS calls. Must be called before any
-// MQTT command that could trigger a factory reset.
+// Register the Settings instance used by monitoring events and syslog for
+// device identity and system configuration.
 void monitoring_set_settings(Settings* settings);
 Settings* monitoring_get_settings(void);
 
@@ -145,6 +144,11 @@ void monitoring_resume_after_ota(uint32_t paused_mask);
 
 // Get current configuration
 esp_err_t monitoring_get_config(monitoring_config_t *config);
+
+// Persist a complete configuration restored from a backup without restarting
+// every monitoring worker. The caller restarts the device immediately after
+// this returns, so the restored configuration becomes active on the next boot.
+esp_err_t monitoring_save_config_for_restore(const monitoring_config_t *config);
 
 // Run a lightweight connectivity/self-test for a configured monitoring target.
 // Supported targets: "checkmk", "mqtt"

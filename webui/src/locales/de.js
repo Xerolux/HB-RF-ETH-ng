@@ -202,8 +202,8 @@ export default {
 
     // Backup & Restore
     backupRestore: 'Sichern & Wiederherstellen',
-    backupInfo: 'Laden Sie eine Sicherung Ihrer Einstellungen herunter. Der Administrator-Benutzername ist enthalten, das Passwort aus Sicherheitsgründen nicht.',
-    restoreInfo: 'Laden Sie eine Sicherungsdatei hoch, um die Einstellungen inklusive Administrator-Benutzername wiederherzustellen. Das Passwort bleibt erhalten. Das System wird danach neu gestartet.',
+    backupInfo: 'Vollständige Sicherung aller Benutzereinstellungen einschließlich Zugangsdaten, Monitoring, Zertifikaten, Netzwerk, Zeit, LED und Design. Die Datei enthält sensible Daten und muss sicher verwahrt werden.',
+    restoreInfo: 'Stellt die vollständige Sicherung einschließlich Zugangsdaten, Monitoring, Zertifikaten und Design wieder her. Das System wird danach neu gestartet.',
     downloadBackup: 'Sicherung herunterladen',
     restore: 'Wiederherstellen',
     restoreBtn: 'Wiederherstellen',
@@ -211,6 +211,9 @@ export default {
     noFileChosen: 'Keine Datei ausgewählt',
     browse: 'Datei auswählen',
     restoreConfirm: 'Sind Sie sicher? Die aktuellen Einstellungen werden überschrieben und das System neu gestartet.',
+    systemActions: 'Systemaktionen',
+    openRecovery: 'Notfallseite öffnen',
+    openRecoveryHint: 'Unabhängige Wiederherstellungs- und Diagnoseseite öffnen.',
     experimentalTitle: 'Experimentell',
     experimentalWarningTitle: 'In Arbeit',
     experimentalWarningText: 'Diese Funktionen sind zum Testen gedacht. Es gibt keine Garantie auf Funktion oder Darstellung.',
@@ -224,8 +227,20 @@ export default {
     restoreError: 'Fehler beim Wiederherstellen der Einstellungen',
     backupError: 'Fehler beim Herunterladen der Sicherung',
     validation: {
+      invalidUsername: 'Der Benutzername darf nur Buchstaben, Zahlen, Punkt, Bindestrich und Unterstrich enthalten.',
+      invalidHostname: 'Ungültiger Hostname.',
+      invalidIpv4: 'Ungültige IPv4-Adresse.',
       invalidIpv4OrIpv6: 'Ungültige IPv4- oder IPv6-Adresse',
+      invalidNetmask: 'Ungültige Netzmaske. Die gesetzten Bits müssen zusammenhängend sein.',
+      invalidNetwork: 'Die Netzwerkeinstellungen sind ungültig.',
+      invalidNtpServer: 'Ungültiger NTP-Server oder Port.',
       invalidIpv6: 'Ungültige IPv6-Adresse',
+      invalidIpv6Prefix: 'Das IPv6-Präfix muss zwischen 1 und 128 liegen.',
+      invalidIpv6Mode: 'Ungültiger IPv6-Modus.',
+      invalidTimeSource: 'Ungültige Zeitquelle.',
+      invalidDcfOffset: 'Ungültiger DCF-Offset.',
+      invalidGpsBaudrate: 'Ungültige GPS-Baudrate.',
+      invalidLedBrightness: 'Die LED-Helligkeit muss zwischen 0 und 100 Prozent liegen.',
       minPrefix: 'Mindestens 1',
       maxPrefix: 'Maximal 128',
       fixErrors: 'Bitte korrigiere die markierten Felder.'
@@ -236,7 +251,12 @@ export default {
       placeholder: '192.168.1.1',
       button: 'Ping',
       success: 'Ping erfolgreich. Latenz: {latency} ms',
-      failure: 'Ping fehlgeschlagen oder Timeout.'
+      failure: 'Ping fehlgeschlagen.',
+      invalid_target: 'Das Ping-Ziel ist ungültig.',
+      dns_failed: 'Der Hostname konnte nicht aufgelöst werden.',
+      timeout: 'Das Ziel antwortet nicht innerhalb des Zeitlimits.',
+      unauthorized: 'Die Sitzung ist abgelaufen. Bitte erneut anmelden.',
+      internal: 'Die Netzwerkdiagnose konnte nicht ausgeführt werden.'
     }
   },
 
@@ -446,7 +466,7 @@ export default {
     factoryResetHint: 'Auf Werkseinstellungen zurücksetzen',
     factoryResetTitle: 'Werkseinstellungen',
     factoryResetMessage: 'Möchten Sie wirklich alle Einstellungen auf Werkseinstellungen zurücksetzen?',
-    factoryResetWarning: 'Alle gespeicherten Einstellungen gehen verloren. Das Gerät startet danach automatisch neu.',
+    factoryResetWarning: 'Alle Benutzerdaten werden gelöscht – einschließlich Zugangsdaten, Netzwerk, Monitoring, Zertifikate, Protokolle sowie Design und Akzentfarbe. Das Gerät startet danach automatisch neu.',
     factoryResetConfirm: 'Auf Werkseinstellungen zurücksetzen',
     factoryResetError: 'Zurücksetzen auf Werkseinstellungen fehlgeschlagen.',
     factoryResetChallengeHelp: 'Geben Sie den folgenden 8-stelligen Sicherheitscode exakt ein. Groß-/Kleinschreibung wird beachtet; Kopieren und Einfügen sind gesperrt.',
@@ -553,20 +573,20 @@ export default {
       password: 'Passwort',
       passwordHelp: 'Optional: MQTT Passwort',
       topicPrefix: 'Topic Präfix',
-      topicPrefixHelp: 'Wurzel aller vom Gerät veröffentlichten bzw. abonnierten MQTT-Topics. Standard: hb-rf-eth-ng. Beispiele: „präfix/status/uptime“, „präfix/status/version“, „präfix/command/update“. Sichtbar im MQTT-Broker (z. B. MQTT Explorer), nicht im WebUI.',
+      topicPrefixHelp: 'Wurzel aller vom Gerät veröffentlichten bzw. abonnierten MQTT-Topics. Standard: hb-rf-eth-ng. Beispiele: „präfix/status/uptime“, „präfix/status/version“, „präfix/command/restart“. Sichtbar im MQTT-Broker (z. B. MQTT Explorer), nicht im WebUI.',
       haDiscoveryEnabled: 'Home Assistant Discovery',
       haDiscoveryPrefix: 'Discovery Präfix',
       haDiscoveryPrefixHelp: 'Standard: homeassistant',
       serverRequired: 'Bitte einen MQTT-Server angeben, wenn MQTT aktiviert ist.',
       commands: {
         title: 'Kommando-Topics',
-        enableHelp: 'Erlaubt Fernsteuerung (Restart, Factory-Reset, OTA) über MQTT. Ohne Token oder Broker-ACL kann jeder Client im Netz das Gerät steuern.',
+        enableHelp: 'Erlaubt einen Geräteneustart über MQTT. Werksreset und OTA sind aus Sicherheitsgründen nicht als MQTT-Kommandos verfügbar.',
         token: 'Kommando-Token',
         tokenPlaceholder: 'optional – gemeinsames Geheimnis',
         tokenHelp: 'Wenn gesetzt, muss der Payload eines Kommandos genau diesem Token entsprechen. Erlaubt: A-Z a-z 0-9 - _ .',
         tokenPresent: '✓ Vorhanden – neu eingeben zum Ersetzen',
         clear: 'Löschen',
-        aclHint: 'Hinweis: Ohne Broker-ACL + Token kann jeder MQTT-Client das Gerät neustarten oder ein Update auslösen. Bitte am Broker eine ACL setzen, die Publish-Rechte auf das Kommando-Topic nur dem Gerät gibt.'
+        aclHint: 'Hinweis: Ohne Broker-ACL + Token kann jeder MQTT-Client das Gerät neustarten. Bitte am Broker eine ACL setzen, die Publish-Rechte auf das Kommando-Topic nur autorisierten Clients gibt.'
       },
       tls: {
         title: 'TLS / SSL',
@@ -738,6 +758,8 @@ export default {
     newPasswordPlaceholder: 'Neues Passwort eingeben',
     currentPasswordPlaceholder: 'Aktuelles Passwort eingeben',
     currentPasswordRequired: 'Aktuelles Passwort ist erforderlich',
+    currentPasswordIncorrect: 'Das aktuelle Passwort ist falsch.',
+    sessionExpired: 'Die Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.',
     confirmPasswordPlaceholder: 'Neues Passwort bestätigen'
   },
 

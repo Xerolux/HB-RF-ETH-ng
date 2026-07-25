@@ -41,16 +41,27 @@ export function safeGetItem(storage, key) {
   }
 }
 
+export function safeClear(storage) {
+  try {
+    storage.clear()
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 // Convenience bound helpers so call sites read naturally:
 //   safeLocal.set('theme', 'dark')   /  safeLocal.remove('theme')
 export const safeLocal = {
   get: (key) => safeGetItem(localStorage, key),
   set: (key, value) => safeSetItem(localStorage, key, value),
-  remove: (key) => safeRemoveItem(localStorage, key)
+  remove: (key) => safeRemoveItem(localStorage, key),
+  clear: () => safeClear(localStorage)
 }
 
 export const safeSession = {
   get: (key) => safeGetItem(sessionStorage, key),
   set: (key, value) => safeSetItem(sessionStorage, key, value),
-  remove: (key) => safeRemoveItem(sessionStorage, key)
+  remove: (key) => safeRemoveItem(sessionStorage, key),
+  clear: () => safeClear(sessionStorage)
 }

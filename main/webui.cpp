@@ -24,9 +24,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <inttypes.h>
 #include <sys/param.h>
 #include <atomic>
+#include <memory>
 #include <new>
 #include <stdarg.h>
 #include "webui.h"
@@ -709,19 +711,15 @@ esp_err_t post_ping_handler_func(httpd_req_t *req)
     }
 
     char buf[128];
-    int ret, remaining = req->content_len;
-    if (remaining >= sizeof(buf)) {
+    if (req->content_len <= 0 || req->content_len >= sizeof(buf)) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Payload too large");
         return ESP_FAIL;
     }
 
-    if ((ret = httpd_req_recv(req, buf, remaining)) <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
+    const int ret = recv_full_body(req, buf, sizeof(buf));
+    if (ret <= 0) {
         return ESP_FAIL;
     }
-    buf[ret] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
     if (!root) {
@@ -731,10 +729,15 @@ esp_err_t post_ping_handler_func(httpd_req_t *req)
 
     cJSON *target_json = cJSON_GetObjectItem(root, "target");
     const char *target = target_json && cJSON_IsString(target_json) ? target_json->valuestring : "";
-    if (strlen(target) == 0) {
+    ip4_addr_t literal_addr = {};
+    const bool literal_ipv4 = ip4addr_aton(target, &literal_addr) != 0;
+    if (strlen(target) == 0 ||
+        (!literal_ipv4 && !validateHostname(target))) {
         cJSON_Delete(root);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing target");
-        return ESP_FAIL;
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req,
+            "{\"success\":false,\"error\":\"invalid_target\"}");
     }
 
     int latency = ping_service_ping(target, 4000); // 4 seconds timeout
@@ -744,8 +747,16 @@ esp_err_t post_ping_handler_func(httpd_req_t *req)
     char resp[128];
     if (latency >= 0) {
         snprintf(resp, sizeof(resp), "{\"success\":true,\"latency_ms\":%d}", latency);
+    } else if (latency == PING_SERVICE_DNS_ERROR) {
+        snprintf(resp, sizeof(resp),
+                 "{\"success\":false,\"error\":\"dns_failed\"}");
+    } else if (latency == PING_SERVICE_TIMEOUT) {
+        snprintf(resp, sizeof(resp),
+                 "{\"success\":false,\"error\":\"timeout\"}");
     } else {
-        snprintf(resp, sizeof(resp), "{\"success\":false}");
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        snprintf(resp, sizeof(resp),
+                 "{\"success\":false,\"error\":\"internal\"}");
     }
     httpd_resp_sendstr(req, resp);
     return ESP_OK;
@@ -865,6 +876,57 @@ bool cJSON_GetBoolValue(const cJSON *item)
     return (item && cJSON_IsBool(item)) ? cJSON_IsTrue(item) : false;
 }
 
+static esp_err_t send_json_error(httpd_req_t *req, const char *status,
+                                 const char *code, const char *field = NULL)
+{
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "JSON allocation failed");
+    }
+    cJSON_AddBoolToObject(root, "success", false);
+    cJSON_AddStringToObject(root, "error", code);
+    if (field) cJSON_AddStringToObject(root, "field", field);
+    char *body = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!body) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "JSON allocation failed");
+    }
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_type(req, "application/json");
+    const esp_err_t result = httpd_resp_sendstr(req, body);
+    free(body);
+    return result;
+}
+
+static bool valid_admin_username(const char *value)
+{
+    if (!value) return false;
+    const size_t length = strlen(value);
+    if (length < 1 || length > 32) return false;
+    for (size_t index = 0; index < length; ++index) {
+        const char c = value[index];
+        if (!isalnum(static_cast<unsigned char>(c)) &&
+            c != '-' && c != '_' && c != '.') {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool parse_ipv4_json(const cJSON *item, bool optional,
+                            ip4_addr_t *address)
+{
+    if (!item || !cJSON_IsString(item) || !address) return false;
+    const char *value = cJSON_GetStringValue(item);
+    if (optional && value && value[0] == '\0') {
+        address->addr = IPADDR_ANY;
+        return true;
+    }
+    return value && ip4addr_aton(value, address) != 0;
+}
+
 static bool refresh_restart_sync_from_settings()
 {
     const bool enabled = _settings && _settings->getFlashPause();
@@ -944,57 +1006,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     int ledBrightness = cJSON_GetIntValueSafe(
         cJSON_GetObjectItem(root, "ledBrightness"), _settings->getLEDBrightness());
-    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
-        LED::setBrightness(ledBrightness);
-    }
-
     cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
-    if (ledPrograms) {
-        cJSON *item;
-        int value;
-        item = cJSON_GetObjectItem(ledPrograms, "idle");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_IDLE, value);
-            LED::setProgram(LED_PROG_IDLE, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, value);
-            LED::setProgram(LED_PROG_CCU_DISCONNECTED, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_CCU_CONNECTED, value);
-            LED::setProgram(LED_PROG_CCU_CONNECTED, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "update_available");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, value);
-            LED::setProgram(LED_PROG_UPDATE_AVAILABLE, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "error");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_ERROR, value);
-            LED::setProgram(LED_PROG_ERROR, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "booting");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_BOOTING, value);
-            LED::setProgram(LED_PROG_BOOTING, (led_state_t)value);
-        }
-        item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) {
-            _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, value);
-            LED::setProgram(LED_PROG_UPDATE_IN_PROGRESS, (led_state_t)value);
-        }
-    }
 
     // IPv6
     bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
@@ -1011,26 +1023,168 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     char *adminUsername = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminUsername"));
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
 
+    // Validate the complete request before changing any live setting. This
+    // prevents a later invalid NTP/network value from producing a misleading
+    // success response after earlier fields were already applied.
+    if (adminUsername && !valid_admin_username(adminUsername)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_username",
+                               "adminUsername");
+    }
+    if (adminPassword && adminPassword[0] != '\0' &&
+        !validateAdminPassword(adminPassword)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_password",
+                               "adminPassword");
+    }
+    if (hostname && !validateHostname(hostname)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_hostname",
+                               "hostname");
+    }
+    if (hostname && !useDHCP) {
+        const bool local_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "localIP"), false, &localIP);
+        const bool netmask_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "netmask"), false, &netmask);
+        const bool gateway_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "gateway"), false, &gateway);
+        if (!local_ok || localIP.addr == IPADDR_ANY ||
+            !validateIPAddress(localIP)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv4",
+                                   "localIP");
+        }
+        if (!netmask_ok || netmask.addr == IPADDR_ANY ||
+            !validateNetmask(netmask)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_netmask",
+                                   "netmask");
+        }
+        if (!gateway_ok || !validateIPAddress(gateway)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv4",
+                                   "gateway");
+        }
+    }
+    if (hostname) {
+        const bool dns1_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "dns1"), true, &dns1);
+        const bool dns2_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "dns2"), true, &dns2);
+        if (!dns1_ok || (dns1.addr != IPADDR_ANY &&
+                        !validateIPAddress(dns1))) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv4",
+                                   "dns1");
+        }
+        if (!dns2_ok || (dns2.addr != IPADDR_ANY &&
+                        !validateIPAddress(dns2))) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv4",
+                                   "dns2");
+        }
+    }
+    if (timesource < TIMESOURCE_NTP || timesource > TIMESOURCE_GPS) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_time_source",
+                               "timesource");
+    }
+    if (ntpServer && !validateNtpServer(ntpServer)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_ntp_server",
+                               "ntpServer");
+    }
+    if (!validateDcfOffset(dcfOffset)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_dcf_offset",
+                               "dcfOffset");
+    }
+    if (!validateGpsBaudrate(gpsBaudrate)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_gps_baudrate",
+                               "gpsBaudrate");
+    }
+    if (!validateLEDBrightness(ledBrightness)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_led_brightness",
+                               "ledBrightness");
+    }
+    if (ccuIP && ccuIP[0] != '\0' && !validateCcuAddress(ccuIP)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_ccu_address",
+                               "ccuIP");
+    }
+
+    const bool has_ipv6 = cJSON_GetObjectItem(root, "enableIPv6") ||
+        cJSON_GetObjectItem(root, "ipv6Mode") ||
+        cJSON_GetObjectItem(root, "ipv6Address") ||
+        cJSON_GetObjectItem(root, "ipv6PrefixLength") ||
+        cJSON_GetObjectItem(root, "ipv6Gateway") ||
+        cJSON_GetObjectItem(root, "ipv6Dns1") ||
+        cJSON_GetObjectItem(root, "ipv6Dns2");
+    if (has_ipv6) {
+        const char *effective_mode = ipv6Mode ? ipv6Mode : _settings->getIPv6Mode();
+        const char *effective_address = ipv6Address ? ipv6Address : _settings->getIPv6Address();
+        if (!effective_mode ||
+            (strcmp(effective_mode, "auto") != 0 &&
+             strcmp(effective_mode, "static") != 0 &&
+             strcmp(effective_mode, "disabled") != 0)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv6_mode",
+                                   "ipv6Mode");
+        }
+        if (ipv6PrefixLength < 1 || ipv6PrefixLength > 128) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv6_prefix",
+                                   "ipv6PrefixLength");
+        }
+        if (enableIPv6 && strcmp(effective_mode, "static") == 0 &&
+            (!effective_address || effective_address[0] == '\0' ||
+             !validateIPv6Address(effective_address))) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv6",
+                                   "ipv6Address");
+        }
+        const struct {
+            const char *value;
+            const char *field;
+        } optional_ipv6[] = {
+            {ipv6Gateway, "ipv6Gateway"},
+            {ipv6Dns1, "ipv6Dns1"},
+            {ipv6Dns2, "ipv6Dns2"},
+        };
+        for (const auto &entry : optional_ipv6) {
+            if (entry.value && entry.value[0] != '\0' &&
+                !validateIPv6Address(entry.value)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request", "invalid_ipv6",
+                                       entry.field);
+            }
+        }
+    }
+
     if (adminUsername && adminUsername[0] != '\0') {
         if (!_settings->setAdminUsername(adminUsername)) {
             cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                       "Username must be 1-32 characters using letters, numbers, dot, dash, or underscore");
+            return send_json_error(req, "400 Bad Request", "invalid_username",
+                                   "adminUsername");
         }
     }
 
     if (adminPassword && adminPassword[0] != '\0') {
         if (!validateAdminPassword(adminPassword) || !_settings->setAdminPassword(adminPassword)) {
             cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                       "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+            return send_json_error(req, "400 Bad Request", "invalid_password",
+                                   "adminPassword");
         }
     }
 
     if (hostname) {
         if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
             cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
+            return send_json_error(req, "400 Bad Request", "invalid_network",
+                                   "network");
         }
     }
     _settings->setTimesource(timesource);
@@ -1040,16 +1194,36 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setNtpServer(ntpServer);
     }
     _settings->setLEDBrightness(ledBrightness);
+    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
+        LED::setBrightness(ledBrightness);
+    }
+
+    if (ledPrograms) {
+        const struct {
+            const char *key;
+            led_program_t program;
+        } programs[] = {
+            {"idle", LED_PROG_IDLE},
+            {"ccu_disconnected", LED_PROG_CCU_DISCONNECTED},
+            {"ccu_connected", LED_PROG_CCU_CONNECTED},
+            {"update_available", LED_PROG_UPDATE_AVAILABLE},
+            {"error", LED_PROG_ERROR},
+            {"booting", LED_PROG_BOOTING},
+            {"update_in_progress", LED_PROG_UPDATE_IN_PROGRESS},
+        };
+        for (const auto &program : programs) {
+            const int value = cJSON_GetIntValueSafe(
+                cJSON_GetObjectItem(ledPrograms, program.key), -1);
+            if (value >= 0 && value <= 10) {
+                _settings->setLedProgram(program.program, value);
+                LED::setProgram(program.program, (led_state_t)value);
+            }
+        }
+    }
 
     // Handle IPv6 when any IPv6-related field is present so toggling
     // enableIPv6 to false without sending ipv6Mode still persists.
-    if (cJSON_GetObjectItem(root, "enableIPv6") ||
-        cJSON_GetObjectItem(root, "ipv6Mode") ||
-        cJSON_GetObjectItem(root, "ipv6Address") ||
-        cJSON_GetObjectItem(root, "ipv6PrefixLength") ||
-        cJSON_GetObjectItem(root, "ipv6Gateway") ||
-        cJSON_GetObjectItem(root, "ipv6Dns1") ||
-        cJSON_GetObjectItem(root, "ipv6Dns2")) {
+    if (has_ipv6) {
         _settings->setIPv6Settings(
             cJSON_GetObjectItem(root, "enableIPv6") ? enableIPv6 : _settings->getEnableIPv6(),
             ipv6Mode ? ipv6Mode : _settings->getIPv6Mode(),
@@ -1131,6 +1305,348 @@ httpd_uri_t post_settings_json_handler = {
     .handler = post_settings_json_handler_func,
     .user_ctx = NULL};
 
+static bool backup_get_bool(const cJSON *object, const char *key, bool *value)
+{
+    const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, key);
+    if (!cJSON_IsBool(item) || !value) return false;
+    *value = cJSON_IsTrue(item);
+    return true;
+}
+
+static bool backup_get_uint(const cJSON *object, const char *key,
+                            unsigned maximum, unsigned *value)
+{
+    const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, key);
+    if (!cJSON_IsNumber(item) || !value ||
+        item->valuedouble < 0 || item->valuedouble > maximum ||
+        item->valuedouble != item->valueint) {
+        return false;
+    }
+    *value = static_cast<unsigned>(item->valueint);
+    return true;
+}
+
+static bool backup_get_string(const cJSON *object, const char *key,
+                              char *value, size_t value_size)
+{
+    const cJSON *item = cJSON_GetObjectItemCaseSensitive(object, key);
+    if (!cJSON_IsString(item) || !item->valuestring ||
+        !value || value_size == 0 ||
+        strlen(item->valuestring) >= value_size) {
+        return false;
+    }
+    snprintf(value, value_size, "%s", item->valuestring);
+    return true;
+}
+
+static esp_err_t add_monitoring_backup(cJSON *root)
+{
+    monitoring_config_t *config =
+        new (std::nothrow) monitoring_config_t();
+    if (!config) return ESP_ERR_NO_MEM;
+    if (monitoring_get_config(config) != ESP_OK) {
+        delete config;
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    cJSON *monitoring = cJSON_AddObjectToObject(root, "monitoring");
+    cJSON *checkmk = monitoring
+        ? cJSON_AddObjectToObject(monitoring, "checkmk") : NULL;
+    cJSON *mqtt = monitoring
+        ? cJSON_AddObjectToObject(monitoring, "mqtt") : NULL;
+    cJSON *prometheus = monitoring
+        ? cJSON_AddObjectToObject(monitoring, "prometheus") : NULL;
+    cJSON *syslog = monitoring
+        ? cJSON_AddObjectToObject(monitoring, "syslog") : NULL;
+    cJSON *notify = monitoring
+        ? cJSON_AddObjectToObject(monitoring, "notify") : NULL;
+    if (!monitoring || !checkmk || !mqtt || !prometheus ||
+        !syslog || !notify) {
+        delete config;
+        return ESP_ERR_NO_MEM;
+    }
+
+    cJSON_AddBoolToObject(checkmk, "enabled", config->checkmk.enabled);
+    cJSON_AddNumberToObject(checkmk, "port", config->checkmk.port);
+    cJSON_AddStringToObject(checkmk, "allowedHosts",
+                            config->checkmk.allowed_hosts);
+
+    cJSON_AddBoolToObject(mqtt, "enabled", config->mqtt.enabled);
+    cJSON_AddStringToObject(mqtt, "server", config->mqtt.server);
+    cJSON_AddNumberToObject(mqtt, "port", config->mqtt.port);
+    cJSON_AddStringToObject(mqtt, "user", config->mqtt.user);
+    cJSON_AddStringToObject(mqtt, "password", config->mqtt.password);
+    cJSON_AddStringToObject(mqtt, "topicPrefix", config->mqtt.topic_prefix);
+    cJSON_AddBoolToObject(mqtt, "haDiscoveryEnabled",
+                          config->mqtt.ha_discovery_enabled);
+    cJSON_AddStringToObject(mqtt, "haDiscoveryPrefix",
+                            config->mqtt.ha_discovery_prefix);
+    cJSON_AddBoolToObject(mqtt, "tlsEnable", config->mqtt.tls_enable);
+    cJSON_AddBoolToObject(mqtt, "tlsSkipVerify",
+                          config->mqtt.tls_skip_verify);
+    cJSON_AddStringToObject(mqtt, "tlsCaCerts",
+                            config->mqtt.tls_ca_certs);
+    cJSON_AddStringToObject(mqtt, "tlsCertfile",
+                            config->mqtt.tls_certfile);
+    cJSON_AddStringToObject(mqtt, "tlsKeyfile",
+                            config->mqtt.tls_keyfile);
+    cJSON_AddBoolToObject(mqtt, "commandEnabled",
+                          config->mqtt.command_enabled);
+    cJSON_AddStringToObject(mqtt, "commandToken",
+                            config->mqtt.command_token);
+
+    cJSON_AddBoolToObject(prometheus, "enabled",
+                          config->prometheus.enabled);
+    cJSON_AddNumberToObject(prometheus, "port", config->prometheus.port);
+    cJSON_AddStringToObject(prometheus, "allowedHosts",
+                            config->prometheus.allowed_hosts);
+
+    cJSON_AddBoolToObject(syslog, "enabled", config->syslog.enabled);
+    cJSON_AddStringToObject(syslog, "server", config->syslog.server);
+    cJSON_AddNumberToObject(syslog, "port", config->syslog.port);
+    cJSON_AddNumberToObject(syslog, "transport",
+                            config->syslog.transport);
+    cJSON_AddNumberToObject(syslog, "minSeverity",
+                            config->syslog.min_severity);
+    cJSON_AddStringToObject(syslog, "hostname",
+                            config->syslog.hostname);
+
+    cJSON_AddBoolToObject(notify, "enabled", config->notify.enabled);
+    cJSON_AddNumberToObject(notify, "channels", config->notify.channels);
+    cJSON_AddStringToObject(notify, "webhookUrl",
+                            config->notify.webhook_url);
+    cJSON_AddStringToObject(notify, "webhookSecret",
+                            config->notify.webhook_secret);
+    cJSON_AddStringToObject(notify, "telegramToken",
+                            config->notify.telegram_token);
+    cJSON_AddStringToObject(notify, "telegramChatId",
+                            config->notify.telegram_chatid);
+    cJSON_AddStringToObject(notify, "smtpServer",
+                            config->notify.smtp_server);
+    cJSON_AddNumberToObject(notify, "smtpPort",
+                            config->notify.smtp_port);
+    cJSON_AddNumberToObject(notify, "smtpTls",
+                            config->notify.smtp_tls);
+    cJSON_AddStringToObject(notify, "smtpUser",
+                            config->notify.smtp_user);
+    cJSON_AddStringToObject(notify, "smtpPassword",
+                            config->notify.smtp_password);
+    cJSON_AddStringToObject(notify, "smtpFrom",
+                            config->notify.smtp_from);
+    cJSON_AddStringToObject(notify, "smtpTo",
+                            config->notify.smtp_to);
+    cJSON_AddNumberToObject(notify, "cooldownSeconds",
+                            config->notify.cooldown_seconds);
+
+    delete config;
+    return ESP_OK;
+}
+
+static esp_err_t parse_monitoring_backup(
+    const cJSON *root, monitoring_config_t **restored_config)
+{
+    if (!restored_config) return ESP_ERR_INVALID_ARG;
+    *restored_config = NULL;
+
+    const cJSON *monitoring =
+        cJSON_GetObjectItemCaseSensitive(root, "monitoring");
+    if (!monitoring) return ESP_OK; // Backwards-compatible legacy backup.
+    if (!cJSON_IsObject(monitoring)) return ESP_ERR_INVALID_ARG;
+
+    const cJSON *checkmk =
+        cJSON_GetObjectItemCaseSensitive(monitoring, "checkmk");
+    const cJSON *mqtt =
+        cJSON_GetObjectItemCaseSensitive(monitoring, "mqtt");
+    const cJSON *prometheus =
+        cJSON_GetObjectItemCaseSensitive(monitoring, "prometheus");
+    const cJSON *syslog =
+        cJSON_GetObjectItemCaseSensitive(monitoring, "syslog");
+    const cJSON *notify =
+        cJSON_GetObjectItemCaseSensitive(monitoring, "notify");
+    if (!cJSON_IsObject(checkmk) || !cJSON_IsObject(mqtt) ||
+        !cJSON_IsObject(prometheus) || !cJSON_IsObject(syslog) ||
+        !cJSON_IsObject(notify)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    monitoring_config_t *config =
+        new (std::nothrow) monitoring_config_t();
+    if (!config) return ESP_ERR_NO_MEM;
+    memset(config, 0, sizeof(*config));
+    unsigned number = 0;
+
+    bool valid =
+        backup_get_bool(checkmk, "enabled", &config->checkmk.enabled) &&
+        backup_get_uint(checkmk, "port", UINT16_MAX, &number);
+    if (valid) config->checkmk.port = static_cast<uint16_t>(number);
+    valid = valid && validatePort(config->checkmk.port) &&
+        backup_get_string(checkmk, "allowedHosts",
+                          config->checkmk.allowed_hosts,
+                          sizeof(config->checkmk.allowed_hosts));
+
+    valid = valid &&
+        backup_get_bool(mqtt, "enabled", &config->mqtt.enabled) &&
+        backup_get_string(mqtt, "server", config->mqtt.server,
+                          sizeof(config->mqtt.server)) &&
+        backup_get_uint(mqtt, "port", UINT16_MAX, &number);
+    if (valid) config->mqtt.port = static_cast<uint16_t>(number);
+    valid = valid && validatePort(config->mqtt.port) &&
+        backup_get_string(mqtt, "user", config->mqtt.user,
+                          sizeof(config->mqtt.user)) &&
+        backup_get_string(mqtt, "password", config->mqtt.password,
+                          sizeof(config->mqtt.password)) &&
+        backup_get_string(mqtt, "topicPrefix", config->mqtt.topic_prefix,
+                          sizeof(config->mqtt.topic_prefix)) &&
+        backup_get_bool(mqtt, "haDiscoveryEnabled",
+                        &config->mqtt.ha_discovery_enabled) &&
+        backup_get_string(mqtt, "haDiscoveryPrefix",
+                          config->mqtt.ha_discovery_prefix,
+                          sizeof(config->mqtt.ha_discovery_prefix)) &&
+        backup_get_bool(mqtt, "tlsEnable", &config->mqtt.tls_enable) &&
+        backup_get_bool(mqtt, "tlsSkipVerify",
+                        &config->mqtt.tls_skip_verify) &&
+        backup_get_string(mqtt, "tlsCaCerts",
+                          config->mqtt.tls_ca_certs,
+                          sizeof(config->mqtt.tls_ca_certs)) &&
+        backup_get_string(mqtt, "tlsCertfile",
+                          config->mqtt.tls_certfile,
+                          sizeof(config->mqtt.tls_certfile)) &&
+        backup_get_string(mqtt, "tlsKeyfile",
+                          config->mqtt.tls_keyfile,
+                          sizeof(config->mqtt.tls_keyfile)) &&
+        backup_get_bool(mqtt, "commandEnabled",
+                        &config->mqtt.command_enabled) &&
+        backup_get_string(mqtt, "commandToken",
+                          config->mqtt.command_token,
+                          sizeof(config->mqtt.command_token));
+    if (valid && (config->mqtt.enabled || config->mqtt.server[0] != '\0')) {
+        valid = validateServerAddress(config->mqtt.server,
+                                      sizeof(config->mqtt.server) - 1);
+    }
+    if (valid && config->mqtt.command_token[0] != '\0') {
+        valid = validateMqttCommandToken(config->mqtt.command_token);
+    }
+
+    valid = valid &&
+        backup_get_bool(prometheus, "enabled",
+                        &config->prometheus.enabled) &&
+        backup_get_uint(prometheus, "port", UINT16_MAX, &number);
+    if (valid) config->prometheus.port = static_cast<uint16_t>(number);
+    valid = valid && validatePort(config->prometheus.port) &&
+        backup_get_string(prometheus, "allowedHosts",
+                          config->prometheus.allowed_hosts,
+                          sizeof(config->prometheus.allowed_hosts));
+
+    valid = valid &&
+        backup_get_bool(syslog, "enabled", &config->syslog.enabled) &&
+        backup_get_string(syslog, "server", config->syslog.server,
+                          sizeof(config->syslog.server)) &&
+        backup_get_uint(syslog, "port", UINT16_MAX, &number);
+    if (valid) config->syslog.port = static_cast<uint16_t>(number);
+    valid = valid && validatePort(config->syslog.port) &&
+        backup_get_uint(syslog, "transport", 2, &number);
+    if (valid) config->syslog.transport = static_cast<uint8_t>(number);
+    valid = valid &&
+        backup_get_uint(syslog, "minSeverity", 7, &number);
+    if (valid) config->syslog.min_severity = static_cast<uint8_t>(number);
+    valid = valid &&
+        backup_get_string(syslog, "hostname", config->syslog.hostname,
+                          sizeof(config->syslog.hostname));
+    if (valid && (config->syslog.enabled || config->syslog.server[0] != '\0')) {
+        valid = validateServerAddress(config->syslog.server,
+                                      sizeof(config->syslog.server) - 1);
+    }
+
+    valid = valid &&
+        backup_get_bool(notify, "enabled", &config->notify.enabled) &&
+        backup_get_uint(notify, "channels", 7, &number);
+    if (valid) config->notify.channels = static_cast<uint8_t>(number);
+    valid = valid &&
+        backup_get_string(notify, "webhookUrl",
+                          config->notify.webhook_url,
+                          sizeof(config->notify.webhook_url)) &&
+        backup_get_string(notify, "webhookSecret",
+                          config->notify.webhook_secret,
+                          sizeof(config->notify.webhook_secret)) &&
+        backup_get_string(notify, "telegramToken",
+                          config->notify.telegram_token,
+                          sizeof(config->notify.telegram_token)) &&
+        backup_get_string(notify, "telegramChatId",
+                          config->notify.telegram_chatid,
+                          sizeof(config->notify.telegram_chatid)) &&
+        backup_get_string(notify, "smtpServer",
+                          config->notify.smtp_server,
+                          sizeof(config->notify.smtp_server)) &&
+        backup_get_uint(notify, "smtpPort", UINT16_MAX, &number);
+    if (valid) config->notify.smtp_port = static_cast<uint16_t>(number);
+    valid = valid && validatePort(config->notify.smtp_port) &&
+        backup_get_uint(notify, "smtpTls", 2, &number);
+    if (valid) config->notify.smtp_tls = static_cast<uint8_t>(number);
+    valid = valid &&
+        backup_get_string(notify, "smtpUser", config->notify.smtp_user,
+                          sizeof(config->notify.smtp_user)) &&
+        backup_get_string(notify, "smtpPassword",
+                          config->notify.smtp_password,
+                          sizeof(config->notify.smtp_password)) &&
+        backup_get_string(notify, "smtpFrom", config->notify.smtp_from,
+                          sizeof(config->notify.smtp_from)) &&
+        backup_get_string(notify, "smtpTo", config->notify.smtp_to,
+                          sizeof(config->notify.smtp_to)) &&
+        backup_get_uint(notify, "cooldownSeconds", UINT16_MAX, &number);
+    if (valid) {
+        config->notify.cooldown_seconds = static_cast<uint16_t>(number);
+    }
+
+    if (!valid) {
+        delete config;
+        return ESP_ERR_INVALID_ARG;
+    }
+    *restored_config = config;
+    return ESP_OK;
+}
+
+static esp_err_t add_theme_backup(cJSON *root)
+{
+    char scheme[8] = {};
+    char color[8] = {};
+    esp_err_t result = theme_api_get_config(
+        scheme, sizeof(scheme), color, sizeof(color));
+    if (result != ESP_OK) return result;
+    cJSON *theme = cJSON_AddObjectToObject(root, "theme");
+    if (!theme) return ESP_ERR_NO_MEM;
+    cJSON_AddStringToObject(theme, "colorScheme", scheme);
+    cJSON_AddStringToObject(theme, "primaryColor", color);
+    return ESP_OK;
+}
+
+static esp_err_t parse_theme_backup(const cJSON *root,
+                                    char scheme[8], char color[8],
+                                    bool *has_theme)
+{
+    if (!scheme || !color || !has_theme) return ESP_ERR_INVALID_ARG;
+    *has_theme = false;
+    const cJSON *theme = cJSON_GetObjectItemCaseSensitive(root, "theme");
+    if (!theme) return ESP_OK; // Backwards-compatible legacy backup.
+    if (!cJSON_IsObject(theme) ||
+        !backup_get_string(theme, "colorScheme", scheme, 8) ||
+        !backup_get_string(theme, "primaryColor", color, 8)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strcmp(scheme, "system") != 0 &&
+        strcmp(scheme, "light") != 0 &&
+        strcmp(scheme, "dark") != 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (strlen(color) != 7 || color[0] != '#') return ESP_ERR_INVALID_ARG;
+    for (size_t index = 1; index < 7; ++index) {
+        if (!isxdigit(static_cast<unsigned char>(color[index]))) {
+            return ESP_ERR_INVALID_ARG;
+        }
+    }
+    *has_theme = true;
+    return ESP_OK;
+}
+
 esp_err_t get_backup_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -1143,14 +1659,20 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"settings.json\"");
+    httpd_resp_set_hdr(
+        req, "Content-Disposition",
+        "attachment; filename=\"hb-rf-eth-ng-backup.json\"");
+    httpd_resp_set_hdr(req, "Cache-Control",
+                       "no-store, no-cache, must-revalidate, max-age=0");
 
     cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Out of memory");
+    }
 
-    // NOTE: Admin password is intentionally excluded from backup for security.
-    // The admin username is included because it is not secret and is needed to
-    // restore password-manager friendly login settings across devices.
-    // On restore, the current password will be preserved unless explicitly changed.
+    cJSON_AddStringToObject(root, "_format", "hb-rf-eth-ng-backup");
+    cJSON_AddNumberToObject(root, "_version", 2);
 
     add_settings(root);
 
@@ -1169,6 +1691,21 @@ esp_err_t get_backup_handler_func(httpd_req_t *req)
             child = child->next;
         }
         cJSON_DeleteItemFromObject(root, "settings");
+    }
+
+    // A complete backup intentionally contains credentials and private keys.
+    // It is available only through the authenticated endpoint and marked
+    // no-store, but the downloaded file itself must be protected by the user.
+    cJSON_AddStringToObject(root, "adminPassword",
+                            _settings->getAdminPassword());
+    cJSON_AddBoolToObject(root, "passwordChanged",
+                          _settings->getPasswordChanged());
+
+    if (add_theme_backup(root) != ESP_OK ||
+        add_monitoring_backup(root) != ESP_OK) {
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Could not create complete backup");
     }
 
     const char *json = cJSON_PrintUnformatted(root);
@@ -1200,7 +1737,10 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    constexpr size_t maxRestoreBodySize = 8192;
+    // Complete backups include MQTT TLS material and notification credentials,
+    // so they can legitimately be larger than the old settings-only 8 KiB
+    // payload.
+    constexpr size_t maxRestoreBodySize = 24576;
     if (req->content_len == 0)
     {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
@@ -1231,8 +1771,28 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
          return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
     }
 
+    monitoring_config_t *parsed_monitoring = NULL;
+    const esp_err_t monitoring_parse_result =
+        parse_monitoring_backup(root, &parsed_monitoring);
+    std::unique_ptr<monitoring_config_t> restored_monitoring(
+        parsed_monitoring);
+    char restored_theme_scheme[8] = {};
+    char restored_theme_color[8] = {};
+    bool has_restored_theme = false;
+    const esp_err_t theme_parse_result =
+        parse_theme_backup(root, restored_theme_scheme,
+                           restored_theme_color, &has_restored_theme);
+    if (monitoring_parse_result != ESP_OK ||
+        theme_parse_result != ESP_OK) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request",
+                               "invalid_backup", "backup");
+    }
+
     char *adminUsername = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminUsername"));
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+    cJSON *passwordChangedItem =
+        cJSON_GetObjectItem(root, "passwordChanged");
 
     char *hostname = cJSON_GetStringValue(cJSON_GetObjectItem(root, "hostname"));
     // Presence guard mirrors the IPv6 fields below: without it,
@@ -1312,10 +1872,17 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     }
 
     if (adminPassword && adminPassword[0] != '\0') {
-        if (!validateAdminPassword(adminPassword) || !_settings->setAdminPassword(adminPassword)) {
+        const bool hasPasswordChangedFlag =
+            passwordChangedItem && cJSON_IsBool(passwordChangedItem);
+        const bool restored = hasPasswordChangedFlag
+            ? _settings->restoreAdminPassword(
+                adminPassword, cJSON_IsTrue(passwordChangedItem))
+            : (validateAdminPassword(adminPassword) &&
+               _settings->setAdminPassword(adminPassword));
+        if (!restored) {
             cJSON_Delete(root);
             return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                       "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+                                       "Invalid password in backup");
         }
     }
 
@@ -1392,6 +1959,20 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     }
 
     _settings->save();
+
+    if (restored_monitoring &&
+        monitoring_save_config_for_restore(restored_monitoring.get()) != ESP_OK) {
+        cJSON_Delete(root);
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_monitoring_failed", "monitoring");
+    }
+    if (has_restored_theme &&
+        theme_api_set_config(restored_theme_scheme,
+                             restored_theme_color) != ESP_OK) {
+        cJSON_Delete(root);
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_theme_failed", "theme");
+    }
 
     cJSON_Delete(root);
 
@@ -1726,11 +2307,11 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
-    // Store reset reason before factory reset
-    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
-
-    // Perform factory reset - clear settings
+    // Erase every user-controlled namespace first. reset_info is deliberately
+    // part of Settings::clear(), so store the one allowed post-reset metadata
+    // value only after the wipe.
     _settings->clear();
+    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
 
     // Restart after a short delay to allow response to be sent
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -2137,7 +2718,7 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     if (validate_auth(req) != ESP_OK)
     {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+        return send_json_error(req, "401 Unauthorized", "unauthorized");
     }
 
     char buffer[512];
@@ -2145,13 +2726,13 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
 
     if (len <= 0)
     {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid request");
+        return send_json_error(req, "400 Bad Request", "invalid_request");
     }
 
     cJSON *root = cJSON_Parse(buffer);
     if (root == NULL)
     {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return send_json_error(req, "400 Bad Request", "invalid_request");
     }
 
     char *currentPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "currentPassword"));
@@ -2162,24 +2743,30 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
     if (currentPassword == NULL || currentPassword[0] == '\0')
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Current password is required");
+        return send_json_error(req, "400 Bad Request",
+                               "current_password_required",
+                               "currentPassword");
     }
     if (secure_strcmp(currentPassword, _settings->getAdminPassword()) != 0)
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Current password is incorrect");
+        return send_json_error(req, "403 Forbidden",
+                               "current_password_incorrect",
+                               "currentPassword");
     }
 
     if (!validateAdminPassword(newPassword))
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be 8-32 characters with uppercase, lowercase, and numbers");
+        return send_json_error(req, "400 Bad Request",
+                               "invalid_new_password", "newPassword");
     }
 
     if (!_settings->setAdminPassword(newPassword))
     {
         cJSON_Delete(root);
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid password");
+        return send_json_error(req, "400 Bad Request",
+                               "invalid_new_password", "newPassword");
     }
     _settings->save();
 
