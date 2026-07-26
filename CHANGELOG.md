@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-07-26
+
+### Changes
+- Merge pull request #395 from Xerolux/chore/release-2.2.5-webui-note
+- docs(changelog): add 2.2.5 upgrade note about separate WebUI install
+- chore: update manifests for v2.2.5-Beta.19
+
 ### ⚠️ Wichtiger Hinweis für das Update von 2.2.4 auf 2.2.5
 
 Ab **2.2.5** werden Firmware und WebUI **separat** ausgeliefert und müssen
