@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ⚠️ Wichtiger Hinweis für das Update von 2.2.4 auf 2.2.5
+
+Ab **2.2.5** werden Firmware und WebUI **separat** ausgeliefert und müssen
+beide aktualisiert werden, damit Gerät und Oberfläche kompatibel bleiben:
+
+1. **Firmware** wie gewohnt über die Firmware-Update-Seite oder OTA flashen.
+2. **Anschließend WebUI** über *Updates → WebUI* hochladen und installieren.
+   Die passende WebUI-Version steht im Release-Anhang (`webui-v1.0.0-Beta.15`
+   oder neuer) und ist zusätzlich unter
+   <https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/webui-v1.0.0-Beta.15>
+   verfügbar.
+
+Eine **inkompatible oder veraltete WebUI** wird vom Gerät nicht ausgeliefert:
+die eingebaute Recovery-WebUI bleibt aktiv und zeigt einen Reparaturhinweis.
+In diesem Fall die zur Firmware passende WebUI-Version manuell hochladen.
+
+Warum die Trennung? Firmware und WebUI haben unterschiedliche Release-Zyklen
+und APIs. Der serverseitig geprüfte Kompatibilitätsvertrag
+(`apiVersion` / `minFirmwareVersion`) stellt sicher, dass nie eine
+unpassende Kombination aktiv wird.
+
 ## [2.2.5-Beta.19] - 2026-07-25
 
 ### Changes
