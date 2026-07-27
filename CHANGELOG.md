@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.1] - 2026-07-27
+
+### Changes
+- perf(heap): reclaim ~11 KB from log_stream, mqtt_publish and raw-uart tasks
+- chore: update manifests for v2.2.5
+
 ## [2.2.5] - 2026-07-26
 
 ### Changes
