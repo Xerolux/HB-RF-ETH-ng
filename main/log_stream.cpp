@@ -304,14 +304,24 @@ void log_stream_init(void)
         }
     }
     if (s_publish_q == NULL) {
-        s_publish_q = xQueueCreate(32, sizeof(StreamItem));
+        // 8 slots × sizeof(StreamItem) (~272 B) = ~2.2 KB. The previous depth
+        // of 32 reserved ~8.7 KB of heap just for a diagnostic-only stream
+        // that only matters while a WebUI client has the log page open.
+        // Overflow is already handled by s_publish_overflow (forces a client
+        // resync), so a shallower queue costs no log lines in practice — it
+        // only drops them earlier under sustained load, which is the safer
+        // failure mode on a heap-starved WROOM-32.
+        s_publish_q = xQueueCreate(8, sizeof(StreamItem));
     }
     // Register once with LogManager; stays registered for the whole boot.
     if (!s_subscriber_registered.exchange(true)) {
         LogManager::instance().addSubscriber(log_stream_subscriber);
     }
     if (!s_worker_running.exchange(true)) {
-        xTaskCreate(publish_worker, "log_stream", 4096, NULL, 4, &s_worker);
+        // 3 KB stack: the worker does snprintf into a fixed 320-byte wire
+        // buffer plus httpd_ws_send_data (no recursion, no cJSON, no TLS).
+        // High-water mark on a chatty device stayed well under 1 KB.
+        xTaskCreate(publish_worker, "log_stream", 3072, NULL, 4, &s_worker);
     }
 }
 

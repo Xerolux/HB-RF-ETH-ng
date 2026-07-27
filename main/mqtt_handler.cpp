@@ -285,10 +285,11 @@ void mqtt_publish_task(void *pvParameters)
         mqtt_handler_publish_status();
         publish_ota_state();
 
-        // Task-stack diagnostics move slowly; publishing every cycle (5 s)
+        // Task-stack diagnostics move slowly; publishing every cycle
         // wastes broker storage for no insight. ~60 s cadence is enough to
         // spot slow leaks or post-OTA drift when the user files a bug.
-        if (publish_cycle % 12 == 0) {
+        // With the 10 s status cadence above, every-6th-cycle ≈ 60 s.
+        if (publish_cycle % 6 == 0) {
             mqtt_handler_publish_task_stacks();
         }
 
@@ -328,7 +329,12 @@ void mqtt_publish_task(void *pvParameters)
         // Sleep with quick wake-ups so we can react fast to trigger_publish
         // requests and so the OTA-state-changed detection runs every second
         // while an update is in flight.
-        int delay_ms = (ota.state == OTA_STATE_IDLE) ? 5000 : 1000;
+        // 10 s base cadence (was 5 s): each cycle publishes ~40 retained
+        // status topics, so doubling the interval halves the steady-state
+        // esp_mqtt_client_publish churn and the small per-call tx-buffer
+        // allocations inside esp-mqtt. HA's measurement sensors tolerate
+        // 10 s updates comfortably; OTA progress still runs on the 1 s path.
+        int delay_ms = (ota.state == OTA_STATE_IDLE) ? 10000 : 1000;
         for (int i = 0; i < 12 && mqtt_running.load(); i++) {
             if (mqtt_publish_request.exchange(false)) {
                 break;  // run a fresh publish cycle immediately
@@ -930,11 +936,14 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
         return err;
     }
 
-    // The publish task formats several JSON/status payloads and performs MQTT
-    // client calls. 8 KB keeps TLS-enabled brokers stable while returning
-    // ~2 KB heap to firmware-update/archive HTTPS operations on WROOM-32.
+    // The publish task formats several status payloads via snprintf into a
+    // 96-byte stack buffer and calls esp_mqtt_client_publish — TLS handshakes
+    // run in the esp-mqtt client task, not here. The observed high-water mark
+    // (e.g. "mqtt_publish stack high water mark: 7536 bytes free") confirms
+    // only ~650 B of the previous 8 KB were ever used, so 5 KB leaves a
+    // >4 KB safety margin while returning ~3 KB to the WROOM-32 heap.
     TaskHandle_t pub_handle = NULL;
-    if (xTaskCreate(mqtt_publish_task, "mqtt_publish", 8192,
+    if (xTaskCreate(mqtt_publish_task, "mqtt_publish", 5120,
                     NULL, 4, &pub_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create MQTT publish task");
         mqtt_running.store(false);

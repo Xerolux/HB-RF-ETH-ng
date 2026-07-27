@@ -338,7 +338,9 @@ void RawUartUdpListener::start()
 
     // Store the small event descriptor directly in the FreeRTOS queue. This
     // removes one malloc/free pair per UDP datagram from the LwIP callback.
-    _udp_queue = xQueueCreate(64, sizeof(udp_event_t));
+    // 32 slots is plenty for a single CCU-3 session; 64 reserved ~1 KB of
+    // queue storage for no observed benefit. Drop depth halves that reserve.
+    _udp_queue = xQueueCreate(32, sizeof(udp_event_t));
     if (_udp_queue == NULL)
     {
         ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");
@@ -355,8 +357,15 @@ void RawUartUdpListener::start()
     }
     _udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
+    // Priority 12 (was 15): the listener still runs well above user tasks
+    // (events: 3, log_stream: 4, mqtt_publish: 4) so the CCU-3 session stays
+    // latency-bound to the radio module, but yields a few levels of headroom
+    // below the ESP-IDF system / Wi-Fi / timer tasks. Under a burst of UDP
+    // frames this gives critical system work (including the IWDT-feeding
+    // timer-task path) more room to interleave without the listener being
+    // scheduled ahead of it purely on numeric priority.
     if (xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler",
-                    4096, this, 15, &_tHandle) != pdPASS) {
+                    4096, this, 12, &_tHandle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UDP listener task");
         _udp_recv(_pcb, NULL, NULL);
         _udp_remove(_pcb);
