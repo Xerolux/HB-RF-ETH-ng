@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.2] - 2026-07-27
+
+### Changes
+- fix(mqtt): clear stale retained temperature/supply_voltage/version topics
+- chore: update manifests for v2.2.6-Beta.1
+
 ## [2.2.6-Beta.1] - 2026-07-27
 
 ### Changes
