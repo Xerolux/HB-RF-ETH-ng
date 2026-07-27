@@ -92,6 +92,7 @@ extern SystemClock* monitoring_get_systemclock(void);
 
 void mqtt_handler_publish_ha_discovery(void);
 static void publish_ota_state(void);
+static void publish_legacy_topic_cleanup(void);
 
 // Helper: map OTA state enum to short string for status topic + HA.
 static const char* ota_state_str(ota_state_t s)
@@ -214,6 +215,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             esp_mqtt_client_subscribe(client, command_topic, 1);
             ESP_LOGI(TAG, "Subscribed to command topic: %s", command_topic);
         }
+        // Clear legacy retained status/* topics the firmware no longer
+        // publishes to. Must happen BEFORE the first publish_status so
+        // subscribers don't briefly see a stale -127 temperature again
+        // after we've just announced we're online.
+        publish_legacy_topic_cleanup();
         // Publish initial status (includes online marker)
         mqtt_handler_publish_status();
         // Publish HA discovery config if enabled
@@ -594,6 +600,45 @@ static void publish_ota_state(void)
 #undef PUBLISH_INT
 #undef PUBLISH_UINT64
 #undef PUBLISH_DOUBLE
+
+// One-shot broker cleanup of status/* topics the firmware no longer
+// publishes to but used to emit with retain=1 in earlier versions
+// (commit b13b484, "fix: stabilize OTA and clean firmware diagnostics").
+//
+// The ESP32 classic has no internal temperature sensor, so the legacy
+// SysInfo::getTemperature() always returned -127 (the standard
+// "no sensor" sentinel) and that value got retained on the broker.
+// After the upgrade the firmware simply stops publishing to the topic,
+// leaving stale retained payloads that subscribers like ioBroker keep
+// displaying forever — see issue #396.
+//
+// We also clear supply_voltage (same removal commit) and the short-named
+// version / latest_version topics that were renamed to firmware_version /
+// latest_firmware_version. Each is an empty retained publish that the
+// broker treats as "delete this retained value", mirroring the existing
+// remove_config() pattern for HA discovery topics. Idempotent and cheap,
+// so running it on every MQTT_EVENT_CONNECTED is safer than tracking
+// per-boot state across reconnects.
+static void publish_legacy_topic_cleanup(void)
+{
+    if (!mqtt_can_publish()) return;
+
+    static const char *const legacy_subtopics[] = {
+        "status/temperature",
+        "status/supply_voltage",
+        "status/version",
+        "status/latest_version",
+    };
+
+    char topic[160];
+    for (size_t i = 0; i < sizeof(legacy_subtopics) / sizeof(legacy_subtopics[0]); i++) {
+        snprintf(topic, sizeof(topic), "%s/%s",
+                 current_mqtt_config.topic_prefix, legacy_subtopics[i]);
+        // qos=0, retain=1: an empty retained payload is the MQTT-standard
+        // way to delete a retained value from the broker.
+        mqtt_publish_connected(topic, "", 0, 0, 1);
+    }
+}
 
 void mqtt_handler_publish_ha_discovery(void)
 {
