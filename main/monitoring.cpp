@@ -52,6 +52,7 @@
 #include "crash_blackbox.h"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
+#include "sysinfo.h"
 
 static const char *TAG = "MONITORING";
 SemaphoreHandle_t g_net_fetch_mutex = NULL;

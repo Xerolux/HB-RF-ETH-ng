@@ -25,6 +25,7 @@
 #include <stdint.h>
 #include "settings.h"
 #include "led.h"
+#include "sysinfo.h"
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
