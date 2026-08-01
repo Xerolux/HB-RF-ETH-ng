@@ -23,7 +23,7 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "esbuild": "^0.28.1",
     "sass": "^1.101.7",
