@@ -419,6 +419,9 @@ firmware: {
   availableKicker: 'Micrologiciel disponible',
   availableHeading: 'Micrologiciel disponible',
   availableHelp: 'L’ESP télécharge uniquement le manifeste de mise à jour. Le fichier du micrologiciel est téléchargé directement par votre navigateur.',
+        updatesOnGithubHeading: 'Mises à jour sur GitHub',
+    updatesOnGithubHelp: 'Les nouvelles versions sont toujours disponibles sur la page GitHub du projet.',
+    noAutoCheckNote: "L'appareil ne recherche plus les mises à jour automatiquement. Consultez GitHub régulièrement ou téléversez manuellement un nouveau firmware_*.bin.",
   newVersionLabel: 'Nouvelle version',
   publishedAt: 'Publié le : {time}',
   statusLabel: 'État',
@@ -591,6 +594,9 @@ firmware: {
     availableKicker: 'Micrologiciel disponible pour l’appareil',
     availableHeading: 'Micrologiciel disponible',
     availableHelp: 'L’ESP télécharge uniquement le petit manifeste de mise à jour. Le fichier du micrologiciel est téléchargé directement par votre navigateur.',
+        updatesOnGithubHeading: 'Mises à jour sur GitHub',
+    updatesOnGithubHelp: 'Les nouvelles versions sont toujours disponibles sur la page GitHub du projet.',
+    noAutoCheckNote: "L'appareil ne recherche plus les mises à jour automatiquement. Consultez GitHub régulièrement ou téléversez manuellement un nouveau firmware_*.bin.",
     newVersionLabel: 'Nouvelle version',
     publishedAt: 'Publié : {time}',
     statusLabel: 'État',
@@ -1010,17 +1016,6 @@ firmware: {
     updateCheck: 'Les mises à jour automatiques et les vérifications du firmware se connectent au serveur raw.githubusercontent.com / github.com. Votre adresse IP est transmise pour vérifier la disponibilité de nouvelles versions.',
   },
 
-  // Changelog
-  changelog: {
-    title: 'Journal des modifications',
-    loading: 'Chargement...',
-    fetching: 'Récupération du journal des modifications depuis GitHub...',
-    error: 'Échec du chargement du journal des modifications',
-    fetchError: 'Impossible de récupérer le journal des modifications. Veuillez vérifier votre connexion Internet.',
-    retry: 'Réessayer',
-    close: 'Fermer',
-    viewOnGithub: 'Voir sur GitHub'
-  },
 
   // Supporter
   supporter: {

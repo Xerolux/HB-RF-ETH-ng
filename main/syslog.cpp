@@ -460,6 +460,15 @@ static void syslog_task(void *pv)
 
     // Persistent TCP socket for the TCP transport.
     int tcp_sock = -1;
+    // Persistent UDP socket + resolved destination for the UDP transport.
+    // Reused across log lines so we don't open/close a socket (and re-resolve
+    // via getaddrinfo, which allocates) on every single message — that lwIP /
+    // getaddrinfo churn adds up under high log volume and contributes to heap
+    // fragmentation on the WROOM-32. Mirrors how the TCP path already keeps
+    // its socket; rebuilt lazily only after a send failure.
+    int udp_sock = -1;
+    struct sockaddr_in udp_dst;
+    memset(&udp_dst, 0, sizeof(udp_dst));
 
     // Persistent TLS session for the TLS transport. Allocated once on the
     // worker's stack; mbedtls contexts inside it are set up lazily.
@@ -482,12 +491,21 @@ static void syslog_task(void *pv)
         if (e.len == 0) continue;
 
         if (s_cfg.transport == 0) {
-            // UDP — connection-less, no need to keep a socket open.
-            struct sockaddr_in dst;
-            int sock = resolve_and_connect_udp(s_cfg.server, s_cfg.port, &dst);
-            if (sock < 0) continue;
-            sendto(sock, e.buf, e.len, 0, (struct sockaddr *)&dst, sizeof(dst));
-            close(sock);
+            // UDP — keep a persistent socket + resolved destination (analogous
+            // to the TCP path) instead of open/close + getaddrinfo per line.
+            if (udp_sock < 0) {
+                udp_sock = resolve_and_connect_udp(s_cfg.server, s_cfg.port, &udp_dst);
+            }
+            if (udp_sock >= 0) {
+                ssize_t w = sendto(udp_sock, e.buf, e.len, 0,
+                                   (struct sockaddr *)&udp_dst, sizeof(udp_dst));
+                if (w < 0) {
+                    // Socket went bad (e.g. interface cycled) — drop and rebuild
+                    // on the next line. Best-effort, like the TCP path.
+                    close(udp_sock);
+                    udp_sock = -1;
+                }
+            }
         } else if (s_cfg.transport == 1) {
             // TCP — reconnect lazily and reuse the socket.
             if (tcp_sock < 0) {
@@ -517,6 +535,7 @@ static void syslog_task(void *pv)
     }
 
     if (tcp_sock >= 0) close(tcp_sock);
+    if (udp_sock >= 0) close(udp_sock);
     syslog_tls_teardown(&tls);
     ESP_LOGI(TAG, "syslog forwarder stopped");
     s_running.store(false);

@@ -8,101 +8,30 @@
       </div>
       <div class="hero-meta">
         <span class="meta-chip"><AppIcon name="firmware" /> {{ t('firmware.installedLabel') }}: {{ sysInfoStore.currentVersion || '—' }}</span>
-        <span class="meta-chip"><AppIcon name="clock" /> {{ lastCheckText }}</span>
       </div>
     </section>
 
     <div class="content-grid">
       <section class="update-card">
         <div class="card-header">
-          <div class="header-icon bg-success-light text-success"><AppIcon name="download" /></div>
+          <div class="header-icon bg-success-light text-success"><AppIcon name="externalLink" /></div>
           <div class="header-text">
             <span class="kicker">{{ t('firmware.availableKicker') }}</span>
-            <h2>{{ t('firmware.availableHeading') }}</h2>
-            <p>{{ t('firmware.availableHelp') }}</p>
+            <h2>{{ t('firmware.updatesOnGithubHeading') }}</h2>
+            <p>{{ t('firmware.updatesOnGithubHelp') }}</p>
           </div>
         </div>
         <div class="card-body">
-          <BAlert v-if="updateStore.checkError" variant="warning" :model-value="true">
-            {{ t('firmware.checkFailed') }}: {{ updateStore.checkError }}
-          </BAlert>
-
-          <!-- Manual "search for updates now" (Korrekturauftrag §6.2/§6.3).
-               The on-device fetch runs off the httpd thread; the store polls
-               fetchInProgress until it clears, so the spinner reflects the real
-               check. The automatic 24 h cycle is untouched (§6.4). -->
-          <div class="check-now-row">
-            <BButton variant="outline-primary" class="action-btn check-now-btn"
-                     :disabled="updateStore.isChecking" @click="onCheckNow">
-              <span v-if="updateStore.isChecking" class="spinner-border spinner-border-sm me-2"></span>
-              <AppIcon v-else name="refresh" />
-              {{ updateStore.isChecking ? t('updates.checkingNow') : t('updates.checkNow') }}
-            </BButton>
-          </div>
-
-          <BAlert
-            v-if="manualCheckFeedback"
-            :variant="manualCheckFeedback.variant"
-            :model-value="true"
-            class="manual-check-feedback"
-            data-testid="manual-check-feedback"
-          >
-            <strong>{{ manualCheckFeedback.title }}</strong>
-            <span>{{ manualCheckFeedback.message }}</span>
-          </BAlert>
-
-          <div v-if="updateStore.updateAvailable" class="release-box">
-            <div>
-              <span class="release-label">{{ t('firmware.newVersionLabel') }}</span>
-              <strong>v{{ updateStore.latestVersion }}</strong>
-              <small v-if="updateStore.publishedAt">{{ t('firmware.publishedAt', { time: formatDate(updateStore.publishedAt) }) }}</small>
-            </div>
-            <span v-if="updateStore.isPrerelease" class="beta-badge">{{ t('firmware.beta') }}</span>
-          </div>
-          <div v-else class="release-box is-current">
-            <div>
-              <span class="release-label">{{ t('firmware.statusLabel') }}</span>
-              <strong>{{ updateStore.hasCompletedManualCheck || (updateStore.latestVersion && updateStore.latestVersion !== 'n/a') ? t('firmware.upToDate') : t('firmware.noCheckResult') }}</strong>
-            </div>
-          </div>
-
+          <p class="muted-text">{{ t('firmware.noAutoCheckNote') }}</p>
           <div class="actions">
             <a
-              v-if="updateStore.updateAvailable && updateStore.downloadUrl"
               class="btn btn-success action-btn"
-              :href="updateStore.downloadUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <AppIcon name="download" /> {{ t('firmware.downloadBin') }}
-            </a>
-            <a
-              v-if="updateStore.releaseUrl"
-              class="btn btn-outline-secondary action-btn"
-              :href="updateStore.releaseUrl"
+              href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"
               target="_blank"
               rel="noopener noreferrer"
             >
               <AppIcon name="externalLink" /> {{ t('firmware.viewOnGithub') }}
             </a>
-          </div>
-
-          <div class="beta-toggle-row">
-            <div class="form-check form-switch">
-              <input
-                id="betaChannelSwitch"
-                class="form-check-input"
-                type="checkbox"
-                role="switch"
-                :checked="updateStore.betaChannel"
-                :disabled="betaToggleSaving"
-                @change="onBetaToggle"
-              >
-            </div>
-            <label for="betaChannelSwitch" class="beta-toggle-label">
-              {{ t('firmware.betaChannel') }}
-              <span class="beta-toggle-hint">{{ t('firmware.betaCycleHint') }}</span>
-            </label>
           </div>
         </div>
       </section>
@@ -162,20 +91,18 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import axios from 'axios'
-import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, useUpdateStore } from './stores.js'
+import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore } from './stores.js'
 
 const WEBUI_IMAGE_SIZE = 0x50000
 const ESP_IMAGE_MAGIC = 0xe9
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const firmwareUpdateStore = useFirmwareUpdateStore()
 const restartUiStore = useRestartUiStore()
 const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
-const updateStore = useUpdateStore()
 
 const file = ref(null)
 const fileInput = ref(null)
@@ -183,51 +110,7 @@ const fileError = ref('')
 const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
-const betaToggleSaving = ref(false)
-const lastCheckText = computed(() => {
-  const checkedAt = updateStore.lastSuccessfulManualCheckAt || updateStore.lastCheck
-  if (!checkedAt) return t('firmware.noRecentCheck')
-  return t('firmware.lastCheckAt', { time: new Date(checkedAt).toLocaleString(locale.value) })
-})
 
-const manualCheckFeedback = computed(() => {
-  switch (updateStore.lastManualCheckOutcome) {
-    case 'updated':
-      return {
-        variant: 'success',
-        title: t('updates.checkResultUpdatedTitle'),
-        message: t('updates.checkResultUpdated', { version: updateStore.latestVersion })
-      }
-    case 'no-update':
-      return {
-        variant: 'success',
-        title: t('updates.checkResultNoUpdateTitle'),
-        message: t('updates.checkResultNoUpdate')
-      }
-    case 'cooldown':
-      return {
-        variant: 'info',
-        title: t('updates.checkResultCooldownTitle'),
-        message: t('updates.checkResultCooldown')
-      }
-    case 'skipped':
-      return {
-        variant: 'warning',
-        title: t('updates.checkResultSkippedTitle'),
-        message: updateStore.lastSkipReason || t('updates.checkResultSkipped')
-      }
-    case 'error':
-      return {
-        variant: 'danger',
-        title: t('updates.checkResultErrorTitle'),
-        message: updateStore.checkError || t('updates.checkResultError')
-      }
-    default:
-      return null
-  }
-})
-
-const formatDate = value => value ? new Date(value).toLocaleString(locale.value) : '—'
 const formatSize = bytes => {
   const value = Number(bytes) || 0
   if (value < 1024) return `${value} B`
@@ -303,72 +186,8 @@ const uploadFirmware = async () => {
   }
 }
 
-const onBetaToggle = async event => {
-  const enabled = event.target.checked
-  betaToggleSaving.value = true
-  try {
-    await axios.post('/settings.json', { betaChannel: enabled }, { silent: true })
-    updateStore.betaChannel = enabled
-    uiStore.pushToast({ type: 'success', title: t('firmware.betaSavedTitle'), message: t('firmware.betaSavedMessage') })
-  } catch (error) {
-    event.target.checked = !enabled
-    uiStore.pushToast({ type: 'error', title: t('firmware.saveFailedTitle'), message: error.response?.data?.error || error.message })
-  } finally {
-    betaToggleSaving.value = false
-  }
-}
-
-// Manual update search (Korrekturauftrag §6.2/§6.3). The store handles the
-// POST + polling and returns one of: 'updated' | 'no-update' | 'cooldown' |
-// 'skipped' | 'error'. Each outcome surfaces a clear toast so the user
-// always knows the result of clicking "search now".
-const onCheckNow = async () => {
-  if (updateStore.isChecking) return
-  const outcome = await updateStore.checkNow(sysInfoStore.currentVersion)
-  if (outcome === 'updated') {
-    uiStore.pushToast({
-      type: 'success',
-      title: t('updates.checkResultUpdatedTitle'),
-      message: t('updates.checkResultUpdated', { version: updateStore.latestVersion }),
-      duration: 5000
-    })
-  } else if (outcome === 'no-update') {
-    uiStore.pushToast({
-      type: 'info',
-      title: t('updates.checkResultNoUpdateTitle'),
-      message: t('updates.checkResultNoUpdate'),
-      duration: 4000
-    })
-  } else if (outcome === 'skipped') {
-    // Device accepted the request but skipped the fetch (typically low heap
-    // while the radio module is actively serving a CCU session). Show the
-    // device's own reason rather than a misleading "no update available".
-    uiStore.pushToast({
-      type: 'warning',
-      title: t('updates.checkResultSkippedTitle'),
-      message: updateStore.lastSkipReason || t('updates.checkResultSkipped'),
-      duration: 8000
-    })
-  } else if (outcome === 'cooldown') {
-    uiStore.pushToast({
-      type: 'info',
-      title: t('updates.checkResultCooldownTitle'),
-      message: t('updates.checkResultCooldown'),
-      duration: 4000
-    })
-  } else {
-    uiStore.pushToast({
-      type: 'error',
-      title: t('updates.checkResultErrorTitle'),
-      message: updateStore.checkError || t('updates.checkResultError'),
-      duration: 6000
-    })
-  }
-}
-
 onMounted(async () => {
   try { await sysInfoStore.update() } catch { /* Anzeige bleibt mit Platzhalter nutzbar. */ }
-  await updateStore.checkForUpdate(sysInfoStore.currentVersion)
 })
 </script>
 
@@ -382,23 +201,9 @@ onMounted(async () => {
 .header-text p { margin:.35rem 0 0; color:var(--color-text-secondary); }
 .kicker { color:var(--color-primary-strong); font-size:var(--fs-2xs); font-weight:var(--font-weight-heavy); text-transform:uppercase; letter-spacing:.04em; }
 .card-body { padding:var(--card-padding); display:flex; flex-direction:column; gap:var(--space-4); }
-.release-box { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:var(--space-4); border-radius:var(--radius-md); background:var(--color-success-soft); }
-.release-box.is-current { background:var(--color-bg-alt); }
-.release-box div { display:flex; flex-direction:column; gap:3px; }
-.release-label, .release-box small { color:var(--color-text-secondary); font-size: var(--fs-xs); }
-.release-box strong { font-size: var(--fs-lg); }
-.beta-badge { padding:var(--space-1) var(--space-2); border-radius:var(--radius-pill); background:var(--color-warning-soft); font-size: var(--fs-2xs); font-weight: var(--font-weight-bold); }
+.muted-text { margin:0; color:var(--color-text-secondary); }
 .actions { display:flex; flex-wrap:wrap; gap:10px; }
 .action-btn { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2); text-decoration:none; }
-/* Manual "search now" sits above the release status so the primary action is
-   reachable before the user reads the cached result. Reuses .action-btn so it
-   shares size/alignment with the download + GitHub buttons below. */
-.check-now-row { display:flex; }
-.check-now-btn { width:auto; }
-.manual-check-feedback { margin:0; display:flex; flex-direction:column; gap:var(--space-1); }
-.beta-toggle-row { display:flex; gap:12px; align-items:flex-start; padding-top:14px; border-top:1px solid var(--color-border); }
-.beta-toggle-label { display:flex; flex-direction:column; gap:3px; font-weight: var(--font-weight-bold); }
-.beta-toggle-hint { font-size: var(--fs-xs); font-weight: var(--font-weight-normal); color:var(--color-text-secondary); }
 .upload-zone { min-height:150px; border:2px dashed var(--color-border-strong); border-radius:var(--radius-lg); display:flex; align-items:center; justify-content:center; cursor:pointer; padding:18px; text-align:center; }
 .upload-zone.dragging { border-color:var(--color-primary); background:var(--color-primary-soft); }
 .upload-zone.invalid { border-color:var(--color-danger); }

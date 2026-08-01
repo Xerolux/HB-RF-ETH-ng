@@ -423,6 +423,9 @@ export default {
     availableKicker: 'Available device firmware',
     availableHeading: 'Available firmware',
     availableHelp: 'The ESP downloads only the small update manifest. The firmware file is downloaded directly by your browser.',
+    updatesOnGithubHeading: 'Updates on GitHub',
+    updatesOnGithubHelp: 'New versions are always available on the GitHub project page.',
+    noAutoCheckNote: 'The device no longer checks for updates automatically. Check GitHub periodically or upload a new firmware_*.bin manually.',
     newVersionLabel: 'New version',
     publishedAt: 'Published: {time}',
     statusLabel: 'Status',
@@ -839,20 +842,9 @@ export default {
   // Privacy
   privacy: {
     title: 'Privacy',
-    updateCheck: 'Automatic updates and firmware checks connect to the server raw.githubusercontent.com / github.com. Your IP address is transmitted to check for availability of new versions.'
+    updateCheck: 'The device no longer checks for updates automatically and does not connect to GitHub for that purpose. New versions can be found on GitHub; the firmware upload happens directly from your browser to the device. Optional features (MQTT, syslog, supporter-key CRL) only connect to their configured servers when enabled.'
   },
 
-  // Changelog
-  changelog: {
-    title: 'Changelog',
-    loading: 'Loading...',
-    fetching: 'Fetching changelog from GitHub...',
-    error: 'Failed to load changelog',
-    fetchError: 'Could not fetch changelog. Please check your internet connection.',
-    retry: 'Retry',
-    close: 'Close',
-    viewOnGithub: 'View on GitHub'
-  },
 
   // Supporter
   supporter: {

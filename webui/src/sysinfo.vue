@@ -260,12 +260,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useSysInfoStore, useUpdateStore, useUiStore, useLoginStore } from './stores.js'
+import { useSysInfoStore, useUiStore, useLoginStore } from './stores.js'
 import { copyToClipboard } from './composables/useClipboard'
 
 const { t } = useI18n()
 const sysInfoStore = useSysInfoStore()
-const updateStore = useUpdateStore()
 const uiStore = useUiStore()
 const loginStore = useLoginStore()
 const isLoading = ref(true)

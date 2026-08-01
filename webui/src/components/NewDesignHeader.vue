@@ -1,27 +1,5 @@
 <template>
   <header class="header-shell">
-    <Transition name="slide-down">
-      <div v-if="updateStore.shouldShowUpdateBadge && showBanner" class="update-banner">
-        <div class="update-banner-copy">
-          <span class="hero-eyebrow">
-            <AppIcon name="firmware" />
-            {{ t('update.available') }}
-          </span>
-          <strong>v{{ updateStore.latestVersion }}</strong>
-          <span>{{ t('update.manualInstallHint') }}</span>
-        </div>
-        <div class="update-banner-actions">
-          <router-link class="btn btn-primary btn-sm" to="/updates/firmware" @click="mobileMenuOpen = false">
-            <AppIcon name="arrowRight" />
-            {{ t('update.viewUpdate') }}
-          </router-link>
-          <button class="icon-button" @click="dismissUpdate">
-            <AppIcon name="close" />
-          </button>
-        </div>
-      </div>
-    </Transition>
-
     <aside class="desktop-sidebar">
       <router-link to="/" class="brand" @click="closeMobileMenu">
         <BrandLogo :size="48" />
@@ -60,7 +38,6 @@
             >
               <AppIcon :name="item.icon" />
               <span>{{ item.label }}</span>
-              <span v-if="item.to === '/updates/firmware' && updateStore.shouldShowUpdateBadge" class="mini-dot"></span>
             </router-link>
           </template>
         </div>
@@ -137,9 +114,6 @@
       </div>
 
       <div class="header-actions">
-        <button v-if="updateStore.shouldShowUpdateBadge && !showBanner" class="icon-button" @click="showBanner = true">
-          <AppIcon name="firmware" />
-        </button>
         <button class="icon-button" :title="t('nav.toggleTheme')" @click="themeStore.toggleTheme">
           <AppIcon :name="themeStore.theme === 'light' ? 'moon' : 'sun'" />
         </button>
@@ -262,7 +236,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
-import { useLoginStore, useThemeStore, useUpdateStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore } from '../stores.js'
+import { useLoginStore, useThemeStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore } from '../stores.js'
 import { availableLocales } from '../locales/index.js'
 import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 import { safeLocal } from '../composables/useSafeStorage'
@@ -274,19 +248,16 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const loginStore = useLoginStore()
 const themeStore = useThemeStore()
-const updateStore = useUpdateStore()
 const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
 const settingsStore = useSettingsStore()
 const restartUiStore = useRestartUiStore()
 
-const showBanner = ref(true)
 const localeOpen = ref(false)
 const mobileMenuOpen = ref(false)
 const showRestartModal = ref(false)
 const isRestarting = ref(false)
 const now = ref(new Date())
-let updateCheckTimer = null
 let clockTimer = null
 
 // Wrap the desktop locale toggle + dropdown for outside-click / Escape dismiss
@@ -349,23 +320,13 @@ const performRestart = async () => {
   }
 }
 
-const dismissUpdate = () => {
-  showBanner.value = false
-  safeLocal.set('dismissedUpdate', updateStore.latestVersion)
-}
-
 onMounted(async () => {
   try {
     if (!sysInfoStore.currentVersion) {
       await sysInfoStore.update()
     }
-    // /api/check_update requires auth - calling it logged out triggers a 401
-    // that force-redirects visitors away from the public pages (/, /about).
-    if (loginStore.isLoggedIn) {
-      await updateStore.checkForUpdate(sysInfoStore.currentVersion)
-    }
   } catch (e) {
-    console.error('Failed to load sys info for update check', e)
+    console.error('Failed to load sys info', e)
   }
 
   if (loginStore.isLoggedIn) {
@@ -376,16 +337,6 @@ onMounted(async () => {
     }
   }
 
-  if (safeLocal.get('dismissedUpdate') === updateStore.latestVersion) {
-    showBanner.value = false
-  }
-
-  updateCheckTimer = setInterval(() => {
-    if (loginStore.isLoggedIn && sysInfoStore.currentVersion) {
-      updateStore.checkForUpdate(sysInfoStore.currentVersion)
-    }
-  }, 24 * 60 * 60 * 1000)
-
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 30000)
@@ -395,9 +346,6 @@ onUnmounted(() => {
   // Release the body scroll lock if a menu/modal was open when navigating away.
   setBodyScrollLock(false)
   disableLocaleDismiss()
-  if (updateCheckTimer) {
-    clearInterval(updateCheckTimer)
-  }
   if (clockTimer) {
     clearInterval(clockTimer)
   }

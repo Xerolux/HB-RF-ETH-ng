@@ -26,6 +26,7 @@
 #include "nvs.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "crash_blackbox.h"
 #include <cstring>
 
 static const char *TAG = "ResetInfo";
@@ -217,9 +218,47 @@ const char* ResetInfo::getResetDetails() {
             // Without this copy, -Wformat-truncation fires because getLastDiag
             // returns const char* with no length the compiler can reason about.
             char diag_bounded[96];
+            diag_bounded[0] = '\0';
             if (diag && diag[0]) {
                 strncpy(diag_bounded, diag, sizeof(diag_bounded) - 1);
                 diag_bounded[sizeof(diag_bounded) - 1] = '\0';
+            } else {
+                // No subsystem left a stored diag (the heap_watchdog only
+                // stores one when IT triggers a clean restart). For a sudden
+                // watchdog/panic/brownout reset there is no prior hint, so
+                // surface the RTC crash black box: the last heap sample taken
+                // before the reset. This is the only way to tell whether heap
+                // exhaustion preceded an Interrupt-Watchdog reboot (#362),
+                // given that coredump is disabled and the RAM log is lost.
+                if (hw == ESP_RST_INT_WDT || hw == ESP_RST_TASK_WDT ||
+                    hw == ESP_RST_WDT || hw == ESP_RST_PANIC ||
+                    hw == ESP_RST_BROWNOUT) {
+                    const crash_blackbox_t *bb = crash_blackbox_read();
+                    if (bb) {
+                        snprintf(diag_bounded, sizeof(diag_bounded),
+                                 "pre-crash heap: free=%u larg=%u min=%u int=%u up=%us",
+                                 (unsigned)bb->free_heap,
+                                 (unsigned)bb->largest_block,
+                                 (unsigned)bb->min_heap,
+                                 (unsigned)bb->internal_free,
+                                 (unsigned)bb->uptime_s);
+                        ESP_LOGI(TAG,
+                                 "Crash black box (last sample before reset): "
+                                 "free=%u largest=%u min_ever=%u internal=%u "
+                                 "uptime=%us low_streak=%u samples=%u",
+                                 (unsigned)bb->free_heap,
+                                 (unsigned)bb->largest_block,
+                                 (unsigned)bb->min_heap,
+                                 (unsigned)bb->internal_free,
+                                 (unsigned)bb->uptime_s,
+                                 (unsigned)bb->low_streak,
+                                 (unsigned)bb->sample_count);
+                        crash_blackbox_clear();
+                    }
+                }
+            }
+
+            if (diag_bounded[0]) {
                 snprintf(reset_text_buffer, sizeof(reset_text_buffer),
                          "%s (%s) - %s",
                          get_reason_text(stored_reason), esp_reason, diag_bounded);

@@ -52,7 +52,6 @@
 #include "system_overview_api.h"
 #include "theme_api.h"
 #include "esp_http_client.h"
-#include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -106,7 +105,6 @@ EMBED_HANDLER("/icon-256.png", icon_256_png_gz, "image/png", "gzip")
 static Settings *_settings;
 static LED *_statusLED;
 static SysInfo *_sysInfo;
-static UpdateCheck *_updateCheck;
 static Ethernet *_ethernet;
 static RawUartUdpListener *_rawUartUdpListener;
 static RadioModuleConnector *_radioModuleConnector;
@@ -582,7 +580,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"latestVersion\":\"%s\",\"memoryUsage\":%.1f,\"cpuUsage\":%.1f,",
-             _updateCheck ? _updateCheck->getLatestVersion() : "n/a", _sysInfo->getMemoryUsage(), _sysInfo->getCpuUsage());
+             "n/a", _sysInfo->getMemoryUsage(), _sysInfo->getCpuUsage());
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"supplyVoltage\":null,\"temperature\":null,\"uptimeSeconds\":%" PRIu32 ",",
@@ -815,7 +813,6 @@ void add_settings(cJSON *root)
 
     cJSON_AddStringToObject(settings, "ccuIP", _settings->getCCUIP());
 
-    cJSON_AddBoolToObject(settings, "betaChannel", _settings->getBetaChannel());
     cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
     cJSON_AddBoolToObject(settings, "flashPause", _settings->getFlashPause());
     cJSON_AddBoolToObject(settings, "testDesignEnabled", _settings->getTestDesignEnabled());
@@ -1237,12 +1234,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     if (ccuIP) {
         _settings->setCCUIP(ccuIP);
-    }
-
-    // Beta update channel toggle. Optional - omitted when not changed.
-    cJSON *betaChannelItem = cJSON_GetObjectItem(root, "betaChannel");
-    if (betaChannelItem && cJSON_IsBool(betaChannelItem)) {
-        _settings->setBetaChannel(cJSON_IsTrue(betaChannelItem));
     }
 
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
@@ -1953,12 +1944,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         _settings->setCCUIP(ccuIP);
     }
 
-    // Beta update channel toggle (optional in backup payload).
-    cJSON *betaChannelItem = cJSON_GetObjectItem(root, "betaChannel");
-    if (betaChannelItem && cJSON_IsBool(betaChannelItem)) {
-        _settings->setBetaChannel(cJSON_IsTrue(betaChannelItem));
-    }
-
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
         _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
@@ -2088,13 +2073,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    if (!_updateCheck) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_sendstr(req, "OTA not available");
-        return ESP_OK;
-    }
-
-    if (!_updateCheck->tryBeginOtaOperation())
+    if (!ota_operation_try_begin())
     {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "OTA update already in progress");
         return ESP_OK;
@@ -2111,7 +2090,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to allocate OTA buffer");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         _ota_status = OTA_FAILED;
-        _updateCheck->finishOtaOperation();
+        ota_operation_finish();
         return ESP_FAIL;
     }
 
@@ -2120,7 +2099,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGW(TAG, "Rejected 320 KiB WebUI image on firmware endpoint");
         free(ota_buff);
         _ota_status = OTA_FAILED;
-        _updateCheck->finishOtaOperation();
+        ota_operation_finish();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
             "Falsche Datei: Das 327680-Byte-WebUI-/WWW-Image muss unter System -> WebUI installiert werden.");
     }
@@ -2250,15 +2229,13 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
     // Stop heap- and network-active subsystems before the restart so they do
     // not touch lwIP / TLS during the link-down pause (flashPause) or the GPIO
-    // reconfiguration in full_system_restart(). The URL-OTA path
-    // (performOnlineUpdate in updatecheck.cpp) already does this via its own
-    // monitoring_pause_for_ota / supporter_crl_stop_refresh_task / stop()
-    // sequence; without it the WebUI upload was the only full_system_restart()
-    // caller that left MQTT, the CRL refresh task, the UpdateCheck esp_timer
-    // and the WebSocket publish worker running into the restart. On a flashPause
-    // device these kept operating on an Ethernet that had just been stopped,
-    // which surfaced as an Exception/Panic during the reboot. The success path
-    // ends in a full restart, so the returned paused-mask is discarded.
+    // reconfiguration in full_system_restart(). Without this the WebUI upload
+    // was the only full_system_restart() caller that left MQTT, the CRL refresh
+    // task and the WebSocket publish worker running into the restart. On a
+    // flashPause device these kept operating on an Ethernet that had just been
+    // stopped, which surfaced as an Exception/Panic during the reboot. The
+    // success path ends in a full restart, so the returned paused-mask is
+    // discarded.
     (void)prepare_ota_heap();
 
     // Restart on the existing 8 KiB httpd task. The previous dedicated 2 KiB
@@ -2284,7 +2261,7 @@ err:
 
     // Store reset reason for failed firmware update
     ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
-    _updateCheck->finishOtaOperation();
+    ota_operation_finish();
     return ESP_FAIL;
 }
 
@@ -2434,13 +2411,8 @@ static uint32_t prepare_ota_heap()
     ESP_LOGI(TAG, "CRL task stopped for OTA (free heap now %u KB)",
              (unsigned)(esp_get_free_heap_size() / 1024));
 
-    // Stop UpdateCheck background task — frees 12 KB task stack.
-    // Safe: it only sleeps in a 24h loop; OTA state is tracked separately.
-    if (_updateCheck) {
-        _updateCheck->stop();
-        ESP_LOGI(TAG, "UpdateCheck task stopped for OTA (free heap now %u KB)",
-                 (unsigned)(esp_get_free_heap_size() / 1024));
-    }
+    // Note: the automatic update-check feature (former UpdateCheck esp_timer)
+    // was removed, so there is no background fetch task left to stop here.
 
     // Brief settle for heap de-fragmentation
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -2449,19 +2421,14 @@ static uint32_t prepare_ota_heap()
 
 // Resume tasks stopped by prepare_ota_heap() after an OTA failure. The success
 // path ends in a full system restart, so this only matters on failure. Without
-// it the CRL + UpdateCheck tasks stay dead after the first failed attempt,
-// leaving the device with more free heap than before — which is exactly the
-// asymmetry that makes a second "Install" click succeed where the first one
-// failed. Restarting them restores the pre-OTA heap layout so retries are not
-// silently biased. Mirrors the same gating used at boot (main.cpp) and on
-// supporter-key save: the CRL task only runs when a key is configured.
+// it the CRL task stays dead after the first failed attempt, leaving the device
+// with more free heap than before — which is exactly the asymmetry that makes
+// a second "Install" click succeed where the first one failed. Restarting it
+// restores the pre-OTA heap layout so retries are not silently biased. Mirrors
+// the same gating used at boot (main.cpp) and on supporter-key save: the CRL
+// task only runs when a key is configured.
 static void resume_tasks_after_ota_failure()
 {
-    if (_updateCheck) {
-        _updateCheck->start();
-        ESP_LOGI(TAG, "UpdateCheck task resumed after OTA failure (free heap %u KB)",
-                 (unsigned)(esp_get_free_heap_size() / 1024));
-    }
     if (_settings) {
         const char *sk = _settings->getSupporterKey();
         if (sk && sk[0] != '\0') {
@@ -2471,276 +2438,6 @@ static void resume_tasks_after_ota_failure()
         }
     }
 }
-
-// OTA update from URL handler
-static esp_err_t post_ota_url_handler_func(httpd_req_t *req)
-{
-    add_security_headers(req);
-
-    if (validate_auth(req) != ESP_OK)
-    {
-        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
-    }
-
-    if (!_updateCheck) {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA not available\"}");
-        return ESP_OK;
-    }
-
-    // Read request body to get URL
-    char buffer[512];
-    int len = recv_full_body(req, buffer, sizeof(buffer));
-
-    if (len <= 0)
-    {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Invalid request\"}");
-        return ESP_OK;
-    }
-
-    cJSON *root = cJSON_Parse(buffer);
-    if (root == NULL)
-    {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Invalid JSON\"}");
-        return ESP_OK;
-    }
-
-    char *url_json = cJSON_GetStringValue(cJSON_GetObjectItem(root, "url"));
-
-    // Copy URL before freeing JSON to avoid use-after-free
-    char url_buf[256] = {0};
-    if (url_json != NULL && strlen(url_json) > 0) {
-        // Firmware downloads must be authenticated by TLS.
-        if (strncmp(url_json, "https://", 8) != 0) {
-            cJSON_Delete(root);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"Firmware URL must use HTTPS\"}");
-            return ESP_OK;
-        }
-        if (strlen(url_json) >= sizeof(url_buf)) {
-            cJSON_Delete(root);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"URL too long\"}");
-            return ESP_OK;
-        }
-        strncpy(url_buf, url_json, sizeof(url_buf) - 1);
-    }
-
-    cJSON_Delete(root);
-
-    if (url_buf[0] == '\0')
-    {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"URL is required\"}");
-        return ESP_OK;
-    }
-
-    // Reject concurrent OTA starts - two tasks writing the same update
-    // partition would corrupt the image.
-    if (!_updateCheck->tryBeginOtaOperation())
-    {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"success\":false,\"error\":\"OTA update already in progress\"}");
-        return ESP_OK;
-    }
-
-    ESP_LOGI(TAG, "Starting OTA update from URL: %s", url_buf);
-
-    // Mark as downloading before the response is sent so a second request
-    // arriving immediately afterwards is rejected.
-    _ota_status = OTA_DOWNLOADING;
-    _ota_progress = 0;
-
-    // Create a task to perform the update (it's blocking)
-    struct TaskArgs {
-        char* url;
-        LED* statusLED;
-    };
-
-    TaskArgs* args = new (std::nothrow) TaskArgs();
-    if (args == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate OTA task arguments");
-        _ota_status = OTA_IDLE;
-        _updateCheck->finishOtaOperation();
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-    }
-    args->url = strdup(url_buf);
-    if (args->url == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for URL");
-        delete args;
-        _ota_status = OTA_IDLE;
-        _updateCheck->finishOtaOperation();
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
-    }
-    args->statusLED = _statusLED;
-
-    BaseType_t ret = xTaskCreate([](void* p) {
-        TaskArgs* a = (TaskArgs*)p;
-
-        ESP_LOGI(TAG, "OTA task started, downloading from: %s", a->url);
-
-        _ota_status = OTA_DOWNLOADING;
-        _ota_progress = 0;
-        set_ota_error("");
-
-        bool net_locked = false;
-        if (g_net_fetch_mutex) {
-            if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(30000)) != pdTRUE) {
-                ESP_LOGE(TAG, "OTA URL update could not start: HTTPS subsystem busy");
-                set_ota_error("HTTPS subsystem busy");
-                _ota_status = OTA_FAILED;
-                a->statusLED->setState(LED_STATE_ON);
-                free(a->url);
-                delete a;
-                _updateCheck->finishOtaOperation();
-                vTaskDelete(NULL);
-                return;
-            }
-            net_locked = true;
-        }
-
-        esp_http_client_config_t config = {};
-        configure_ota_http_client(config, a->url);
-        config.timeout_ms = 60000;
-        config.buffer_size = 4096;
-
-        esp_https_ota_config_t ota_config = {};
-        ota_config.http_config = &config;
-
-        a->statusLED->setState(LED_STATE_BLINK_FAST);
-
-        // Signal lower-priority TLS consumers (event notifications, syslog
-        // forwarding) to stand down for the duration of the download so they
-        // don't contend for g_net_fetch_mutex or the limited TLS heap.
-        net_fetch_set_ota_active(true);
-
-        // Free heap by stopping monitoring workers + CRL so the GitHub TLS
-        // handshake + download has enough room (~50 KB plus fragmentation).
-        uint32_t paused_monitoring = prepare_ota_heap();
-
-        // Use advanced OTA API for progress tracking. Retry the begin+download
-        // a couple of times — the GitHub asset redirect forces a second TLS
-        // handshake to objects.githubusercontent.com which can transiently OOM
-        // on the WROOM-32. A single transient failure should not force the
-        // user to click "Update" repeatedly.
-        esp_https_ota_handle_t ota_handle = NULL;
-        esp_err_t ret = ESP_FAIL;
-        for (int attempt = 1; attempt <= 3; ++attempt) {
-            ret = esp_https_ota_begin(&ota_config, &ota_handle);
-            if (ret == ESP_OK) {
-                break;
-            }
-            ESP_LOGW(TAG, "OTA begin attempt %d/3 failed: %s",
-                     attempt, esp_err_to_name(ret));
-            if (attempt < 3) {
-                vTaskDelay(pdMS_TO_TICKS(2000));
-            }
-        }
-
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "OTA begin failed after retries: %s", esp_err_to_name(ret));
-            set_ota_error("OTA begin failed: %s", esp_err_to_name(ret));
-            _ota_status = OTA_FAILED;
-            a->statusLED->setState(LED_STATE_ON);
-            net_fetch_set_ota_active(false);
-            if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
-            monitoring_resume_after_ota(paused_monitoring);
-            resume_tasks_after_ota_failure();
-            free(a->url);
-            delete a;
-            _updateCheck->finishOtaOperation();
-            vTaskDelete(NULL);
-            return;
-        }
-
-        int image_size = esp_https_ota_get_image_size(ota_handle);
-        ESP_LOGI(TAG, "OTA image size: %d bytes", image_size);
-
-        // Yield periodically (every 8th chunk) rather than every chunk so the
-        // total artificial delay over a ~1.5 MB image stays modest. This
-        // matches the MQTT-triggered OTA path in updatecheck.cpp.
-        int otaChunk = 0;
-        while (true) {
-            ret = esp_https_ota_perform(ota_handle);
-            if (ret != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-                break;
-            }
-            // Update progress
-            if (image_size > 0) {
-                int downloaded = esp_https_ota_get_image_len_read(ota_handle);
-                _ota_progress = (int)((int64_t)downloaded * 100 / image_size);
-            }
-            if ((++otaChunk & 0x07) == 0) {
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-        }
-
-        bool complete = esp_https_ota_is_complete_data_received(ota_handle);
-        if (ret == ESP_OK && complete) {
-            _ota_progress = 100;
-            ret = esp_https_ota_finish(ota_handle);
-        } else {
-            esp_https_ota_abort(ota_handle);
-            if (ret == ESP_OK) {
-                ret = ESP_ERR_INVALID_SIZE;
-                set_ota_error("OTA download incomplete");
-            }
-        }
-
-        if (ret == ESP_OK) {
-            ESP_LOGI(TAG, "OTA Update successful, restarting...");
-            _ota_status = OTA_SUCCESS;
-            ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
-            a->statusLED->setState(LED_STATE_OFF);
-            net_fetch_set_ota_active(false);
-            if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
-            free(a->url);
-            delete a;
-            _updateCheck->finishOtaOperation();
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            refresh_restart_sync_from_settings();
-            full_system_restart();
-        } else {
-            ESP_LOGE(TAG, "OTA Update failed: %s", esp_err_to_name(ret));
-            set_ota_error("OTA failed: %s", esp_err_to_name(ret));
-            _ota_status = OTA_FAILED;
-            ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
-            a->statusLED->setState(LED_STATE_ON);
-            net_fetch_set_ota_active(false);
-            if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
-            monitoring_resume_after_ota(paused_monitoring);
-            resume_tasks_after_ota_failure();
-            free(a->url);
-            delete a;
-            _updateCheck->finishOtaOperation();
-        }
-        vTaskDelete(NULL);
-    }, "ota_url_update", 12288, args, 5, NULL);
-
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create OTA update task");
-        free(args->url);
-        delete args;
-        _ota_status = OTA_IDLE;
-        _updateCheck->finishOtaOperation();
-        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not start OTA task");
-    }
-
-    // Report success only after all allocations succeeded and the worker task
-    // is running. The previous ordering returned success even on OOM.
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"OTA update started\"}");
-
-    return ESP_OK;
-}
-
-httpd_uri_t post_ota_url_handler = {
-    .uri = "/api/ota_url",
-    .method = HTTP_POST,
-    .handler = post_ota_url_handler_func,
-    .user_ctx = NULL};
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)
 {
@@ -2832,168 +2529,6 @@ httpd_uri_t post_change_password_handler = {
     .handler = post_change_password_handler_func,
     .user_ctx = NULL};
 
-
-// Build and send a JSON snapshot of the currently cached GitHub release.
-// Served by GET /api/check_update — the release snapshot is refreshed
-// automatically every 24 h by the UpdateCheck esp_timer (see updatecheck.cpp).
-static void send_release_info_response(httpd_req_t *req)
-{
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-
-    if (!_updateCheck) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_sendstr(req, "{\"error\":\"Update check not initialised\"}");
-        return;
-    }
-
-    ReleaseInfo info = _updateCheck->getReleaseInfo();
-    const char *currentVersion = _sysInfo->getCurrentVersion();
-    const bool configuredBeta = _settings->getBetaChannel();
-    const bool cacheMatchesChannel = info.valid && info.betaChannel == configuredBeta;
-
-    bool updateAvailable = false;
-    if (cacheMatchesChannel && currentVersion && strcmp(info.version, "n/a") != 0) {
-        updateAvailable = (compareVersions(currentVersion, info.version) < 0);
-    }
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "currentVersion", currentVersion ? currentVersion : "");
-    cJSON_AddStringToObject(root, "latestVersion", cacheMatchesChannel ? info.version : "n/a");
-    cJSON_AddBoolToObject(root, "updateAvailable", updateAvailable);
-    cJSON_AddBoolToObject(root, "isPrerelease", info.isPrerelease);
-    cJSON_AddStringToObject(root, "releaseNotes", cacheMatchesChannel ? info.body : "");
-    cJSON_AddStringToObject(root, "releaseUrl", cacheMatchesChannel ? info.releaseUrl : "");
-    cJSON_AddStringToObject(root, "downloadUrl", cacheMatchesChannel ? info.downloadUrl : "");
-    cJSON_AddStringToObject(root, "sha256", cacheMatchesChannel ? info.sha256 : "");
-    cJSON_AddStringToObject(root, "publishedAt", cacheMatchesChannel ? info.publishedAt : "");
-    cJSON_AddNumberToObject(root, "fetchedAt", (double)info.fetchedAtMs);
-    cJSON_AddBoolToObject(root, "betaChannel", configuredBeta);
-    cJSON_AddNumberToObject(root, "checkIntervalSeconds", 24 * 60 * 60);
-    cJSON_AddBoolToObject(root, "fetchInProgress", _updateCheck->isFetchInProgress());
-    {
-        // Surface the most recent skip reason (e.g. low heap when the radio
-        // module is actively serving a CCU session) so the WebUI can tell the
-        // user why "search now" produced no result, instead of silently
-        // showing a stale "no update available".
-        char skipReason[96] = {0};
-        _updateCheck->getLastSkipReason(skipReason, sizeof(skipReason));
-        if (skipReason[0]) {
-            cJSON_AddStringToObject(root, "lastSkipReason", skipReason);
-        }
-    }
-    if (cacheMatchesChannel && info.webui.valid) {
-        cJSON *webui = cJSON_AddObjectToObject(root, "webui");
-        if (webui) {
-            cJSON_AddStringToObject(webui, "version", info.webui.version);
-            cJSON_AddStringToObject(webui, "design", info.webui.design);
-            cJSON_AddNumberToObject(webui, "apiVersion", info.webui.apiVersion);
-            cJSON_AddStringToObject(webui, "minFirmwareVersion", info.webui.minFirmwareVersion);
-            cJSON_AddStringToObject(webui, "downloadUrl", info.webui.downloadUrl);
-            cJSON_AddStringToObject(webui, "sha256", info.webui.sha256);
-            cJSON_AddNumberToObject(webui, "size", info.webui.size);
-            cJSON_AddStringToObject(webui, "partition", info.webui.partition);
-            cJSON_AddNumberToObject(webui, "format", info.webui.format);
-            cJSON_AddStringToObject(webui, "releaseUrl", info.webui.releaseUrl);
-            cJSON_AddStringToObject(webui, "publishedAt", info.webui.publishedAt);
-        }
-    } else {
-        cJSON_AddNullToObject(root, "webui");
-    }
-    if (!info.valid && info.error[0]) {
-        cJSON_AddStringToObject(root, "error", info.error);
-    } else {
-        cJSON_AddNullToObject(root, "error");
-    }
-
-    const char *json = cJSON_PrintUnformatted(root);
-    if (json) {
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-    } else {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
-    }
-    cJSON_Delete(root);
-}
-
-esp_err_t get_check_update_handler_func(httpd_req_t *req)
-{
-    add_security_headers(req);
-
-    if (validate_auth(req) != ESP_OK)
-    {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-
-    // GET returns the persistent cached snapshot. The snapshot is refreshed
-    // automatically every 24 h by the UpdateCheck timer, and additionally on
-    // demand via POST /api/check_update (manual "search now"); this handler
-    // itself never opens a network connection. `fetchInProgress` in the JSON
-    // body tells the caller whether a manual fetch is currently running.
-    send_release_info_response(req);
-    return ESP_OK;
-}
-
-httpd_uri_t get_check_update_handler = {
-    .uri = "/api/check_update",
-    .method = HTTP_GET,
-    .handler = get_check_update_handler_func,
-    .user_ctx = NULL};
-
-// POST /api/check_update — arms an immediate online manifest fetch on the
-// device (the "Jetzt nach Updates suchen" button). The actual GitHub request
-// is deferred to a short-lived task so this handler returns 202 right away;
-// the client then polls GET /api/check_update (fetchInProgress) until it
-// clears and reads the updated snapshot. triggerManualFetch() enforces a 60 s
-// cooldown and refuses to stack onto a running fetch, so the 24 h automatic
-// timer and the ESP32 TLS heap stay protected.
-esp_err_t post_check_update_handler_func(httpd_req_t *req)
-{
-    add_security_headers(req);
-    httpd_resp_set_type(req, "application/json");
-
-    if (validate_auth(req) != ESP_OK)
-    {
-        httpd_resp_set_status(req, "401 Not authorized");
-        httpd_resp_sendstr(req, "401 Not authorized");
-        return ESP_OK;
-    }
-
-    if (!_updateCheck) {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_sendstr(req, "503 Service Unavailable");
-        return ESP_OK;
-    }
-    const bool accepted = _updateCheck->triggerManualFetch();
-    const bool fetchInProgress = _updateCheck->isFetchInProgress();
-
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddBoolToObject(root, "triggered", accepted);
-    cJSON_AddBoolToObject(root, "fetchInProgress", fetchInProgress);
-    // accepted=false with fetchInProgress=true means "a check is already
-    // running" (the client should just keep polling). accepted=false with
-    // fetchInProgress=false means "cooldown active" (the client shows the
-    // cached result). Either way the response is 202: the request was
-    // understood, the latest snapshot remains available via GET.
-    httpd_resp_set_status(req, "202 Accepted");
-    const char *json = cJSON_PrintUnformatted(root);
-    if (json) {
-        httpd_resp_sendstr(req, json);
-        free((void *)json);
-    } else {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "JSON alloc failed");
-    }
-    cJSON_Delete(root);
-    return ESP_OK;
-}
-
-httpd_uri_t post_check_update_handler = {
-    .uri = "/api/check_update",
-    .method = HTTP_POST,
-    .handler = post_check_update_handler_func,
-    .user_ctx = NULL};
 
 esp_err_t get_log_handler_func(httpd_req_t *req)
 {
@@ -3336,13 +2871,12 @@ httpd_uri_t get_log_download_handler = {
 
 // Prometheus metrics disabled - feature code available in prometheus.cpp.disabled
 
-WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, UpdateCheck *updateCheck, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
+WebUI::WebUI(Settings *settings, LED *statusLED, SysInfo *sysInfo, Ethernet *ethernet, RawUartUdpListener *rawUartUdpListener, RadioModuleConnector *radioModuleConnector, RadioModuleDetector *radioModuleDetector)
 {
     _settings = settings;
     _statusLED = statusLED;
     _sysInfo = sysInfo;
     _ethernet = ethernet;
-    _updateCheck = updateCheck;
     _rawUartUdpListener = rawUartUdpListener;
     _radioModuleConnector = radioModuleConnector;
     _radioModuleDetector = radioModuleDetector;
@@ -3403,8 +2937,6 @@ void WebUI::start()
 
         httpd_register_uri_handler(_httpd_handle, &get_backup_handler);
         httpd_register_uri_handler(_httpd_handle, &post_restore_handler);
-        httpd_register_uri_handler(_httpd_handle, &get_check_update_handler);
-        httpd_register_uri_handler(_httpd_handle, &post_check_update_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_log_enable_handler);

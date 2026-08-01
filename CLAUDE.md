@@ -104,7 +104,13 @@ python3 rename_webui_files.py   # gzip-compresses the dist assets idf.py embeds
 
 `main/CMakeLists.txt` embeds `webui/dist/{index.html,main.css,main.js,favicon.ico}.gz` directly into the firmware via `target_add_binary_data` — these gzipped files must exist before the ESP-IDF build runs.
 
-It also embeds `main/generated/archive.json.gz` — the gzipped firmware release archive. This is the source for the `/api/firmware_archive` endpoint, which serves the archive **from flash** instead of fetching it live from GitHub on every request (the live TLS fetch was a heap-pressure / panic source and made the archive viewable only when online). The embedded `.gz` is regenerated from `archive.json` by `scripts/update_archive.py`, which runs in every CI build step right before `idf.py build` (see `.github/workflows/*.yml`) and is also committed by the `rebuild-archive.yml` workflow. A local firmware build must therefore run `python scripts/update_archive.py` first if `archive.json` changed. The script is strict: it fails (non-zero exit) if `archive.json` is missing or invalid JSON. The "newest release available" check stays live via `/api/check_update` (`latest.json`/`beta.json`); only the historical archive list is embedded.
+> **Note: automatic update-check removed.** The firmware no longer polls
+> GitHub for new releases and no longer ships the `/api/check_update`,
+> `/api/ota_url`, `/api/changelog` or `/api/firmware_archive` endpoints, nor
+> the embedded `archive.json.gz`. Firmware/WebUI updates are now performed
+> purely manually (upload a `*.bin` via the WebUI). Point users at the GitHub
+> releases page to discover new versions. Any `scripts/update_archive.py` /
+> `main/generated/archive.json*` artifacts left in the tree are dead.
 
 ### Other Python Scripts
 
@@ -159,8 +165,8 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `rawuartudplistener.cpp` | UDP↔UART bridge (the core protocol relay) |
 | `webui.cpp` | HTTP server + all REST API endpoint handlers (largest file) |
 | `settings.cpp` | Persistent config via NVS Flash |
-| `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (UpdateCheck, supporter CRL, syslog, events, mqtt, OTA) so concurrent handshakes don't exhaust the ESP32 heap |
-| `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`, `factory_reset`, `update`, `check_update`) |
+| `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (supporter CRL, syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
+| `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`) |
 | `monitoring_api.cpp` | REST endpoints for monitoring config |
 | `ntpclient.cpp` | NTP time sync client |
 | `ntpserver.cpp` | NTP server for downstream clients |
@@ -170,7 +176,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `systemclock.cpp` | Unified system time management |
 | `led.cpp` | RGB + status LED control |
 | `pushbuttonhandler.cpp` | Factory reset button logic |
-| `updatecheck.cpp` | GitHub Releases polling + OTA firmware update execution |
+| `ota_config.cpp` | OTA / shared HTTPS client configuration helper |
 | `ota_config.cpp` | OTA / shared HTTPS client configuration helper |
 | `mdnsserver.cpp` | mDNS / Bonjour advertisement |
 | `validation.cpp` | Input validation (IP, hostname, passwords, etc.) |
@@ -189,7 +195,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 - HTTP handler functions in `webui.cpp` follow the pattern `esp_err_t <name>_handler_func(httpd_req_t *req)`, registered via a matching `httpd_uri_t` struct.
 - Settings persistence uses `settings.cpp` — avoid direct NVS calls elsewhere.
 - **`vTaskDelay(pdMS_TO_TICKS(ms))` overflows for large `ms` values.** `pdMS_TO_TICKS` multiplies `ms * configTICK_RATE_HZ` in 32-bit `TickType_t` arithmetic before dividing by 1000; a 24h value (86,400,000 ms) overflows `uint32_t` and silently wraps to a much shorter delay. For long delays, loop in smaller chunks (e.g. N × 1h) instead of passing the full duration directly.
-- Any code performing an outbound TLS/HTTPS request (GitHub API, etc.) should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `updatecheck.cpp::_doFetch` for the pattern.
+- Any code performing an outbound TLS/HTTPS request should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `supporter_crl.cpp` for the pattern.
 
 ---
 
@@ -291,13 +297,9 @@ Key endpoint categories:
 - `/api/restore` — restore settings from a backup
 - `/api/factory-reset` — trigger a factory reset
 - `/ota_update` — OTA firmware upload (raw binary)
-- `/api/ota_url` — start OTA from a URL
 - `/api/ota_status` — poll OTA progress/state
-- `/api/check_update` — GET cached release info / POST to trigger a GitHub Releases fetch
 - `/api/webui/status` — active/external WebUI version and compatibility state
 - `/api/webui/update` — raw standalone WebUI upload with backend compatibility validation
-- `/api/changelog` — fetch the firmware changelog (proxied from GitHub)
-- `/api/firmware_archive` — list previous firmware versions
 - `/api/log` — polled system log (text)
 - `/api/log/status` — check if log capture is active
 - `/api/log/enable` — enable log capture
@@ -443,7 +445,7 @@ chore: bump ESP-IDF to 6.1-beta1
 - Thread safety is critical — all monitoring state access must be guarded by the monitoring mutex
 - See `main/monitoring.cpp` for the mutex pattern
 - Both MQTT and CheckMK share the same configuration structure
-- Outbound TLS fetches elsewhere in the firmware (UpdateCheck) take `g_net_fetch_mutex` (declared in `monitoring.h`, created in `monitoring.cpp`) to avoid concurrent TLS handshakes exhausting heap — keep new HTTPS call sites consistent with this
+- Outbound TLS fetches elsewhere in the firmware (supporter CRL, syslog) take `g_net_fetch_mutex` (declared in `monitoring.h`, created in `monitoring.cpp`) to avoid concurrent TLS handshakes exhausting heap — keep new HTTPS call sites consistent with this
 
 ### Updating the WebUI
 
@@ -474,7 +476,6 @@ python3 rename_webui_files.py
 | `main/settings.cpp` | All persistent config logic lives here |
 | `main/webui.cpp` | All HTTP/REST API handlers — largest file |
 | `main/monitoring.cpp` | MQTT + CheckMK logic; thread-safety critical; owns `g_net_fetch_mutex` |
-| `main/updatecheck.cpp` | GitHub release polling + OTA execution; watch for tick-overflow pitfalls in its background loop |
 | `main/radiomoduledetector.cpp` | Core HomeMatic protocol detection |
 | `main/CMakeLists.txt` | ESP-IDF component registration, dependency `REQUIRES`, embedded WebUI assets |
 | `sdkconfig.hb-rf-eth-ng` | ESP-IDF kernel/driver configuration |

@@ -17,9 +17,8 @@ idf_component_register(SRCS ${app_sources}
                            esp_netif
                            esp_event
                            esp_http_server
-                           esp_http_client
-                           esp_https_ota
-                           esp_timer
+                            esp_http_client
+                            esp_timer
                            nvs_flash
                            lwip
                            mbedtls

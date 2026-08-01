@@ -34,7 +34,6 @@
 // Forward declarations
 class Settings;
 class SysInfo;
-class UpdateCheck;
 class Ethernet;
 class RadioModuleDetector;
 class SystemClock;
@@ -122,7 +121,17 @@ void monitoring_config_set_defaults(monitoring_config_t *config);
 void monitoring_config_normalize(monitoring_config_t *config);
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck);
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo);
+
+// OTA operation serialization flag. Replaces the former UpdateCheck mutex
+// after the automatic update-check feature was removed. The manual firmware
+// upload handler calls ota_operation_try_begin() before writing a new image
+// and ota_operation_finish() when done (success reboots, failure resumes).
+// The heap watchdog reads ota_operation_active() to skip low-heap restarts
+// while a flash/OTA write is in flight.
+bool ota_operation_try_begin(void);
+void ota_operation_finish(void);
+bool ota_operation_active(void);
 
 // Register additional data providers so MQTT can publish richer status topics
 // (Ethernet link/IP, radio module info, system clock / NTP sync state).

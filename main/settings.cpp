@@ -280,7 +280,6 @@ void Settings::load()
   len = sizeof(_ccuIP);
   if (nvs_get_str(handle, "ccuIP", _ccuIP, &len) != ESP_OK) _ccuIP[0] = 0;
 
-  GET_BOOL(handle, "betaChannel", _betaChannel, false);
   // NVS key max length is 15; do not rename to "systemLogEnabled" (16) — it
   // silently fails with ESP_ERR_NVS_KEY_TOO_LONG and the toggle won't persist.
   GET_BOOL(handle, "sysLogEnabled", _systemLogEnabled, false);
@@ -355,7 +354,6 @@ void Settings::save()
 
   SET_STR(handle, "ccuIP", _ccuIP);
 
-  SET_BOOL(handle, "betaChannel", _betaChannel);
   SET_BOOL(handle, "sysLogEnabled", _systemLogEnabled);
   SET_BOOL(handle, "flashPause", true);
   SET_BOOL(handle, "testDesign", true);
@@ -880,21 +878,6 @@ void Settings::setCCUIP(const char *ip)
   }
 
   strncpy(_ccuIP, ip, sizeof(_ccuIP) - 1);
-  if (_mutex) xSemaphoreGive(_mutex);
-}
-
-bool Settings::getBetaChannel()
-{
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  bool result = _betaChannel;
-  if (_mutex) xSemaphoreGive(_mutex);
-  return result;
-}
-
-void Settings::setBetaChannel(bool enabled)
-{
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  _betaChannel = enabled;
   if (_mutex) xSemaphoreGive(_mutex);
 }
 

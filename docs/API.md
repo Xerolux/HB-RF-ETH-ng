@@ -15,7 +15,6 @@ The HB-RF-ETH firmware provides a RESTful HTTP API for configuration and monitor
 | Feature | Version | Endpoint |
 |---------|---------|----------|
 | Token Persistence | 2.2.0-Beta.7 | All endpoints (token survives reboots) |
-| OTA Success Feedback | 2.2.0-Beta.9 | GET/POST `/api/check_update`, `POST /api/ota_url` |
 | Enhanced TLS Support | 2.2.0-Beta.10 | All HTTPS endpoints (Mozilla CA bundle) |
 | Prometheus Exporter | 2.3.0 | `GET /metrics` on configurable port (default 9100) |
 | Syslog Forwarding | 2.3.0 | Configured via `GET/POST /api/monitoring` (`syslog` block) |
@@ -248,7 +247,6 @@ Retrieve current device settings.
 **System Settings:**
 - `ledBrightness`: LED brightness (0-100)
 - `updateLedBlink`: Enable/disable LED blinking for update notifications
-- `betaChannel`: When `true`, the firmware update check considers pre-release versions published on GitHub (see [Firmware Management](#firmware-management)). Stable channel (default) only reports the latest stable release.
 - `flashPause`: When `true`, a system restart holds the Ethernet PHY in hardware reset for ~35 seconds before the ESP32 actually reboots. This lets a connected CCU's link-loss watchdog trigger a clean CCU restart so no stale radio-mod connections survive a firmware update. Optional, defaults to `false`. Set via the Settings page; persisted in NVS alongside the other settings.
 - `systemLogEnabled`: When `true`, the in-device ring-buffer system log is active and can be read via `/api/log`. Managed from the System Log page rather than the Settings page, but returned here for visibility.
 
@@ -498,160 +496,9 @@ curl -X POST http://192.168.1.100/api/monitoring \
 
 ## Firmware Management
 
-### GET /api/check_update
-
-Return the cached snapshot of the latest release known to the firmware. The
-snapshot is refreshed automatically every 24 h by a background task and on
-demand via `POST /api/check_update`. No network request is triggered by GET,
-so it is safe to poll.
-
-The release data is sourced from static update manifests in this repository:
-`https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/latest.json?t=<seconds>`
-for the stable channel and `.../beta.json?t=<seconds>` for the beta channel.
-GitHub Releases still host the firmware binary, but the device no longer parses
-the GitHub Releases API. The query value prevents stale raw CDN entries shortly
-after the release workflow updates the manifests.
-
-The release workflow updates the manifests automatically. Stable releases write
-both `latest.json` and `beta.json`; pre-releases write only `beta.json`. The
-manifest `sha256` must match the firmware binary entry in the release
-`SHA256SUMS.txt`.
-
-**Authentication:** Required
-
-**Response (200 OK):**
-```json
-{
-  "currentVersion": "2.1.11",
-  "latestVersion": "2.1.12",
-  "updateAvailable": true,
-  "isPrerelease": false,
-  "releaseNotes": "## What's new\n\n- Fixed ...",
-  "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.1.12",
-  "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.1.12/firmware_2.1.12.bin",
-  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "publishedAt": "2025-08-14T12:34:56Z",
-  "fetchedAt": 1735300000000,
-  "betaChannel": false,
-  "fetchInProgress": false,
-  "error": null
-}
-```
-
-**Fields:**
-- `currentVersion`: Firmware version currently running on the device.
-- `latestVersion`: Latest version matching the selected channel (`"n/a"` before the first successful fetch).
-- `updateAvailable`: `true` when `latestVersion > currentVersion` per semver.
-- `isPrerelease`: Mirrors the manifest's pre-release flag.
-- `releaseNotes`: Optional Markdown excerpt from the manifest.
-- `releaseUrl`: Release page for the "View on GitHub" link.
-- `downloadUrl`: Firmware binary URL advertised by the manifest.
-- `sha256`: Expected SHA-256 of the firmware binary advertised by the manifest.
-- `publishedAt`: ISO 8601 timestamp from the manifest.
-- `fetchedAt`: Unix epoch (milliseconds) of the last successful fetch; `0` if never fetched.
-- `betaChannel`: Current value of the `betaChannel` setting.
-- `fetchInProgress`: `true` while a manifest fetch is in flight.
-- `error`: Human-readable description of the last fetch failure, `null` if the snapshot is valid.
-
-**Example:**
-```bash
-curl http://192.168.1.100/api/check_update \
-  -H "Authorization: Token YOUR_TOKEN_HERE"
-```
-
----
-
-### POST /api/check_update
-
-Trigger an immediate refresh from the static update manifest. This is the
-backend behind the WebUI "Jetzt nach Updates suchen" button. It **ignores the
-24 h automatic window** (the user explicitly asked for a check) but enforces a
-60 s cooldown and refuses to stack onto a fetch that is already running, so
-the GitHub manifest and the ESP32 TLS heap stay protected.
-
-The actual manifest fetch runs in a detached task (a GitHub TLS handshake can
-take several seconds); this handler therefore returns **202 Accepted
-immediately** and the client polls `GET /api/check_update` (`fetchInProgress`)
-until it clears, then reads the updated snapshot.
-
-**Authentication:** Required
-
-**Request:** Empty body accepted (`{}` is also fine).
-
-**Response (202 Accepted):**
-```json
-{
-  "triggered": true,
-  "fetchInProgress": true
-}
-```
-
-**Fields:**
-- `triggered`: `true` when a new fetch was armed. `false` if a fetch is
-  already running, or the 60 s manual cooldown has not elapsed — in either
-  case the cached snapshot remains available via `GET /api/check_update`.
-- `fetchInProgress`: `true` while a manifest fetch (manual or automatic) is in
-  flight. Clients should poll `GET /api/check_update` until this becomes
-  `false`.
-
-**Example:**
-```bash
-curl -i -X POST http://192.168.1.100/api/check_update \
-  -H "Authorization: Token YOUR_TOKEN_HERE"
-# HTTP/1.1 202 Accepted
-# {"triggered":true,"fetchInProgress":true}
-```
-
-**Client flow:** POST → poll GET every ~1 s until `fetchInProgress == false`
-(≤ 20 s) → read the refreshed snapshot. The automatic 24 h check timer is not
-affected by manual triggers.
-
----
-
-### GET /api/changelog
-
-Proxy to the raw `CHANGELOG.md` on GitHub
-(`https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/CHANGELOG.md`).
-Used by the WebUI to render the full release history in a modal. The fetch
-runs in a detached task; only one upstream fetch is allowed at a time.
-
-**Authentication:** Required
-
-**Response (200 OK):** `text/markdown`, full file contents.
-
-**Response (503 Service Unavailable):** Another external fetch is already in progress. Retry shortly.
-
----
-
-### POST /api/ota_url
-
-Download and install a firmware image from an HTTPS URL. The download runs
-in a detached task while progress is reported via `GET /api/ota_status`.
-Typically called with the `downloadUrl` returned by `GET /api/check_update`.
-
-**Authentication:** Required
-
-**Request:**
-```json
-{ "url": "https://github.com/.../firmware_2.1.12.bin" }
-```
-
-**Response (200 OK):**
-```json
-{ "success": true, "message": "OTA update started" }
-```
-
-**Response (200 OK, request rejected):**
-```json
-{ "success": false, "error": "OTA update already in progress" }
-```
-
----
-
 ### GET /api/ota_status
 
-Report progress of an OTA download started via `POST /api/ota_url` or a manual
-file upload.
+Report progress of an OTA firmware upload (manual `POST /ota_update`).
 
 **Authentication:** Required
 
@@ -701,48 +548,6 @@ curl -X POST http://192.168.1.100/ota_update \
   -H "Authorization: Token YOUR_TOKEN_HERE" \
   -F "file=@firmware_2_1_0.bin"
 ```
-
-### GET /api/firmware_archive
-
-Retrieve the list of previously released firmware versions. Proxied from the project's `archive.json` manifest on GitHub.
-
-**Authentication:** Required
-
-**Response (200 OK):**
-```json
-{
-  "schema": 1,
-  "updatedAt": "2026-07-05T19:06:15Z",
-  "releases": [
-    {
-      "version": "2.2.3-Beta.12",
-      "channel": "beta",
-      "isPrerelease": true,
-      "publishedAt": "2026-07-05T19:06:15Z",
-      "downloadUrl": "https://github.com/.../firmware_2.2.3-Beta.12.bin",
-      "releaseUrl": "https://github.com/.../releases/tag/v2.2.3-Beta.12",
-      "notesUrl": "https://github.com/.../releases/tag/v2.2.3-Beta.12",
-      "tagName": "v2.2.3-Beta.12",
-      "name": "HB-RF-ETH-ng v2.2.3-Beta.12",
-      "assetName": "firmware_2.2.3-Beta.12.bin",
-      "assetSize": 1234567,
-      "notesExcerpt": "Short single-line preview of the release notes…"
-    }
-  ]
-}
-```
-
-**Fields:**
-- `version`: Semantic version string.
-- `channel`: `"stable"` or `"beta"`.
-- `downloadUrl`: Direct asset URL on GitHub (used to trigger an archive install via `POST /api/ota_url`).
-- `notesExcerpt`: A short (~300 char) collapsed-whitespace preview of the release notes. The full release notes are not embedded in the manifest to keep it small enough to stream through the device; follow `notesUrl` to read them on GitHub.
-- `notesUrl` / `releaseUrl`: GitHub URL for the release (full notes, assets, etc.).
-- `assetSize`: Firmware binary size in bytes (absent on legacy manifest entries).
-
-**Note:** The response is generated by the GitHub Actions `rebuild-archive.yml` / `release.yml` workflows. Older manifest entries may carry a `notes` field with the full markdown; the API and WebUI accept both shapes. The device streams the manifest via an async HTTPS proxy, so a request can return `503` if the HTTPS subsystem is busy (e.g. another fetch or OTA is in progress) — retry shortly afterwards.
-
----
 
 ## System Log Management
 

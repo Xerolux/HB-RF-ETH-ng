@@ -94,9 +94,6 @@ static const EventMeta &meta_for(Event e)
     static const EventMeta m_eth_up       = { "eth_link_up",        "Ethernet link came up" };
     static const EventMeta m_rf_lost      = { "rf_module_lost",     "Radio module no longer responds" };
     static const EventMeta m_rf_detected  = { "rf_module_detected", "Radio module detected" };
-    static const EventMeta m_ota_start    = { "ota_started",        "Firmware update started" };
-    static const EventMeta m_ota_ok       = { "ota_succeeded",      "Firmware update succeeded" };
-    static const EventMeta m_ota_fail     = { "ota_failed",         "Firmware update failed" };
     static const EventMeta m_mqtt_disc    = { "mqtt_disconnected",  "MQTT broker connection lost" };
     static const EventMeta m_mqtt_recon   = { "mqtt_reconnected",   "MQTT broker connection re-established" };
     static const EventMeta m_factory      = { "factory_reset",      "Factory reset initiated" };
@@ -109,9 +106,6 @@ static const EventMeta &meta_for(Event e)
         case EVENT_ETH_LINK_UP:        return m_eth_up;
         case EVENT_RF_MODULE_LOST:     return m_rf_lost;
         case EVENT_RF_MODULE_DETECTED: return m_rf_detected;
-        case EVENT_OTA_STARTED:        return m_ota_start;
-        case EVENT_OTA_SUCCEEDED:      return m_ota_ok;
-        case EVENT_OTA_FAILED:         return m_ota_fail;
         case EVENT_MQTT_DISCONNECTED:  return m_mqtt_disc;
         case EVENT_MQTT_RECONNECTED:   return m_mqtt_recon;
         case EVENT_FACTORY_RESET:      return m_factory;

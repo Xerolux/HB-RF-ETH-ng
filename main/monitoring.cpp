@@ -49,9 +49,9 @@
 #include "radiomoduledetector.h"
 #include "systemclock.h"
 #include "reset_info.h"
+#include "crash_blackbox.h"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
-#include "updatecheck.h"
 
 static const char *TAG = "MONITORING";
 SemaphoreHandle_t g_net_fetch_mutex = NULL;
@@ -147,11 +147,30 @@ enum OtaPausedService : uint32_t {
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
-static UpdateCheck* g_updateCheck = NULL;
 static Ethernet* g_ethernet = NULL;
 static RadioModuleDetector* g_radioModuleDetector = NULL;
 static SystemClock* g_systemClock = NULL;
 static Settings* g_settings = NULL;
+
+// OTA operation serialization flag (replaces the former UpdateCheck mutex).
+// See ota_operation_try_begin/finish/active in monitoring.h.
+static std::atomic<bool> g_ota_operation{false};
+
+bool ota_operation_try_begin(void)
+{
+    bool expected = false;
+    return g_ota_operation.compare_exchange_strong(expected, true);
+}
+
+void ota_operation_finish(void)
+{
+    g_ota_operation.store(false);
+}
+
+bool ota_operation_active(void)
+{
+    return g_ota_operation.load();
+}
 
 // Provider accessors for mqtt_handler.cpp
 Ethernet* monitoring_get_ethernet(void) { return g_ethernet; }
@@ -192,10 +211,6 @@ static void get_system_uptime(uint32_t *days, uint32_t *hours, uint32_t *minutes
 // Helper to access global pointers from other files (like mqtt_handler)
 SysInfo* monitoring_get_sysinfo(void) {
     return g_sysInfo;
-}
-
-UpdateCheck* monitoring_get_updatecheck(void) {
-    return g_updateCheck;
 }
 
 // CheckMK Agent Task
@@ -775,22 +790,30 @@ static void heap_watchdog_task(void *pvParameters)
     {
         vTaskDelay(HEAP_WATCHDOG_INTERVAL_TICKS);
 
-        // Skip checks during an active OTA: TLS handshakes, HTTP buffers and
-        // flash writes routinely push free heap below the threshold, and a
-        // restart here would interrupt and fail the firmware upgrade.
-        if (g_updateCheck)
+        // Skip checks during an active firmware/OTA write: flash erase +
+        // buffer allocations routinely push free heap below the threshold,
+        // and a restart here would interrupt and fail the upgrade. The manual
+        // upload path toggles this via ota_operation_try_begin/finish.
+        if (ota_operation_active())
         {
-            OtaSnapshot ota = g_updateCheck->getOtaState();
-            if (ota.state == OTA_STATE_STARTING ||
-                ota.state == OTA_STATE_DOWNLOADING ||
-                ota.state == OTA_STATE_FLASHING)
-            {
-                low_heap_streak = 0;
-                continue;
-            }
+            low_heap_streak = 0;
+            continue;
         }
 
         size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+        // Record a pre-crash snapshot in RTC memory so the next boot can tell
+        // us whether heap exhaustion preceded a sudden watchdog/panic reboot
+        // (issue #362). Done every cycle regardless of the threshold so the
+        // last sample is always recent.
+        {
+            size_t largest_now = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+            size_t min_ever = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+            size_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            uint32_t secs = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
+            crash_blackbox_update((uint32_t)free_heap, (uint32_t)largest_now,
+                                  (uint32_t)min_ever, (uint32_t)internal_free,
+                                  secs, (uint32_t)low_heap_streak);
+        }
         if (free_heap < HEAP_WATCHDOG_CRITICAL_BYTES)
         {
             low_heap_streak++;
@@ -891,7 +914,7 @@ static void mqtt_network_ready_handler(void *handler_args,
 }
 
 // Initialize monitoring subsystem
-esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, UpdateCheck* updateCheck)
+esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
 {
     ESP_LOGI(TAG, "Initializing monitoring subsystem");
 
@@ -911,7 +934,6 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo, U
     }
 
     g_sysInfo = sysInfo;
-    g_updateCheck = updateCheck;
 
     // Initialize MQTT handler
     mqtt_handler_init();

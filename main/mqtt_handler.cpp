@@ -24,7 +24,6 @@
 #include "mqtt_handler.h"
 #include "monitoring.h"
 #include "sysinfo.h"
-#include "updatecheck.h"
 #include "webui_storage.h"
 #include "reset_info.h"
 #include "system_reset.h"
@@ -32,6 +31,8 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -40,7 +41,6 @@
 #include "ethernet.h"
 #include "radiomoduledetector.h"
 #include "systemclock.h"
-#include "semver.h"
 
 #include <string.h>
 #include <atomic>
@@ -85,29 +85,12 @@ static SemaphoreHandle_t mqtt_lifecycle_mutex = NULL;
 
 // Forward declarations
 extern SysInfo* monitoring_get_sysinfo(void);
-extern UpdateCheck* monitoring_get_updatecheck(void);
 extern Ethernet* monitoring_get_ethernet(void);
 extern RadioModuleDetector* monitoring_get_radiomodule(void);
 extern SystemClock* monitoring_get_systemclock(void);
 
 void mqtt_handler_publish_ha_discovery(void);
-static void publish_ota_state(void);
 static void publish_legacy_topic_cleanup(void);
-
-// Helper: map OTA state enum to short string for status topic + HA.
-static const char* ota_state_str(ota_state_t s)
-{
-    switch (s) {
-    case OTA_STATE_CHECKING:    return "checking";
-    case OTA_STATE_STARTING:    return "starting";
-    case OTA_STATE_DOWNLOADING: return "downloading";
-    case OTA_STATE_FLASHING:    return "flashing";
-    case OTA_STATE_SUCCESS:     return "success";
-    case OTA_STATE_FAILED:      return "failed";
-    case OTA_STATE_IDLE:
-    default:                    return "idle";
-    }
-}
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -160,30 +143,6 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
         mqtt_handler_publish_event("event/restart", "requested");
         vTaskDelay(pdMS_TO_TICKS(300));
         full_system_restart();
-    } else if (strcmp(command, "check_update") == 0) {
-        // Use the same timer-backed, cooldown- and heap-guarded path as the
-        // WebUI. The former MQTT implementation spawned its own large worker
-        // directly from the MQTT callback and was removed after causing OOM /
-        // stack watchdog failures. When the safe manual path was reintroduced
-        // for the WebUI, this dispatcher case was accidentally left out.
-        ESP_LOGI(TAG, "Check-update command received via MQTT");
-        UpdateCheck *updateCheck = monitoring_get_updatecheck();
-        if (!updateCheck) {
-            mqtt_handler_publish_event("event/check_update",
-                                       "updatecheck_unavailable");
-            return;
-        }
-
-        const bool accepted = updateCheck->triggerManualFetch();
-        if (accepted) {
-            mqtt_handler_publish_event("event/check_update", "requested");
-        } else if (updateCheck->isFetchInProgress()) {
-            mqtt_handler_publish_event("event/check_update",
-                                       "already_in_progress");
-        } else {
-            mqtt_handler_publish_event("event/check_update",
-                                       "cooldown_or_not_started");
-        }
     } else {
         ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
         mqtt_handler_publish_event("event/command_rejected", "reason=unknown_command");
@@ -267,10 +226,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_publish_task(void *pvParameters)
 {
-    // Track which OTA state we last published so we emit an out-of-cycle
-    // status update the moment it changes (rather than waiting up to 60 s).
-    ota_state_t last_ota_state = OTA_STATE_IDLE;
-    int last_ota_progress = -1;
     int publish_cycle = 0;
 
     while (mqtt_running.load()) {
@@ -289,65 +244,29 @@ void mqtt_publish_task(void *pvParameters)
         }
         publish_cycle++;
         mqtt_handler_publish_status();
-        publish_ota_state();
 
         // Task-stack diagnostics move slowly; publishing every cycle
-        // wastes broker storage for no insight. ~60 s cadence is enough to
-        // spot slow leaks or post-OTA drift when the user files a bug.
-        // With the 10 s status cadence above, every-6th-cycle ≈ 60 s.
+        // wastes broker storage for no insight. With the 60 s status cadence
+        // below, every-6th-cycle ≈ 6 min — plenty to spot slow leaks or
+        // post-OTA drift when the user files a bug.
         if (publish_cycle % 6 == 0) {
             mqtt_handler_publish_task_stacks();
         }
 
-        // Re-publish the moment the OTA state changes - users get instant
-        // feedback when an update starts, finishes or fails.
-        OtaSnapshot ota = monitoring_get_updatecheck()
-            ? monitoring_get_updatecheck()->getOtaState() : OtaSnapshot{};
-        if (ota.state != last_ota_state) {
-            mqtt_handler_publish_status();
-            publish_ota_state();
-            // Emit a discrete event for state transitions that integrations
-            // may want to trigger on (notification, automation, ...).
-            if (ota.state == OTA_STATE_SUCCESS) {
-                mqtt_handler_publish_event("event/update_finished", "success");
-            } else if (ota.state == OTA_STATE_FAILED) {
-                char buf[160];
-                snprintf(buf, sizeof(buf), "failed: %s (code=0x%x)",
-                         ota.error_text[0] ? ota.error_text : "unknown",
-                         ota.error_code);
-                mqtt_handler_publish_event("event/update_finished", buf);
-            } else if (ota.state == OTA_STATE_DOWNLOADING && last_ota_state == OTA_STATE_STARTING) {
-                mqtt_handler_publish_event("event/update_downloading", "started");
-            }
-            last_ota_state = ota.state;
-        }
-        // Emit progress events at most every ~5 % to avoid MQTT flooding.
-        if (ota.state == OTA_STATE_DOWNLOADING &&
-            ota.progress_pct >= 0 &&
-            (ota.progress_pct - last_ota_progress >= 5 ||
-             ota.progress_pct < last_ota_progress)) {
-            publish_ota_state();
-            last_ota_progress = ota.progress_pct;
-        } else if (ota.state != OTA_STATE_DOWNLOADING) {
-            last_ota_progress = -1;
-        }
-
-        // Sleep with quick wake-ups so we can react fast to trigger_publish
-        // requests and so the OTA-state-changed detection runs every second
-        // while an update is in flight.
-        // 10 s base cadence (was 5 s): each cycle publishes ~40 retained
-        // status topics, so doubling the interval halves the steady-state
-        // esp_mqtt_client_publish churn and the small per-call tx-buffer
-        // allocations inside esp-mqtt. HA's measurement sensors tolerate
-        // 10 s updates comfortably; OTA progress still runs on the 1 s path.
-        int delay_ms = (ota.state == OTA_STATE_IDLE) ? 10000 : 1000;
+        // 60 s base cadence (was 10 s): each cycle publishes ~30 retained
+        // status topics, so at 10 s that was ~11 000 esp_mqtt_client_publish
+        // calls per hour — each doing small internal mallocs that slowly
+        // fragment the WROOM-32 heap over hours/days, the prime suspect for
+        // the long-uptime Interrupt-Watchdog crashes (issue #362). Raising the
+        // cadence to 60 s cuts that churn to ~1 800/h (−84 %) without losing
+        // useful monitoring resolution — the values barely change within a
+        // minute. The 12-step subdivision keeps trigger_publish response at
+        // ~5 s so OTA/state changes still publish promptly.
         for (int i = 0; i < 12 && mqtt_running.load(); i++) {
             if (mqtt_publish_request.exchange(false)) {
                 break;  // run a fresh publish cycle immediately
             }
-            int step = delay_ms / 12;
-            if (step < 50) step = 50;
-            vTaskDelay(pdMS_TO_TICKS(step));
+            vTaskDelay(pdMS_TO_TICKS(60000 / 12));
         }
     }
     mqtt_publish_task_handle.store(NULL);
@@ -425,7 +344,6 @@ void mqtt_handler_publish_status(void)
     }
 
     SysInfo* sysInfo = monitoring_get_sysinfo();
-    UpdateCheck* updateCheck = monitoring_get_updatecheck();
     Ethernet* eth = monitoring_get_ethernet();
     RadioModuleDetector* radio = monitoring_get_radiomodule();
     SystemClock* clk = monitoring_get_systemclock();
@@ -449,27 +367,6 @@ void mqtt_handler_publish_status(void)
     webui_storage_get_effective_version(webuiVersion, sizeof(webuiVersion));
     PUBLISH_STR("status/webui_version", webuiVersion);
     PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString());
-
-    // ---- Informational update status -------------------------------------
-    if (updateCheck) {
-        VersionSnapshot rel = updateCheck->getVersionSnapshot();
-        const char* currentVersion = sysInfo->getCurrentVersion();
-        const char* latestFirmware = rel.valid ? rel.version : currentVersion;
-        if (rel.valid && compareVersions(latestFirmware, currentVersion) <= 0) {
-            latestFirmware = currentVersion;
-        }
-        const bool firmwareUpdateAvailable = rel.valid &&
-            compareVersions(rel.version, currentVersion) > 0;
-        const char* latestWebui = rel.webuiValid ? rel.webuiVersion : webuiVersion;
-        const bool webuiUpdateAvailable = rel.webuiValid &&
-            compareVersions(rel.webuiVersion, webuiVersion) > 0;
-
-        PUBLISH_STR("status/update_available", firmwareUpdateAvailable ? "true" : "false");
-        PUBLISH_STR("status/latest_firmware_version", latestFirmware);
-        PUBLISH_STR("status/latest_webui_version", latestWebui);
-        PUBLISH_STR("status/firmware_update_available", firmwareUpdateAvailable ? "true" : "false");
-        PUBLISH_STR("status/webui_update_available", webuiUpdateAvailable ? "true" : "false");
-    }
 
     // ---- System metrics ---------------------------------------------------
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
@@ -573,29 +470,6 @@ void mqtt_handler_publish_status(void)
     }
 }
 
-// Publish the OTA state + progress under dedicated subtopics so HA can render
-// a progress bar and automations can trigger on completion.
-static void publish_ota_state(void)
-{
-    if (!mqtt_can_publish()) return;
-    UpdateCheck* updateCheck = monitoring_get_updatecheck();
-    if (!updateCheck) return;
-
-    OtaSnapshot ota = updateCheck->getOtaState();
-    char topic[160];
-    char payload[64];
-
-    PUBLISH_STR("status/ota_state", ota_state_str(ota.state));
-    if (ota.progress_pct >= 0) {
-        PUBLISH_INT("status/ota_progress", ota.progress_pct);
-    } else {
-        PUBLISH_STR("status/ota_progress", "-1");
-    }
-    if (ota.state == OTA_STATE_FAILED && ota.error_text[0]) {
-        PUBLISH_STR("status/ota_error", ota.error_text);
-    }
-}
-
 #undef PUBLISH_STR
 #undef PUBLISH_INT
 #undef PUBLISH_UINT64
@@ -623,11 +497,54 @@ static void publish_legacy_topic_cleanup(void)
 {
     if (!mqtt_can_publish()) return;
 
+    // Versioned one-shot migration gate (issue #404). The empty retained
+    // payloads this function emits are the MQTT-standard way to DELETE a
+    // retained value, but ioBroker's MQTT adapter is non-conformant: it
+    // keeps/creates a datapoint with a null value instead of removing the
+    // topic. For users who never had these legacy topics, running the cleanup
+    // on every connect therefore creates the phantom "(null)" data points
+    // reported in #404.
+    //
+    // A version counter (rather than a single boolean) is used so that adding
+    // newly-retired topics — e.g. the update-check/OTA topics removed together
+    // with the automatic update-check feature — re-runs the cleanup exactly
+    // once on devices that already performed an older run. Bump CLEANUP_VERSION
+    // whenever legacy_subtopics grows. Persisted in the main settings namespace
+    // so a factory reset (which erases "HB-RF-ETH") re-runs it once more.
+    static const char *const CLEANUP_NS = "HB-RF-ETH";
+    static const char *const CLEANUP_KEY = "mqttLgcyVer"; // 11 chars (NVS limit 15)
+    static const uint8_t CLEANUP_VERSION = 2;
+    bool needs_cleanup = false;
+    {
+        nvs_handle_t h;
+        if (nvs_open(CLEANUP_NS, NVS_READWRITE, &h) == ESP_OK) {
+            uint8_t stored = 0;
+            if (nvs_get_u8(h, CLEANUP_KEY, &stored) != ESP_OK || stored < CLEANUP_VERSION) {
+                needs_cleanup = true;
+            }
+            nvs_close(h);
+        }
+        // If NVS is unavailable we proceed with the cleanup rather than
+        // silently losing the migration for users who need it.
+    }
+    if (!needs_cleanup) {
+        return;
+    }
+
     static const char *const legacy_subtopics[] = {
         "status/temperature",
         "status/supply_voltage",
         "status/version",
         "status/latest_version",
+        // Topics retired together with the automatic update-check feature.
+        "status/update_available",
+        "status/latest_firmware_version",
+        "status/latest_webui_version",
+        "status/firmware_update_available",
+        "status/webui_update_available",
+        "status/ota_state",
+        "status/ota_progress",
+        "status/ota_error",
     };
 
     char topic[160];
@@ -637,6 +554,19 @@ static void publish_legacy_topic_cleanup(void)
         // qos=0, retain=1: an empty retained payload is the MQTT-standard
         // way to delete a retained value from the broker.
         mqtt_publish_connected(topic, "", 0, 0, 1);
+    }
+
+    // Mark this cleanup version complete so it never runs again until the
+    // version is bumped again.
+    {
+        nvs_handle_t h;
+        if (nvs_open(CLEANUP_NS, NVS_READWRITE, &h) == ESP_OK) {
+            nvs_set_u8(h, CLEANUP_KEY, CLEANUP_VERSION);
+            nvs_commit(h);
+            nvs_close(h);
+            ESP_LOGI(TAG, "Legacy retained-topic cleanup performed (v%u); will not repeat",
+                     (unsigned)CLEANUP_VERSION);
+        }
     }
 }
 
@@ -657,10 +587,6 @@ void mqtt_handler_publish_ha_discovery(void)
     // buttons work even when a command_token is configured. Empty token ->
     // plain "restart" etc. (legacy behaviour).
     const char* restart_payload  = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "restart";
-    const char* check_update_payload =
-        current_mqtt_config.command_token[0]
-            ? current_mqtt_config.command_token
-            : "check_update";
     // Device Info — use the configurable hostname as the HA device name so
     // multiple HB-RF-ETH boards can be told apart in the UI. Fall back to a
     // generic label if the hostname is unavailable.
@@ -736,21 +662,21 @@ void mqtt_handler_publish_ha_discovery(void)
     remove_config("sensor", "temperature");
     publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
-    // Remove the legacy short-named version sensors. Before the dual-version
-    // refactor these were the only version topics; afterwards they duplicated
-    // firmware_version/latest_firmware_version 1:1, showing up in Home
-    // Assistant as two sensors named "Firmware Version". The explicit
-    // firmware_version / webui_version (and latest_*) sensors below fully
-    // cover the use case. Empty retained discovery payload removes the
-    // already-announced entities from HA on the next status publish.
+    // Remove the legacy short-named version sensors (renamed to
+    // firmware_version / webui_version below). Empty retained discovery
+    // payload removes the already-announced entities from HA.
     remove_config("sensor", "version");
     remove_config("sensor", "latest_version");
     publish_config("sensor", "firmware_version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
     publish_config("sensor", "webui_version", "WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web");
-    publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-up");
-    publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web-sync");
-    publish_config("binary_sensor", "firmware_update_available", "Firmware Update Available", "update", NULL, NULL, NULL, "diagnostic", "mdi:package-up", "true", "false");
-    publish_config("binary_sensor", "webui_update_available", "WebUI Update Available", "update", NULL, NULL, NULL, "diagnostic", "mdi:web-sync", "true", "false");
+    // The automatic update-check feature was removed; drop the update-status
+    // entities older firmware may still have retained in HA / ioBroker so
+    // they don't linger as stale "(null)" / false sensors.
+    remove_config("sensor", "latest_firmware_version");
+    remove_config("sensor", "latest_webui_version");
+    remove_config("binary_sensor", "firmware_update_available");
+    remove_config("binary_sensor", "webui_update_available");
+    remove_config("binary_sensor", "update_available");
     publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");
 
     // ---- Sensors: network -----------------------------------------------
@@ -778,36 +704,13 @@ void mqtt_handler_publish_ha_discovery(void)
     publish_config("binary_sensor", "ntp_synced", "NTP Synced", NULL, NULL, NULL,
                    NULL, "diagnostic", "mdi:clock-check", "true", "false");
 
-    // ---- Sensors: OTA ----------------------------------------------------
+    // ---- Retired OTA / update-check topics ------------------------------
+    // Automatic update-check was removed. Delete any retained discovery
+    // entries and (via publish_legacy_topic_cleanup) the retained status
+    // values so HA / ioBroker don't keep stale sensors with null/false.
     remove_config("sensor", "ota_progress");
-
-    // ---- Update Available (binary) --------------------------------------
-    {
-        cJSON *root = cJSON_CreateObject();
-        cJSON_AddStringToObject(root, "name", "Update Available");
-        char unique_id[128];
-        snprintf(unique_id, sizeof(unique_id), "%s_update_available", identifiers);
-        cJSON_AddStringToObject(root, "unique_id", unique_id);
-
-        char state_topic[160];
-        snprintf(state_topic, sizeof(state_topic), "%s/status/update_available", current_mqtt_config.topic_prefix);
-        cJSON_AddStringToObject(root, "state_topic", state_topic);
-
-        cJSON_AddStringToObject(root, "device_class", "update");
-        cJSON_AddStringToObject(root, "entity_category", "diagnostic");
-        cJSON_AddStringToObject(root, "payload_on", "true");
-        cJSON_AddStringToObject(root, "payload_off", "false");
-
-        cJSON_AddItemToObject(root, "device", cJSON_Duplicate(device, 1));
-
-        char *json_str = cJSON_PrintUnformatted(root);
-        char topic[256];
-        snprintf(topic, sizeof(topic), "%s/binary_sensor/hb-rf-eth-%s/update_available/config",
-                 current_mqtt_config.ha_discovery_prefix, sysInfo->getSerialNumber());
-        mqtt_publish_connected(topic, json_str, 0, 1, 1);
-        free(json_str);
-        cJSON_Delete(root);
-    }
+    remove_config("sensor", "ota_state");
+    remove_config("sensor", "ota_error");
 
     // ---- Buttons ---------------------------------------------------------
     auto publish_button = [&](const char* object_id, const char* name,
@@ -845,12 +748,11 @@ void mqtt_handler_publish_ha_discovery(void)
     // must NOT publish buttons that look clickable. Hide them by skipping.
     if (current_mqtt_config.command_enabled) {
         publish_button("restart", "Restart", "restart", restart_payload, "restart", "mdi:restart");
-        publish_button("check_update", "Check for Update", "check_update",
-                       check_update_payload, "update", "mdi:refresh");
     }
 
     // Remove destructive/retired entities retained by older firmware.
     remove_config("button", "factory_reset");
+    remove_config("button", "check_update");
     remove_config("update", "firmware_update");
 
     cJSON_Delete(device);

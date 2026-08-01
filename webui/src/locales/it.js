@@ -424,6 +424,9 @@ webuiUpdate: {
     availableKicker: 'Firmware disponibile per il dispositivo',
     availableHeading: 'Firmware disponibile',
     availableHelp: 'L’ESP scarica solo il piccolo manifest di aggiornamento. Il file del firmware viene invece scaricato direttamente dal browser.',
+        updatesOnGithubHeading: 'Aggiornamenti su GitHub',
+    updatesOnGithubHelp: 'Le nuove versioni sono sempre disponibili sulla pagina GitHub del progetto.',
+    noAutoCheckNote: "Il dispositivo non cerca più aggiornamenti automaticamente. Controlla GitHub periodicamente o carica manualmente un nuovo firmware_*.bin.",
     newVersionLabel: 'Nuova versione',
     publishedAt: 'Pubblicato: {time}',
     statusLabel: 'Stato',
@@ -843,17 +846,6 @@ webuiUpdate: {
     updateCheck: 'Gli aggiornamenti automatici e i controlli del firmware si connettono al server raw.githubusercontent.com / github.com. Il tuo indirizzo IP viene trasmesso per verificare la disponibilità di nuove versioni.',
   },
 
-  // Changelog
-  changelog: {
-    title: 'Registro delle Modifiche',
-    loading: 'Caricamento...',
-    fetching: 'Recupero registro modifiche da GitHub...',
-    error: 'Impossibile caricare il registro delle modifiche',
-    fetchError: 'Impossibile recuperare il registro delle modifiche. Controlla la tua connessione internet.',
-    retry: 'Riprova',
-    close: 'Chiudi',
-    viewOnGithub: 'Vedi su GitHub'
-  },
 
   // Supporter
   supporter: {

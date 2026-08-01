@@ -31,76 +31,25 @@
         <strong>{{ formatBytes(status.usedBytes) }} / {{ formatBytes(status.partitionSize) }}</strong>
         <div class="track"><span :style="{ width: storagePercent + '%' }"></span></div>
       </article>
-      <article class="panel status-card">
-        <span class="label">{{ t('webuiUpdate.checkLabel') }}</span>
-        <strong>{{ lastCheckText }}</strong>
-        <small>{{ t('webuiUpdate.checkHint') }}</small>
-      </article>
     </section>
 
     <div class="content-grid">
       <section class="update-card">
         <div class="card-header">
-          <div class="header-icon bg-success-light text-success"><AppIcon name="download" /></div>
+          <div class="header-icon bg-success-light text-success"><AppIcon name="externalLink" /></div>
           <div class="header-text">
             <span class="kicker">{{ t('webuiUpdate.availableKicker') }}</span>
-            <h2>{{ t('webuiUpdate.downloadHeading') }}</h2>
-            <p>{{ t('webuiUpdate.downloadHelp') }}</p>
+            <h2>{{ t('firmware.updatesOnGithubHeading') }}</h2>
+            <p>{{ t('firmware.updatesOnGithubHelp') }}</p>
           </div>
-          <span v-if="release.version" class="version-badge">v{{ release.version }}</span>
         </div>
 
         <div class="card-body">
-          <BAlert v-if="manifestError" variant="warning" :model-value="true">{{ manifestError }}</BAlert>
-
-          <!-- Manual "search for updates now" (Korrekturauftrag §6.2/§6.3). Shares
-               the on-device fetch with the Firmware tab; after it settles we reload
-               the WebUI-specific release block. -->
-          <div class="check-now-row">
-            <BButton variant="outline-primary" class="action-btn check-now-btn"
-                     :disabled="checkNowBusy" @click="onCheckNow">
-              <span v-if="checkNowBusy" class="spinner-border spinner-border-sm me-2"></span>
-              <AppIcon v-else name="refresh" />
-              {{ checkNowBusy ? checkNowLabel : checkNowIdleLabel }}
-            </BButton>
-          </div>
-
-          <BAlert
-            v-if="manualCheckFeedback"
-            :variant="manualCheckFeedback.variant"
-            :model-value="true"
-            class="manual-check-feedback"
-            data-testid="manual-check-feedback"
-          >
-            <strong>{{ manualCheckFeedback.title }}</strong>
-            <span>{{ manualCheckFeedback.message }}</span>
-          </BAlert>
-
-          <div v-if="release.version" class="release-grid">
-            <div><span>{{ t('webuiUpdate.installedGridLabel') }}</span><strong>{{ installedVersion }}</strong></div>
-            <div><span>{{ t('webuiUpdate.availableGridLabel') }}</span><strong>{{ release.version }}</strong></div>
-            <div><span>{{ t('webuiUpdate.imageSizeLabel') }}</span><strong>{{ formatBytes(release.size) }}</strong></div>
-            <div><span>{{ t('webuiUpdate.minFirmwareLabel') }}</span><strong>{{ release.minFirmwareVersion || '—' }}</strong></div>
-          </div>
-
-          <BAlert v-if="!updateAvailable && (release.version || updateStore.hasCompletedManualCheck)" variant="success" :model-value="true">
-            {{ t('webuiUpdate.upToDate') }}
-          </BAlert>
-
+          <p class="muted-text">{{ t('firmware.noAutoCheckNote') }}</p>
           <div class="actions">
             <a
-              v-if="updateAvailable && release.downloadUrl && !manifestError"
               class="btn btn-success action-btn"
-              :href="release.downloadUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <AppIcon name="download" /> {{ t('webuiUpdate.downloadButton') }}
-            </a>
-            <a
-              v-if="release.releaseUrl"
-              class="btn btn-outline-secondary action-btn"
-              :href="release.releaseUrl"
+              href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -161,7 +110,7 @@
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
-import { useUiStore, useUpdateStore } from './stores.js'
+import { useUiStore } from './stores.js'
 
 const { t } = useI18n()
 
@@ -169,22 +118,13 @@ const WEBUI_API_VERSION = typeof __WEBUI_API_VERSION__ !== 'undefined' ? __WEBUI
 const EMBEDDED_WEBUI_VERSION = typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : ''
 
 const uiStore = useUiStore()
-const updateStore = useUpdateStore()
 const loading = ref(true)
 const busy = ref(false)
 const progress = ref(0)
-const manifestError = ref('')
 const statusError = ref('')
 const fileError = ref('')
 const selectedFile = ref(null)
-const release = ref({})
 const firmwareVersion = ref('')
-const updateFetchedAt = ref(null)
-// Manual update search (Korrekturauftrag §6.2/§6.3). Labels reuse the shared
-// updates.* keys so this tab stays in sync with the Firmware tab.
-const checkNowBusy = ref(false)
-const checkNowIdleLabel = computed(() => t('updates.checkNow'))
-const checkNowLabel = computed(() => t('updates.checkingNow'))
 const status = ref({
   partitionFound: false,
   mounted: false,
@@ -211,76 +151,12 @@ const storagePercent = computed(() => {
   const total = status.value.totalBytes || status.value.partitionSize || 0
   return total ? Math.min(100, Math.round((status.value.usedBytes || 0) * 100 / total)) : 0
 })
-const updateAvailable = computed(() => !!release.value.version && compareVersions(installedVersion.value, release.value.version) < 0)
-const lastCheckText = computed(() => {
-  const checkedAt = updateStore.lastSuccessfulManualCheckAt || updateFetchedAt.value
-  return checkedAt ? new Date(Number(checkedAt)).toLocaleString() : t('webuiUpdate.neverChecked')
-})
-
-const manualCheckFeedback = computed(() => {
-  let outcome = updateStore.lastManualCheckOutcome
-  if (outcome === 'updated' || outcome === 'no-update') {
-    outcome = updateAvailable.value ? 'updated' : 'no-update'
-  }
-
-  switch (outcome) {
-    case 'updated':
-      return {
-        variant: 'success',
-        title: t('updates.checkResultUpdatedTitle'),
-        message: t('updates.checkResultUpdated', { version: release.value.version })
-      }
-    case 'no-update':
-      return {
-        variant: 'success',
-        title: t('updates.checkResultNoUpdateTitle'),
-        message: t('updates.checkResultNoUpdate')
-      }
-    case 'cooldown':
-      return {
-        variant: 'info',
-        title: t('updates.checkResultCooldownTitle'),
-        message: t('updates.checkResultCooldown')
-      }
-    case 'skipped':
-      return {
-        variant: 'warning',
-        title: t('updates.checkResultSkippedTitle'),
-        message: updateStore.lastSkipReason || t('updates.checkResultSkipped')
-      }
-    case 'error':
-      return {
-        variant: 'danger',
-        title: t('updates.checkResultErrorTitle'),
-        message: updateStore.checkError || t('updates.checkResultError')
-      }
-    default:
-      return null
-  }
-})
 
 const formatBytes = bytes => {
   const value = Number(bytes) || 0
   if (value < 1024) return `${value} B`
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
   return `${(value / 1024 / 1024).toFixed(2)} MB`
-}
-
-const compareVersions = (left = '', right = '') => {
-  const parse = value => {
-    const [core, pre = ''] = String(value).replace(/^v/i, '').split('-', 2)
-    const numbers = core.split('.').map(part => Number(part) || 0)
-    return { numbers: [numbers[0] || 0, numbers[1] || 0, numbers[2] || 0], pre }
-  }
-  const a = parse(left)
-  const b = parse(right)
-  for (let index = 0; index < 3; index += 1) {
-    if (a.numbers[index] !== b.numbers[index]) return a.numbers[index] > b.numbers[index] ? 1 : -1
-  }
-  if (!a.pre && !b.pre) return 0
-  if (!a.pre) return 1
-  if (!b.pre) return -1
-  return a.pre.localeCompare(b.pre, undefined, { numeric: true, sensitivity: 'base' })
 }
 
 const loadStatus = async () => {
@@ -296,64 +172,7 @@ const loadStatus = async () => {
     firmwareVersion.value = systemResponse.data?.sysInfo?.currentVersion || ''
     statusError.value = ''
   } catch (err) {
-    // Network drop, device mid-reboot, 500 — degrade gracefully instead of
-    // rejecting through onMounted. Show a retry banner; partitionSize stays
-    // at its previous value so install validation can't trip on a bogus 0.
     statusError.value = err.response?.data?.message || err.message || t('webuiUpdate.statusLoadError')
-  }
-}
-
-const loadCachedRelease = async () => {
-  manifestError.value = ''
-  release.value = {}
-  try {
-    const response = await axios.get('/api/check_update', { timeout: 8000, silent: true })
-    updateFetchedAt.value = response.data?.fetchedAt || null
-    const item = response.data?.webui
-    if (!item) {
-      manifestError.value = t('webuiUpdate.manifestNoWebui')
-      return
-    }
-    if (item.design !== 'newdesign') {
-      manifestError.value = t('webuiUpdate.manifestWrongDesign')
-      return
-    }
-    release.value = item
-    if (Number(item.size) !== Number(status.value.partitionSize)) {
-      manifestError.value = t('webuiUpdate.manifestWrongSize', { expected: formatBytes(status.value.partitionSize) })
-    } else if (Number(item.apiVersion) !== Number(status.value.supportedApiVersion || WEBUI_API_VERSION)) {
-      manifestError.value = t('webuiUpdate.manifestWrongApi')
-    } else if (compareVersions(firmwareVersion.value, item.minFirmwareVersion) < 0) {
-      manifestError.value = t('webuiUpdate.manifestFirmwareTooOld', { min: item.minFirmwareVersion })
-    }
-  } catch (error) {
-    manifestError.value = error.response?.data?.message || error.message || t('webuiUpdate.manifestLoadError')
-  }
-}
-
-// Manual update search (Korrekturauftrag §6.2/§6.3). Delegates the POST +
-// polling to the shared update store, then reloads the WebUI release block so
-// the result (new version / current / error) is reflected in this tab. The
-// outcome drives a definitive toast per §6.3.
-const onCheckNow = async () => {
-  if (checkNowBusy.value) return
-  checkNowBusy.value = true
-  try {
-    const outcome = await updateStore.checkNow(firmwareVersion.value)
-    await loadCachedRelease()
-    if ((outcome === 'updated' || outcome === 'no-update') && updateAvailable.value) {
-      uiStore.pushToast({ type: 'success', title: t('updates.checkResultUpdatedTitle'), message: t('updates.checkResultUpdated', { version: release.value.version }), duration: 5000 })
-    } else if (outcome === 'skipped') {
-      uiStore.pushToast({ type: 'warning', title: t('updates.checkResultSkippedTitle'), message: updateStore.lastSkipReason || t('updates.checkResultSkipped'), duration: 8000 })
-    } else if (outcome === 'no-update' || outcome === 'updated') {
-      uiStore.pushToast({ type: 'info', title: t('updates.checkResultNoUpdateTitle'), message: t('updates.checkResultNoUpdate'), duration: 4000 })
-    } else if (outcome === 'cooldown') {
-      uiStore.pushToast({ type: 'info', title: t('updates.checkResultCooldownTitle'), message: t('updates.checkResultCooldown'), duration: 4000 })
-    } else {
-      uiStore.pushToast({ type: 'error', title: t('updates.checkResultErrorTitle'), message: updateStore.checkError || t('updates.checkResultError'), duration: 6000 })
-    }
-  } finally {
-    checkNowBusy.value = false
   }
 }
 
@@ -361,7 +180,6 @@ const refreshCachedStatus = async () => {
   loading.value = true
   try {
     await loadStatus()
-    await loadCachedRelease()
   } finally {
     loading.value = false
   }
@@ -383,8 +201,6 @@ const selectFile = event => {
   } else if (name.startsWith('firmware_')) {
     fileError.value = t('webuiUpdate.fileIsFirmware')
   } else if (!status.value.partitionSize) {
-    // Status load failed earlier — can't validate size. Tell the user instead
-    // of every file failing with "expected 0 bytes".
     fileError.value = t('webuiUpdate.fileStatusMissing')
   } else if (Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
     fileError.value = t('webuiUpdate.fileWrongSize', { expected: formatBytes(status.value.partitionSize), bytes: status.value.partitionSize })
@@ -397,25 +213,6 @@ const installManual = async () => {
   progress.value = 0
   try {
     const headers = { 'Content-Type': 'application/octet-stream' }
-    let releaseFileName = ''
-    try {
-      releaseFileName = decodeURIComponent(
-        new URL(release.value.downloadUrl || '', window.location.href)
-          .pathname.split('/').pop() || ''
-      )
-    } catch {
-      releaseFileName = ''
-    }
-    const matchesRelease =
-      releaseFileName &&
-      selectedFile.value.name === releaseFileName &&
-      Number(selectedFile.value.size) === Number(release.value.size)
-    if (matchesRelease && release.value.sha256 &&
-        release.value.apiVersion && release.value.minFirmwareVersion) {
-      headers['X-WebUI-SHA256'] = release.value.sha256
-      headers['X-WebUI-API-Version'] = String(release.value.apiVersion)
-      headers['X-WebUI-Min-Firmware-Version'] = release.value.minFirmwareVersion
-    }
 
     await axios.post('/api/webui/update', selectedFile.value, {
       timeout: 180000,
@@ -444,7 +241,7 @@ onMounted(refreshCachedStatus)
 </script>
 
 <style scoped>
-.status-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-3); margin-bottom:var(--card-padding); }
+.status-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-bottom:var(--card-padding); }
 .content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--card-padding); }
 .panel { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); }
 .status-card { padding:var(--space-4); display:flex; flex-direction:column; gap:5px; }
@@ -458,18 +255,9 @@ onMounted(refreshCachedStatus)
 .header-text p { margin:.35rem 0 0; color:var(--color-text-secondary); }
 .card-body { padding:var(--card-padding); display:flex; flex-direction:column; gap:var(--space-4); }
 .kicker { color:var(--color-primary-strong); font-size: var(--fs-2xs); font-weight:var(--font-weight-heavy); text-transform:uppercase; letter-spacing:.04em; }
-.version-badge { margin-left:auto; padding:5px 9px; border-radius:999px; background:var(--color-primary-soft); font-weight:var(--font-weight-heavy); white-space:nowrap; }
-.release-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); }
-.release-grid div { padding:var(--space-3); border-radius:var(--radius-sm); background:var(--color-bg-alt); display:flex; flex-direction:column; gap:var(--space-1); }
-.release-grid span { color:var(--color-text-secondary); font-size: var(--fs-xs); }
-.release-grid strong { overflow-wrap:anywhere; }
+.muted-text { margin:0; color:var(--color-text-secondary); }
 .actions { display:flex; flex-wrap:wrap; gap:var(--space-3); }
 .action-btn { display:inline-flex; gap:var(--space-2); align-items:center; text-decoration:none; }
-/* Manual "search now" row — mirrors the Firmware tab so both sub-tabs share
-   the same primary action placement (Korrekturauftrag §6.5). */
-.check-now-row { display:flex; }
-.check-now-btn { width:auto; }
-.manual-check-feedback { margin:0; display:flex; flex-direction:column; gap:var(--space-1); }
 .file-drop { min-height:150px; border:2px dashed var(--color-border-strong); border-radius:var(--radius-lg); display:flex; flex-direction:column; gap:7px; align-items:center; justify-content:center; text-align:center; cursor:pointer; padding:var(--card-padding); }
 .file-drop input { display:none; }
 .file-drop.invalid { border-color:var(--color-danger); }

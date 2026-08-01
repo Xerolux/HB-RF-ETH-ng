@@ -424,6 +424,9 @@ export default {
     availableKicker: 'Verfügbare Geräte-Firmware',
     availableHeading: 'Verfügbare Firmware',
     availableHelp: 'Der ESP lädt nur das kleine Update-Manifest. Die Firmware-Datei wird direkt von deinem Browser heruntergeladen.',
+    updatesOnGithubHeading: 'Updates auf GitHub',
+    updatesOnGithubHelp: 'Neue Versionen findest du immer auf der GitHub-Projektseite.',
+    noAutoCheckNote: 'Das Gerät sucht nicht mehr automatisch nach Updates. Schau regelmäßig auf GitHub vorbei oder lade eine neue firmware_*.bin manuell hoch.',
     newVersionLabel: 'Neue Version',
     publishedAt: 'Veröffentlicht: {time}',
     statusLabel: 'Status',
@@ -840,20 +843,9 @@ export default {
   // Privacy
   privacy: {
     title: 'Datenschutz',
-    updateCheck: 'Automatische Updates und Firmware-Checks verbinden sich mit dem Server raw.githubusercontent.com / github.com. Dabei wird Ihre IP-Adresse übertragen, um die Verfügbarkeit neuer Versionen zu prüfen.'
+    updateCheck: 'Das Gerät sucht nicht mehr automatisch nach Updates und baut dafür keine Verbindungen zu GitHub auf. Neue Versionen finden Sie auf GitHub; der Upload der Firmware erfolgt direkt vom Browser an das Gerät. Optionale Funktionen (MQTT, Syslog, Unterstützerschlüssel-CRL) verbinden sich nur bei aktivierter Funktion mit den entsprechend konfigurierten Servern.'
   },
 
-  // Changelog
-  changelog: {
-    title: 'Änderungsprotokoll',
-    loading: 'Laden...',
-    fetching: 'Lade Änderungsprotokoll von GitHub...',
-    error: 'Fehler beim Laden des Änderungsprotokolls',
-    fetchError: 'Änderungsprotokoll konnte nicht geladen werden. Bitte überprüfen Sie Ihre Internetverbindung.',
-    retry: 'Wiederholen',
-    close: 'Schließen',
-    viewOnGithub: 'Auf GitHub anzeigen'
-  },
 
   // Supporter
   supporter: {

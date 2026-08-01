@@ -72,9 +72,6 @@ private:
 
   char _ccuIP[64] = {0};
 
-  // Update channel: when true, pre-release versions are considered.
-  bool _betaChannel;
-
   // System log capture persists across reboots when enabled from the WebUI.
   bool _systemLogEnabled;
 
@@ -148,10 +145,6 @@ public:
 
   char *getCCUIP();
   void setCCUIP(const char *ip);
-
-  // Update channel selection
-  bool getBetaChannel();
-  void setBetaChannel(bool enabled);
 
   bool getSystemLogEnabled();
   void setSystemLogEnabled(bool enabled);

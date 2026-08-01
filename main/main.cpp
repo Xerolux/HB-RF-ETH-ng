@@ -48,7 +48,6 @@
 #include "webui.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
-#include "updatecheck.h"
 #include "monitoring.h"
 #include "log_manager.h"
 #include "supporter_crl.h"
@@ -66,10 +65,10 @@ extern "C"
 
 // Keep a freshly installed OTA image in PENDING_VERIFY just long enough to
 // confirm the critical boot sequence (Ethernet, radio module, WebUI) survived.
-// The previous 60-second window overlapped with the first UpdateCheck (30s),
-// CRL refresh (60s) and deferred log-retry (10s) TLS fetches — on a device
-// already starved of sockets/heap those fetches could destabilise the system
-// inside the self-test window and trigger an unwanted bootloader rollback.
+// The previous 60-second window overlapped with the CRL refresh (60s) and
+// deferred log-retry (10s) TLS fetches — on a device already starved of
+// sockets/heap those fetches could destabilise the system inside the self-test
+// window and trigger an unwanted bootloader rollback.
 // 15 seconds is enough for all services to start and for the first httpd
 // request to be served, while staying well clear of the TLS-heavy window.
 static void validate_running_firmware_task(void *parameter)
@@ -320,16 +319,6 @@ void app_main()
                  (unsigned)free_heap, (unsigned)largest);
     }
 
-    static UpdateCheck updateCheck(&settings, &sysInfo, &statusLED);
-    // NOTE: updateCheck.start() is intentionally deferred until AFTER
-    // monitoring_init(). monitoring_init() creates g_net_fetch_mutex, the
-    // serialization guard for all outbound TLS handshakes. The UpdateCheck task
-    // delays its first fetch by 30 s, but on a slow boot (radio-module
-    // detection alone can take ~20 s) that window can close before the mutex
-    // exists, letting the first manifest fetch race a CRL/MQTT/WebUI fetch and
-    // exhaust the WROOM-32 TLS heap → panic. Starting the task after the mutex
-    // exists removes that boot-race for good. The task itself only sleeps until
-    // then, so this costs nothing.
     // Register data providers for MQTT status topics (Ethernet link/IP,
     // radio module info, system clock / NTP sync state). Must happen before
     // monitoring_init() so the very first status publish cycle sees them.
@@ -337,15 +326,11 @@ void app_main()
     monitoring_set_settings(&settings);
 
     // Initialize monitoring (CheckMK, MQTT)
-    esp_err_t monitoringResult = monitoring_init(NULL, &sysInfo, &updateCheck);
+    esp_err_t monitoringResult = monitoring_init(NULL, &sysInfo);
     if (monitoringResult != ESP_OK)
     {
         ESP_LOGE(TAG, "Monitoring initialization failed: %s", esp_err_to_name(monitoringResult));
     }
-
-    // g_net_fetch_mutex now exists — safe to start the background update-check
-    // task. See the NOTE above for why this ordering matters.
-    updateCheck.start();
 
     // Emit a one-shot "radio module detected" event now that the notification
     // worker is running. Boots without a module stay silent.
@@ -354,15 +339,12 @@ void app_main()
                     radioModuleType == RADIO_MODULE_RPI_RF_MOD ? "RPI-RF-MOD" : "HM-MOD-RPI-PCB");
     }
 
-    // Open HTTP endpoints only after the shared HTTPS mutex exists. This
-    // closes the boot-time window in which proxy/OTA requests could overlap
-    // the first background update check and exhaust TLS heap.
-    static WebUI webUI(&settings, &statusLED, &sysInfo, &updateCheck, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
+    static WebUI webUI(&settings, &statusLED, &sysInfo, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
 
     // If system logging was enabled in settings but the ring buffer could not
     // be allocated during early boot (heap was too tight — typically because
-    // the first background UpdateCheck / TLS fetch was running), retry once
+    // an early TLS fetch such as the CRL refresh was running), retry once
     // after all subsystems have finished initialising. By then free heap has
     // usually recovered enough for at least the reduced buffer to fit, so the
     // "not enough memory" state after a restart resolves itself.
