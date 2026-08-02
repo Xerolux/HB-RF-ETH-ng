@@ -104,3 +104,9 @@ Diese Firmware steht unter [Creative Commons Attribution-NonCommercial-ShareAlik
 
 *Diese Firmware basiert auf der originalen Arbeit von [Alexander Reinert](https://github.com/ja-ra). 
 Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
+
+## Included WebUI
+
+- WebUI version: `1.0.0-Beta.16`
+- WebUI API: `1`
+- Minimum firmware: `2.2.5-Beta.1`
