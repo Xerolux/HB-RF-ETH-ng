@@ -1171,8 +1171,6 @@ body.newdesign-active .newdesign-shell .quick-action,
 body.newdesign-active .newdesign-shell .metric-card,
 body.newdesign-active .newdesign-shell .stat-card,
 body.newdesign-active .newdesign-shell .change-password-card,
-body.newdesign-active .newdesign-shell .archive-card,
-body.newdesign-active .newdesign-shell .network-update-card,
 body.newdesign-active .newdesign-shell .radio-card,
 body.newdesign-active .newdesign-shell .action-tile,
 body.newdesign-active .newdesign-shell .system-actions .action-tile {
@@ -1187,16 +1185,6 @@ body.newdesign-active .newdesign-shell .system-actions .action-tile {
 /* Soft (filled) panel base for sub-surfaces */
 body.newdesign-active .newdesign-shell .upload-zone,
 body.newdesign-active .newdesign-shell .file-preview,
-body.newdesign-active .newdesign-shell .archive-item,
-body.newdesign-active .newdesign-shell .archive-warning,
-body.newdesign-active .newdesign-shell .archive-error,
-body.newdesign-active .newdesign-shell .archive-empty,
-body.newdesign-active .newdesign-shell .archive-selected,
-body.newdesign-active .newdesign-shell .archive-notes,
-body.newdesign-active .newdesign-shell .update-info,
-body.newdesign-active .newdesign-shell .update-available,
-body.newdesign-active .newdesign-shell .no-update,
-body.newdesign-active .newdesign-shell .beta-toggle-row,
 body.newdesign-active .newdesign-shell .security-item,
 body.newdesign-active .newdesign-shell .security-info,
 body.newdesign-active .newdesign-shell .backup-action-card,
@@ -1237,7 +1225,6 @@ body.newdesign-active .newdesign-shell .content-grid,
 body.newdesign-active .newdesign-shell .stats-grid,
 body.newdesign-active .newdesign-shell .info-grid,
 body.newdesign-active .newdesign-shell .diagnostics-grid,
-body.newdesign-active .newdesign-shell .archive-list,
 body.newdesign-active .newdesign-shell .libs-grid,
 body.newdesign-active .newdesign-shell .backup-grid,
 body.newdesign-active .newdesign-shell .led-programs-grid,
@@ -1346,17 +1333,13 @@ body.newdesign-active .newdesign-shell .form-text,
 body.newdesign-active .newdesign-shell .text-muted,
 body.newdesign-active .newdesign-shell .project-description,
 body.newdesign-active .newdesign-shell .license-info,
-body.newdesign-active .newdesign-shell .beta-toggle-hint,
-body.newdesign-active .newdesign-shell .archive-meta,
-body.newdesign-active .newdesign-shell .version-info,
-body.newdesign-active .newdesign-shell .last-check {
+body.newdesign-active .newdesign-shell .version-info {
   color: var(--newdesign-text-soft) !important;
 }
 
 /* ---- Card header / body / section headers ---- */
 body.newdesign-active .newdesign-shell .card-header,
 body.newdesign-active .newdesign-shell .section-header,
-body.newdesign-active .newdesign-shell .archive-main-row,
 body.newdesign-active .newdesign-shell .mobile-panel-top,
 body.newdesign-active .newdesign-shell .card-header-content {
   border-bottom: 1px solid var(--newdesign-border) !important;
@@ -1462,12 +1445,9 @@ body.newdesign-active .newdesign-shell .meta-chip.active {
 
 /* ---- Tabs & toolbars ---- */
 body.newdesign-active .newdesign-shell .tabs-container,
-body.newdesign-active .newdesign-shell .archive-toolbar,
 body.newdesign-active .newdesign-shell .quick-actions,
 body.newdesign-active .newdesign-shell .toolbar,
-body.newdesign-active .newdesign-shell .log-actions,
-body.newdesign-active .newdesign-shell .archive-actions,
-body.newdesign-active .newdesign-shell .archive-title-row {
+body.newdesign-active .newdesign-shell .log-actions {
   border-radius: var(--newdesign-radius-card);
 }
 
@@ -1487,7 +1467,6 @@ body.newdesign-active .newdesign-shell .level-filter {
 
 /* ---- Segmented controls / filters / source & mode selectors ---- */
 body.newdesign-active .newdesign-shell .segmented-control,
-body.newdesign-active .newdesign-shell .archive-filters,
 body.newdesign-active .newdesign-shell .mode-toggle,
 body.newdesign-active .newdesign-shell .mode-selector,
 body.newdesign-active .newdesign-shell .time-source-options,
@@ -1526,7 +1505,6 @@ body.newdesign-active .newdesign-shell .form-control,
 body.newdesign-active .newdesign-shell .form-select,
 body.newdesign-active .newdesign-shell textarea,
 body.newdesign-active .newdesign-shell .pem-textarea,
-body.newdesign-active .newdesign-shell .archive-select,
 body.newdesign-active .newdesign-shell .brightness-control {
   border-radius: var(--newdesign-radius-input) !important;
   border: 1px solid var(--newdesign-border) !important;
@@ -1537,8 +1515,7 @@ body.newdesign-active .newdesign-shell .brightness-control {
 body.newdesign-active .newdesign-shell .form-control:focus,
 body.newdesign-active .newdesign-shell .form-select:focus,
 body.newdesign-active .newdesign-shell textarea:focus,
-body.newdesign-active .newdesign-shell .pem-textarea:focus,
-body.newdesign-active .newdesign-shell .archive-select:focus {
+body.newdesign-active .newdesign-shell .pem-textarea:focus {
   border-color: var(--newdesign-primary) !important;
   box-shadow: var(--newdesign-focus-ring) !important;
   background: var(--newdesign-panel) !important;
@@ -1548,7 +1525,6 @@ body.newdesign-active .newdesign-shell .form-label,
 body.newdesign-active .newdesign-shell .switch-label,
 body.newdesign-active .newdesign-shell .segment-label,
 body.newdesign-active .newdesign-shell .source-label,
-body.newdesign-active .newdesign-shell .archive-select-label,
 body.newdesign-active .newdesign-shell .brightness-value,
 body.newdesign-active .newdesign-shell .metric-label {
   letter-spacing: 0.04em !important;
@@ -1589,10 +1565,7 @@ body.newdesign-active .newdesign-shell .hidden-input {
 /* ---- Buttons ---- */
 body.newdesign-active .newdesign-shell .btn,
 body.newdesign-active .newdesign-shell .tool-btn,
-body.newdesign-active .newdesign-shell .check-btn,
 body.newdesign-active .newdesign-shell .action-btn,
-body.newdesign-active .newdesign-shell .archive-link,
-body.newdesign-active .newdesign-shell .archive-install-btn,
 body.newdesign-active .newdesign-shell .save-btn,
 body.newdesign-active .newdesign-shell .security-save-btn,
 body.newdesign-active .newdesign-shell .btn-load-file,
@@ -1611,8 +1584,6 @@ body.newdesign-active .newdesign-shell .btn-link-danger {
 
 body.newdesign-active .newdesign-shell .btn:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .tool-btn:hover:not(:disabled),
-body.newdesign-active .newdesign-shell .check-btn:hover:not(:disabled),
-body.newdesign-active .newdesign-shell .archive-install-btn:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled) {
   transform: translateY(-1px) !important;
 }
@@ -1620,8 +1591,7 @@ body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled) {
 body.newdesign-active .newdesign-shell .btn-primary,
 body.newdesign-active .newdesign-shell .save-btn,
 body.newdesign-active .newdesign-shell .security-save-btn,
-body.newdesign-active .newdesign-shell .submit-btn,
-body.newdesign-active .newdesign-shell .archive-install-btn {
+body.newdesign-active .newdesign-shell .submit-btn {
   border-color: var(--color-primary) !important;
   background: var(--color-primary) !important;
   color: #ffffff !important;
@@ -1630,8 +1600,7 @@ body.newdesign-active .newdesign-shell .archive-install-btn {
 body.newdesign-active .newdesign-shell .btn-primary:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .save-btn:hover:not(:disabled),
 body.newdesign-active .newdesign-shell .security-save-btn:hover:not(:disabled),
-body.newdesign-active .newdesign-shell .submit-btn:hover:not(:disabled),
-body.newdesign-active .newdesign-shell .archive-install-btn:hover:not(:disabled) {
+body.newdesign-active .newdesign-shell .submit-btn:hover:not(:disabled) {
   border-color: var(--color-primary-hover) !important;
   background: var(--color-primary-hover) !important;
 }
@@ -1674,10 +1643,6 @@ body.newdesign-active .newdesign-shell .chip-btn {
   background: var(--newdesign-panel-soft) !important;
 }
 
-body.newdesign-active .newdesign-shell .archive-install-btn {
-  border-color: var(--color-primary) !important;
-}
-
 /* ---- Progress bars ---- */
 body.newdesign-active .newdesign-shell .progress,
 body.newdesign-active .newdesign-shell .progress-bar,
@@ -1695,28 +1660,10 @@ body.newdesign-active .newdesign-shell .upload-zone.has-file {
   background: var(--newdesign-primary-soft) !important;
 }
 
-body.newdesign-active .newdesign-shell .beta-toggle-label,
-body.newdesign-active .newdesign-shell .beta-toggle-hint,
-body.newdesign-active .newdesign-shell .update-text strong,
 body.newdesign-active .newdesign-shell .file-name,
 body.newdesign-active .newdesign-shell .progress-label,
 body.newdesign-active .newdesign-shell .progress-value {
   color: var(--color-text) !important;
-}
-
-body.newdesign-active .newdesign-shell .changelog-link {
-  border-radius: var(--newdesign-radius-button) !important;
-  border: 1px solid var(--newdesign-border) !important;
-  background: var(--newdesign-panel-soft) !important;
-  box-shadow: none !important;
-}
-
-body.newdesign-active .newdesign-shell .archive-link {
-  border-color: var(--newdesign-border) !important;
-}
-
-body.newdesign-active .newdesign-shell .archive-picker {
-  gap: 8px;
 }
 
 body.newdesign-active .newdesign-shell .countdown-overlay {
@@ -1905,15 +1852,9 @@ body.newdesign-active .newdesign-shell .toast-dismiss {
 }
 
 /* ---- Code / pre ---- */
-body.newdesign-active .newdesign-shell .archive-notes pre,
 body.newdesign-active .newdesign-shell pre,
 body.newdesign-active .newdesign-shell code {
   border-radius: var(--newdesign-radius-card) !important;
-}
-
-body.newdesign-active .newdesign-shell .archive-notes pre {
-  background: var(--newdesign-panel) !important;
-  border: 1px solid var(--newdesign-border) !important;
 }
 
 /* ---- Utility background colors (custom, mimic Bootstrap naming) ---- */
@@ -2180,22 +2121,6 @@ body.newdesign-active .modal-backdrop.show {
   body.newdesign-active.bare-layout .login-card {
     padding: 24px 18px !important;
   }
-}
-
-/* ---- firmwareupdate.vue: archive release-notes row + changelog button ---- */
-body.newdesign-active .newdesign-shell .archive-notes-row {
-  border-top: 1px solid var(--newdesign-border) !important;
-}
-body.newdesign-active .newdesign-shell .archive-changelog-btn {
-  border-radius: var(--newdesign-radius-button) !important;
-  background: transparent !important;
-  border: 1px solid var(--newdesign-border-strong) !important;
-  box-shadow: none !important;
-  color: var(--newdesign-primary) !important;
-}
-body.newdesign-active .newdesign-shell .archive-changelog-btn:hover:not(:disabled) {
-  background: var(--newdesign-primary-soft) !important;
-  border-color: var(--newdesign-hover-border) !important;
 }
 
 /* ---- about.vue: license pill + version badge ---- */

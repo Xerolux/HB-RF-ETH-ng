@@ -28,6 +28,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "pins.h"
+#include "monitoring.h"
+#include "supporter_crl.h"
+#include <atomic>
 
 static const char *TAG = "SystemReset";
 
@@ -35,6 +38,7 @@ static const char *TAG = "SystemReset";
 // old backups may still contain flashPause=false, but they can no longer disable
 // the 35-second Ethernet link-down window.
 static bool g_flashPauseEnabled = true;
+static std::atomic<bool> g_restart_in_progress{false};
 
 // Optional callback registered by the Ethernet driver. When set, it cleanly
 // stops the MAC (esp_eth_stop) BEFORE we toggle the PHY reset pin. This
@@ -42,6 +46,7 @@ static bool g_flashPauseEnabled = true;
 // unreliable on some board revisions and the CCU watchdog never saw the
 // disconnect.
 static restart_eth_pause_fn_t g_eth_pause_cb = NULL;
+static restart_network_stop_fn_t g_network_stop_cb = NULL;
 
 void set_flash_pause_enabled(bool enabled) {
     (void)enabled;
@@ -52,8 +57,98 @@ void register_restart_eth_pause_callback(restart_eth_pause_fn_t cb) {
     g_eth_pause_cb = cb;
 }
 
-void full_system_restart() {
+void register_restart_network_stop_callback(restart_network_stop_fn_t cb) {
+    g_network_stop_cb = cb;
+}
+
+static void full_system_restart_impl(bool operation_reserved) {
+    bool wait_logged = false;
+    for (;;) {
+        bool expected = false;
+        if (g_restart_in_progress.compare_exchange_weak(
+                expected, true, std::memory_order_acq_rel,
+                std::memory_order_acquire)) {
+            break;
+        }
+        if (!wait_logged) {
+            ESP_LOGW(TAG, "Restart already in progress; waiting for ownership");
+            wait_logged = true;
+        }
+        // A genuine restart never returns. If the incumbent instead rejects
+        // its operation reservation and clears the flag, a reserved caller
+        // must be able to take over rather than park forever while still
+        // owning the global OTA/config-operation gate.
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     ESP_LOGI(TAG, "Initiating full system restart...");
+
+    // Reserve the same operation gate used by manual firmware uploads and
+    // config updates.
+    // A normal restart waits for a short in-flight config transaction so it
+    // does not unnecessarily trigger the NVS marker's safe-default recovery.
+    // If a firmware upload owns the gate, abort the competing restart instead
+    // of interrupting active flash writes.
+    if (operation_reserved) {
+        if (!ota_operation_active()) {
+            ESP_LOGE(TAG, "Reserved restart called without operation ownership");
+            g_restart_in_progress.store(false, std::memory_order_release);
+            return;
+        }
+    } else {
+        if (!ota_operation_try_begin()) {
+            if (monitoring_config_update_active()) {
+                ESP_LOGW(TAG, "Config update active; waiting before restart");
+                for (int attempt = 0;
+                     attempt < 200 && monitoring_config_update_active();
+                     ++attempt) {
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                }
+                if (monitoring_config_update_active() ||
+                    !ota_operation_try_begin()) {
+                    // The fail-safe NVS marker prevents a partial monitoring
+                    // generation from becoming active on the next boot.
+                    ESP_LOGE(TAG,
+                             "Config update did not quiesce; restarting directly");
+                    esp_restart();
+                    return;
+                }
+            } else {
+                ESP_LOGE(TAG, "Restart rejected while another operation is active");
+                g_restart_in_progress.store(false, std::memory_order_release);
+                return;
+            }
+        }
+    }
+
+    // Every caller—not only a post-upload restart—must stop lwIP/TLS users before the
+    // Ethernet MAC and PHY are held down for 35 seconds. Otherwise MQTT,
+    // notifications, Syslog, CRL, CheckMK or Prometheus can touch sockets
+    // after esp_eth_stop(), which was one path to watchdog/panic resets.
+    esp_err_t prepare_result = ESP_OK;
+    if (!monitoring_ota_pause_active()) {
+        uint32_t ignored_pause_mask = 0;
+        prepare_result = monitoring_pause_for_ota(&ignored_pause_mask);
+    }
+    if (prepare_result == ESP_OK) {
+        prepare_result = supporter_crl_stop_refresh_task();
+    }
+    if (prepare_result == ESP_OK && g_network_stop_cb != NULL) {
+        // Raw-UART owns a UDP PCB/queue outside the monitoring subsystem.
+        // Stop it before esp_eth_stop() so queued radio frames cannot call
+        // udp_sendto() throughout the link-down window.
+        prepare_result = g_network_stop_cb();
+    }
+    if (prepare_result != ESP_OK) {
+        // A worker still owns network/library state. Reboot the ESP32 without
+        // first tearing Ethernet out from under it; the CCU link-down pause is
+        // less important than avoiding another corrupted shutdown.
+        ESP_LOGE(TAG, "Worker quiesce failed (%s); restarting without link-down pause",
+                 esp_err_to_name(prepare_result));
+        vTaskDelay(pdMS_TO_TICKS(100));
+        esp_restart();
+        return;
+    }
 
     // Cleanly stop the Ethernet MAC first so the link partner (switch / CCU)
     // immediately sees carrier loss. The PHY pin toggle below keeps the PHY
@@ -94,4 +189,12 @@ void full_system_restart() {
 
     ESP_LOGI(TAG, "Peripherals reset complete. Restarting ESP32...");
     esp_restart();
+}
+
+void full_system_restart() {
+    full_system_restart_impl(false);
+}
+
+void full_system_restart_with_reserved_operation() {
+    full_system_restart_impl(true);
 }

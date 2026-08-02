@@ -112,8 +112,8 @@ def generate(version: str, min_firmware: str, api_version: str) -> str:
     lines.append("- Image-Größe: 327680 Bytes")
     lines.append("")
     lines.append(
-        "Der Online-Updater prüft API und Mindest-Firmware vor dem Download. "
-        "Das ESP32 verifiziert Image-Größe, SHA-256, Produkt, Design und benötigte Assets, "
+        "Die lokal ausgewählte WebUI-Datei wird vor der Installation geprüft. "
+        "Der ESP32 verifiziert Image-Größe, optionales SHA-256, Produkt, Design und benötigte Assets, "
         "bevor die separate WWW-Partition aktiviert wird."
     )
     lines.append("")

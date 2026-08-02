@@ -27,6 +27,8 @@
 #include "lwip/inet.h"
 #include "lwip/udp.h"
 #include "lwip/priv/tcpip_priv.h"
+#include "esp_err.h"
+#include "freertos/semphr.h"
 #include <atomic>
 #define _Atomic(X) std::atomic<X>
 #include "radiomoduleconnector.h"
@@ -40,12 +42,17 @@ private:
     std::atomic<bool> _connectionStarted;
     std::atomic<int> _counter;
     std::atomic<int> _endpointConnectionIdentifier;
-    std::atomic<int64_t> _lastReceivedKeepAlive;
-    udp_pcb *_pcb;
-    QueueHandle_t _udp_queue;
-    TaskHandle_t _tHandle = NULL;
+    std::atomic<udp_pcb *> _pcb{NULL};
+    std::atomic<QueueHandle_t> _udp_queue{NULL};
+    std::atomic<TaskHandle_t> _tHandle{NULL};
+    std::atomic<bool> _stopRequested{true};
+    // Closes the race between a radio-frame callback which already entered
+    // sendMessage() and worker-owned PCB teardown during cooperative stop.
+    std::atomic<uint32_t> _activeSenders{0};
+    StaticSemaphore_t _lifecycleMutexStorage = {};
+    SemaphoreHandle_t _lifecycleMutex = NULL;
 
-    void handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
+    bool handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port);
     void sendMessage(unsigned char command, unsigned char *buffer, size_t len);
 
 public:
@@ -57,7 +64,7 @@ public:
     ip4_addr_t getConnectedRemoteAddress();
 
     void start();
-    void stop();
+    esp_err_t stop();
 
     void _udpQueueHandler();
     bool IRAM_ATTR _udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port);

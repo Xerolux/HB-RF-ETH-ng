@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 #include <cstdarg>
+#include <atomic>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
@@ -55,16 +56,10 @@ public:
     uint64_t getTotalWritten() const;
 
     /** Current allocated ring-buffer capacity in bytes. */
-    size_t getBufferSize() const { return log_buffer_size; }
+    size_t getBufferSize() const;
 
     /** Bytes currently available to a new reader after ring-buffer overwrite. */
-    size_t getBufferedBytes() const
-    {
-        const uint64_t written = getTotalWritten();
-        return written < log_buffer_size
-            ? static_cast<size_t>(written)
-            : log_buffer_size;
-    }
+    size_t getBufferedBytes() const;
 
     static constexpr size_t CRASH_TAIL_MAX = 1024;
     bool saveCrashTailNvs(const char *tag);
@@ -80,14 +75,24 @@ private:
 
     char *log_buffer = nullptr;
     size_t log_buffer_size = 0;
+    // Absolute stream position at which the current ring contents begin.
+    // Both fields are plain 64-bit values protected by _mutex.
+    uint64_t ring_start_offset = 0;
     uint64_t total_written = 0;
+    // The logger is constructed once and lives for the whole boot. Static
+    // semaphore storage avoids a boot-time heap allocation and, importantly,
+    // cannot leave the singleton permanently mutex-less after transient OOM.
+    mutable StaticSemaphore_t _mutex_storage = {};
     mutable SemaphoreHandle_t _mutex = nullptr;
 
     log_line_subscriber_t _subscribers[LOG_MAX_SUBSCRIBERS] = {};
     int _subscriber_count = 0;
-    bool _hook_installed = false;
+    std::atomic<uint32_t> _subscriber_count_fast{0};
+    std::atomic<bool> _capture_active{false};
+    std::atomic<bool> _hook_installed{false};
 
-    int (*_orig_vprintf)(const char *, va_list) = nullptr;
+    using vprintf_fn_t = int (*)(const char *, va_list);
+    std::atomic<vprintf_fn_t> _orig_vprintf{nullptr};
 
     friend int log_vprintf(const char *fmt, va_list args);
 };

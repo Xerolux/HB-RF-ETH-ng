@@ -1,6 +1,6 @@
 # HB-RF-ETH-ng Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.2.6-Beta.2
+This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng firmware v2.2.6-Beta.4
 
 ## Table of Contents
 
@@ -293,26 +293,13 @@ With current firmware versions, reconnect handling after restarts has been impro
 
 ## Firmware Update Issues
 
-### Beta Update Not Shown
+### New Version Not Shown Automatically
 
-**Important:** If the device is already running the newest beta, the WebUI
-correctly reports no update available. Check `currentVersion` and
-`latestVersion` in `/api/check_update`: when both values are identical, there is
-no newer beta to install.
-
-**Checks:**
-
-1. Enable the beta channel in Firmware / Network Update.
-2. Press "Check now" to force a manifest refresh.
-3. Verify the public beta manifest:
-   `https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/beta.json?t=<timestamp>`.
-4. In the firmware archive, use the Beta filter. On beta devices the WebUI
-   should select this filter automatically.
-
-**Developer note:** The firmware update check must use the raw `main/*.json`
-manifest URL with a cache-busting query value. Avoid switching back to
-`refs/heads/main` without testing immediately after a release, because GitHub
-raw CDN edges can temporarily serve stale manifest content.
+This is expected. Automatic update searches, the beta-channel manifest, the
+firmware archive, and URL-based installation were removed. Open the project's
+[GitHub Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) page on a
+computer, download the desired `firmware_*.bin`, and upload that local file in
+**System → Firmware**.
 
 ### Firmware Upload Fails
 
@@ -340,7 +327,8 @@ raw CDN edges can temporarily serve stale manifest content.
      ```bash
      curl -X POST http://192.168.1.100/ota_update \
        -H "Authorization: Token YOUR_TOKEN" \
-       -F "file=@firmware_2_1_0.bin"
+       -H "Content-Type: application/octet-stream" \
+       --data-binary @firmware_2_1_0.bin
      ```
 
 4. **Insufficient Space**
@@ -408,17 +396,15 @@ If the WebUI is inaccessible but the device is still reachable on the network (p
 The script is located in the root directory of the repository.
 
 ```bash
-# Syntax
-python3 test_ota_function.py <DEVICE_IP> <PASSWORD> [--url <FIRMWARE_URL>]
+# Syntax (the password is requested interactively)
+python3 test_ota_function.py <DEVICE_IP> <LOCAL_FIRMWARE.bin>
 
-# Example (using default URL for latest firmware)
-python3 test_ota_function.py 192.168.1.100 myPassword
-
-# Example (using custom URL)
-python3 test_ota_function.py 192.168.1.100 myPassword --url http://192.168.1.50/firmware.bin
+# Example
+python3 test_ota_function.py 192.168.1.100 build/firmware.bin
 ```
 
-The script will authenticate, trigger the OTA update, and monitor progress until the device restarts.
+The script authenticates and sends the local file as a raw
+`application/octet-stream` request body to `POST /ota_update`.
 
 ---
 
@@ -505,8 +491,8 @@ The script will authenticate, trigger the OTA update, and monitor progress until
 3. **Topic Name Check**
    - Default prefix: `hb-rf-eth`
    - Check custom prefix if changed
-   - Commands: `<prefix>/command/restart` and `<prefix>/command/check_update`
-   - Factory reset and firmware installation are intentionally WebUI-only
+   - Command: `<prefix>/command/restart`
+   - Update search, factory reset, and firmware installation are not MQTT commands
 
 4. **Broker ACL**
    - Ensure device user has publish rights on `<prefix>/command/#`
@@ -554,12 +540,12 @@ The script will authenticate, trigger the OTA update, and monitor progress until
 
 2. **Check Topic Prefix**
    - Default: `hb-rf-eth`
-   - Subscribe to: `hb-rf-eth/status/#` (not retained)
+   - Subscribe to: `hb-rf-eth/status/#` (retained status values)
    - Check: `mosquitto_sub -h <broker> -t "hb-rf-eth/status/#" -v`
 
 3. **Publish Interval**
-   - Messages published every 5 seconds (idle)
-   - 1 second during OTA updates
+   - Status batches are published every 60 seconds
+   - Explicit status triggers are processed within about 5 seconds
    - Check broker is actually receiving: enable broker logging
 
 4. **System Log**
@@ -639,7 +625,7 @@ The script will authenticate, trigger the OTA update, and monitor progress until
 | Pattern | Meaning | Action |
 |---------|---------|--------|
 | Solid OFF | Normal operation | None |
-| Slow blink (1Hz) | Firmware update available | Update firmware |
+| Slow blink (1Hz) | Legacy update-available pattern; no longer triggered by an automatic search | Check the configured LED program if observed |
 | Fast blink, green OFF | Factory reset mode | See factory reset procedure |
 | Fast blink, green ON | Firmware update in progress | Wait for completion |
 | Alternating with green | System booting | Wait 30-60 seconds |
@@ -827,9 +813,9 @@ If problems persist:
 
    The MQTT user/password configured in the WebUI authenticates the **device**
    against the broker - it does NOT prevent other clients from publishing to
-   `<prefix>/command/#`. Anyone with publish rights on that topic can
-   restart the device, trigger OTA, or even factory-reset it. Three
-   complementary levers are available:
+   `<prefix>/command/#`. Anyone with publish rights on that topic can restart
+   the device. Firmware installation and factory reset are not MQTT commands.
+   Three complementary levers are available:
 
    - **Broker ACL (most important).** Configure your broker so that only the
      HB-RF-ETH-ng user may publish to `<prefix>/command/#`. Example
@@ -854,6 +840,6 @@ If problems persist:
    command token to work.
 
    When a command token is configured, the HA discovery JSON publishes the
-   token verbatim as `payload_press` / `payload_install` so the HA buttons
-   continue to work. Lock down write access to `homeassistant/#` on the
+   token verbatim as `payload_press` so the HA restart button continues to
+   work. Lock down write access to `homeassistant/#` on the
    broker so other clients cannot read the token via the discovery topic.

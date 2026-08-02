@@ -24,7 +24,6 @@
 #include "rawuartudplistener.h"
 #include "hmframe.h"
 #include "esp_log.h"
-#include "esp_timer.h"
 #include <stdlib.h>
 #include <string.h>
 #include "udphelper.h"
@@ -47,6 +46,9 @@ static MetricsCounter g_keepalives("hbrfeth_udp_keepalive_total",
 static MetricsCounter g_rx_drops("hbrfeth_udp_drop_total",
                                  "Received UDP frames dropped (queue full / parse error)");
 
+static_assert(std::atomic<uint32_t>::is_always_lock_free,
+              "Raw-UART sender lifetime guard must be native 32-bit");
+
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
     ((RawUartUdpListener *)parameter)->_udpQueueHandler();
@@ -62,7 +64,10 @@ void IRAM_ATTR _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, cons
     }
 }
 
-RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector) : _radioModuleConnector(radioModuleConnector), _lastReceivedKeepAlive(0), _pcb(NULL), _udp_queue(NULL), _tHandle(NULL)
+RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnector)
+    : _radioModuleConnector(radioModuleConnector),
+      _lifecycleMutex(
+          xSemaphoreCreateMutexStatic(&_lifecycleMutexStorage))
 {
     atomic_init(&_connectionStarted, false);
     atomic_init(&_remotePort, (ushort)0);
@@ -71,14 +76,14 @@ RawUartUdpListener::RawUartUdpListener(RadioModuleConnector *radioModuleConnecto
     atomic_init(&_endpointConnectionIdentifier, 1);
 }
 
-void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
+bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 {
     size_t length = pb->tot_len;
     if (length < 4 || length > 1500)
     {
         ESP_LOGE(TAG, "Received invalid raw-uart packet, length %zu", length);
         g_rx_drops.inc();
-        return;
+        return false;
     }
 
     struct HeapBufferGuard {
@@ -103,7 +108,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         {
             ESP_LOGE(TAG, "Could not allocate raw-uart packet buffer, length %zu", length);
             g_rx_drops.inc();
-            return;
+            return false;
         }
         data = heap_data.value;
     }
@@ -113,14 +118,14 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     if (pbuf_copy_partial(pb, data, length, 0) != length) {
         ESP_LOGE(TAG, "Could not linearize raw-uart packet, length %zu", length);
         g_rx_drops.inc();
-        return;
+        return false;
     }
 
     if (data[0] != 0 && (addr.addr != atomic_load(&_remoteAddress) || port != atomic_load(&_remotePort)))
     {
         ESP_LOGE(TAG, "Received raw-uart packet from invalid address.");
         g_rx_drops.inc();
-        return;
+        return false;
     }
 
     /* Read the trailing CRC16 with memcpy: the data pointer + length comes from
@@ -132,13 +137,11 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
     {
         ESP_LOGE(TAG, "Received raw-uart packet with invalid crc.");
         g_rx_drops.inc();
-        return;
+        return false;
     }
 
     // Valid frame received from the CCU.
     g_rx_frames.inc();
-
-    atomic_store(&_lastReceivedKeepAlive, (int64_t)esp_timer_get_time());
 
     switch (data[0])
     {
@@ -192,7 +195,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         }
         else {
             ESP_LOGE(TAG, "Received invalid raw-uart connect packet, length %d", length);
-            return;
+            return true;
         }
         break;
 
@@ -212,7 +215,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length != 5)
         {
             ESP_LOGE(TAG, "Received invalid raw-uart LED packet, length %d", length);
-            return;
+            return true;
         }
 
         _radioModuleConnector->setLED(data[2] & 1, data[2] & 2, data[2] & 4);
@@ -222,7 +225,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length != 4)
         {
             ESP_LOGE(TAG, "Received invalid raw-uart reset packet, length %d", length);
-            return;
+            return true;
         }
 
         _radioModuleConnector->resetModule();
@@ -232,7 +235,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length != 4)
         {
             ESP_LOGE(TAG, "Received invalid raw-uart startconn packet, length %d", length);
-            return;
+            return true;
         }
 
         atomic_store(&_connectionStarted, true);
@@ -242,7 +245,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length != 4)
         {
             ESP_LOGE(TAG, "Received invalid raw-uart endconn packet, length %d", length);
-            return;
+            return true;
         }
 
         atomic_store(&_connectionStarted, false);
@@ -252,7 +255,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         if (length < 5)
         {
             ESP_LOGE(TAG, "Received invalid raw-uart frame packet, length %d", length);
-            return;
+            return true;
         }
 
         _radioModuleConnector->sendFrame(&data[2], length - 4);
@@ -262,6 +265,7 @@ void RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
         ESP_LOGE(TAG, "Received invalid raw-uart packet with unknown type %d", data[0]);
         break;
     }
+    return true;
 }
 
 ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
@@ -282,10 +286,26 @@ ip4_addr_t RawUartUdpListener::getConnectedRemoteAddress()
 
 void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffer, size_t len)
 {
+    // Stop closes the send gate before the worker removes the PCB. Register as
+    // an active sender and then re-check the gate so teardown can safely wait
+    // for callbacks which entered immediately before that transition.
+    if (_stopRequested.load(std::memory_order_acquire)) return;
+    _activeSenders.fetch_add(1, std::memory_order_seq_cst);
+    struct ActiveSenderGuard {
+        std::atomic<uint32_t> *counter;
+        ~ActiveSenderGuard()
+        {
+            counter->fetch_sub(1, std::memory_order_seq_cst);
+        }
+    } active_sender{&_activeSenders};
+
+    if (_stopRequested.load(std::memory_order_seq_cst)) return;
+
     uint16_t port = atomic_load(&_remotePort);
     uint32_t address = atomic_load(&_remoteAddress);
+    udp_pcb *pcb = _pcb.load(std::memory_order_acquire);
 
-    if (!port)
+    if (!port || !pcb)
         return;
 
     // Every command type is also a downstream frame to the CCU.
@@ -314,7 +334,7 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t crc_net = htons(HMFrame::crc(sendBuffer, len + 2));
     memcpy(sendBuffer + len + 2, &crc_net, sizeof(uint16_t));
 
-    _udp_sendto(_pcb, pb, &addr, port);
+    _udp_sendto(pcb, pb, &addr, port);
     pbuf_free(pb);
 }
 
@@ -334,93 +354,177 @@ void RawUartUdpListener::handleFrame(unsigned char *buffer, uint16_t len)
 
 void RawUartUdpListener::start()
 {
-    if (_tHandle || _pcb || _udp_queue) return;
+    if (!_lifecycleMutex) {
+        ESP_LOGE(TAG, "Cannot start UDP listener without lifecycle mutex");
+        return;
+    }
+    xSemaphoreTake(_lifecycleMutex, portMAX_DELAY);
+
+    if (_tHandle.load(std::memory_order_acquire) ||
+        _pcb.load(std::memory_order_acquire) ||
+        _udp_queue.load(std::memory_order_acquire)) {
+        ESP_LOGW(TAG, "UDP listener already running or still stopping");
+        xSemaphoreGive(_lifecycleMutex);
+        return;
+    }
+
+    _stopRequested.store(false, std::memory_order_release);
 
     // Store the small event descriptor directly in the FreeRTOS queue. This
     // removes one malloc/free pair per UDP datagram from the LwIP callback.
     // 32 slots is plenty for a single CCU-3 session; 64 reserved ~1 KB of
     // queue storage for no observed benefit. Drop depth halves that reserve.
-    _udp_queue = xQueueCreate(32, sizeof(udp_event_t));
-    if (_udp_queue == NULL)
+    QueueHandle_t queue = xQueueCreate(32, sizeof(udp_event_t));
+    if (queue == NULL)
     {
         ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");
+        _stopRequested.store(true, std::memory_order_release);
+        xSemaphoreGive(_lifecycleMutex);
         return;
     }
-    _pcb = _udp_new();
-    if (!_pcb || _udp_bind(_pcb, IP4_ADDR_ANY, 3008) != ERR_OK) {
+    _udp_queue.store(queue, std::memory_order_release);
+
+    udp_pcb *pcb = _udp_new();
+    _pcb.store(pcb, std::memory_order_release);
+    if (!pcb || _udp_bind(pcb, IP4_ADDR_ANY, 3008) != ERR_OK) {
         ESP_LOGE(TAG, "Failed to create/bind UDP listener on port 3008");
-        _udp_remove(_pcb);
-        _pcb = NULL;
-        vQueueDelete(_udp_queue);
-        _udp_queue = NULL;
+        _udp_remove(pcb);
+        _pcb.store(NULL, std::memory_order_release);
+        vQueueDelete(queue);
+        _udp_queue.store(NULL, std::memory_order_release);
+        _stopRequested.store(true, std::memory_order_release);
+        xSemaphoreGive(_lifecycleMutex);
         return;
     }
-    _udp_recv(_pcb, &_raw_uart_udpReceivePaket, (void *)this);
+    _udp_recv(pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
     // Priority 12 (was 15): the listener still runs well above user tasks
     // (events: 3, log_stream: 4, mqtt_publish: 4) so the CCU-3 session stays
     // latency-bound to the radio module, but yields a few levels of headroom
     // below the ESP-IDF system / Wi-Fi / timer tasks. Under a burst of UDP
-    // frames this gives critical system work (including the IWDT-feeding
-    // timer-task path) more room to interleave without the listener being
-    // scheduled ahead of it purely on numeric priority.
+    // frames this gives high-priority system tasks more room to interleave and
+    // avoids unnecessary pressure around the per-CPU tick ISR that feeds the
+    // interrupt watchdog.
+    TaskHandle_t task = NULL;
     if (xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler",
-                    4096, this, 12, &_tHandle) != pdPASS) {
+                    4096, this, 12, &task) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UDP listener task");
-        _udp_recv(_pcb, NULL, NULL);
-        _udp_remove(_pcb);
-        _pcb = NULL;
-        vQueueDelete(_udp_queue);
-        _udp_queue = NULL;
+        // Reception was enabled before task creation so the tcpip thread may
+        // already have transferred pbuf ownership into the queue. Close
+        // admission first, synchronously unregister the callback, then return
+        // every queued pbuf before deleting the queue. This OOM path must not
+        // leak the very packet buffers needed for a later recovery attempt.
+        _stopRequested.store(true, std::memory_order_release);
+        _udp_recv(pcb, NULL, NULL);
+        _udp_remove(pcb);
+        _pcb.store(NULL, std::memory_order_release);
+        udp_event_t pending = {};
+        while (xQueueReceive(queue, &pending, 0) == pdTRUE) {
+            if (pending.pb) pbuf_free(pending.pb);
+        }
+        vQueueDelete(queue);
+        _udp_queue.store(NULL, std::memory_order_release);
+        xSemaphoreGive(_lifecycleMutex);
         return;
     }
+    _tHandle.store(task, std::memory_order_release);
 
     _radioModuleConnector->setFrameHandler(this, false);
+    xSemaphoreGive(_lifecycleMutex);
 
     ESP_LOGI(TAG, "UDP listener started on port 3008");
 }
 
-void RawUartUdpListener::stop()
+esp_err_t RawUartUdpListener::stop()
 {
+    static constexpr uint32_t RAW_UART_STOP_TIMEOUT_MS = 2000;
+
+    if (!_lifecycleMutex) return ESP_ERR_NO_MEM;
+    xSemaphoreTake(_lifecycleMutex, portMAX_DELAY);
+
+    // Clear the handler inside the same lifecycle transition used by start().
+    // Otherwise a concurrent start could register `this` after an early clear
+    // and leave the stopped listener installed. A callback which already
+    // loaded the old handler is covered by _activeSenders.
     _radioModuleConnector->setFrameHandler(NULL, false);
-    if (_pcb) {
-        _udp_recv(_pcb, NULL, NULL);
-        _udp_disconnect(_pcb);
-        _udp_remove(_pcb);
-        _pcb = NULL;
+    // Sequential consistency closes the two-atomic admission race with
+    // sendMessage(): either teardown observes the registered sender, or that
+    // sender observes this closed gate before it can load/use the PCB.
+    _stopRequested.store(true, std::memory_order_seq_cst);
+
+    TaskHandle_t task = _tHandle.load(std::memory_order_acquire);
+    if (!task) {
+        xSemaphoreGive(_lifecycleMutex);
+        return ESP_OK;
     }
-    if (_tHandle) {
-        vTaskDelete(_tHandle);
-        _tHandle = NULL;
+
+    if (task == xTaskGetCurrentTaskHandle()) {
+        // The worker will observe the closed gate on return and clean itself
+        // up. Waiting for our own handle here would deadlock.
+        xSemaphoreGive(_lifecycleMutex);
+        return ESP_ERR_INVALID_STATE;
     }
-    if (_udp_queue) {
-        udp_event_t event = {};
-        while (xQueueReceive(_udp_queue, &event, 0) == pdTRUE) {
-            pbuf_free(event.pb);
-        }
-        vQueueDelete(_udp_queue);
-        _udp_queue = NULL;
+
+    // Do not use the generic FreeRTOS delay-abort API here. The same worker can be blocked inside
+    // tcpip_api_call() while sending a keep-alive; aborting that semaphore wait
+    // would let the stack-backed lwIP call descriptor disappear while the
+    // tcpip thread still references it. The queue receive below is deliberately
+    // bounded to 10 ms, so setting the stop flag is already a targeted and
+    // sufficiently prompt wake-up mechanism.
+    xSemaphoreGive(_lifecycleMutex);
+
+    const TickType_t started = xTaskGetTickCount();
+    const TickType_t timeout = pdMS_TO_TICKS(RAW_UART_STOP_TIMEOUT_MS);
+    while (_tHandle.load(std::memory_order_acquire) != NULL &&
+           (TickType_t)(xTaskGetTickCount() - started) < timeout) {
+        vTaskDelay(1);
     }
+
+    if (_tHandle.load(std::memory_order_acquire) != NULL) {
+        ESP_LOGE(TAG, "UDP listener did not stop within %u ms",
+                 (unsigned)RAW_UART_STOP_TIMEOUT_MS);
+        return ESP_ERR_TIMEOUT;
+    }
+    return ESP_OK;
 }
 
 void RawUartUdpListener::_udpQueueHandler()
 {
     udp_event_t event = {};
-    int64_t nextKeepAliveSentOut = esp_timer_get_time();
+    // All keep-alive timekeeping is confined to this task. Tick subtraction
+    // is unsigned and therefore remains correct across TickType_t rollover.
+    const TickType_t keep_alive_interval = pdMS_TO_TICKS(1000);
+    const TickType_t connection_timeout = pdMS_TO_TICKS(10000);
+    TickType_t last_received_keep_alive = xTaskGetTickCount();
+    TickType_t last_keep_alive_sent = last_received_keep_alive;
 
     for (;;)
     {
-        if (xQueueReceive(_udp_queue, &event, (TickType_t)pdMS_TO_TICKS(10)) == pdTRUE)
+        if (_stopRequested.load(std::memory_order_acquire)) break;
+
+        QueueHandle_t queue = _udp_queue.load(std::memory_order_acquire);
+        if (!queue) break;
+
+        if (xQueueReceive(queue, &event, (TickType_t)pdMS_TO_TICKS(10)) == pdTRUE)
         {
-            handlePacket(event.pb, event.addr, event.port);
-            pbuf_free(event.pb);
+            if (event.pb) {
+                const TickType_t received_at = xTaskGetTickCount();
+                if (!_stopRequested.load(std::memory_order_acquire) &&
+                    handlePacket(event.pb, event.addr, event.port)) {
+                    last_received_keep_alive = received_at;
+                }
+                pbuf_free(event.pb);
+            }
         }
+
+        if (_stopRequested.load(std::memory_order_acquire)) break;
 
         if (atomic_load(&_remotePort) != 0)
         {
-            int64_t now = esp_timer_get_time();
+            const TickType_t now = xTaskGetTickCount();
 
-            if (now > atomic_load(&_lastReceivedKeepAlive) + 10000000)
+            if ((TickType_t)(now - last_received_keep_alive) >=
+                connection_timeout)
             { // 10 sec
                 ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 10 seconds)");
                 atomic_store(&_connectionStarted, false);
@@ -428,18 +532,64 @@ void RawUartUdpListener::_udpQueueHandler()
                 atomic_store(&_remoteAddress, 0u);
                 _radioModuleConnector->setLED(true, false, false);
             }
-            else if (now > nextKeepAliveSentOut)
+            else if ((TickType_t)(now - last_keep_alive_sent) >=
+                     keep_alive_interval)
             {
-                nextKeepAliveSentOut = now + 1000000; // 1sec
+                last_keep_alive_sent = now;
                 g_keepalives.inc();
                 sendMessage(2, NULL, 0);
             }
         }
     }
+
+    // Stop LwIP delivery first. tcpip_api_call() serialises with the receive
+    // callback, so when this returns no callback can still be using the queue.
+    udp_pcb *pcb = _pcb.load(std::memory_order_acquire);
+    if (pcb) _udp_recv(pcb, NULL, NULL);
+
+    // A radio callback may already be inside the synchronous tcpip send call.
+    // Keep this low-priority task cooperative until it leaves; stop() remains
+    // bounded and reports ESP_ERR_TIMEOUT instead of force-deleting either
+    // task and stranding shared counter state.
+    while (_activeSenders.load(std::memory_order_seq_cst) != 0) {
+        vTaskDelay(1);
+    }
+
+    pcb = _pcb.exchange(NULL, std::memory_order_acq_rel);
+    if (pcb) {
+        _udp_disconnect(pcb);
+        _udp_remove(pcb);
+    }
+
+    QueueHandle_t queue = _udp_queue.exchange(NULL, std::memory_order_acq_rel);
+    if (queue) {
+        while (xQueueReceive(queue, &event, 0) == pdTRUE) {
+            if (event.pb) pbuf_free(event.pb);
+        }
+        vQueueDelete(queue);
+    }
+
+    atomic_store(&_connectionStarted, false);
+    atomic_store(&_remotePort, (ushort)0);
+    atomic_store(&_remoteAddress, 0u);
+    _radioModuleConnector->setLED(false, false, false);
+
+    ESP_LOGI(TAG, "UDP listener stopped");
+    xSemaphoreTake(_lifecycleMutex, portMAX_DELAY);
+    _tHandle.store(NULL, std::memory_order_release);
+    xSemaphoreGive(_lifecycleMutex);
+    vTaskDelete(NULL);
 }
 
-bool IRAM_ATTR RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)
+bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
+    if (!pb || !addr || _stopRequested.load(std::memory_order_acquire)) {
+        return false;
+    }
+
+    QueueHandle_t queue = _udp_queue.load(std::memory_order_acquire);
+    if (!queue) return false;
+
     udp_event_t event = {};
     event.pb = pb;
 
@@ -448,7 +598,7 @@ bool IRAM_ATTR RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *
     event.addr.addr = addr->u_addr.ip4.addr;
     event.port = port;
 
-    if (xQueueSend(_udp_queue, &event, 0) != pdPASS)
+    if (xQueueSend(queue, &event, 0) != pdPASS)
     {
         ESP_LOGW(TAG, "UDP queue full, dropping packet");
         g_rx_drops.inc();

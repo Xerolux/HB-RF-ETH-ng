@@ -28,6 +28,7 @@
 #include <lwip/ip4_addr.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "esp_err.h"
 
 typedef enum
 {
@@ -36,12 +37,54 @@ typedef enum
     TIMESOURCE_GPS = 2
 } timesource_t;
 
+// Complete in-RAM settings image used to roll back a multi-namespace restore
+// if a later NVS commit fails. Authentication tokens are intentionally not
+// included because restore does not modify them.
+typedef struct {
+  char adminPassword[33];
+  char adminUsername[33];
+  bool passwordChanged;
+  char hostname[64];
+  bool useDHCP;
+  ip4_addr_t localIP;
+  ip4_addr_t netmask;
+  ip4_addr_t gateway;
+  ip4_addr_t dns1;
+  ip4_addr_t dns2;
+  int32_t timesource;
+  int32_t dcfOffset;
+  int32_t gpsBaudrate;
+  char ntpServer[65];
+  int32_t ledBrightness;
+  int32_t ledPrograms[7];
+  bool enableIPv6;
+  char ipv6Mode[10];
+  char ipv6Address[40];
+  int32_t ipv6PrefixLength;
+  char ipv6Gateway[40];
+  char ipv6Dns1[40];
+  char ipv6Dns2[40];
+  char ccuIP[64];
+  bool systemLogEnabled;
+  bool flashPause;
+  bool testDesignEnabled;
+  char supporterKey[24];
+} settings_snapshot_t;
+
 class Settings
 {
 private:
+  void resetToSafeDefaultsLocked();
+  void lockAuthenticationAfterStorageFailureLocked();
+  esp_err_t validateStorageCapacityLocked(uint32_t handle,
+                                          size_t *requiredEntries = nullptr);
+
   char _adminPassword[33] = {0};
   char _adminUsername[33] = {0};
   bool _passwordChanged;
+  // A failed load must not make a previously persisted bearer token active.
+  // Published only after every authentication field was read successfully.
+  bool _storageHealthy = false;
 
   char _hostname[64] = {0};
   bool _useDHCP;
@@ -92,9 +135,30 @@ private:
 
 public:
   Settings();
-  void load();
-  void save();
-  void clear();
+  // Load one complete settings generation. If an interrupted settings or
+  // backup-restore transaction is found, affected namespaces are erased
+  // before any value is made visible and safe defaults are loaded instead.
+  esp_err_t load();
+  // Persist the complete settings snapshot. Callers that report success to a
+  // user must check the return value. A persistent transaction marker makes
+  // interrupted multi-key writes fail-safe even though ESP-IDF 6 writes each
+  // nvs_set_* call immediately and nvs_commit() is not a batch transaction.
+  esp_err_t save();
+  esp_err_t clear();
+
+  // Preflight the complete in-RAM Settings generation without changing NVS.
+  // The shared NvsStorageLock must remain held by callers which combine this
+  // check with writes to other namespaces.
+  esp_err_t validateStorageCapacity();
+
+  // Bracket a backup restore spanning Settings, theme, and monitoring. The
+  // caller must hold NvsStorageLock from before begin through finish. On any
+  // failed write, deliberately do not call finish: the next boot will erase
+  // all affected namespaces rather than activating a mixed generation.
+  static esp_err_t beginRestoreTransaction();
+  static esp_err_t finishRestoreTransaction();
+  void snapshot(settings_snapshot_t *out);
+  void restoreSnapshot(const settings_snapshot_t *snapshot);
 
   char *getAdminPassword();
   char *getAdminUsername();
@@ -163,6 +227,6 @@ public:
   // the browser "remember me" stays valid after a firmware update or restart.
   // Empty on first boot – generateToken() fills and saves it automatically.
   bool loadAdminToken(char *out, size_t size);
-  void saveAdminToken(const char *token);
-  void clearAdminToken();
+  esp_err_t saveAdminToken(const char *token);
+  esp_err_t clearAdminToken();
 };

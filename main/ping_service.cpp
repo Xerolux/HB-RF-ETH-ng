@@ -30,11 +30,14 @@ static void cmd_ping_on_ping_success(esp_ping_handle_t hndl, void *args)
 
 static void cmd_ping_on_ping_timeout(esp_ping_handle_t hndl, void *args)
 {
+    (void)hndl;
+    (void)args;
     // Ignore timeout, handled by PING_END_BIT or timeout in wait
 }
 
 static void cmd_ping_on_ping_end(esp_ping_handle_t hndl, void *args)
 {
+    (void)hndl;
     ping_ctx_t *ctx = (ping_ctx_t *)args;
     xEventGroupSetBits(ctx->event_group, PING_END_BIT);
 }

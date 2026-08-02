@@ -27,8 +27,10 @@
 #include "security_headers.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "nvs.h"
 #include "cJSON.h"
 #include <string.h>
+#include <strings.h>
 #include <memory>
 #include <new>
 #include <atomic>
@@ -246,6 +248,44 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
 
     free(json_string);
     return ESP_OK;
+}
+
+struct MonitoringUpdateResponse {
+    httpd_req_t *req;
+};
+
+static void send_monitoring_update_result(httpd_req_t *req,
+                                          esp_err_t update_result)
+{
+    httpd_resp_set_type(req, "application/json");
+    if (update_result == ESP_OK) {
+        httpd_resp_sendstr(req, "{\"success\":true}");
+    } else if (update_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+        httpd_resp_set_status(req, "507 Insufficient Storage");
+        httpd_resp_sendstr(
+            req,
+            "{\"error\":\"Insufficient storage for monitoring configuration\"}");
+    } else if (update_result == ESP_ERR_INVALID_STATE) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(
+            req,
+            "{\"error\":\"Monitoring configuration update unavailable, please retry\"}");
+    } else {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_sendstr(
+            req,
+            "{\"error\":\"Failed to apply monitoring configuration\"}");
+    }
+}
+
+static void monitoring_update_request_complete(esp_err_t update_result,
+                                               void *context)
+{
+    MonitoringUpdateResponse *response =
+        static_cast<MonitoringUpdateResponse *>(context);
+    send_monitoring_update_result(response->req, update_result);
+    httpd_req_async_handler_complete(response->req);
+    free(response);
 }
 
 // POST /api/monitoring - Update monitoring configuration
@@ -585,6 +625,11 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 cJSON_Delete(root);
                 return send_json_error(req, "Webhook URL too long");
             }
+            if (nurl->valuestring[0] != '\0' &&
+                strncasecmp(nurl->valuestring, "https://", 8) != 0) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Webhook URL must use HTTPS");
+            }
             copy_string_field(config.notify.webhook_url, sizeof(config.notify.webhook_url), nurl->valuestring);
         }
         cJSON *nwsc = cJSON_GetObjectItem(notify, "webhookSecretClear");
@@ -673,28 +718,29 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
 
     cJSON_Delete(root);
 
-    // Schedule the config update asynchronously so the HTTP handler returns immediately.
-    // Stopping/restarting MQTT and CheckMK can take several seconds; doing it synchronously
-    // would block the httpd task, stall the HTTP response, and risk a watchdog reset.
-    esp_err_t schedule_err = monitoring_schedule_update_config(&config);
-    if (schedule_err == ESP_ERR_INVALID_STATE)
-    {
-        httpd_resp_set_status(req, "503 Service Unavailable");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"error\":\"Config update already in progress, please wait\"}");
-        return ESP_OK;
+    // Stopping/restarting monitoring services can take several seconds. Keep
+    // it off the httpd task, but retain an async request copy so the client only
+    // receives success after runtime application and NVS persistence succeed.
+    MonitoringUpdateResponse *response =
+        static_cast<MonitoringUpdateResponse *>(
+            calloc(1, sizeof(MonitoringUpdateResponse)));
+    if (response == NULL) {
+        return httpd_resp_send_err(
+            req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
-    if (schedule_err != ESP_OK)
-    {
-        httpd_resp_set_status(req, "500 Internal Server Error");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"error\":\"Failed to schedule config update\"}");
-        return ESP_OK;
+    if (httpd_req_async_handler_begin(req, &response->req) != ESP_OK) {
+        free(response);
+        return httpd_resp_send_err(
+            req, HTTPD_500_INTERNAL_SERVER_ERROR,
+            "Could not detach monitoring update request");
     }
 
-    httpd_resp_set_type(req, "application/json");
-    /* CORS header removed - same-origin requests only */
-    httpd_resp_sendstr(req, "{\"success\":true}");
+    esp_err_t schedule_err = monitoring_schedule_update_config(
+        &config, monitoring_update_request_complete, response);
+    if (schedule_err != ESP_OK) {
+        // Once detached, every path must answer and complete the async copy.
+        monitoring_update_request_complete(schedule_err, response);
+    }
 
     return ESP_OK;
 }

@@ -26,8 +26,6 @@
 #include "monitoring.h"
 #include "settings.h"
 #include "esp_log.h"
-#include "esp_timer.h"
-#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -41,34 +39,83 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <time.h>
 
 extern Settings *monitoring_get_settings(void);
 extern SemaphoreHandle_t g_net_fetch_mutex;
 
 static const char *TAG = "syslog";
 
-// Forwarder configuration snapshot. Copied under s_mutex on start().
+// Forwarder configuration snapshot. Copied under the lifecycle mutex on start.
 static syslog_config_t s_cfg = {};
-static SemaphoreHandle_t s_cfg_mutex = NULL;
+// A restart requested while the old worker is still unwinding must not
+// overwrite s_cfg: the old cycle may still use its server/port/TLS fields.
+// The worker promotes this snapshot only after all old I/O is gone.
+static syslog_config_t s_pending_cfg = {};
+static StaticSemaphore_t s_lifecycle_mutex_buffer;
+
+static SemaphoreHandle_t syslog_mutex()
+{
+    static SemaphoreHandle_t mutex =
+        xSemaphoreCreateMutexStatic(&s_lifecycle_mutex_buffer);
+    return mutex;
+}
 
 static std::atomic<bool>         s_running{false};
+static std::atomic<bool>         s_restart_requested{false};
 static std::atomic<TaskHandle_t> s_task{NULL};
+static std::atomic<uint32_t>     s_min_severity{7};
 static QueueHandle_t             s_queue = NULL;
 
-// Each queued entry is a self-contained RFC 5424 message ready to send.
+// The logging hot path only copies one bounded raw line. Parsing, wall-clock
+// access, hostname selection and RFC 5424 formatting all happen in the worker.
+static constexpr size_t SYSLOG_RAW_LINE_MAX = 384;
 struct syslog_entry {
-    char  buf[512];   // PRI + version + timestamp + host + app + msg
+    char  line[SYSLOG_RAW_LINE_MAX];
     size_t len;
 };
 
-// Queue depth: 16 entries × ~516 bytes ≈ 8.3 KB heap. Halved from the
-// original 32 (16.5 KB) to ease heap pressure on the WROOM-32 (no PSRAM)
+// Queue depth: 16 bounded raw entries. Halved from the original 32 to ease
+// heap pressure on the WROOM-32 (no PSRAM)
 // when syslog is enabled. Syslog forwarding is best-effort UDP; a full
 // queue already drops new lines via xQueueSend(..., 0) in enqueue(), so
 // the lower depth trades burst capacity for ~8 KB of freed heap that is
-// better spent on the TLS handshake during the periodic update check /
-// OTA path. 16 still covers the typical smart-home log volume.
+// better spent on other TLS handshakes or a manual firmware upload. 16 still
+// covers the typical smart-home log volume.
 static constexpr int QUEUE_DEPTH = 16;
+
+static void normalise_config(syslog_config_t *dst,
+                             const syslog_config_t *src)
+{
+    memcpy(dst, src, sizeof(*dst));
+    dst->server[sizeof(dst->server) - 1] = '\0';
+    dst->hostname[sizeof(dst->hostname) - 1] = '\0';
+    if (dst->min_severity > 7) dst->min_severity = 7;
+
+    if (dst->hostname[0] == '\0') {
+        Settings *settings = monitoring_get_settings();
+        const char *hostname = settings ? settings->getHostname() : NULL;
+        if (hostname && hostname[0]) {
+            snprintf(dst->hostname, sizeof(dst->hostname), "%s", hostname);
+        }
+    }
+    if (dst->hostname[0] == '\0') {
+        snprintf(dst->hostname, sizeof(dst->hostname), "%s",
+                 "hb-rf-eth-ng");
+    }
+}
+
+static int severity_from_level(char level)
+{
+    switch (level) {
+        case 'E': return 3;  // ERROR
+        case 'W': return 4;  // WARNING
+        case 'I': return 5;  // NOTICE/INFO
+        case 'D': return 7;  // DEBUG
+        case 'V': return 7;  // VERBOSE -> DEBUG
+        default:  return 5;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // ESP-IDF log line parsing.
@@ -88,17 +135,7 @@ static bool parse_idf_line(const char *line, size_t len,
 {
     if (len < 6 || line[1] != ' ' || line[2] != '(') return false;
 
-    char lvl = line[0];
-    int sev;
-    switch (lvl) {
-        case 'E': sev = 3; break;  // ERROR
-        case 'W': sev = 4; break;  // WARNING
-        case 'I': sev = 5; break;  // NOTICE/INFO
-        case 'D': sev = 7; break;  // DEBUG
-        case 'V': sev = 7; break;  // VERBOSE -> DEBUG
-        default:  sev = 5; break;
-    }
-    *severity_out = sev;
+    *severity_out = severity_from_level(line[0]);
 
     // Find the closing paren of "(<timestamp>)"
     size_t i = 3;
@@ -125,35 +162,29 @@ static bool parse_idf_line(const char *line, size_t len,
 
 static void format_rfc5424(char *out, size_t cap, size_t *out_len,
                            int severity, const char *tag,
-                           const char *msg, size_t msg_len)
+                           const char *msg, size_t msg_len,
+                           const char *hostname)
 {
     // Facility = 1 (user-level). PRI = facility*8 + severity.
     int pri = 8 + severity;
 
-    // ISO-8601 UTC timestamp from esp_timer. The device does not always have
-    // wall-clock time early in boot, so fall back to monotonic uptime.
-    int64_t now_us = esp_timer_get_time();
-    time_t secs = (time_t)(now_us / 1000000ULL);
+    // Wall-clock work belongs to the worker, never the LogManager callback.
+    // If time conversion fails, RFC 5424 permits NILVALUE ("-").
+    time_t secs = time(NULL);
     struct tm tmv;
-    gmtime_r(&secs, &tmv);
     char ts[24];
-    // If the system clock has been synchronised (NTP/GPS/DCF), use it.
-    // Otherwise gmtime_r will produce something around 1970 — syslog servers
-    // accept that.
-    strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", &tmv);
-
-    const char *host = "hb-rf-eth-ng";
-    Settings *s = monitoring_get_settings();
-    if (s) {
-        const char *h = s->getHostname();
-        if (h && *h) host = h;
+    if (gmtime_r(&secs, &tmv) == NULL ||
+        strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", &tmv) == 0) {
+        strcpy(ts, "-");
     }
 
     // Cap msg_len to avoid blowing the fixed buffer.
     if (msg_len > 384) msg_len = 384;
 
     int n = snprintf(out, cap, "<%d>1 %s %s fw %s - - %.*s\n",
-                     pri, ts, host, tag ? tag : "fw",
+                     pri, ts,
+                     (hostname && hostname[0]) ? hostname : "hb-rf-eth-ng",
+                     tag ? tag : "fw",
                      (int)msg_len, msg ? msg : "");
     if (n < 0) {
         *out_len = 0;
@@ -169,31 +200,16 @@ static void format_rfc5424(char *out, size_t cap, size_t *out_len,
 void syslog_subscriber(const char *line, size_t len, uint64_t end_offset)
 {
     (void)end_offset;
-    if (!s_running.load() || !s_queue) return;
+    if (!line || len == 0 ||
+        !s_running.load(std::memory_order_acquire) || !s_queue) return;
 
-    // Severity filter (cheap pre-check before formatting)
-    if (s_cfg.min_severity < 7 && line && len > 0) {
-        char lvl = line[0];
-        int sev;
-        switch (lvl) {
-            case 'E': sev = 3; break;
-            case 'W': sev = 4; break;
-            case 'I': sev = 5; break;
-            case 'D': sev = 7; break;
-            case 'V': sev = 7; break;
-            default:  sev = 5; break;
-        }
-        if (sev > s_cfg.min_severity) return;
-    }
+    const int severity = severity_from_level(line[0]);
+    if (severity > static_cast<int>(
+            s_min_severity.load(std::memory_order_relaxed))) return;
 
     struct syslog_entry e;
-    int sev = 6;
-    char tag[32] = "fw";
-    const char *msg = line;
-    size_t msg_len = len;
-    parse_idf_line(line, len, &sev, tag, sizeof(tag), &msg, &msg_len);
-    format_rfc5424(e.buf, sizeof(e.buf), &e.len, sev, tag, msg, msg_len);
-    if (e.len == 0) return;
+    e.len = len < sizeof(e.line) ? len : sizeof(e.line);
+    memcpy(e.line, line, e.len);
 
     // Non-blocking enqueue. Drop on full (best-effort, ring buffer remains
     // authoritative).
@@ -208,6 +224,7 @@ void syslog_subscriber(const char *line, size_t len, uint64_t end_offset)
 static int resolve_and_connect_udp(const char *host, uint16_t port,
                                     struct sockaddr_in *out_addr)
 {
+    if (!s_running.load(std::memory_order_acquire)) return -1;
     memset(out_addr, 0, sizeof(*out_addr));
 
     struct addrinfo hints = {};
@@ -219,6 +236,10 @@ static int resolve_and_connect_udp(const char *host, uint16_t port,
     if (getaddrinfo(host, port_str, &hints, &res) != ESP_OK || !res) {
         return -1;
     }
+    if (!s_running.load(std::memory_order_acquire)) {
+        freeaddrinfo(res);
+        return -1;
+    }
     memcpy(out_addr, res->ai_addr, sizeof(*out_addr));
     freeaddrinfo(res);
 
@@ -228,6 +249,7 @@ static int resolve_and_connect_udp(const char *host, uint16_t port,
 
 static int resolve_and_connect_tcp(const char *host, uint16_t port)
 {
+    if (!s_running.load(std::memory_order_acquire)) return -1;
     struct addrinfo hints = {};
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -237,9 +259,14 @@ static int resolve_and_connect_tcp(const char *host, uint16_t port)
     if (getaddrinfo(host, port_str, &hints, &res) != ESP_OK || !res) {
         return -1;
     }
+    if (!s_running.load(std::memory_order_acquire)) {
+        freeaddrinfo(res);
+        return -1;
+    }
 
     int sock = -1;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
+        if (!s_running.load(std::memory_order_acquire)) break;
         sock = socket(a->ai_family, a->ai_socktype, a->ai_protocol);
         if (sock < 0) continue;
 
@@ -272,66 +299,17 @@ static int resolve_and_connect_tcp(const char *host, uint16_t port)
         sock = -1;
     }
     freeaddrinfo(res);
-    return sock;
-}
 
-// TLS-over-TCP send. Serialised via g_net_fetch_mutex (see CLAUDE.md: any
-// outbound TLS must take this mutex to avoid heap exhaustion from concurrent
-// handshakes).
-static bool send_tls(const char *host, uint16_t port, const char *buf, size_t len)
-{
-    if (!g_net_fetch_mutex) return false;
-    if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) != pdTRUE) return false;
-
-    bool ok = false;
-    int sock = resolve_and_connect_tcp(host, port);
-    if (sock < 0) goto done;
-
-    {
-        mbedtls_ssl_context ssl;
-        mbedtls_ssl_config  conf;
-        mbedtls_net_context server_fd;
-        size_t written = 0;
-        mbedtls_ssl_init(&ssl);
-        mbedtls_ssl_config_init(&conf);
-        mbedtls_net_init(&server_fd);
-
-        server_fd.fd = sock;
-
-        if (mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT,
-                                        MBEDTLS_SSL_TRANSPORT_STREAM,
-                                        MBEDTLS_SSL_PRESET_DEFAULT) != 0) goto teardown;
-        mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-        esp_crt_bundle_attach(&conf);
-        mbedtls_ssl_setup(&ssl, &conf);
-        mbedtls_ssl_set_bio(&ssl, &server_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
-
-        // hostname check
-        mbedtls_ssl_set_hostname(&ssl, host);
-
-        int r;
-        while ((r = mbedtls_ssl_handshake(&ssl)) != 0) {
-            if (r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) goto teardown;
-        }
-
-        while (written < len) {
-            int w = mbedtls_ssl_write(&ssl, (const unsigned char *)buf + written, len - written);
-            if (w == MBEDTLS_ERR_SSL_WANT_READ || w == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
-            if (w <= 0) break;
-            written += (size_t)w;
-        }
-        ok = (written == len);
-
-    teardown:
-        mbedtls_ssl_free(&ssl);
-        mbedtls_ssl_config_free(&conf);
-        // mbedtls_net_free closes the socket; do not double-close.
-        mbedtls_net_free(&server_fd);
+    if (sock >= 0) {
+        // Bound every downstream TCP/TLS read and write. This prevents a dead
+        // peer from pinning the best-effort worker (and syslog_stop) forever.
+        struct timeval io_timeout = { .tv_sec = 3, .tv_usec = 0 };
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+                   &io_timeout, sizeof(io_timeout));
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO,
+                   &io_timeout, sizeof(io_timeout));
     }
-
-done:
-    if (g_net_fetch_mutex) xSemaphoreGive(g_net_fetch_mutex);
-    return ok;
+    return sock;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +321,7 @@ done:
 // fragmentation. On the WROOM-32 (no PSRAM, ~250 KB internal heap, allocator
 // with limited coalescing) this drives the *largest contiguous free block*
 // steadily downward even though total free heap looks fine, until the next
-// OTA/UpdateCheck/TLS consumer cannot satisfy mbedtls_ssl_setup and panics
+// another TLS consumer cannot satisfy mbedtls_ssl_setup and panics
 // deep inside the handshake. The heap watchdog eventually catches the
 // sustained pressure and restarts the device.
 //
@@ -358,14 +336,28 @@ struct syslog_tls_session {
     mbedtls_ssl_context  ssl;
     mbedtls_ssl_config   conf;
     mbedtls_net_context  net_fd;
-    int                  last_use_tick_ms = 0;
+    TickType_t           last_use_tick = 0;
 };
+
+static constexpr TickType_t SYSLOG_TLS_HANDSHAKE_TIMEOUT =
+    pdMS_TO_TICKS(10000);
+static constexpr TickType_t SYSLOG_TLS_WRITE_TIMEOUT =
+    pdMS_TO_TICKS(5000);
+static constexpr int SYSLOG_STOP_TIMEOUT_MS = 15000;
+
+static bool tick_timeout_elapsed(TickType_t start, TickType_t timeout)
+{
+    return (TickType_t)(xTaskGetTickCount() - start) >= timeout;
+}
 
 // Tear down everything but keep the struct alive (caller frees the struct).
 static void syslog_tls_teardown(syslog_tls_session *s)
 {
     if (!s || !s->initialised) return;
-    if (s->handshake_ok) {
+    // close_notify can itself consume a complete socket timeout. During a
+    // requested stop the peer is not entitled to delay local resource release;
+    // mbedtls_net_free still closes the connection cleanly from our side.
+    if (s->handshake_ok && s_running.load(std::memory_order_acquire)) {
         mbedtls_ssl_close_notify(&s->ssl);
     }
     mbedtls_ssl_free(&s->ssl);
@@ -406,15 +398,24 @@ static bool syslog_tls_connect(syslog_tls_session *s, const char *host, uint16_t
     mbedtls_ssl_set_bio(&s->ssl, &s->net_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
     mbedtls_ssl_set_hostname(&s->ssl, host);
 
+    const TickType_t handshake_start = xTaskGetTickCount();
     int r;
-    while ((r = mbedtls_ssl_handshake(&s->ssl)) != 0) {
+    for (;;) {
+        if (!s_running.load(std::memory_order_acquire) ||
+            tick_timeout_elapsed(handshake_start,
+                                 SYSLOG_TLS_HANDSHAKE_TIMEOUT)) {
+            syslog_tls_teardown(s);
+            return false;
+        }
+        r = mbedtls_ssl_handshake(&s->ssl);
+        if (r == 0) break;
         if (r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) {
             syslog_tls_teardown(s);
             return false;
         }
     }
     s->handshake_ok = true;
-    s->last_use_tick_ms = (int)xTaskGetTickCount() * portTICK_PERIOD_MS;
+    s->last_use_tick = xTaskGetTickCount();
     return true;
 }
 
@@ -427,8 +428,14 @@ static bool syslog_tls_send(syslog_tls_session *s, const char *host, uint16_t po
         if (!syslog_tls_connect(s, host, port)) return false;
     }
 
+    const TickType_t write_start = xTaskGetTickCount();
     size_t written = 0;
     while (written < len) {
+        if (!s_running.load(std::memory_order_acquire) ||
+            tick_timeout_elapsed(write_start, SYSLOG_TLS_WRITE_TIMEOUT)) {
+            syslog_tls_teardown(s);
+            return false;
+        }
         int w = mbedtls_ssl_write(&s->ssl, (const unsigned char *)buf + written, len - written);
         if (w == MBEDTLS_ERR_SSL_WANT_READ || w == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
         if (w <= 0) {
@@ -439,7 +446,7 @@ static bool syslog_tls_send(syslog_tls_session *s, const char *host, uint16_t po
         }
         written += (size_t)w;
     }
-    s->last_use_tick_ms = (int)xTaskGetTickCount() * portTICK_PERIOD_MS;
+    s->last_use_tick = xTaskGetTickCount();
     return true;
 }
 
@@ -448,13 +455,15 @@ static bool syslog_tls_send(syslog_tls_session *s, const char *host, uint16_t po
 // silently and the next write returns a fatal error — which syslog_tls_send
 // already handles by tearing down and reconnecting, so this is only an
 // optimisation to free ~6-8 KB of heap when syslog has been quiet.
-static constexpr int SYSLOG_TLS_IDLE_CLOSE_MS = 5 * 60 * 1000;  // 5 min
+static constexpr TickType_t SYSLOG_TLS_IDLE_CLOSE_TICKS =
+    pdMS_TO_TICKS(5 * 60 * 1000);  // 5 min
 
 // ---------------------------------------------------------------------------
 // Worker task.
 // ---------------------------------------------------------------------------
 static void syslog_task(void *pv)
 {
+  for (;;) {
     ESP_LOGI(TAG, "syslog forwarder started -> %s:%u transport=%u",
              s_cfg.server, s_cfg.port, s_cfg.transport);
 
@@ -481,8 +490,9 @@ static void syslog_task(void *pv)
             // contexts if it has been quiet for a while, so the ~6-8 KB
             // returns to the heap. Re-connected on the next log line.
             if (tls.handshake_ok) {
-                int now_ms = (int)xTaskGetTickCount() * portTICK_PERIOD_MS;
-                if (now_ms - tls.last_use_tick_ms > SYSLOG_TLS_IDLE_CLOSE_MS) {
+                const TickType_t now = xTaskGetTickCount();
+                if ((TickType_t)(now - tls.last_use_tick) >=
+                    SYSLOG_TLS_IDLE_CLOSE_TICKS) {
                     syslog_tls_teardown(&tls);
                 }
             }
@@ -490,14 +500,28 @@ static void syslog_task(void *pv)
         }
         if (e.len == 0) continue;
 
+        int severity = 6;
+        char tag[32] = "fw";
+        const char *message = e.line;
+        size_t message_len = e.len;
+        parse_idf_line(e.line, e.len, &severity, tag, sizeof(tag),
+                       &message, &message_len);
+
+        char wire[512];
+        size_t wire_len = 0;
+        format_rfc5424(wire, sizeof(wire), &wire_len, severity, tag,
+                       message, message_len, s_cfg.hostname);
+        if (wire_len == 0) continue;
+
         if (s_cfg.transport == 0) {
             // UDP — keep a persistent socket + resolved destination (analogous
             // to the TCP path) instead of open/close + getaddrinfo per line.
-            if (udp_sock < 0) {
+            if (udp_sock < 0 &&
+                s_running.load(std::memory_order_acquire)) {
                 udp_sock = resolve_and_connect_udp(s_cfg.server, s_cfg.port, &udp_dst);
             }
             if (udp_sock >= 0) {
-                ssize_t w = sendto(udp_sock, e.buf, e.len, 0,
+                ssize_t w = sendto(udp_sock, wire, wire_len, 0,
                                    (struct sockaddr *)&udp_dst, sizeof(udp_dst));
                 if (w < 0) {
                     // Socket went bad (e.g. interface cycled) — drop and rebuild
@@ -508,11 +532,12 @@ static void syslog_task(void *pv)
             }
         } else if (s_cfg.transport == 1) {
             // TCP — reconnect lazily and reuse the socket.
-            if (tcp_sock < 0) {
+            if (tcp_sock < 0 &&
+                s_running.load(std::memory_order_acquire)) {
                 tcp_sock = resolve_and_connect_tcp(s_cfg.server, s_cfg.port);
             }
             if (tcp_sock >= 0) {
-                ssize_t w = send(tcp_sock, e.buf, e.len, 0);
+                ssize_t w = send(tcp_sock, wire, wire_len, 0);
                 if (w <= 0) {
                     close(tcp_sock);
                     tcp_sock = -1;
@@ -521,13 +546,19 @@ static void syslog_task(void *pv)
         } else {
             // TLS — persistent session, reconnect on failure.
             //
-            // Skip while an OTA firmware download is in progress: the OTA
-            // owns g_net_fetch_mutex for the whole download, and contending
+            // Skip while a manual firmware upload is in progress: the upload
+            // owns g_net_fetch_mutex while writing, and contending
             // for it (or opening a second TLS context) risks starving the
-            // OTA of heap. The log line is dropped; the queue keeps moving.
+            // upload of heap. The log line is dropped; the queue keeps moving.
             if (!net_fetch_ota_active() && g_net_fetch_mutex) {
-                if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
-                    syslog_tls_send(&tls, s_cfg.server, s_cfg.port, e.buf, e.len);
+                if (xSemaphoreTake(g_net_fetch_mutex, 0) == pdTRUE) {
+                    // Stop may race with the non-blocking mutex acquisition.
+                    // Recheck after ownership so no TLS setup begins while the
+                    // lifecycle is already unwinding.
+                    if (s_running.load(std::memory_order_acquire)) {
+                        syslog_tls_send(&tls, s_cfg.server, s_cfg.port,
+                                        wire, wire_len);
+                    }
                     xSemaphoreGive(g_net_fetch_mutex);
                 }
             }
@@ -538,8 +569,26 @@ static void syslog_task(void *pv)
     if (udp_sock >= 0) close(udp_sock);
     syslog_tls_teardown(&tls);
     ESP_LOGI(TAG, "syslog forwarder stopped");
-    s_running.store(false);
-    s_task.store(NULL);
+    SemaphoreHandle_t mutex = syslog_mutex();
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    if (s_restart_requested.exchange(false, std::memory_order_acq_rel)) {
+        // A caller tried to restore the service after stop() timed out. All
+        // sockets/TLS state are gone now, so reuse this task and its stack
+        // instead of racing a second task against the old cleanup path.
+        memcpy(&s_cfg, &s_pending_cfg, sizeof(s_cfg));
+        s_min_severity.store(s_cfg.min_severity, std::memory_order_release);
+        if (s_queue) xQueueReset(s_queue);
+        s_running.store(true, std::memory_order_release);
+        LogManager::instance().addSubscriber(syslog_subscriber);
+        xSemaphoreGive(mutex);
+        ESP_LOGI(TAG, "syslog deferred restart completed");
+        continue;
+    }
+    s_running.store(false, std::memory_order_release);
+    s_task.store(NULL, std::memory_order_release);
+    xSemaphoreGive(mutex);
+    break;
+  }
     vTaskDelete(NULL);
 }
 
@@ -550,31 +599,48 @@ esp_err_t syslog_start(const syslog_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
     if (!config->enabled) return ESP_OK;
-    if (s_running.load()) {
-        ESP_LOGW(TAG, "already running");
-        return ESP_OK;
-    }
     if (config->server[0] == '\0') {
         ESP_LOGE(TAG, "no server configured");
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (s_cfg_mutex == NULL) s_cfg_mutex = xSemaphoreCreateMutex();
-    if (s_cfg_mutex) {
-        xSemaphoreTake(s_cfg_mutex, portMAX_DELAY);
-        memcpy(&s_cfg, config, sizeof(s_cfg));
-        xSemaphoreGive(s_cfg_mutex);
+    SemaphoreHandle_t mutex = syslog_mutex();
+    if (!mutex) {
+        ESP_LOGE(TAG, "lifecycle mutex create failed");
+        return ESP_ERR_NO_MEM;
     }
+    xSemaphoreTake(mutex, portMAX_DELAY);
+
+    if (s_task.load(std::memory_order_acquire) != NULL) {
+        const bool running = s_running.load(std::memory_order_acquire);
+        if (!running) {
+            normalise_config(&s_pending_cfg, config);
+            s_restart_requested.store(true, std::memory_order_release);
+        }
+        xSemaphoreGive(mutex);
+        if (running) {
+            ESP_LOGW(TAG, "already running");
+            return ESP_OK;
+        }
+        ESP_LOGW(TAG, "syslog restart queued until cleanup completes");
+        return ESP_OK;
+    }
+
+    normalise_config(&s_cfg, config);
+    s_min_severity.store(s_cfg.min_severity, std::memory_order_release);
 
     if (s_queue == NULL) {
         s_queue = xQueueCreate(QUEUE_DEPTH, sizeof(struct syslog_entry));
         if (!s_queue) {
+            xSemaphoreGive(mutex);
             ESP_LOGE(TAG, "queue create failed");
             return ESP_ERR_NO_MEM;
         }
     }
+    xQueueReset(s_queue);
 
-    s_running.store(true);
+    s_restart_requested.store(false, std::memory_order_release);
+    s_running.store(true, std::memory_order_release);
     LogManager::instance().addSubscriber(syslog_subscriber);
 
     TaskHandle_t h = NULL;
@@ -582,31 +648,51 @@ esp_err_t syslog_start(const syslog_config_t *config)
     if (xTaskCreate(syslog_task, "syslog", 6144, NULL, 4, &h) != pdPASS) {
         ESP_LOGE(TAG, "task create failed");
         LogManager::instance().removeSubscriber(syslog_subscriber);
-        s_running.store(false);
+        s_running.store(false, std::memory_order_release);
+        xSemaphoreGive(mutex);
         return ESP_FAIL;
     }
-    s_task.store(h);
+    s_task.store(h, std::memory_order_release);
+    xSemaphoreGive(mutex);
     return ESP_OK;
 }
 
 esp_err_t syslog_stop(void)
 {
-    if (!s_running.load()) return ESP_OK;
-    s_running.store(false);
+    SemaphoreHandle_t mutex = syslog_mutex();
+    if (!mutex) return ESP_ERR_NO_MEM;
+
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    TaskHandle_t task = s_task.load(std::memory_order_acquire);
+    // A deliberate stop supersedes any restore queued by a previous caller.
+    s_restart_requested.store(false, std::memory_order_release);
+    if (!task) {
+        s_running.store(false, std::memory_order_release);
+        xSemaphoreGive(mutex);
+        return ESP_OK;
+    }
+
+    s_running.store(false, std::memory_order_release);
     LogManager::instance().removeSubscriber(syslog_subscriber);
 
     // Wake the worker by sending a no-op so it exits its queue wait.
     struct syslog_entry empty = {};
     if (s_queue) xQueueSend(s_queue, &empty, 0);
+    xSemaphoreGive(mutex);
 
-    for (int i = 0; i < 30 && s_task.load() != NULL; i++) {
+    // Connect and socket I/O are bounded to 3 s; handshake/write loops also
+    // observe s_running and cleanup skips close_notify during stop. Fifteen
+    // seconds therefore covers the longest TLS unwind with scheduler margin.
+    for (int i = 0; i < SYSLOG_STOP_TIMEOUT_MS / 100 &&
+         s_task.load(std::memory_order_acquire) != NULL; i++) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    TaskHandle_t h = s_task.load();
-    if (h) {
-        ESP_LOGW(TAG, "task did not exit cleanly, force-deleting");
-        s_task.store(NULL);
-        vTaskDelete(h);
+    if (s_task.load(std::memory_order_acquire) != NULL) {
+        // Never delete a task which may own g_net_fetch_mutex or live mbedTLS
+        // state. Socket timeouts bound its eventual self-cleanup; start() stays
+        // blocked until the worker publishes s_task == NULL.
+        ESP_LOGW(TAG, "worker still stopping after timeout");
+        return ESP_ERR_TIMEOUT;
     }
     return ESP_OK;
 }

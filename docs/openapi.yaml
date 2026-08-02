@@ -13,7 +13,7 @@ info:
     ## Security Note
     The default username is `admin`. The initial password is `admin`. **Change the password immediately after first login.**
 
-  version: '2.2.6-Beta.2'
+  version: '2.2.6-Beta.4'
   contact:
     name: HB-RF-ETH Project
     url: https://github.com/Xerolux/HB-RF-ETH-ng
@@ -202,21 +202,15 @@ paths:
     post:
       tags:
         - Firmware
-      summary: Upload firmware update
-      description: Upload and install a firmware update. The device restarts automatically after a successful upload.
+      summary: Upload a local firmware image
+      description: Upload a local ESP32 firmware .bin as the raw request body. URL-based and multipart uploads are not supported. The device restarts automatically after a successful upload.
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/octet-stream:
             schema:
-              type: object
-              required:
-                - file
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: Firmware binary file
+              type: string
+              format: binary
       responses:
         '200':
           description: Firmware uploaded successfully
@@ -225,9 +219,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  status:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
                     type: string
-                    example: success
+                    example: Firmware update completed, restarting in 3 seconds...
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -275,8 +272,8 @@ components:
           example: 2.0.0
         latestVersion:
           type: string
-          description: Latest available firmware version
-          example: 2.1.12
+          description: Compatibility placeholder; automatic update checks were removed and the value is n/a
+          example: n/a
         rawUartRemoteAddress:
           type: string
           description: Remote address for raw UART connection
@@ -388,10 +385,11 @@ components:
         flashPause:
           type: boolean
           description: >-
-            When true, a system restart holds the Ethernet PHY in hardware reset
-            for ~35 seconds so a connected CCU's link-loss watchdog can trigger
-            a clean CCU restart. Default false.
-          example: false
+            Compatibility field, always enforced as true. A system restart
+            holds the Ethernet PHY in hardware reset for ~35 seconds so a
+            connected CCU's link-loss watchdog can trigger a clean CCU restart.
+            Older backups containing false cannot disable Restart Sync.
+          example: true
         systemLogEnabled:
           type: boolean
           description: >-
@@ -566,7 +564,7 @@ components:
               x-enum-descriptions:
                 - 0 = UDP
                 - 1 = TCP
-                - 2 = TLS-over-TCP (serialized on the net-fetch mutex; deferred during OTA)
+                - 2 = TLS-over-TCP (serialized on the net-fetch mutex; deferred during a manual firmware upload)
             minSeverity:
               type: integer
               description: Minimum severity to forward (0 = EMERG ... 7 = DEBUG)

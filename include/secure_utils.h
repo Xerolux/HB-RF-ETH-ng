@@ -41,8 +41,9 @@ static inline void secure_zero(void *v, size_t n) {
 /**
  * @brief Constant-time string comparison to prevent timing attacks.
  *
- * The comparison never short-circuits on length and does not call strlen,
- * so an attacker cannot learn the length of the inputs from timing.
+ * The comparison never short-circuits on the first mismatching byte. Like any
+ * C-string comparison its runtime may reveal the public string lengths, but it
+ * does not read beyond either terminating NUL byte.
  *
  * @param a First string (NULL-safe)
  * @param b Second string (NULL-safe)
@@ -51,27 +52,24 @@ static inline void secure_zero(void *v, size_t n) {
 static inline int secure_strcmp(const char *a, const char *b) {
     if (!a || !b) return 1;
 
-    // Walk both strings in lock-step without calling strlen (which leaks
-    // length via timing) and without short-circuiting on the first mismatch.
-    // Accumulate differences and track whether each string has ended. The loop
-    // stops once both strings have terminated, so the runtime only reveals the
-    // length of the longer string, not the position of any difference.
-    int result = 0;
-    int a_ended = 0;
-    int b_ended = 0;
-    size_t i = 0;
+    const size_t a_len = strlen(a);
+    const size_t b_len = strlen(b);
+    const size_t max_len = a_len > b_len ? a_len : b_len;
+    size_t result = a_len ^ b_len;
 
-    do {
-        unsigned char ca = (unsigned char)a[i];
-        unsigned char cb = (unsigned char)b[i];
-        a_ended |= (ca == 0);
-        b_ended |= (cb == 0);
-        result |= (ca ^ cb);
-        i++;
-    } while (!(a_ended && b_ended));
+    // Use zero for positions beyond the shorter string rather than indexing
+    // past its terminator. The old lock-step loop kept dereferencing the short
+    // input until the long input ended, which was undefined behaviour and
+    // could fault when a credential ended at a memory-region boundary.
+    for (size_t i = 0; i < max_len; ++i) {
+        const unsigned char ca =
+            i < a_len ? (unsigned char)a[i] : 0U;
+        const unsigned char cb =
+            i < b_len ? (unsigned char)b[i] : 0U;
+        result |= (size_t)(ca ^ cb);
+    }
 
-    // Strings are equal only if every byte matched AND they ended at the same position.
-    return result | (a_ended ^ b_ended);
+    return result == 0 ? 0 : 1;
 }
 
 #endif // SECURE_UTILS_H

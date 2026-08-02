@@ -34,18 +34,19 @@
 // the LogManager. No-op if config->enabled is false.
 esp_err_t syslog_start(const syslog_config_t *config);
 
-// Stop the forwarder and unregister from LogManager. Blocks until the
-// worker task has exited.
+// Stop the forwarder and unregister from LogManager. Waits up to 15 seconds
+// for bounded connect/TLS I/O and worker-owned cleanup; returns ESP_ERR_TIMEOUT
+// if that lifecycle is still in progress. The worker is never force-deleted;
+// a start requested during cleanup is queued and reuses the existing task.
 esp_err_t syslog_stop(void);
 
 // Returns true while the forwarder task is running.
 bool syslog_is_running(void);
 
 // Subscriber hook compatible with log_line_subscriber_t. Called by
-// LogManager::write() for every captured line. Parses the ESP-IDF
-// `L (ts) TAG: message` prefix into (severity, tag, message), wraps it in
-// RFC 5424 framing and pushes it on the forwarder queue. Non-blocking; if
-// the queue is full the line is dropped (best-effort).
+// LogManager::write() for every captured line. It only applies the severity
+// filter and non-blockingly queues one bounded raw line. Parsing, timestamp /
+// hostname lookup and RFC 5424 formatting are performed by the worker.
 void syslog_subscriber(const char *line, size_t len, uint64_t end_offset);
 
 #endif // SYSLOG_H

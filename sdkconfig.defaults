@@ -1,5 +1,5 @@
 # HB-RF-ETH Default Configuration
-# Compatible with ESP-IDF v6.1-beta1
+# Compatible with ESP-IDF v6.0.2
 
 # Partition Table
 CONFIG_PARTITION_TABLE_CUSTOM=y
@@ -10,15 +10,17 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 
 # MQTT 3.1.1 Protocol
 CONFIG_MQTT_PROTOCOL_311=y
+CONFIG_MQTT_TRANSPORT_SSL=y
 
 # HTTP Server
 CONFIG_HTTPD_WS_SUPPORT=y
 CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT=y
 CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
 
-# TLS certificate verification: use the full Mozilla root CA bundle so the
-# ECDSA roots GitHub's CDN may present (e.g. ISRG Root X2) are covered. Keeps
-# server-certificate verification enabled on the UpdateCheck / OTA path.
+# TLS certificate verification: use the full Mozilla root CA bundle for the
+# optional outbound HTTPS clients (supporter-key CRL, HTTPS webhooks, TLS
+# syslog and MQTT). Manual firmware uploads arrive from the browser and do not
+# download an image over HTTPS on the ESP32.
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=y
 # Permit the explicit MQTT "skip verify" setting for private/self-signed lab
@@ -29,21 +31,18 @@ CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
 # mbedTLS dynamic buffers: the WROOM-32 has no PSRAM, so heap during a TLS
 # handshake is scarce. With static buffers mbedTLS reserves a full 16 KB RX
 # buffer (CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN) for the entire connection, which
-# - combined with the GitHub-response buffer - starved the PSA-crypto signature
+# - combined with application response buffers - starved the PSA-crypto signature
 # verification and aborted the handshake with PSA_ERROR_INSUFFICIENT_MEMORY
-# (mbedtls_ssl_handshake returned -0x008D / -141), failing both the update
-# check and the OTA download. Dynamic buffers allocate the RX/TX buffers to the
+# (mbedtls_ssl_handshake returned -0x008D / -141). Dynamic buffers allocate the RX/TX buffers to the
 # actual record size and free per-connection state when idle, freeing the heap
 # the handshake needs.
 CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
 CONFIG_MBEDTLS_DYNAMIC_FREE_CONFIG_DATA=y
 CONFIG_MBEDTLS_DYNAMIC_FREE_CA_CERT=y
 
-# TLS peers may legally send records with up to 16 KiB of plaintext. GitHub's
-# release CDN starts the OTA response with small records but switches to full
-# records during the binary stream. An 8 KiB RX limit therefore made online
-# OTA fail reproducibly near 4% with mbedTLS/PSA error -0x0087. Keep the TX
-# side small, but accept standards-compliant incoming records.
+# TLS peers may legally send records with up to 16 KiB of plaintext. Keep the
+# TX side small, but accept standards-compliant incoming records from any
+# configured HTTPS/TLS service.
 CONFIG_MBEDTLS_ASYMMETRIC_CONTENT_LEN=y
 CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=16384
 CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
@@ -55,21 +54,20 @@ CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY=n
 CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
 
-# WiFi support disabled: the HB-RF-ETH board uses Ethernet (LAN8720A) only.
-# Keeping WiFi enabled wastes ~30KB+ DRAM which is needed for the TLS handshake
-# during the GitHub update check on the WROOM-32 (no PSRAM).
+# The HB-RF-ETH board uses Ethernet (LAN8720A) only. These legacy symbols are
+# retained as documentation; ESP-IDF v6.0.2 may still resolve its promptless
+# Wi-Fi component symbol internally, but the application never initializes it.
 # CONFIG_ESP_WIFI_ENABLED is not set
 # CONFIG_ESP32_WIFI_ENABLED is not set
 
 # LwIP socket pool: 10 sockets is too tight for concurrent httpd (WebUI polling),
-# MQTT client, monitoring listeners and an OTA HTTPS download. With only 10
-# sockets the device hits EMFILE (errno 23) during OTA downloads — httpd can't
-# accept new connections and the OTA HTTPS client can't create a socket.
-# 16 gives enough headroom for all subsystems plus outbound TLS fetches.
+# MQTT client, monitoring listeners and outbound HTTPS clients. With only 10
+# sockets the device can hit EMFILE (errno 23), preventing httpd from accepting
+# a manual firmware upload. 16 gives the subsystems sufficient headroom.
 CONFIG_LWIP_MAX_SOCKETS=16
 
 # Reduce TCP TIME_WAIT from the default 60s to 15s. The 60s MSL meant that
-# after every outbound HTTPS fetch (update check, CRL refresh,
-# OTA redirect handshake) the socket FD was unavailable for a full minute,
+# after every outbound HTTPS fetch (for example a CRL refresh or webhook)
+# the socket FD was unavailable for a full minute,
 # compounding the socket-exhaustion problem above.
 CONFIG_LWIP_TCP_MSL=15000

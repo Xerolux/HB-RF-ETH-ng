@@ -30,7 +30,7 @@ test.describe('Generate Assets', () => {
           sysInfo: {
             serial: "MEQ1234567",
             currentVersion: "2.1.11",
-            latestVersion: "2.1.12",
+            latestVersion: "n/a",
             rawUartRemoteAddress: "192.168.1.10",
             memoryUsage: 45.2,
             cpuUsage: 12.5,
@@ -115,28 +115,12 @@ test.describe('Generate Assets', () => {
         });
     });
 
-    // Update Check (Available)
-    await page.route('**/api/check_update?*', async route => {
-        await route.fulfill({
-            contentType: 'text/plain',
-            body: "2.1.12" // Newer version to show badge
-        });
-    });
-
     // System Log
     await page.route('**/api/log*', async route => {
         await route.fulfill({
             contentType: 'text/plain',
             headers: { 'X-Log-Total': '500' },
-            body: "I (1000) main: Board: HB-RF-ETH-ng (v2.0)\nI (1010) net: Ethernet Link Up. Speed: 100Mbps, Duplex: Full\nI (1012) net: IPv4 Address: 192.168.1.200\nI (1020) hb-rf: Radio module detected: HM-MOD-RPI-PCB\nI (1025) hb-rf: Radio Serial: MEQ1234567\nI (1030) hb-rf: Radio Firmware: 2.8.6\nI (1040) webui: Web server started on port 80\nI (2000) webui: Client connected: 192.168.1.50\nI (5000) update: Checking for updates...\nI (5005) update: Update available: v2.1.12\n"
-        });
-    });
-
-    // Changelog
-    await page.route('**/api/changelog', async route => {
-        await route.fulfill({
-            contentType: 'text/markdown',
-            body: "# Changelog\n\n## v2.1.12 (Latest)\n- **Improved**: Updated examples and documentation consistency.\n- **Changed**: Refined monitoring and update messaging.\n\n## v2.1.11\n- **Changed**: Bumped version to 2.1.11"
+            body: "I (1000) main: Board: HB-RF-ETH-ng (v2.0)\nI (1010) net: Ethernet Link Up. Speed: 100Mbps, Duplex: Full\nI (1012) net: IPv4 Address: 192.168.1.200\nI (1020) hb-rf: Radio module detected: HM-MOD-RPI-PCB\nI (1025) hb-rf: Radio Serial: MEQ1234567\nI (1030) hb-rf: Radio Firmware: 2.8.6\nI (1040) webui: Web server started on port 80\nI (2000) webui: Client connected: 192.168.1.50\n"
         });
     });
 
@@ -185,7 +169,7 @@ test.describe('Generate Assets', () => {
     await page.screenshot({ path: path.join(screenshotsDir, '05_Monitoring.png') });
 
     // 6. Firmware
-    await gotoApp(page, '/firmware');
+    await gotoApp(page, '/updates/firmware');
     await page.waitForSelector('.firmware-page', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotsDir, '06_FirmwareUpdate.png') });
@@ -201,20 +185,6 @@ test.describe('Generate Assets', () => {
     await page.waitForSelector('.about-page', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotsDir, '08_About.png') });
-
-    // 9. Changelog Modal
-    // Go to firmware page where the button exists
-    await gotoApp(page, '/firmware');
-    await page.waitForSelector('.firmware-page', { timeout: 5000 }).catch(() => {});
-
-    const changelogBtn = page.locator('.changelog-btn').first();
-    if (await changelogBtn.isVisible()) {
-        await changelogBtn.click();
-        await page.waitForSelector('.modal-content:visible');
-        await page.waitForTimeout(1000);
-        await page.screenshot({ path: path.join(screenshotsDir, '09_Changelog.png') });
-        await page.keyboard.press('Escape');
-    }
 
     // Video will be saved automatically to screenshotsDir with a random name.
   });

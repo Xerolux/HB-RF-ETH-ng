@@ -1,130 +1,126 @@
-# OTA & Update-Search Test Protocol
+# Manual Firmware OTA Test Protocol
 
-A hands-on checklist to verify the **update search** and **OTA update** paths on
-real HB-RF-ETH-ng hardware. The firmware logic is covered by code review, but the
-on-device TLS handshake against GitHub's CDN and the heap behaviour during an OTA
-can only be proven on a physical device — that is what this protocol is for.
+This checklist verifies the one remaining firmware-update path on real
+HB-RF-ETH-ng hardware: an administrator uploads a **local firmware `.bin`** as
+the raw request body of `POST /ota_update`.
 
-> Recommended test vehicle: flash a device with **v2.2.0-Beta.13**, then use this
-> protocol to update it to **v2.2.0-Beta.14**. That exercises the full
-> search → download → flash → reboot chain end to end.
+The following former online-update features have been removed and are not part
+of this test:
+
+- automatic release/update searches;
+- URL-based OTA downloads;
+- MQTT or Home Assistant initiated OTA updates;
+- the former `/api/check_update` and `/api/ota_url` endpoints.
+
+The device does not need Internet access, DNS for GitHub, or a TLS connection to
+a release server for a manual update.
 
 ## Prerequisites
 
-- A device reachable on the LAN with a known IP and admin password.
-- The device has working DNS + outbound HTTPS (needed to reach
-  `raw.githubusercontent.com`, GitHub release downloads and
-  `objects.githubusercontent.com`).
-- Python 3 on the test host (for `test_ota_function.py`).
-- A serial console attached is helpful but optional (`./idf.py monitor`) to watch
-  the `UpdateCheck` / OTA log lines.
+- A test device reachable on the LAN.
+- The administrator username and password. The default username is `admin`.
+- A local HB-RF-ETH-ng **firmware** image (`*.bin`). Do not use the separate
+  327680-byte WebUI/SPIFFS image on the firmware endpoint.
+- Stable power and, preferably, a serial console for observing the upload,
+  service shutdown, boot selection, and restart.
+- Python 3 when using `test_ota_function.py`.
 
----
-
-## Part 1 — Update search (`/api/check_update`)
-
-Goal: confirm the device fetches the static update manifest, parses it, and reports
-the correct latest version for both channels.
-
-### 1a. Stable channel
-
-1. In the WebUI, make sure the **beta channel** toggle is **off**.
-2. Open **Firmware Update** and press **Check for update**.
-3. Expected: `latestVersion` resolves to the newest **stable** release
-   (e.g. `2.1.10`), `isPrerelease=false`, and `error` is `null`.
-
-### 1b. Beta channel
-
-1. Enable the **beta channel** toggle and press **Check for update** again.
-2. Expected: `latestVersion` resolves to the highest pre-release
-   (e.g. `2.2.0-Beta.14`), `isPrerelease=true`, a non-empty `downloadUrl`
-   ending in `firmware_<version>.bin`, a valid `sha256`, and
-   `updateAvailable=true` when the
-   running firmware is older.
-
-### 1c. Raw API spot-check (optional)
+Use a known test build and record its SHA-256 before flashing:
 
 ```bash
-# Trigger a fresh fetch and inspect the JSON the device returns.
-TOKEN=$(curl -s -X POST http://<device-ip>/login.json \
+sha256sum build/HB-RF-ETH-ng-<version>.bin
+```
+
+## Test with the helper script
+
+The helper authenticates, validates the local file, and sends its bytes directly
+as `application/octet-stream`. It does not contact GitHub or submit a download
+URL.
+
+```bash
+python3 test_ota_function.py <device-ip> build/HB-RF-ETH-ng-<version>.bin
+```
+
+The password is requested interactively so it is not stored in shell history.
+For non-interactive use, provide it explicitly:
+
+```bash
+python3 test_ota_function.py <device-ip> firmware.bin \
+  --username admin --password '<admin-password>'
+```
+
+Expected output is similar to:
+
+```text
+Authenticating as admin at http://192.168.0.31...
+Uploading firmware.bin (1320848 bytes) to POST /ota_update...
+Firmware update completed, restarting in 3 seconds...
+The device should now restart and boot the uploaded firmware.
+```
+
+The request remains open while the device receives, validates, and activates the
+image. Allow up to ten minutes; do not interrupt the upload merely because it
+takes longer than a normal API request.
+
+## Equivalent curl test
+
+`/ota_update` accepts a raw binary body, not `multipart/form-data`. In
+particular, use `--data-binary`, not `-F`:
+
+```bash
+TOKEN=$(curl -fsS -X POST http://<device-ip>/login.json \
   -H 'Content-Type: application/json' \
-  -d '{"password":"<admin-password>"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+  -d '{"username":"admin","password":"<admin-password>"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
 
-curl -s -X POST http://<device-ip>/api/check_update \
-  -H "Authorization: Token $TOKEN" | python3 -m json.tool
+curl -fsS -X POST http://<device-ip>/ota_update \
+  -H "Authorization: Token $TOKEN" \
+  -H 'Content-Type: application/octet-stream' \
+  --data-binary @firmware.bin
 ```
 
-Check that `latestVersion`, `downloadUrl`, `sha256`, `betaChannel` and
-`fetchInProgress` look sane and that the call returns within ~25 s even under
-contention.
+On success, the endpoint returns JSON with `"success": true`, then the device
+restarts after approximately three seconds.
 
-### Search — pass criteria
+## Pass criteria
 
-- [ ] Stable channel reports the latest non-prerelease version.
-- [ ] Beta channel reports the highest pre-release (semver-correct, not just the
-      first list entry).
-- [ ] `downloadUrl` points at a `firmware_*.bin` asset that actually exists.
-- [ ] A rate-limited / offline device surfaces a clear `error` string instead of
-      silently claiming "up to date".
+- [ ] Authentication succeeds with the configured administrator credentials.
+- [ ] The complete local `.bin` is accepted without a socket, flash-write, or
+      image-validation error.
+- [ ] The success response is sent only after the image has been finalized,
+      background network services have stopped, and the new boot partition has
+      been selected.
+- [ ] The device restarts and reconnects to Ethernet.
+- [ ] The expected new firmware version appears in the WebUI or
+      `/sysinfo.json` after the restart.
+- [ ] MQTT, CheckMK, Syslog, notifications, and raw-UART connectivity recover
+      according to the saved configuration.
+- [ ] The serial log contains no panic, watchdog reset, or heap-corruption
+      message during upload, shutdown, and the first boot.
 
----
+## Negative and recovery checks
 
-## Part 2 — OTA update from URL (`/api/ota_url` + `/api/ota_status`)
+Run destructive recovery tests only on a lab device with a known-good serial
+flashing path.
 
-`test_ota_function.py` drives the URL-based OTA path the WebUI uses: it logs in,
-POSTs the firmware URL, then polls `/api/ota_status` until `success` or `failed`.
+- [ ] Upload without a valid `Authorization: Token ...` header: rejected with
+      HTTP 401 and no partition change.
+- [ ] Upload an empty file or a file without the ESP32 image magic byte `0xE9`:
+      rejected and the running firmware remains active.
+- [ ] Upload the 327680-byte WebUI/SPIFFS image: rejected with guidance to use
+      the separate WebUI installer.
+- [ ] Start two manual uploads concurrently: the second request is rejected as
+      already in progress; the first image is not corrupted.
+- [ ] Interrupt the client connection before the full content length is sent:
+      the partial OTA write is aborted and the current boot partition remains
+      selected.
+- [ ] Remove power during an incomplete upload: after power is restored, the
+      previously selected firmware still boots.
 
-```bash
-python3 test_ota_function.py <device-ip> <admin-password>
-# defaults to the v2.2.0-Beta.14 release asset; override with:
-python3 test_ota_function.py <device-ip> <admin-password> \
-  --url https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.0-Beta.14/firmware_2.2.0-Beta.14.bin
-```
+## Long-run acceptance
 
-Expected console output (abridged):
-
-```
-Authenticated. Token: ...
-Triggering OTA with URL: https://github.com/.../firmware_2.2.0-Beta.14.bin
-OTA Triggered: OTA update started
-Status: downloading, Progress: 0%
-Status: downloading, Progress: 37%
-Status: downloading, Progress: 100%
-Status: success, Progress: 100%
-OTA Update Successful! Device is restarting...
-```
-
-The device reboots automatically on success. After it comes back, confirm the new
-version on the **System Info** page or via `/sysinfo.json`.
-
-### OTA — pass criteria
-
-- [ ] TLS handshake against the GitHub CDN succeeds (no `ESP_ERR_*` /
-      `MBEDTLS_ERR_*` in the serial log) — this is the historically fragile step.
-- [ ] Progress advances monotonically 0 → 100%.
-- [ ] `esp_https_ota_is_complete_data_received` passes (no "download incomplete").
-- [ ] Device reboots and reports the **new** version after restart.
-- [ ] A bad URL / wrong host is rejected with a clear `failed` state and an error
-      string, and the device stays on the old firmware.
-
----
-
-## Part 3 — Negative & robustness checks (optional)
-
-- [ ] Trigger a second OTA while one is running → rejected with
-      `"OTA update already in progress"` (no partition corruption).
-- [ ] Point `--url` at a non-`.bin` / HTML page → OTA fails cleanly, old firmware
-      keeps running.
-- [ ] Pull power mid-download → device boots the previous (still-valid) partition
-      after restart (A/B rollback safety).
-
----
-
-## Notes
-
-- The integrated "update now" button in the WebUI uses the same `/api/ota_url`
-  download path with the `downloadUrl` returned by `/api/check_update`, so Part 1
-  + Part 2 together cover the one-click online-update flow.
-- Both the search and the OTA download serialize on `g_net_fetch_mutex`, so a
-  background update-check and a manual OTA cannot run their TLS handshakes at the
-  same time and exhaust the heap.
+After a successful update, leave the device under its normal MQTT, CheckMK,
+Syslog, notification, and radio traffic for an extended soak. Record reset
+reason, uptime, free heap, largest free block, minimum-ever heap, and worker stack
+watermarks. A manual upload test passes the stability gate only when there are no
+watchdog/panic resets and no sustained resource decline after services reconnect.

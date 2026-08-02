@@ -318,7 +318,6 @@ export const useSysInfoStore = defineStore('sysInfo', {
     serial: "",
     hostname: "",
     currentVersion: "",
-    latestVersion: "",
     rawUartRemoteAddress: "",
     memoryUsage: 0.0,
     cpuUsage: 0.0,

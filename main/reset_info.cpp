@@ -23,6 +23,7 @@
 
 #include "reset_info.h"
 #include "nvs_flash.h"
+#include "nvs_storage_lock.h"
 #include "nvs.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -69,6 +70,11 @@ static const char* get_reason_text(reset_reason_type_t reason) {
 }
 
 void ResetInfo::init() {
+    NvsStorageLock storage_lock;
+    if (!storage_lock) {
+        ESP_LOGE(TAG, "Could not reserve NVS storage during initialization");
+        return;
+    }
     // Initialize NVS if not already done
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -83,6 +89,11 @@ void ResetInfo::storeResetReason(reset_reason_type_t reason) {
 }
 
 void ResetInfo::storeResetReason(reset_reason_type_t reason, const char *diag) {
+    NvsStorageLock storage_lock;
+    if (!storage_lock) {
+        ESP_LOGE(TAG, "Could not reserve NVS storage for reset reason");
+        return;
+    }
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {
@@ -276,6 +287,9 @@ const char* ResetInfo::getResetDetails() {
 }
 
 void ResetInfo::clearResetReason() {
+    NvsStorageLock storage_lock;
+    if (!storage_lock) return;
+
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
     if (err != ESP_OK) {

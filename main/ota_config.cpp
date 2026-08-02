@@ -32,7 +32,7 @@ void configure_ota_http_client(esp_http_client_config_t& config, const char* url
     // buffer is allocated only after the handshake and ESP-IDF's dynamic TLS
     // buffers are enabled, so certificate verification no longer competes with
     // the large JSON buffer for heap. Disabling this check would allow a
-    // network attacker to provide an arbitrary firmware image.
+    // network attacker to impersonate the configured HTTPS service.
     config.crt_bundle_attach = esp_crt_bundle_attach;
 
     // Fix for Bug #235: GitHub redirects fail with keep-alive

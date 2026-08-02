@@ -10,6 +10,7 @@ Example:
     python generate_release_notes.py 2.1.0 release/README.md
 """
 
+import json
 import sys
 import re
 from pathlib import Path
@@ -82,6 +83,9 @@ def generate_release_notes(version: str) -> str:
     """Generate comprehensive release notes: intro, changelog, features, installation, support."""
 
     is_prerelease = any(tag in version.lower() for tag in ['alpha', 'beta', 'rc'])
+    webui_version = json.loads(
+        Path("webui/package.json").read_text(encoding="utf-8")
+    )["version"]
 
     # Try changelog first, fall back to README changes
     changelog = extract_changelog(version)
@@ -125,12 +129,12 @@ def generate_release_notes(version: str) -> str:
     notes.append("## ✨ Hauptfunktionen")
     notes.append("")
     notes.append("- **Moderne WebUI** mit Responsive Design, Dark/Light Theme und 4 Sprachen")
-    notes.append("- **Online-Updates** - Firmware direkt ueber den integrierten Update-Dienst herunterladen")
+    notes.append("- **Manuelle Firmware-Updates** - lokale `firmware_*.bin` sicher über die WebUI hochladen")
     notes.append("- **MQTT-Support** mit Home Assistant Auto-Discovery")
     notes.append("- **CheckMK Monitoring** für Integration in Monitoringsysteme")
     notes.append("- **IPv6-Support** mit Auto-Konfiguration")
     notes.append("- **Sichere Authentifizierung** mit automatischem Session-Timeout")
-    notes.append("- **Verbesserte OTA-Updates** mit besserer Fehlerbehandlung")
+    notes.append("- **Robuster Raw-Binary-Upload** mit Image-Pruefung und sicherem Neustart")
     notes.append("- **LED-Helligkeitssteuerung** (0-100%)")
     notes.append("- **Konfigurations-Backup/Restore** über WebUI")
     notes.append("")
@@ -141,13 +145,10 @@ def generate_release_notes(version: str) -> str:
     notes.append("### Update über WebUI")
     notes.append("")
     notes.append("1. Die `firmware_*.bin` Datei aus diesem Release herunterladen")
-    notes.append("2. In der WebUI zu **Firmware Update** navigieren")
+    notes.append("2. In der WebUI zu **System → Firmware** navigieren")
     notes.append("3. Die .bin Datei hochladen")
     notes.append("4. Auf Abschluss des Updates und automatischen Neustart warten")
-    notes.append("")
-    notes.append("### Update per URL")
-    notes.append("")
-    notes.append("Alternativ kann das Update direkt aus diesem Release per URL in der WebUI durchgeführt werden.")
+    notes.append("5. Das enthaltene `webui_*.bin` bei Bedarf separat unter **System → WebUI** installieren; niemals am Firmware-Endpunkt hochladen")
     notes.append("")
     notes.append("### Prüfsummen")
     notes.append("")
@@ -159,7 +160,7 @@ def generate_release_notes(version: str) -> str:
     notes.append("")
     notes.append("- **Backup der Einstellungen** vor dem Update erstellen (Einstellungen → Backup & Reset)")
     notes.append("- **Nicht abschalten** während des Update-Vorgangs")
-    notes.append("- Bei sehr alten Versionen kann ein **Werksreset** erforderlich sein")
+    notes.append("- Ein **Werksreset ist für dieses Update normalerweise nicht erforderlich**")
     notes.append("- Nach erfolgreichem Update startet das Gerät **automatisch neu**")
     notes.append("")
 
@@ -167,10 +168,11 @@ def generate_release_notes(version: str) -> str:
     notes.append("## 📦 Im Release enthalten")
     notes.append("")
     notes.append(f"- **Firmware-Binary** (`firmware_{version}.bin`)")
+    notes.append(f"- **Kompatibles WebUI-Binary** (`webui_{webui_version}.bin`)")
     notes.append("- **Bootloader** (`bootloader.bin`)")
     notes.append("- **Partitionstabelle** (`partitions.bin`)")
     notes.append("- **SHA256-Prüfsummen** (`SHA256SUMS.txt`)")
-    notes.append("- **Versionsinformationen** (`version.txt`)")
+    notes.append("- **Versionsinformationen** (`firmware-version.txt` und `webui-version.txt`)")
     notes.append("")
 
     # Compatible systems

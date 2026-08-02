@@ -2,7 +2,7 @@
 
 # HB-RF-ETH-ng
 
-**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 6.1-beta1**
+**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 6.0.2**
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -17,7 +17,7 @@
 
 ## Modernisierte Fork von Xerolux (2025)
 
-Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware basiert auf ESP-IDF 6.1-beta1 und ist für moderne Toolchains optimiert.
+Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware basiert auf ESP-IDF 6.0.2 und ist für moderne Toolchains optimiert.
 
 > Alle detaillierten Änderungen pro Version finden Sie im [CHANGELOG.md](CHANGELOG.md).
 
@@ -39,8 +39,9 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 - Dashboard, Kopfzeile und Browser-Tab zeigen den unter Einstellungen/Netzwerk gesetzten Hostnamen, damit mehrere HB-RF-ETH-ng Geräte sofort unterscheidbar sind.
 - System-Log bleibt nach Aktivierung auch über einen Reboot aktiv; beim Deaktivieren bleibt es nach dem nächsten Start wieder aus.
 - **Monitoring via MQTT** (mit Home Assistant Auto-Discovery, TLS/mTLS, Kommando-Token) und CheckMK
-- OTA-Updates per Datei-Upload, URL-Download oder direkt aus Home Assistant heraus
-- ESP-IDF 6.1-beta1 Toolchain (native `idf.py` Builds), GCC 15.2 (xtensa-esp-elf)
+- Manuelle Firmware-Updates per `.bin`-Datei-Upload in der WebUI (automatische
+  Update-Suche, URL-OTA und MQTT/Home-Assistant-OTA wurden entfernt)
+- ESP-IDF 6.0.2 Toolchain (native `idf.py` Builds), GCC 15.2 (xtensa-esp-elf)
 
 ### Login nach Update
 Nach dem Update auf eine Version mit Benutzername-Pflicht muss die Anmeldung einmalig mit dem Standard-Benutzernamen `admin` und dem bisherigen Administrator-Passwort erfolgen. Alte gespeicherte Browser-Sessions werden dabei aus Sicherheitsgründen ungültig. Der Benutzername kann anschließend unter **Einstellungen > Allgemein > Sicherheit** geändert werden, z.B. für Passwortmanager oder Installationen mit mehreren Geräten.
@@ -56,7 +57,7 @@ Backups enthalten vollständig alle wiederherstellbaren Benutzereinstellungen: A
 > HA-Entitäten, TLS-Konfiguration, Sicherheitsmodell) findet sich im
 > [Wiki – MQTT-Sektion](docs/WIKI.md#home-assistant-mqtt-integration).
 
-### Entwickler-Build (ESP-IDF 6.1-beta1)
+### Entwickler-Build (ESP-IDF 6.0.2)
 ```bash
 ./scripts/setup_esp_idf.sh
 . ~/esp-idf/export.sh
@@ -73,8 +74,11 @@ python3 rename_webui_files.py
 > Vor jeder Styling-Änderung an der WebUI bitte [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) lesen — die verbindliche Design-Spezifikation (Zwei-Theme-System, Farbpaletten, Tokens).
 
 ### Update- und Release-Hinweise
-- Die WebUI prüft neue Versionen standardmäßig über den gehosteten Update-Dienst unter `https://xerolux.de/firmware/HB-RF-ETH-ng/`.
-- Releases auf GitHub bleiben die zentrale Quelle für Release Notes, Artefakte und Historie.
+- Das Gerät sucht nicht automatisch nach neuen Versionen und installiert keine
+  Firmware aus URLs oder über MQTT/Home Assistant.
+- Releases auf GitHub sind die Quelle für Release Notes und Artefakte. Laden Sie
+  dort die gewünschte `firmware_*.bin` herunter und installieren Sie sie als
+  lokale Datei über die WebUI.
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
 ### Screenshots
@@ -90,9 +94,9 @@ python3 rename_webui_files.py
 | :---: | :---: |
 | ![Firmware Update](screenshots/06_FirmwareUpdate.png) | ![System Log](screenshots/07_SystemLog.png) |
 
-| About | Changelog |
-| :---: | :---: |
-| ![About](screenshots/08_About.png) | ![Changelog](screenshots/09_Changelog.png) |
+| About |
+| :---: |
+| ![About](screenshots/08_About.png) |
 
 ### Danksagung
 Ein großer Dank geht an **Alexander Reinert** für die Entwicklung der originalen HB-RF-ETH Firmware und Hardware. Seine Arbeit bildet die Grundlage für diese modernisierte Version.

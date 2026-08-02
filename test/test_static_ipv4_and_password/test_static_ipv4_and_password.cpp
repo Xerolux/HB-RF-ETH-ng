@@ -11,6 +11,7 @@
  */
 
 #include <unity.h>
+#include <stdio.h>
 #include <string.h>
 #include "settings.h"
 #include "validation.h"
@@ -18,6 +19,49 @@
 #include "nvs_flash.h"
 
 static Settings *settings = nullptr;
+
+// Mirrors the durable rollback record layout in settings.cpp. These tests
+// deliberately leave a valid stale credential image behind to prove that a
+// malformed/unknown pending marker can never route through auth restoration.
+struct TestSettingsAuthBackup
+{
+    uint32_t magic;
+    uint8_t version;
+    uint8_t username_present;
+    uint8_t password_present;
+    uint8_t password_changed_present;
+    uint8_t token_present;
+    int8_t password_changed;
+    uint8_t reserved[2];
+    char username[33];
+    char password[33];
+    char token[64];
+};
+
+static void write_stale_auth_backup(void)
+{
+    TestSettingsAuthBackup backup = {};
+    backup.magic = 0x53415554U;
+    backup.version = 1;
+    backup.username_present = 1;
+    backup.password_present = 1;
+    backup.password_changed_present = 1;
+    backup.token_present = 1;
+    backup.password_changed = 1;
+    snprintf(backup.username, sizeof(backup.username), "%s", "stale-user");
+    snprintf(backup.password, sizeof(backup.password), "%s", "StalePass9");
+    snprintf(backup.token, sizeof(backup.token), "%s",
+             "StaleAdminToken-1234567890");
+
+    nvs_handle_t handle;
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_open("settings_txn", NVS_READWRITE, &handle));
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_set_blob(handle, "auth_backup", &backup,
+                                   sizeof(backup)));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+    nvs_close(handle);
+}
 
 void setUp(void)
 {
@@ -321,7 +365,7 @@ void test_factory_reset_restores_default_password(void)
     TEST_ASSERT_TRUE(settings->getPasswordChanged());
 
     // Factory reset
-    settings->clear();
+    TEST_ASSERT_EQUAL(ESP_OK, settings->clear());
 
     // Should be back to default
     TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
@@ -332,9 +376,13 @@ void test_factory_reset_erases_all_user_namespaces(void)
 {
     const char *namespaces[] = {
         "monitoring",
+        "monitoring_txn",
+        "settings_txn",
         "ui_theme",
         "reset_info",
         "upd_cache",
+        "supporter_crl",
+        "mqtt_cleanup",
     };
 
     for (const char *namespace_name : namespaces)
@@ -347,7 +395,7 @@ void test_factory_reset_erases_all_user_namespaces(void)
         nvs_close(handle);
     }
 
-    settings->clear();
+    TEST_ASSERT_EQUAL(ESP_OK, settings->clear());
 
     for (const char *namespace_name : namespaces)
     {
@@ -364,6 +412,137 @@ void test_factory_reset_erases_all_user_namespaces(void)
         {
             TEST_ASSERT_EQUAL(ESP_ERR_NVS_NOT_FOUND, open_result);
         }
+    }
+}
+
+void test_admin_token_persists_across_settings_save_and_reboot(void)
+{
+    static const char *token = "DurableAdminToken-1234567890";
+    TEST_ASSERT_EQUAL(ESP_OK, settings->saveAdminToken(token));
+
+    settings->setDcfOffset(41000);
+    TEST_ASSERT_EQUAL(ESP_OK, settings->save());
+
+    char loaded[64] = {};
+    TEST_ASSERT_TRUE(settings->loadAdminToken(loaded, sizeof(loaded)));
+    TEST_ASSERT_EQUAL_STRING(token, loaded);
+
+    delete settings;
+    settings = new Settings();
+    memset(loaded, 0, sizeof(loaded));
+    TEST_ASSERT_TRUE(settings->loadAdminToken(loaded, sizeof(loaded)));
+    TEST_ASSERT_EQUAL_STRING(token, loaded);
+}
+
+void test_factory_reset_erases_admin_token(void)
+{
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      settings->saveAdminToken("FactoryResetToken-123456"));
+    TEST_ASSERT_EQUAL(ESP_OK, settings->clear());
+
+    char loaded[64] = {};
+    TEST_ASSERT_FALSE(settings->loadAdminToken(loaded, sizeof(loaded)));
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
+}
+
+void test_corrupt_auth_type_fails_closed(void)
+{
+    nvs_handle_t handle;
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_open("HB-RF-ETH", NVS_READWRITE, &handle));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_set_u8(handle, "adminPassword", 1));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+    nvs_close(handle);
+
+    TEST_ASSERT_EQUAL(ESP_ERR_NVS_TYPE_MISMATCH, settings->load());
+    TEST_ASSERT_NOT_EQUAL(0, strcmp("admin", settings->getAdminPassword()));
+    TEST_ASSERT_TRUE(settings->getPasswordChanged());
+
+    char loaded[64] = {};
+    TEST_ASSERT_FALSE(settings->loadAdminToken(loaded, sizeof(loaded)));
+}
+
+void test_factory_reset_supersedes_broken_restore_marker(void)
+{
+    nvs_handle_t handle;
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_open("settings_txn", NVS_READWRITE, &handle));
+    // Ordinary full-restore scope, deliberately without auth_backup.
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_set_u8(handle, "pending", 0x07));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+    nvs_close(handle);
+
+    TEST_ASSERT_EQUAL(ESP_OK, settings->clear());
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
+    TEST_ASSERT_FALSE(settings->getPasswordChanged());
+}
+
+void test_malformed_transaction_marker_wipes_stale_auth_backup(void)
+{
+    write_stale_auth_backup();
+
+    nvs_handle_t handle;
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_open("settings_txn", NVS_READWRITE, &handle));
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_set_str(handle, "pending", "wrong-type"));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+    nvs_close(handle);
+
+    TEST_ASSERT_EQUAL(ESP_OK, settings->load());
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
+    TEST_ASSERT_FALSE(settings->getPasswordChanged());
+    char loaded[64] = {};
+    TEST_ASSERT_FALSE(settings->loadAdminToken(loaded, sizeof(loaded)));
+}
+
+void test_unknown_transaction_marker_wipes_stale_auth_backup(void)
+{
+    write_stale_auth_backup();
+
+    nvs_handle_t handle;
+    TEST_ASSERT_EQUAL(ESP_OK,
+                      nvs_open("settings_txn", NVS_READWRITE, &handle));
+    // In-range bit subsets are invalid too: only SETTINGS (0x01), complete
+    // RESTORE (0x07), and FACTORY_RESET (0x80) are ever written.
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_set_u8(handle, "pending", 0x03));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+    nvs_close(handle);
+
+    TEST_ASSERT_EQUAL(ESP_OK, settings->load());
+    TEST_ASSERT_EQUAL_STRING("admin", settings->getAdminPassword());
+    TEST_ASSERT_FALSE(settings->getPasswordChanged());
+    char loaded[64] = {};
+    TEST_ASSERT_FALSE(settings->loadAdminToken(loaded, sizeof(loaded)));
+}
+
+void test_settings_save_preserves_dedicated_foreign_namespaces(void)
+{
+    const char *namespaces[] = {"supporter_crl", "mqtt_cleanup"};
+    for (const char *namespace_name : namespaces)
+    {
+        nvs_handle_t handle;
+        TEST_ASSERT_EQUAL(ESP_OK,
+                          nvs_open(namespace_name, NVS_READWRITE, &handle));
+        TEST_ASSERT_EQUAL(ESP_OK, nvs_set_str(handle, "test", "foreign-data"));
+        TEST_ASSERT_EQUAL(ESP_OK, nvs_commit(handle));
+        nvs_close(handle);
+    }
+
+    settings->setDcfOffset(41000);
+    TEST_ASSERT_EQUAL(ESP_OK, settings->save());
+
+    for (const char *namespace_name : namespaces)
+    {
+        nvs_handle_t handle;
+        TEST_ASSERT_EQUAL(ESP_OK,
+                          nvs_open(namespace_name, NVS_READONLY, &handle));
+        char value[32] = {};
+        size_t value_size = sizeof(value);
+        TEST_ASSERT_EQUAL(ESP_OK,
+                          nvs_get_str(handle, "test", value, &value_size));
+        TEST_ASSERT_EQUAL_STRING("foreign-data", value);
+        nvs_close(handle);
     }
 }
 
@@ -498,6 +677,13 @@ void app_main(void)
     RUN_TEST(test_password_changed_detected_by_content);
     RUN_TEST(test_factory_reset_restores_default_password);
     RUN_TEST(test_factory_reset_erases_all_user_namespaces);
+    RUN_TEST(test_admin_token_persists_across_settings_save_and_reboot);
+    RUN_TEST(test_factory_reset_erases_admin_token);
+    RUN_TEST(test_corrupt_auth_type_fails_closed);
+    RUN_TEST(test_factory_reset_supersedes_broken_restore_marker);
+    RUN_TEST(test_malformed_transaction_marker_wipes_stale_auth_backup);
+    RUN_TEST(test_unknown_transaction_marker_wipes_stale_auth_backup);
+    RUN_TEST(test_settings_save_preserves_dedicated_foreign_namespaces);
     RUN_TEST(test_password_persists_multiple_reboots);
     RUN_TEST(test_password_change_after_static_ipv4);
 

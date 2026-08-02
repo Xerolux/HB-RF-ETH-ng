@@ -57,6 +57,14 @@
 #include "system_reset.h"
 
 static const char *TAG = "HB-RF-ETH";
+static RawUartUdpListener *g_restart_raw_uart_listener = NULL;
+
+static esp_err_t stop_raw_uart_for_restart()
+{
+    return g_restart_raw_uart_listener
+        ? g_restart_raw_uart_listener->stop()
+        : ESP_OK;
+}
 
 extern "C"
 {
@@ -290,6 +298,8 @@ void app_main()
         esp_task_wdt_reset();
 
     static RawUartUdpListener rawUartUdpLister(&radioModuleConnector);
+    g_restart_raw_uart_listener = &rawUartUdpLister;
+    register_restart_network_stop_callback(stop_raw_uart_for_restart);
     rawUartUdpLister.start();
 
     // Initialize reset info system

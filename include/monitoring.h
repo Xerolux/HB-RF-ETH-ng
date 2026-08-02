@@ -123,15 +123,22 @@ void monitoring_config_normalize(monitoring_config_t *config);
 // Initialize monitoring subsystem
 esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo);
 
-// OTA operation serialization flag. Replaces the former UpdateCheck mutex
-// after the automatic update-check feature was removed. The manual firmware
-// upload handler calls ota_operation_try_begin() before writing a new image
-// and ota_operation_finish() when done (success reboots, failure resumes).
+// Exclusive-operation side of the shared monitoring/flash/NVS/restart gate.
+// This replaces the former UpdateCheck mutex after the automatic update-check
+// feature was removed. The manual firmware-upload handler calls
+// ota_operation_try_begin() before writing a new image and
+// ota_operation_finish() when done (success reboots, failure resumes).
 // The heap watchdog reads ota_operation_active() to skip low-heap restarts
-// while a flash/OTA write is in flight.
+// while a flash write is in flight.
 bool ota_operation_try_begin(void);
 void ota_operation_finish(void);
 bool ota_operation_active(void);
+// True while the asynchronous monitoring configuration transaction is
+// stopping/starting workers or publishing its NVS generation.
+bool monitoring_config_update_active(void);
+// Internal lifecycle gate used by asynchronous network callbacks. True only
+// while monitoring workers must remain stopped for the post-upload restart.
+bool monitoring_ota_pause_active(void);
 
 // Register additional data providers so MQTT can publish richer status topics
 // (Ethernet link/IP, radio module info, system clock / NTP sync state).
@@ -150,14 +157,26 @@ Settings* monitoring_get_settings(void);
 // Update configuration (synchronous - blocks caller)
 esp_err_t monitoring_update_config(const monitoring_config_t *config);
 
-// Schedule configuration update asynchronously (returns immediately, applies in background task)
-esp_err_t monitoring_schedule_update_config(const monitoring_config_t *config);
+// Completion runs in the bounded monitoring-update worker after persistence
+// and all runtime transitions have either succeeded or failed. The callback is
+// only owned/called when monitoring_schedule_update_config() returns ESP_OK.
+typedef void (*monitoring_update_completion_t)(esp_err_t result,
+                                                void *context);
 
-// Temporarily stop heap-heavy monitoring workers before OTA. Returns an
-// opaque bitmask that must be passed to monitoring_resume_after_ota() when the
-// OTA fails and the device stays online. On OTA success the device reboots, so
-// resuming is unnecessary.
-uint32_t monitoring_pause_for_ota(void);
+// Schedule configuration update asynchronously. Blocking service transitions
+// stay off the caller task; completion receives their final result.
+esp_err_t monitoring_schedule_update_config(
+    const monitoring_config_t *config,
+    monitoring_update_completion_t completion,
+    void *completion_context);
+
+// Temporarily stop heap-heavy monitoring workers before activating an uploaded
+// firmware image. On success, paused_mask receives an opaque bitmask for
+// monitoring_resume_after_ota().
+// On failure, services stopped earlier in the transaction are resumed and the
+// out-mask is cleared, so callers must abort/defer the upload and must not
+// restart.
+esp_err_t monitoring_pause_for_ota(uint32_t *paused_mask);
 void monitoring_resume_after_ota(uint32_t paused_mask);
 
 // Get current configuration
@@ -167,6 +186,11 @@ esp_err_t monitoring_get_config(monitoring_config_t *config);
 // every monitoring worker. The caller restarts the device immediately after
 // this returns, so the restored configuration becomes active on the next boot.
 esp_err_t monitoring_save_config_for_restore(const monitoring_config_t *config);
+
+// Validate bounded text and prove that a complete monitoring generation fits
+// in the deployed NVS partition without changing the known-good generation.
+esp_err_t monitoring_validate_config_storage(
+    const monitoring_config_t *config);
 
 // Run a lightweight connectivity/self-test for a configured monitoring target.
 // Supported targets: "checkmk", "mqtt"
@@ -192,17 +216,15 @@ esp_err_t monitoring_run_diagnostic(const char *target, bool *ok,
 esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);
 
-// Serialize external HTTPS requests (update-check, supporter CRL fetch,
-// syslog/events/mqtt TLS setup) so two TLS connections never occupy the heap
-// at once on memory-constrained devices.
+// Ownershipless binary semaphore which serializes external HTTPS requests
+// (supporter CRL, syslog/events and MQTT TLS) so two TLS connections never
+// occupy the heap at once. It is intentionally not a FreeRTOS mutex because
+// MQTT teardown may need to release a gate acquired by its library task.
 extern SemaphoreHandle_t g_net_fetch_mutex;
 
-// OTA download activity flag. Set by both OTA paths (WebUI URL download and
-// MQTT-triggered update) around their TLS download so that lower-priority
-// outbound TLS consumers (event notifications, syslog forwarding) can defer
-// and leave the mutex uncontested for the duration of a firmware download.
-// Without this, an SMTP notification fired by ota_started can hold
-// g_net_fetch_mutex for 20-40s and starve the OTA itself.
+// Manual firmware-upload activity flag. Lower-priority outbound TLS consumers
+// use it to defer new work while the local firmware image is written and
+// workers are being prepared for restart.
 void net_fetch_set_ota_active(bool active);
 bool net_fetch_ota_active(void);
 

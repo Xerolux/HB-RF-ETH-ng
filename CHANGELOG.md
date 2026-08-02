@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.4] - 2026-08-02
+
+### Changes
+- fix(stability): remove emulated 64-bit atomics from Raw-UART hot paths and use native 32-bit, rollover-safe state
+- fix(logging): eliminate subscriber races, activate live-log forwarding only on demand, and move Syslog formatting out of producer tasks
+- fix(lifecycle): stop TLS and monitoring workers cooperatively with bounded network I/O instead of force-deleting resource owners
+- fix(ethernet): restore cache-aware EMAC interrupt handling and disable Ethernet IRAM optimization
+- fix(raw-uart): make UDP callback/task teardown race-free and drain queued pbufs on every startup-failure path
+- fix(monitoring): serialize config writes and firmware/reset operations with one native 32-bit CAS and fail closed on corrupt listener allowlists
+- fix(storage): make Settings, theme, monitoring, CRL and MQTT-marker NVS updates transactional and recover interrupted factory resets without restoring stale credentials
+- fix(auth): require current-password reauthentication for real bulk password changes and make unequal-length credential comparison bounds-safe
+- fix(restart): serialize manual firmware upload, restore, MQTT restart and system reset while preserving cooperative worker shutdown
+- build: pin every firmware workflow and dependency metadata to stable ESP-IDF v6.0.2
+- test(stability): add 32 policy regressions, strict host lifecycle tests, counter rollover/concurrency stress and bounds-sanitized credential tests
+- fix(version): identify the firmware as Beta.4; the Beta.3 tag accidentally still embedded Beta.2
+- docs(update): clarify that automatic checks, URL-OTA and MQTT/Home-Assistant OTA are removed; only manual `.bin` upload remains
+
+> Hinweis: Beta.4 ist ein Pre-Release. Die gehärteten Pfade passen zum beobachteten Interrupt-Watchdog-Reset; ohne Panic-Backtrace lässt sich jedoch keine einzelne Absturzstelle beweisen. Ein mehrtägiger Praxistest auf betroffener Hardware bleibt empfohlen.
+
 ## [2.2.6-Beta.2] - 2026-07-27
 
 ### Changes

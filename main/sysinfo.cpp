@@ -324,7 +324,7 @@ const char* SysInfo::getResetReason()
 
 const char* SysInfo::getTaskStackInfo()
 {
-    // Build a compact "name=hwm_bytes" list sorted by stack usage descending.
+    // Build a compact "name=hwm_bytes" list sorted by HWM ascending.
     // The high-water mark (uxTaskGetStackHighWaterMark) is the minimum free
     // stack ever observed for a task — small values flag tasks close to
     // overflow, large values flag over-provisioned stacks that waste heap.
@@ -349,14 +349,13 @@ const char* SysInfo::getTaskStackInfo()
         return out;
     }
 
-    // Sort descending by usStackHighWaterMark (bytes). The smaller this value,
-    // the closer the task got to overflow — so the most interesting entries
-    // (largest hwm = biggest waste) go to the end; we sort biggest-first so
-    // a truncated buffer still surfaces the worst waste.
+    // Sort ascending by usStackHighWaterMark. The smaller this value, the
+    // closer the task got to overflow, so a truncated diagnostic still shows
+    // the most dangerous tasks first.
     for (UBaseType_t i = 1; i < n; i++) {
         TaskStatus_t key = tasks[i];
         UBaseType_t j = i;
-        while (j > 0 && tasks[j - 1].usStackHighWaterMark < key.usStackHighWaterMark) {
+        while (j > 0 && tasks[j - 1].usStackHighWaterMark > key.usStackHighWaterMark) {
             tasks[j] = tasks[j - 1];
             j--;
         }
@@ -372,10 +371,11 @@ const char* SysInfo::getTaskStackInfo()
             strcmp(tasks[i].pcTaskName, "IDLE1") == 0) {
             continue;
         }
-        // High-water mark is in stack words; multiply by sizeof(StackType_t)
-        // (= 4 bytes on the ESP32) to report bytes, matching the task-creation
-        // stack sizes passed to xTaskCreate.
-        unsigned hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark * sizeof(StackType_t);
+        // ESP-IDF's FreeRTOS port reports usStackHighWaterMark in bytes (unlike
+        // upstream FreeRTOS, whose public documentation traditionally uses
+        // words). Multiplying again would make every diagnostic four times too
+        // large on ESP32 and could hide a genuinely tight task stack.
+        unsigned hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;
         int written = snprintf(out + pos, sizeof(out) - pos,
                                "%s%s=%u",
                                pos > 0 ? " " : "",

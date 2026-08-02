@@ -27,6 +27,7 @@
 #include <esp_heap_caps.h>
 #include <nvs.h>
 #include <nvs_flash.h>
+#include "nvs_storage_lock.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -34,7 +35,8 @@
 
 static const char *TAG = "LogManager";
 
-LogManager::LogManager() : _mutex(xSemaphoreCreateMutex()) {
+LogManager::LogManager()
+    : _mutex(xSemaphoreCreateMutexStatic(&_mutex_storage)) {
 }
 
 // Singleton instance
@@ -54,8 +56,11 @@ int log_vprintf(const char *fmt, va_list args) {
     // (logging is opt-in) and avoids the ~50 % CPU regression seen on devices
     // with chatty subsystems (raw-uart bridge, network events) where every
     // log line paid the full formatting cost for nothing.
-    if (!manager.log_buffer && manager._subscriber_count == 0) {
-        return manager._orig_vprintf ? manager._orig_vprintf(fmt, args) : vprintf(fmt, args);
+    if (!manager._capture_active.load(std::memory_order_acquire) &&
+        manager._subscriber_count_fast.load(std::memory_order_acquire) == 0) {
+        LogManager::vprintf_fn_t sink =
+            manager._orig_vprintf.load(std::memory_order_acquire);
+        return sink ? sink(fmt, args) : vprintf(fmt, args);
     }
 
     // Capture path. We must format once for the ring buffer / subscribers,
@@ -79,7 +84,9 @@ int log_vprintf(const char *fmt, va_list args) {
     }
 
     // Forward to the previous ESP-IDF log sink using the copy.
-    int ret = manager._orig_vprintf ? manager._orig_vprintf(fmt, args_for_uart) : vprintf(fmt, args_for_uart);
+    LogManager::vprintf_fn_t sink =
+        manager._orig_vprintf.load(std::memory_order_acquire);
+    int ret = sink ? sink(fmt, args_for_uart) : vprintf(fmt, args_for_uart);
     va_end(args_for_uart);
     return ret;
 }
@@ -101,14 +108,13 @@ void LogManager::clear() {
 // Idempotent: safe to call repeatedly.
 void LogManager::init() {
     LogManager &m = instance();
-    if (!m._mutex) {
-        m._mutex = xSemaphoreCreateMutex();
-    }
-    if (m._hook_installed) return;
+    if (!m._mutex) return;
+    if (m._hook_installed.load(std::memory_order_acquire)) return;
     xSemaphoreTake(m._mutex, portMAX_DELAY);
-    if (!m._hook_installed && m._orig_vprintf == nullptr) {
-        m._orig_vprintf = esp_log_set_vprintf(log_vprintf);
-        m._hook_installed = true;
+    if (!m._hook_installed.load(std::memory_order_relaxed)) {
+        vprintf_fn_t previous = esp_log_set_vprintf(log_vprintf);
+        m._orig_vprintf.store(previous, std::memory_order_release);
+        m._hook_installed.store(true, std::memory_order_release);
     }
     xSemaphoreGive(m._mutex);
 }
@@ -118,6 +124,7 @@ void LogManager::addSubscriber(log_line_subscriber_t sub) {
     LogManager &m = instance();
     // Ensure the capture hook is installed so log_vprintf actually runs.
     init();
+    if (!m._mutex) return;
     xSemaphoreTake(m._mutex, portMAX_DELAY);
     bool found = false;
     for (int i = 0; i < m._subscriber_count; i++) {
@@ -125,6 +132,9 @@ void LogManager::addSubscriber(log_line_subscriber_t sub) {
     }
     if (!found && m._subscriber_count < LOG_MAX_SUBSCRIBERS) {
         m._subscribers[m._subscriber_count++] = sub;
+        m._subscriber_count_fast.store(
+            static_cast<uint32_t>(m._subscriber_count),
+            std::memory_order_release);
     }
     xSemaphoreGive(m._mutex);
 }
@@ -132,6 +142,7 @@ void LogManager::addSubscriber(log_line_subscriber_t sub) {
 void LogManager::removeSubscriber(log_line_subscriber_t sub) {
     if (!sub) return;
     LogManager &m = instance();
+    if (!m._mutex) return;
     xSemaphoreTake(m._mutex, portMAX_DELAY);
     for (int i = 0; i < m._subscriber_count; i++) {
         if (m._subscribers[i] == sub) {
@@ -140,6 +151,10 @@ void LogManager::removeSubscriber(log_line_subscriber_t sub) {
                 m._subscribers[j - 1] = m._subscribers[j];
             }
             m._subscriber_count--;
+            m._subscribers[m._subscriber_count] = nullptr;
+            m._subscriber_count_fast.store(
+                static_cast<uint32_t>(m._subscriber_count),
+                std::memory_order_release);
             break;
         }
     }
@@ -147,13 +162,12 @@ void LogManager::removeSubscriber(log_line_subscriber_t sub) {
 }
 
 int LogManager::subscriberCount() const {
-    return _subscriber_count;
+    return static_cast<int>(
+        _subscriber_count_fast.load(std::memory_order_acquire));
 }
 
 void LogManager::_begin(size_t size) {
-    if (!_mutex) {
-        _mutex = xSemaphoreCreateMutex();
-    }
+    init();
     if (!_mutex) {
         ESP_LOGE(TAG, "Failed to create log buffer mutex");
         return;
@@ -162,22 +176,15 @@ void LogManager::_begin(size_t size) {
     bool enabled = false;
     xSemaphoreTake(_mutex, portMAX_DELAY);
 
-    // The capture hook is installed unconditionally at boot via init().
-    // _begin() only manages the ring buffer from here on.
-    if (!_hook_installed && _orig_vprintf == nullptr) {
-        _orig_vprintf = esp_log_set_vprintf(log_vprintf);
-        _hook_installed = true;
-    }
-
     if (log_buffer) {
         free(log_buffer);
         log_buffer = nullptr;
     }
-    total_written = 0;
+    ring_start_offset = total_written;
 
     // Try the requested size first, then fall back to progressively smaller
     // buffers. The ESP32-WROOM-32 has no PSRAM and only ~250 KB internal
-    // heap; a single TLS handshake (UpdateCheck / supporter CRL / OTA) can
+    // heap; a single TLS handshake (for example supporter CRL or MQTT) can
     // drop free heap by 30-50 KB, so an 8 KB contiguous allocation can fail
     // even though a 4 KB or 2 KB one still fits. A smaller log is strictly
     // better than no log — and the user's "not enough memory" error goes
@@ -197,14 +204,16 @@ void LogManager::_begin(size_t size) {
         memset(log_buffer, 0, log_buffer_size);
         enabled = true;
     }
+    const size_t enabled_size = log_buffer_size;
+    _capture_active.store(enabled, std::memory_order_release);
 
     xSemaphoreGive(_mutex);
 
     if (enabled) {
-        if (log_buffer_size == size) {
-            ESP_LOGI(TAG, "Log buffering enabled (%d bytes)", (int)log_buffer_size);
+        if (enabled_size == size) {
+            ESP_LOGI(TAG, "Log buffering enabled (%d bytes)", (int)enabled_size);
         } else {
-            ESP_LOGW(TAG, "Log buffering enabled with reduced buffer (%d bytes; %d requested) — free heap was low", (int)log_buffer_size, (int)size);
+            ESP_LOGW(TAG, "Log buffering enabled with reduced buffer (%d bytes; %d requested) — free heap was low", (int)enabled_size, (int)size);
         }
     } else {
         ESP_LOGE(TAG, "Failed to allocate log buffer (even %d bytes unavailable) — heap exhausted", (int)MIN_LOG_BUFFER);
@@ -222,7 +231,8 @@ void LogManager::_stop() {
         log_buffer = nullptr;
         log_buffer_size = 0;
     }
-    total_written = 0;
+    ring_start_offset = total_written;
+    _capture_active.store(false, std::memory_order_release);
 
     xSemaphoreGive(_mutex);
     // Logged through the still-installed hook (UART passthrough).
@@ -230,16 +240,13 @@ void LogManager::_stop() {
 }
 
 bool LogManager::isEnabled() const {
-    // Pointer reads are atomic on the ESP32 (32-bit aligned); a torn read at
-    // worst returns a just-freed pointer, which is harmless because write() /
-    // getLogContent() re-check under the mutex.
-    return log_buffer != nullptr;
+    return _capture_active.load(std::memory_order_acquire);
 }
 
 void LogManager::_clear() {
     if (!_mutex) return;
     xSemaphoreTake(_mutex, portMAX_DELAY);
-    total_written = 0;
+    ring_start_offset = total_written;
     if (log_buffer) memset(log_buffer, 0, log_buffer_size);
     xSemaphoreGive(_mutex);
 }
@@ -262,18 +269,22 @@ void LogManager::write(const char* data, size_t len) {
         snap_count = _subscriber_count;
         for (int i = 0; i < snap_count; i++) snap[i] = _subscribers[i];
 
+        // Advance the absolute stream even when the optional ring is disabled.
+        // Live subscribers need a monotonic checkpoint independent of ring
+        // allocation, clear and stop/start cycles.
+        total_written += len;
+        end_offset = total_written;
+
         if (log_buffer && log_buffer_size > 0) {
             // Only the tail of an oversized log entry can fit in the ring.
-            // Advance total_written for the skipped bytes so client offsets
-            // still reflect the full stream of log data that passed through.
             if (len > log_buffer_size) {
                 size_t skipped = len - log_buffer_size;
                 data += skipped;
                 len = log_buffer_size;
-                total_written += skipped;
             }
 
-            size_t current_idx = total_written % log_buffer_size;
+            const uint64_t write_start = total_written - len;
+            size_t current_idx = write_start % log_buffer_size;
             size_t space_at_end = log_buffer_size - current_idx;
 
             if (len <= space_at_end) {
@@ -282,8 +293,6 @@ void LogManager::write(const char* data, size_t len) {
                 memcpy(log_buffer + current_idx, data, space_at_end);
                 memcpy(log_buffer, data + space_at_end, len - space_at_end);
             }
-            total_written += len;
-            end_offset = total_written;
         }
         xSemaphoreGive(_mutex);
     }
@@ -299,14 +308,19 @@ std::string LogManager::getLogContent(uint64_t offset) {
 
 std::string LogManager::getLogSnapshot(uint64_t offset, uint64_t *snapshot_total) {
     if (snapshot_total) *snapshot_total = 0;
-    if (!log_buffer) return "";
-
     std::string result;
 
     if (_mutex) {
         if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-            uint64_t local_total = total_written;
+            const uint64_t local_total = total_written;
             if (snapshot_total) *snapshot_total = local_total;
+
+            // The atomic capture flag is only a lock-free hint. Recheck the
+            // actual ring state under the mutex before dereferencing it.
+            if (!log_buffer || log_buffer_size == 0) {
+                xSemaphoreGive(_mutex);
+                return "";
+            }
 
             // If client asks for future data (shouldn't happen), return empty
             if (offset >= local_total) {
@@ -314,14 +328,16 @@ std::string LogManager::getLogSnapshot(uint64_t offset, uint64_t *snapshot_total
                 return "";
             }
 
-            uint64_t wanted_len = local_total - offset;
-
-            // If the client is asking for data that has been overwritten (lagging behind)
-            if (wanted_len > log_buffer_size) {
-                // Return the entire valid buffer to catch them up (partially)
-                offset = local_total - log_buffer_size;
-                wanted_len = log_buffer_size;
+            uint64_t oldest = ring_start_offset;
+            if (local_total - ring_start_offset > log_buffer_size) {
+                oldest = local_total - log_buffer_size;
             }
+            if (offset < oldest) offset = oldest;
+            if (offset >= local_total) {
+                xSemaphoreGive(_mutex);
+                return "";
+            }
+            uint64_t wanted_len = local_total - offset;
 
             // FIX: Check heap before allocating to prevent OOM crash.
             // std::string::resize may abort on ESP-IDF if allocation fails.
@@ -364,11 +380,15 @@ std::string LogManager::getLogSnapshot(uint64_t offset, uint64_t *snapshot_total
 size_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,
                              size_t maximum_length) {
     if (!absolute_offset || !destination || maximum_length == 0 ||
-        !_mutex || !log_buffer || log_buffer_size == 0) {
+        !_mutex) {
         return 0;
     }
 
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        return 0;
+    }
+    if (!log_buffer || log_buffer_size == 0) {
+        xSemaphoreGive(_mutex);
         return 0;
     }
 
@@ -376,9 +396,10 @@ size_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,
     uint64_t requested = *absolute_offset;
     if (requested > local_total) requested = local_total;
 
-    const uint64_t oldest = local_total > log_buffer_size
-        ? local_total - log_buffer_size
-        : 0;
+    uint64_t oldest = ring_start_offset;
+    if (local_total - ring_start_offset > log_buffer_size) {
+        oldest = local_total - log_buffer_size;
+    }
     if (requested < oldest) requested = oldest;
 
     const uint64_t available64 = local_total - requested;
@@ -409,6 +430,29 @@ uint64_t LogManager::getTotalWritten() const {
     uint64_t result = 0;
     if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
         result = total_written;
+        xSemaphoreGive(_mutex);
+    }
+    return result;
+}
+
+size_t LogManager::getBufferSize() const {
+    size_t result = 0;
+    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        result = log_buffer_size;
+        xSemaphoreGive(_mutex);
+    }
+    return result;
+}
+
+size_t LogManager::getBufferedBytes() const {
+    size_t result = 0;
+    if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (log_buffer && log_buffer_size > 0) {
+            const uint64_t available = total_written - ring_start_offset;
+            result = available < log_buffer_size
+                ? static_cast<size_t>(available)
+                : log_buffer_size;
+        }
         xSemaphoreGive(_mutex);
     }
     return result;
@@ -449,6 +493,12 @@ bool LogManager::saveCrashTailNvs(const char *tag) {
     blob.reserve(strlen(header) + tail.size() + 1);
     blob.append(header);
     blob.append(tail);
+
+    // This path runs immediately before a protective restart. Never let a
+    // concurrent configuration transaction turn best-effort diagnostics into
+    // an unbounded wait which prevents that restart.
+    NvsStorageLock storage_lock(pdMS_TO_TICKS(20));
+    if (!storage_lock) return false;
 
     nvs_handle_t h;
     if (nvs_open(CRASH_TAIL_NVS_NS, NVS_READWRITE, &h) != ESP_OK) return false;

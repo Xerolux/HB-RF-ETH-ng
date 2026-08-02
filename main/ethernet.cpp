@@ -235,7 +235,6 @@ Ethernet::Ethernet(Settings *settings) : _eth_netif(NULL), _eth_handle(NULL), _m
 
     // Configure MAC
     eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
-    mac_config.flags = ETH_MAC_FLAG_WORK_WITH_CACHE_DISABLE;
 
     eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;

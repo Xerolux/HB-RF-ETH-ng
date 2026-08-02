@@ -2,7 +2,7 @@
 
 HB-RF-ETH-ng uses the existing 320 KiB `spiffs` partition for independently
 updatable New Design assets. The partition table remains unchanged, so devices
-can migrate through the normal firmware OTA process without USB access.
+can migrate through the manual local firmware upload without USB access.
 
 ## Migration
 
@@ -61,11 +61,11 @@ X-WebUI-API-Version: <positive integer>
 X-WebUI-Min-Firmware-Version: <semantic firmware version>
 ```
 
-Release-driven updates provide all three headers when the selected filename
-matches the advertised release asset. The ESP32 checks the compatibility
-headers before erasing flash, then checks the internal manifest again after the
-upload. Manual test uploads may omit them, but all structural and compatibility
-validation still runs from the internal image manifest before activation.
+Clients may provide all three headers when release metadata is available. The
+ESP32 checks the compatibility headers before erasing flash, then checks the
+internal manifest again after the upload. Manual uploads may omit them, but all
+structural and compatibility validation still runs from the internal image
+manifest before activation.
 
 ## Release artifacts
 
@@ -75,5 +75,5 @@ Each release publishes:
 - `webui_<version>.bin`
 - `SHA256SUMS.txt`
 
-`latest.json` and `beta.json` carry the WebUI version, design, URL, SHA-256, and
-exact image size used by the online updater.
+The device does not consume `latest.json`, `beta.json`, or another online-update
+manifest. Users select the release-provided WebUI image locally.

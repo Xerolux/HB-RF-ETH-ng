@@ -90,7 +90,17 @@ void PushButtonHandler::handleStartupFactoryReset(LED *powerLED, LED *statusLED,
         statusLED->setState(LED_STATE_OFF);
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        settings->clear();
+        const esp_err_t clear_result = settings->clear();
+        if (clear_result != ESP_OK)
+        {
+            ESP_LOGE(TAG,
+                     "Factory Reset failed; settings were not reported as erased: %s",
+                     esp_err_to_name(clear_result));
+            powerLED->setState(LED_STATE_ON);
+            statusLED->setState(LED_STATE_STROBE);
+            return;
+        }
+
         // Settings::clear() also removes crash/reset metadata. Preserve only
         // the fact that this boot performed an intentional factory reset.
         ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);

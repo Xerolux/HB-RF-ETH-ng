@@ -21,6 +21,7 @@
 #include "nvs.h"
 
 #include "monitoring.h"
+#include "nvs_storage_lock.h"
 #include "security_headers.h"
 #include "webui_compatibility.h"
 
@@ -161,6 +162,9 @@ void reset_manifest_metadata_locked()
 
 esp_err_t set_transaction_pending_locked(bool pending)
 {
+    NvsStorageLock storage_lock;
+    if (!storage_lock) return ESP_ERR_NO_MEM;
+
     nvs_handle_t handle = 0;
     esp_err_t result = nvs_open(TRANSACTION_NVS_NAMESPACE, NVS_READWRITE, &handle);
     if (result != ESP_OK) return result;
@@ -752,13 +756,13 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     if (net_fetch_ota_active())
     {
         return httpd_resp_send_custom_err(req, "409 Conflict",
-                                          "Firmware OTA already in progress");
+                                          "Firmware upload already in progress");
     }
 
-    // Release-driven uploads provide compatibility metadata before any flash
-    // erase. Rejecting here preserves the currently installed external WebUI.
-    // Expert/manual uploads without these optional headers are still validated
-    // authoritatively from their internal manifest after streaming.
+    // API clients may provide compatibility metadata before any flash erase.
+    // Rejecting here preserves the currently installed external WebUI.
+    // The browser's manual upload omits these optional headers and is validated
+    // authoritatively from the image's internal manifest after streaming.
     char api_version_header[16] = {};
     char minimum_firmware_header[32] = {};
     const bool has_api_version =
@@ -1244,8 +1248,7 @@ esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
 
     const AssetSpec *asset = find_asset_spec(uri_handler->uri);
     const bool firmware_update_route =
-        strcmp(uri_handler->uri, "/ota_update") == 0 ||
-        strcmp(uri_handler->uri, "/api/ota_url") == 0;
+        strcmp(uri_handler->uri, "/ota_update") == 0;
 
     if (!asset && !firmware_update_route)
     {

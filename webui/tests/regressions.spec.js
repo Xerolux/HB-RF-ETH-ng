@@ -29,17 +29,6 @@ const settings = {
   flashPause: false
 }
 
-const archive = {
-  releases: [{
-    id: 'v2.2.3',
-    version: '2.2.3',
-    tagName: 'v2.2.3',
-    prerelease: false,
-    publishedAt: '2026-07-09T00:00:00Z',
-    downloadUrl: 'https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.3/firmware_2.2.3.bin'
-  }]
-}
-
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (!localStorage.getItem('locale')) localStorage.setItem('locale', 'en')
@@ -50,11 +39,6 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/sysinfo.json**', route => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({ sysInfo: { currentVersion: '2.2.4-Beta.3' } })
-  }))
-
-  await page.route('**/api/check_update**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ latestVersion: '2.2.4-Beta.3', updateAvailable: false })
   }))
 })
 
@@ -630,9 +614,8 @@ test('embedded recovery authenticates, adopts the device theme and reveals its t
   await expect(page.locator('#status')).toHaveText('Status aktualisiert.')
 })
 
-test('MQTT check_update uses the guarded manual fetch and republishes its result', async () => {
+test('MQTT exposes restart only and retires old update entities', async () => {
   const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
-  const updateSource = await readFile('../main/updatecheck.cpp', 'utf8')
   const commandHandler = mqttSource.slice(
     mqttSource.indexOf('static void handle_mqtt_command'),
     mqttSource.indexOf('static void mqtt_event_handler')
@@ -641,16 +624,10 @@ test('MQTT check_update uses the guarded manual fetch and republishes its result
     mqttSource.indexOf('void mqtt_handler_publish_ha_discovery'),
     mqttSource.indexOf('esp_err_t mqtt_handler_init')
   )
-  const manualWorker = updateSource.slice(
-    updateSource.indexOf('static void _manual_fetch_task'),
-    updateSource.indexOf('static void _manual_fetch_callback')
-  )
-
-  expect(commandHandler).toContain('strcmp(command, \"check_update\")')
-  expect(commandHandler).toContain('triggerManualFetch()')
-  expect(commandHandler).toContain('event/check_update')
-  expect(discovery).toContain('publish_button(\"check_update\"')
-  expect(manualWorker).toContain('mqtt_handler_trigger_status_publish()')
+  expect(commandHandler).toContain('strcmp(command, "restart")')
+  expect(commandHandler).not.toContain('triggerManualFetch()')
+  expect(discovery).toContain('remove_config("button", "check_update")')
+  expect(discovery).toContain('remove_config("update", "firmware_update")')
 })
 
 test('MQTT defers every publish until the broker connection is established', async () => {
@@ -825,10 +802,6 @@ test('updates sub-navigation uses the shared design and switches child routes', 
     contentType: 'application/json',
     body: JSON.stringify({ settings })
   }))
-  await page.route('**/api/firmware_archive**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(archive)
-  }))
   await page.route('**/api/webui/status**', route => route.fulfill({
     contentType: 'application/json',
     body: JSON.stringify({
@@ -918,28 +891,29 @@ test('incompatible installed WebUI is never presented as active and shows a pers
   await expect(page).toHaveURL(`${BASE_URL}/updates/webui`)
 })
 
-test('firmware update banner does not promise a direct OTA installation', async ({ page }) => {
-  await page.route('**/api/check_update**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
-      latestVersion: '2.2.5-Beta.12',
-      updateAvailable: true,
-      downloadUrl: 'https://example.invalid/firmware_2.2.5-Beta.12.bin'
-    })
-  }))
+test('firmware page uses GitHub discovery and a local file without device-side search', async ({ page }) => {
+  let retiredSearchRequests = 0
+  await page.route('**/api/check_update**', route => {
+    retiredSearchRequests++
+    return route.abort()
+  })
 
-  await page.goto(`${BASE_URL}/`)
+  await page.goto(`${BASE_URL}/updates/firmware`)
 
-  const banner = page.locator('.update-banner')
-  await expect(banner).toBeVisible()
-  await expect(banner).toContainText('Download and manual installation')
-  await expect(banner.getByRole('link', { name: 'View update' })).toBeVisible()
-  await expect(banner).not.toContainText('Update Now')
+  const firmwarePage = page.locator('.firmware-page')
+  await expect(firmwarePage.getByRole('link', { name: 'View on GitHub' })).toHaveAttribute(
+    'href',
+    'https://github.com/Xerolux/HB-RF-ETH-ng/releases'
+  )
+  await expect(firmwarePage).toContainText('Install firmware manually')
+  await expect(firmwarePage.locator('input[type="file"]')).toHaveCount(1)
+  await expect(firmwarePage.getByRole('button', { name: /Search for updates/i })).toHaveCount(0)
+  expect(retiredSearchRequests).toBe(0)
 })
 
-test('release-matched WebUI upload sends compatibility preflight headers', async ({ page }) => {
-  const releaseFile = 'webui_1.0.1.bin'
+test('manual WebUI upload uses a raw local image without release metadata', async ({ page }) => {
   let uploadHeaders = null
+  let retiredSearchRequests = 0
 
   await page.route('**/api/webui/status**', route => route.fulfill({
     contentType: 'application/json',
@@ -960,23 +934,10 @@ test('release-matched WebUI upload sends compatibility preflight headers', async
       usedBytes: 250000
     })
   }))
-  await page.route('**/api/check_update**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
-      latestVersion: '2.2.5-Beta.12',
-      updateAvailable: false,
-      fetchedAt: 1784750400000,
-      webui: {
-        version: '1.0.1',
-        design: 'newdesign',
-        apiVersion: 1,
-        minFirmwareVersion: '2.2.5-Beta.1',
-        size: 327680,
-        sha256: 'a'.repeat(64),
-        downloadUrl: `https://example.invalid/${releaseFile}`
-      }
-    })
-  }))
+  await page.route('**/api/check_update**', route => {
+    retiredSearchRequests++
+    return route.abort()
+  })
   await page.route('**/api/webui/update', route => {
     uploadHeaders = route.request().headers()
     return route.fulfill({
@@ -987,328 +948,18 @@ test('release-matched WebUI upload sends compatibility preflight headers', async
 
   await page.goto(`${BASE_URL}/updates/webui`)
   await page.locator('input[type="file"]').setInputFiles({
-    name: releaseFile,
+    name: 'webui_1.0.1.bin',
     mimeType: 'application/octet-stream',
     buffer: Buffer.alloc(327680)
   })
   await page.getByRole('button', { name: 'Install WebUI' }).click()
 
   await expect.poll(() => uploadHeaders).not.toBeNull()
-  expect(uploadHeaders['x-webui-sha256']).toBe('a'.repeat(64))
-  expect(uploadHeaders['x-webui-api-version']).toBe('1')
-  expect(uploadHeaders['x-webui-min-firmware-version']).toBe('2.2.5-Beta.1')
-})
-
-test('firmware keeps a successful no-update result visible without a release version', async ({ page }) => {
-  const settledSnapshot = {
-    latestVersion: 'n/a',
-    updateAvailable: false,
-    fetchedAt: 1784750400000,
-    fetchInProgress: false,
-    error: null
-  }
-
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: true, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(settledSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  await expect(page.getByText('No check result yet')).toBeVisible()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-
-  await expect(page.getByText('Firmware is up to date')).toBeVisible()
-  await expect(page.locator('.app-toast', { hasText: 'No newer version is available.' })).toBeVisible()
-})
-
-test('WebUI keeps a successful no-update result visible without a release version', async ({ page }) => {
-  const settledSnapshot = {
-    latestVersion: 'n/a',
-    updateAvailable: false,
-    fetchedAt: 1784750400000,
-    fetchInProgress: false,
-    error: null,
-    webui: {
-      version: '',
-      design: 'newdesign',
-      apiVersion: 1,
-      minFirmwareVersion: '2.2.5-Beta.1',
-      size: 327680
-    }
-  }
-
-  await page.route('**/api/webui/status**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
-      valid: true,
-      version: '1.0.0-Beta.7',
-      effectiveVersion: '1.0.0-Beta.7',
-      partitionSize: 327680,
-      usedBytes: 292666
-    })
-  }))
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: true, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(settledSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/webui`)
-  await expect(page.getByText('The installed WebUI is up to date.')).toHaveCount(0)
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-
-  await expect(page.getByText('The installed WebUI is up to date.')).toBeVisible()
-  await expect(page.locator('.app-toast', { hasText: 'No newer version is available.' })).toBeVisible()
-})
-
-test('update-search cooldown does not fabricate a successful result', async ({ page }) => {
-  const emptySnapshot = {
-    latestVersion: 'n/a',
-    updateAvailable: false,
-    fetchedAt: 0,
-    fetchInProgress: false,
-    error: null
-  }
-
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: false, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(emptySnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-
-  await expect(page.locator('.app-toast', { hasText: 'A check is already running or the 60-second cooldown is still active.' })).toBeVisible()
-  await expect(page.getByText('No check result yet')).toBeVisible()
-  await expect(page.getByText('Firmware is up to date')).toHaveCount(0)
-})
-
-test('firmware keeps manual no-update feedback visible when it was already current', async ({ page }) => {
-  let postCount = 0
-  const currentSnapshot = {
-    latestVersion: '2.2.4-Beta.3',
-    updateAvailable: false,
-    fetchedAt: 1700000000000,
-    fetchInProgress: false,
-    error: null
-  }
-
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      postCount += 1
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: true, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(currentSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  await expect(page.getByText('Firmware is up to date')).toBeVisible()
-  const lastCheck = page.locator('.hero-meta .meta-chip').nth(1)
-  const beforeCheck = await lastCheck.textContent()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-  await expect(page.locator('.app-toast', { hasText: 'No newer version is available.' })).toBeVisible()
-  expect(postCount).toBe(1)
-
-  await page.waitForTimeout(4200)
-  const feedback = page.getByTestId('manual-check-feedback')
-  await expect(feedback).toBeVisible()
-  await expect(feedback).toContainText('Everything is up to date')
-  await expect(feedback).toContainText('No newer version is available.')
-  await expect(lastCheck).not.toHaveText(beforeCheck || '')
-})
-
-test('WebUI keeps manual no-update feedback visible when it was already current', async ({ page }) => {
-  let postCount = 0
-  const currentSnapshot = {
-    latestVersion: '2.2.4-Beta.3',
-    updateAvailable: false,
-    fetchedAt: 1700000000000,
-    fetchInProgress: false,
-    error: null,
-    webui: {
-      version: '1.0.0-Beta.7',
-      design: 'newdesign',
-      apiVersion: 1,
-      minFirmwareVersion: '2.2.4-Beta.1',
-      size: 327680
-    }
-  }
-
-  await page.route('**/api/webui/status**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
-      valid: true,
-      version: '1.0.0-Beta.7',
-      effectiveVersion: '1.0.0-Beta.7',
-      partitionSize: 327680,
-      usedBytes: 292666
-    })
-  }))
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      postCount += 1
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: true, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(currentSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/webui`)
-  await expect(page.getByText('The installed WebUI is up to date.')).toBeVisible()
-  const lastCheck = page.locator('.status-card').nth(2).locator('strong')
-  const beforeCheck = await lastCheck.textContent()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-  await expect(page.locator('.app-toast', { hasText: 'No newer version is available.' })).toBeVisible()
-  expect(postCount).toBe(1)
-
-  await page.waitForTimeout(4200)
-  const feedback = page.getByTestId('manual-check-feedback')
-  await expect(feedback).toBeVisible()
-  await expect(feedback).toContainText('Everything is up to date')
-  await expect(feedback).toContainText('No newer version is available.')
-  await expect(lastCheck).not.toHaveText(beforeCheck || '')
-})
-
-test('cooldown feedback stays visible without advancing the successful check time', async ({ page }) => {
-  const currentSnapshot = {
-    latestVersion: '2.2.4-Beta.3',
-    updateAvailable: false,
-    fetchedAt: 1700000000000,
-    fetchInProgress: false,
-    error: null
-  }
-
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: false, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(currentSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  const lastCheck = page.locator('.hero-meta .meta-chip').nth(1)
-  const beforeCheck = await lastCheck.textContent()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-  await expect(page.locator('.app-toast', { hasText: '60-second cooldown' })).toBeVisible()
-
-  await page.waitForTimeout(4200)
-  const feedback = page.getByTestId('manual-check-feedback')
-  await expect(feedback).toBeVisible()
-  await expect(feedback).toContainText('Just a moment')
-  await expect(feedback).toContainText('60-second cooldown')
-  await expect(lastCheck).toHaveText(beforeCheck || '')
-})
-
-test('WebUI cooldown feedback stays visible without advancing the successful check time', async ({ page }) => {
-  const currentSnapshot = {
-    latestVersion: '2.2.4-Beta.3',
-    updateAvailable: false,
-    fetchedAt: 1700000000000,
-    fetchInProgress: false,
-    error: null,
-    webui: {
-      version: '1.0.0-Beta.7',
-      design: 'newdesign',
-      apiVersion: 1,
-      minFirmwareVersion: '2.2.4-Beta.1',
-      size: 327680
-    }
-  }
-
-  await page.route('**/api/webui/status**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
-      valid: true,
-      version: '1.0.0-Beta.7',
-      effectiveVersion: '1.0.0-Beta.7',
-      partitionSize: 327680,
-      usedBytes: 292666
-    })
-  }))
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ triggered: false, fetchInProgress: false })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(currentSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/webui`)
-  const lastCheck = page.locator('.status-card').nth(2).locator('strong')
-  const beforeCheck = await lastCheck.textContent()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-  await expect(page.locator('.app-toast', { hasText: '60-second cooldown' })).toBeVisible()
-
-  await page.waitForTimeout(4200)
-  const feedback = page.getByTestId('manual-check-feedback')
-  await expect(feedback).toBeVisible()
-  await expect(feedback).toContainText('Just a moment')
-  await expect(feedback).toContainText('60-second cooldown')
-  await expect(lastCheck).toHaveText(beforeCheck || '')
-})
-
-test('error feedback stays visible without advancing the successful check time', async ({ page }) => {
-  const currentSnapshot = {
-    latestVersion: '2.2.4-Beta.3',
-    updateAvailable: false,
-    fetchedAt: 1700000000000,
-    fetchInProgress: false,
-    error: null
-  }
-
-  await page.route('**/api/check_update**', route => {
-    if (route.request().method() === 'POST') {
-      return route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'TLS handshake failed' })
-      })
-    }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(currentSnapshot) })
-  })
-
-  await page.goto(`${BASE_URL}/updates/firmware`)
-  const lastCheck = page.locator('.hero-meta .meta-chip').nth(1)
-  const beforeCheck = await lastCheck.textContent()
-
-  await page.getByRole('button', { name: 'Search for updates now' }).click()
-  await expect(page.locator('.app-toast', { hasText: 'TLS handshake failed' }).last()).toBeVisible()
-
-  const feedback = page.getByTestId('manual-check-feedback')
-  await expect(feedback).toBeVisible()
-  await expect(feedback).toContainText('Check failed')
-  await expect(feedback).toContainText('TLS handshake failed')
-  await expect(lastCheck).toHaveText(beforeCheck || '')
+  expect(uploadHeaders['content-type']).toContain('application/octet-stream')
+  expect(uploadHeaders['x-webui-sha256']).toBeUndefined()
+  expect(uploadHeaders['x-webui-api-version']).toBeUndefined()
+  expect(uploadHeaders['x-webui-min-firmware-version']).toBeUndefined()
+  expect(retiredSearchRequests).toBe(0)
 })
 
 test('settings save/discard state follows the edited form immediately', async ({ page }) => {
@@ -1371,17 +1022,17 @@ test('settings save/discard state follows the edited form immediately', async ({
 })
 
 test('late header initialization does not discard settings edits', async ({ page }) => {
-  let releaseUpdateCheck
-  const updateCheckGate = new Promise(resolve => {
-    releaseUpdateCheck = resolve
+  let releaseSysInfo
+  const sysInfoGate = new Promise(resolve => {
+    releaseSysInfo = resolve
   })
   let settingsGetCount = 0
 
-  await page.route('**/api/check_update**', async route => {
-    await updateCheckGate
+  await page.route('**/sysinfo.json**', async route => {
+    await sysInfoGate
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ latestVersion: '2.2.4-Beta.3', updateAvailable: false })
+      body: JSON.stringify({ sysInfo: { currentVersion: '2.2.4-Beta.3' } })
     })
   })
   await page.route('**/settings.json**', async route => {
@@ -1392,7 +1043,7 @@ test('late header initialization does not discard settings edits', async ({ page
     })
   })
 
-  const updateResponse = page.waitForResponse(response => response.url().includes('/api/check_update'))
+  const sysInfoResponse = page.waitForResponse(response => response.url().includes('/sysinfo.json'))
   await page.goto(`${BASE_URL}/settings`)
   await page.getByRole('button', { name: 'Network' }).click()
 
@@ -1401,8 +1052,8 @@ test('late header initialization does not discard settings edits', async ({ page
   await hostname.fill('edit-must-survive')
   await expect(page.locator('.floating-footer')).toBeVisible()
 
-  releaseUpdateCheck()
-  await updateResponse
+  releaseSysInfo()
+  await sysInfoResponse
   await page.waitForTimeout(150)
 
   expect(settingsGetCount).toBe(1)
@@ -1491,26 +1142,6 @@ test('invalid settings reveal the affected tab instead of silently ignoring save
   expect(postCount).toBe(0)
 })
 
-test('OTA success dialog uses the active locale and has no default cancel button', async ({ page }) => {
-  await page.route('**/settings.json**', route => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ settings })
-  }))
-
-  await page.goto(BASE_URL)
-  await page.evaluate(() => {
-    localStorage.setItem('locale', 'de')
-    localStorage.setItem('otaUpdateVersion', '2.2.4-Beta.5')
-  })
-  await page.reload()
-
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('Update erfolgreich')
-  await expect(dialog).toContainText('Die Firmware wurde erfolgreich auf Version 2.2.4-Beta.5 aktualisiert.')
-  await expect(dialog.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(1)
-  await expect(dialog.getByRole('button', { name: /Cancel|Abbrechen/, exact: true })).toHaveCount(0)
-})
-
 test('firmware update page does not load the retired release archive', async ({ page }) => {
   await page.route('**/settings.json**', route => route.fulfill({
     contentType: 'application/json',
@@ -1523,7 +1154,7 @@ test('firmware update page does not load the retired release archive', async ({ 
     localRequests++
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify(archive)
+      body: JSON.stringify({ releases: [] })
     })
   })
   await page.route('https://raw.githubusercontent.com/Xerolux/HB-RF-ETH-ng/main/archive.json**', async route => {

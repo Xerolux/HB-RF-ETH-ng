@@ -26,10 +26,10 @@
 #include <stdint.h>
 #include <cstddef>
 
-// Central registry of process-wide metric counters. All counters are
-// lock-free (std::atomic<uint64_t>) so they can be incremented from any
-// task or ISR-adjacent context (UDP recv callback, UART queue task, MQTT
-// event handler, OTA task) without extra synchronisation.
+// Central registry of process-wide metric counters. Each 64-bit modular
+// value is represented by native lock-free 32-bit low/high atomics, so it can
+// be incremented from any task or ISR-adjacent context without the ESP32's
+// non-lock-free 64-bit atomic helper or an interrupt-disabling spinlock.
 //
 // They are exposed via the Prometheus `/metrics` endpoint and (optionally)
 // surfaced through MQTT topics / notifications.
@@ -52,10 +52,13 @@ void metrics_init(void);
 metrics_counter_t metrics_register_counter(const char *name, const char *help);
 
 // Increment a counter by `delta` (default 1). Safe from any task.
-void metrics_inc(metrics_counter_t counter, uint64_t delta);
+void metrics_inc(metrics_counter_t counter, uint32_t delta);
 void metrics_inc_one(metrics_counter_t counter);
 
-// Read a counter's current value.
+// Read a counter's current value from task context. Native 32-bit writer-count
+// and generation words make the high/low snapshot coherent even with
+// overlapping writers and at the rollover boundary. A reader yields for one
+// scheduler tick only while an update is in flight or its snapshot changed.
 uint64_t metrics_get(metrics_counter_t counter);
 
 // Render every registered counter in Prometheus text exposition format and
@@ -78,7 +81,8 @@ public:
     MetricsCounter(const char *name, const char *help)
         : _handle(metrics_register_counter(name, help)) {}
 
-    void inc(uint64_t delta = 1) { metrics_inc(_handle, delta); }
+    void inc() { metrics_inc_one(_handle); }
+    void inc(uint32_t delta) { metrics_inc(_handle, delta); }
     uint64_t get() const { return metrics_get(_handle); }
 
 private:

@@ -101,24 +101,6 @@
 
     <AppToastContainer />
     <SponsorModal v-model="showSponsorModal" />
-
-    <BModal
-      v-model="showUpdateSuccess"
-      :title="t('updateSuccess.title')"
-      :ok-title="t('common.close')"
-      ok-only
-      @ok="showUpdateSuccess = false"
-      no-close-on-backdrop
-      no-close-on-esc
-      hide-header-close
-    >
-      <div class="update-success-body">
-        <div class="update-success-icon"><AppIcon name="check" /></div>
-        <p class="update-success-text">
-          {{ t('updateSuccess.message', { version: otaUpdateVersion }) }}
-        </p>
-      </div>
-    </BModal>
   </div>
 </template>
 
@@ -128,7 +110,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
-import { safeLocal, safeSession } from './composables/useSafeStorage'
+import { safeSession } from './composables/useSafeStorage'
 import NewDesignHeader from './components/NewDesignHeader.vue'
 import SponsorModal from './components/SponsorModal.vue'
 import AppToastContainer from './components/AppToastContainer.vue'
@@ -139,9 +121,7 @@ const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
 const restartUiStore = useRestartUiStore()
 const showSponsorModal = ref(false)
-const showUpdateSuccess = ref(false)
 const showSupporterExpiredPrompt = ref(false)
-const otaUpdateVersion = ref('')
 const webUiVersion = ref(typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : 'unbekannt')
 const webUiStatus = ref({
   version: '',
@@ -152,7 +132,6 @@ const webUiStatus = ref({
   minFirmwareVersion: '',
   firmwareVersion: ''
 })
-let updateSuccessTimer = null
 const pageTitle = computed(() => `${sysInfoStore.hostname || 'HB-RF-ETH-ng'} - HB-RF-ETH-ng`)
 // Routes flagged meta.bareLayout (currently /login) render without the app
 // shell — standalone full-screen page instead of sidebar + content + footer.
@@ -268,24 +247,10 @@ onMounted(() => {
     console.warn('Failed to load system info on app mount:', error)
   })
 
-  // Check if we just came back from an OTA update
-  const pendingVersion = safeLocal.get('otaUpdateVersion')
-  if (pendingVersion) {
-    otaUpdateVersion.value = pendingVersion
-    showUpdateSuccess.value = true
-    safeLocal.remove('otaUpdateVersion')
-    // Auto-close after 10 seconds
-    updateSuccessTimer = setTimeout(() => {
-      showUpdateSuccess.value = false
-    }, 10000)
-  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('webui-status-changed', handleWebUiStatusChanged)
-  if (updateSuccessTimer) {
-    clearTimeout(updateSuccessTimer)
-  }
 })
 </script>
 
@@ -541,38 +506,6 @@ onUnmounted(() => {
   border-color: var(--color-border);
   transform: none;
   box-shadow: none;
-}
-
-.update-success-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) 0;
-  text-align: center;
-}
-
-.update-success-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-success-soft);
-  color: var(--color-success);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.update-success-icon .app-icon {
-  width: 28px;
-  height: 28px;
-}
-
-.update-success-text {
-  margin: 0;
-  font-size: var(--fs-md);
-  color: var(--color-text);
-  overflow-wrap: anywhere;
 }
 
 .expired-prompt-body {

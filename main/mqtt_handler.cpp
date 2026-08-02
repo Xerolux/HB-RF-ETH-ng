@@ -27,6 +27,7 @@
 #include "webui_storage.h"
 #include "reset_info.h"
 #include "system_reset.h"
+#include "nvs_storage_lock.h"
 #include "events.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
@@ -36,6 +37,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "freertos/timers.h"
 #include "cJSON.h"
 #include "lwip/ip4_addr.h"
 #include "ethernet.h"
@@ -43,6 +45,7 @@
 #include "systemclock.h"
 
 #include <string.h>
+#include <stdlib.h>
 #include <atomic>
 
 static const char *TAG = "MQTT";
@@ -53,9 +56,65 @@ static std::atomic<bool> mqtt_running{false};
 // MQTT_EVENT_DISCONNECTED / stop(). Read by prometheus.cpp and events.cpp.
 static std::atomic<bool> mqtt_connected{false};
 static std::atomic<TaskHandle_t> mqtt_publish_task_handle{NULL};
+static std::atomic<TaskHandle_t> mqtt_cleanup_task_handle{NULL};
 static std::atomic<bool> mqtt_publish_request{false};
+static std::atomic<bool> mqtt_desired_running{false};
+static std::atomic<bool> mqtt_tls_gate_held{false};
+static std::atomic<uint32_t> mqtt_active_publishers{0};
+static std::atomic<bool> mqtt_component_stop_in_progress{false};
+static std::atomic<uint32_t> mqtt_component_stop_deadline_ticks{0};
+static TimerHandle_t mqtt_stop_watchdog_timer = NULL;
+static StaticTimer_t mqtt_stop_watchdog_timer_buffer;
 static mqtt_config_t current_mqtt_config;
+static mqtt_config_t *mqtt_pending_restart_config = NULL;
 static char mqtt_lwt_topic[160];
+static std::atomic<bool> mqtt_restart_command_pending{false};
+
+// ESP-MQTT waits for half the configured reconnect interval while it is in
+// MQTT_STATE_WAIT_RECONNECT. esp_mqtt_client_stop() does not wake that wait, so
+// the public cleanup deadline must include those 15 seconds plus transport,
+// publisher-retirement and scheduler margin.
+static constexpr int MQTT_RECONNECT_TIMEOUT_MS = 30000;
+static constexpr int MQTT_COMPONENT_STOP_WATCHDOG_MS =
+    MQTT_RECONNECT_TIMEOUT_MS / 2 + 15000;
+static constexpr int MQTT_STOP_WAIT_TIMEOUT_MS =
+    MQTT_COMPONENT_STOP_WATCHDOG_MS + 5000;
+static constexpr int MQTT_RESTART_RETRY_DELAY_MS = 10000;
+static constexpr int MQTT_PUBLISH_DRAIN_TIMEOUT_MS = 5000;
+static constexpr int MQTT_TLS_GATE_WAIT_SLICE_MS = 1000;
+static constexpr int MQTT_TLS_GATE_MAX_WAIT_MS = 10 * 60 * 1000;
+
+static_assert(std::atomic<uint32_t>::is_always_lock_free,
+              "MQTT publisher lifetime guard must be native 32-bit");
+
+// Protects an entire logical publish operation, including every read from
+// current_mqtt_config and all payload/topic preparation. Cleanup closes
+// mqtt_running before waiting for this lease count to reach zero, so a queued
+// restart cannot overwrite the non-atomic configuration halfway through a
+// status/discovery batch. mqtt_publish_connected() keeps its narrower nested
+// lease as a defence for any future direct call site.
+class MqttPublishOperation {
+public:
+    MqttPublishOperation()
+    {
+        mqtt_active_publishers.fetch_add(1, std::memory_order_seq_cst);
+        admitted_ = mqtt_running.load(std::memory_order_seq_cst) &&
+                    mqtt_connected.load(std::memory_order_acquire);
+    }
+
+    ~MqttPublishOperation()
+    {
+        mqtt_active_publishers.fetch_sub(1, std::memory_order_seq_cst);
+    }
+
+    MqttPublishOperation(const MqttPublishOperation &) = delete;
+    MqttPublishOperation &operator=(const MqttPublishOperation &) = delete;
+
+    explicit operator bool() const { return admitted_; }
+
+private:
+    bool admitted_ = false;
+};
 
 // "Running" only means the ESP-MQTT client and publisher task exist. The
 // broker may still be connecting or reconnecting. Submitting QoS 0 packets in
@@ -64,24 +123,42 @@ static char mqtt_lwt_topic[160];
 // can accidentally use the weaker lifecycle state.
 static bool mqtt_can_publish()
 {
-    return mqtt_running.load() && mqtt_connected.load() && client != NULL;
+    return mqtt_running.load(std::memory_order_acquire) &&
+           mqtt_connected.load(std::memory_order_acquire);
 }
 
 static int mqtt_publish_connected(const char *topic, const char *data,
                                   int len, int qos, int retain)
 {
-    if (!mqtt_can_publish() || topic == NULL || data == NULL) {
+    if (topic == NULL || data == NULL) {
         return -1;
     }
-    return esp_mqtt_client_publish(client, topic, data, len, qos, retain);
+
+    // Close admission before client destruction and count every caller which
+    // may cross into ESP-MQTT. Sequential consistency pairs with cleanup's
+    // mqtt_running=false store: either cleanup observes this reader, or this
+    // reader observes the closed lifecycle and never dereferences client.
+    mqtt_active_publishers.fetch_add(1, std::memory_order_seq_cst);
+    int result = -1;
+    if (mqtt_running.load(std::memory_order_seq_cst) &&
+        mqtt_connected.load(std::memory_order_acquire)) {
+        esp_mqtt_client_handle_t publish_client = client;
+        if (publish_client != NULL) {
+            result = esp_mqtt_client_publish(
+                publish_client, topic, data, len, qos, retain);
+        }
+    }
+    mqtt_active_publishers.fetch_sub(1, std::memory_order_seq_cst);
+    return result;
 }
 
 // Serializes mqtt_handler_start / mqtt_handler_stop so configuration updates
 // cannot race with the publish task or a concurrent (re)start.
 static SemaphoreHandle_t mqtt_lifecycle_mutex = NULL;
+static StaticSemaphore_t mqtt_lifecycle_mutex_buffer;
 
 // Latch set by mqtt_handler_trigger_status_publish() so the periodic task
-// emits an immediate cycle out-of-band (after OTA state changes etc.).
+// emits an immediate cycle out-of-band after an explicit status change.
 
 // Forward declarations
 extern SysInfo* monitoring_get_sysinfo(void);
@@ -106,7 +183,7 @@ static void log_error_if_nonzero(const char *message, int error_code)
 //   * Otherwise the payload (trimmed) must equal the configured token.
 //
 // HA integration: when a token is set, the HA discovery config publishes the
-// token as payload_press / payload_install, so buttons "just work" in HA.
+// token as payload_press, so the restart button "just works" in HA.
 // This means the HA discovery topic contains the token in clear-text - lock
 // down broker ACLs so only the device may publish to <ha_prefix>/#.
 static bool command_token_ok(const char *payload, int payload_len)
@@ -125,6 +202,17 @@ static bool command_token_ok(const char *payload, int payload_len)
     return strncmp(payload, current_mqtt_config.command_token, expected) == 0;
 }
 
+static void mqtt_restart_command_task(void *)
+{
+    vTaskDelay(pdMS_TO_TICKS(300));
+    // This task is intentionally separate from the ESP-MQTT event task. The
+    // common restart path stops MQTT cooperatively and therefore must not be
+    // invoked by the very task esp_mqtt_client_stop() waits to terminate.
+    full_system_restart_with_reserved_operation();
+    mqtt_restart_command_pending.store(false, std::memory_order_release);
+    vTaskDelete(NULL);
+}
+
 static void handle_mqtt_command(const char* command, const char* payload, int payload_len)
 {
     ESP_LOGI(TAG, "Received MQTT command: %s (payload %d bytes)", command, payload_len);
@@ -138,15 +226,114 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
     }
 
     if (strcmp(command, "restart") == 0) {
+        // Reserve the same operation gate used by the manual upload handler.
+        // This prevents an MQTT command from resetting the chip while the
+        // httpd task owns an active esp_ota_handle/flash write.
+        if (!ota_operation_try_begin()) {
+            ESP_LOGW(TAG, "Restart rejected while firmware upload/config update is active");
+            mqtt_handler_publish_event("event/command_rejected",
+                                       "reason=operation_busy");
+            return;
+        }
         ESP_LOGI(TAG, "Restart command received via MQTT");
         ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
         mqtt_handler_publish_event("event/restart", "requested");
-        vTaskDelay(pdMS_TO_TICKS(300));
-        full_system_restart();
+        bool expected = false;
+        if (mqtt_restart_command_pending.compare_exchange_strong(
+                expected, true, std::memory_order_acq_rel)) {
+            if (xTaskCreate(mqtt_restart_command_task, "mqtt_restart", 4096,
+                            NULL, 5, NULL) != pdPASS) {
+                mqtt_restart_command_pending.store(false,
+                                                   std::memory_order_release);
+                ESP_LOGE(TAG, "Could not create safe MQTT restart task");
+                mqtt_handler_publish_event("event/restart", "task_create_failed");
+                ota_operation_finish();
+            }
+        } else {
+            ota_operation_finish();
+        }
     } else {
         ESP_LOGW(TAG, "Unknown MQTT command: %s", command);
         mqtt_handler_publish_event("event/command_rejected", "reason=unknown_command");
     }
+}
+
+// g_net_fetch_mutex is deliberately an ownershipless binary semaphore. The
+// MQTT task takes it for each TLS connection/reconnection, while a cleanup
+// task may release it if ESP-MQTT exits without dispatching a terminal event.
+static void mqtt_take_tls_gate_if_needed()
+{
+    if (!current_mqtt_config.tls_enable || g_net_fetch_mutex == NULL ||
+        mqtt_tls_gate_held.load(std::memory_order_acquire)) {
+        return;
+    }
+    // Never continue a TLS handshake without the serialization gate.  A
+    // manual firmware upload can legitimately own it for longer than one
+    // network timeout while receiving and flashing the image.  Blocking this
+    // MQTT library task is scheduler-friendly; entering "degraded" here would
+    // overlap the two largest heap consumers and recreate the WROOM-32 crash
+    // condition. Bounded chunks retain diagnostics and prevent a lost
+    // semaphore from leaving MQTT offline forever. Do not return merely
+    // because stop was requested: ESP-MQTT proceeds directly into
+    // esp_transport_connect() after this callback, which would otherwise run
+    // a TLS handshake without the serialization gate while cleanup waits for
+    // the component API lock.
+    uint32_t waited_ms = 0;
+    while (xSemaphoreTake(g_net_fetch_mutex,
+                          pdMS_TO_TICKS(MQTT_TLS_GATE_WAIT_SLICE_MS)) != pdTRUE) {
+        waited_ms += MQTT_TLS_GATE_WAIT_SLICE_MS;
+        if (waited_ms == MQTT_TLS_GATE_WAIT_SLICE_MS ||
+            waited_ms % 30000 == 0) {
+            ESP_LOGW(TAG, "%s; MQTT TLS connection remains deferred",
+                     net_fetch_ota_active()
+                         ? "Firmware upload owns TLS gate"
+                         : "TLS serialization gate is busy");
+        }
+        if (waited_ms >= MQTT_TLS_GATE_MAX_WAIT_MS) {
+            ESP_LOGE(TAG, "MQTT TLS gate wedged for %u ms; rebooting safely",
+                     (unsigned)waited_ms);
+            ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
+                                        "MQTT TLS serialization gate wedged");
+            esp_restart();
+            return;
+        }
+    }
+    mqtt_tls_gate_held.store(true, std::memory_order_release);
+}
+
+static void mqtt_release_tls_gate_if_held()
+{
+    if (mqtt_tls_gate_held.exchange(false, std::memory_order_acq_rel) &&
+        g_net_fetch_mutex != NULL) {
+        xSemaphoreGive(g_net_fetch_mutex);
+    }
+}
+
+static void mqtt_stop_watchdog_callback(TimerHandle_t)
+{
+    if (!mqtt_component_stop_in_progress.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    const uint32_t now = static_cast<uint32_t>(xTaskGetTickCount());
+    const uint32_t deadline = mqtt_component_stop_deadline_ticks.load(
+        std::memory_order_acquire);
+    // Signed subtraction is wrap-safe for deadlines less than half the
+    // 32-bit tick range away (this deadline is only 30 seconds).
+    if (static_cast<int32_t>(now - deadline) < 0) {
+        return;
+    }
+
+    mqtt_connected.store(false, std::memory_order_release);
+    mqtt_running.store(false, std::memory_order_seq_cst);
+    // Keep the TLS gate closed through reset diagnostics. Releasing it here
+    // could start another large TLS allocation while the wedged MQTT task is
+    // still inside its handshake.
+    ESP_LOGE(TAG, "MQTT component cleanup wedged for %d ms; rebooting safely",
+             MQTT_COMPONENT_STOP_WATCHDOG_MS);
+    ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
+                                "MQTT component stop watchdog");
+    esp_restart();
 }
 
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
@@ -155,9 +342,24 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
 
     switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_BEFORE_CONNECT:
+        mqtt_take_tls_gate_if_needed();
+        break;
     case MQTT_EVENT_CONNECTED:
+        mqtt_release_tls_gate_if_held();
+        if (!mqtt_running.load(std::memory_order_acquire)) {
+            ESP_LOGD(TAG, "Ignoring MQTT_EVENT_CONNECTED during cleanup");
+            mqtt_connected.store(false, std::memory_order_release);
+            break;
+        }
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-        mqtt_connected.store(true);
+        mqtt_connected.store(true, std::memory_order_release);
+        // Close the event-vs-stop interleaving where cleanup clears the flag
+        // between the running check above and this store.
+        if (!mqtt_running.load(std::memory_order_acquire)) {
+            mqtt_connected.store(false, std::memory_order_release);
+            break;
+        }
         // Notify subscribers. Suppressed by the cooldown window if this is a
         // rapid reconnect flap.
         events_emit(EVENT_MQTT_RECONNECTED, nullptr);
@@ -168,10 +370,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         if (current_mqtt_config.command_enabled || current_mqtt_config.ha_discovery_enabled) {
             // Subscribe to command topic whenever commands OR HA discovery
             // are enabled. Previously this was gated on ha_discovery only,
-            // which blocked plain-MQTT users from triggering restart/update.
+            // which blocked plain-MQTT users from triggering restart.
             char command_topic[128];
             snprintf(command_topic, sizeof(command_topic), "%s/command/#", current_mqtt_config.topic_prefix);
-            esp_mqtt_client_subscribe(client, command_topic, 1);
+            esp_mqtt_client_subscribe(event->client, command_topic, 1);
             ESP_LOGI(TAG, "Subscribed to command topic: %s", command_topic);
         }
         // Clear legacy retained status/* topics the firmware no longer
@@ -187,6 +389,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         }
         break;
     case MQTT_EVENT_DISCONNECTED:
+        mqtt_release_tls_gate_if_held();
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
         mqtt_connected.store(false);
         events_emit(EVENT_MQTT_DISCONNECTED, nullptr);
@@ -211,6 +414,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         }
         break;
     case MQTT_EVENT_ERROR:
+        mqtt_release_tls_gate_if_held();
         ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
         if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
             log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
@@ -234,7 +438,7 @@ void mqtt_publish_task(void *pvParameters)
         // submitting a complete status batch. MQTT_EVENT_CONNECTED publishes
         // the initial retained status and HA discovery immediately.
         if (!mqtt_can_publish()) {
-            vTaskDelay(pdMS_TO_TICKS(250));
+            (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(250));
             continue;
         }
 
@@ -248,7 +452,7 @@ void mqtt_publish_task(void *pvParameters)
         // Task-stack diagnostics move slowly; publishing every cycle
         // wastes broker storage for no insight. With the 60 s status cadence
         // below, every-6th-cycle ≈ 6 min — plenty to spot slow leaks or
-        // post-OTA drift when the user files a bug.
+        // post-update drift when the user files a bug.
         if (publish_cycle % 6 == 0) {
             mqtt_handler_publish_task_stacks();
         }
@@ -261,27 +465,52 @@ void mqtt_publish_task(void *pvParameters)
         // cadence to 60 s cuts that churn to ~1 800/h (−84 %) without losing
         // useful monitoring resolution — the values barely change within a
         // minute. The 12-step subdivision keeps trigger_publish response at
-        // ~5 s so OTA/state changes still publish promptly.
+        // ~5 s so explicitly requested status changes still publish promptly.
         for (int i = 0; i < 12 && mqtt_running.load(); i++) {
             if (mqtt_publish_request.exchange(false)) {
                 break;  // run a fresh publish cycle immediately
             }
-            vTaskDelay(pdMS_TO_TICKS(60000 / 12));
+            (void)ulTaskNotifyTake(pdTRUE,
+                                   pdMS_TO_TICKS(60000 / 12));
         }
     }
-    mqtt_publish_task_handle.store(NULL);
+    // Coordinate handle retirement with every notifier. Without the mutex a
+    // caller could load the last handle exactly while this task self-deletes.
+    if (mqtt_lifecycle_mutex != NULL &&
+        xSemaphoreTake(mqtt_lifecycle_mutex, portMAX_DELAY) == pdTRUE) {
+        mqtt_publish_task_handle.store(NULL, std::memory_order_release);
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+    } else {
+        mqtt_publish_task_handle.store(NULL, std::memory_order_release);
+    }
     vTaskDelete(NULL);
 }
 
 void mqtt_handler_trigger_status_publish(void)
 {
-    if (!mqtt_running.load()) return;
-    mqtt_publish_request.store(true);
+    if (mqtt_lifecycle_mutex == NULL ||
+        xSemaphoreTake(mqtt_lifecycle_mutex, pdMS_TO_TICKS(50)) != pdTRUE) {
+        // The request flag is level-triggered; the next periodic cycle will
+        // still consume it even if lifecycle reconfiguration owns the lock.
+        mqtt_publish_request.store(true, std::memory_order_release);
+        return;
+    }
+    if (mqtt_running.load(std::memory_order_acquire)) {
+        mqtt_publish_request.store(true, std::memory_order_release);
+        TaskHandle_t task =
+            mqtt_publish_task_handle.load(std::memory_order_acquire);
+        if (task) xTaskNotifyGive(task);
+    }
+    xSemaphoreGive(mqtt_lifecycle_mutex);
 }
 
 void mqtt_handler_publish_event(const char *subtopic, const char *payload)
 {
-    if (!mqtt_can_publish() || !subtopic || !payload) {
+    if (!subtopic || !payload) {
+        return;
+    }
+    MqttPublishOperation operation;
+    if (!operation) {
         return;
     }
     char topic[160];
@@ -296,7 +525,8 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload)
 // would waste bandwidth and MQTT broker storage for no diagnostic gain.
 void mqtt_handler_publish_task_stacks(void)
 {
-    if (!mqtt_can_publish()) {
+    MqttPublishOperation operation;
+    if (!operation) {
         return;
     }
     SysInfo *sysInfo = monitoring_get_sysinfo();
@@ -339,7 +569,8 @@ void mqtt_handler_publish_task_stacks(void)
 
 void mqtt_handler_publish_status(void)
 {
-    if (!mqtt_can_publish()) {
+    MqttPublishOperation operation;
+    if (!operation) {
         return;
     }
 
@@ -495,7 +726,8 @@ void mqtt_handler_publish_status(void)
 // per-boot state across reconnects.
 static void publish_legacy_topic_cleanup(void)
 {
-    if (!mqtt_can_publish()) return;
+    MqttPublishOperation operation;
+    if (!operation) return;
 
     // Versioned one-shot migration gate (issue #404). The empty retained
     // payloads this function emits are the MQTT-standard way to DELETE a
@@ -509,23 +741,36 @@ static void publish_legacy_topic_cleanup(void)
     // newly-retired topics — e.g. the update-check/OTA topics removed together
     // with the automatic update-check feature — re-runs the cleanup exactly
     // once on devices that already performed an older run. Bump CLEANUP_VERSION
-    // whenever legacy_subtopics grows. Persisted in the main settings namespace
-    // so a factory reset (which erases "HB-RF-ETH") re-runs it once more.
-    static const char *const CLEANUP_NS = "HB-RF-ETH";
+    // whenever legacy_subtopics grows. This uses its own namespace so a normal
+    // Settings generation rewrite cannot discard the completed migration.
+    static const char *const CLEANUP_NS = "mqtt_cleanup";
     static const char *const CLEANUP_KEY = "mqttLgcyVer"; // 11 chars (NVS limit 15)
     static const uint8_t CLEANUP_VERSION = 2;
     bool needs_cleanup = false;
     {
+        NvsStorageLock storage_lock;
+        if (!storage_lock) return;
         nvs_handle_t h;
-        if (nvs_open(CLEANUP_NS, NVS_READWRITE, &h) == ESP_OK) {
-            uint8_t stored = 0;
-            if (nvs_get_u8(h, CLEANUP_KEY, &stored) != ESP_OK || stored < CLEANUP_VERSION) {
-                needs_cleanup = true;
-            }
-            nvs_close(h);
+        esp_err_t marker_result = nvs_open(CLEANUP_NS, NVS_READWRITE, &h);
+        if (marker_result != ESP_OK) {
+            ESP_LOGW(TAG, "Could not read legacy-topic cleanup marker: %s",
+                     esp_err_to_name(marker_result));
+            return;
         }
-        // If NVS is unavailable we proceed with the cleanup rather than
-        // silently losing the migration for users who need it.
+        uint8_t stored = 0;
+        marker_result = nvs_get_u8(h, CLEANUP_KEY, &stored);
+        nvs_close(h);
+        if (marker_result == ESP_OK) {
+            needs_cleanup = stored < CLEANUP_VERSION;
+        } else if (marker_result == ESP_ERR_NVS_NOT_FOUND) {
+            // The old HB-RF-ETH marker is intentionally ignored. One cleanup
+            // on upgrade is safe and establishes the dedicated marker.
+            needs_cleanup = true;
+        } else {
+            ESP_LOGW(TAG, "Invalid legacy-topic cleanup marker: %s",
+                     esp_err_to_name(marker_result));
+            return;
+        }
     }
     if (!needs_cleanup) {
         return;
@@ -548,31 +793,51 @@ static void publish_legacy_topic_cleanup(void)
     };
 
     char topic[160];
+    bool cleanup_succeeded = true;
     for (size_t i = 0; i < sizeof(legacy_subtopics) / sizeof(legacy_subtopics[0]); i++) {
         snprintf(topic, sizeof(topic), "%s/%s",
                  current_mqtt_config.topic_prefix, legacy_subtopics[i]);
         // qos=0, retain=1: an empty retained payload is the MQTT-standard
         // way to delete a retained value from the broker.
-        mqtt_publish_connected(topic, "", 0, 0, 1);
+        if (mqtt_publish_connected(topic, "", 0, 0, 1) < 0) {
+            cleanup_succeeded = false;
+        }
+    }
+    if (!cleanup_succeeded) {
+        ESP_LOGW(TAG,
+                 "Legacy retained-topic cleanup was incomplete; marker not advanced");
+        return;
     }
 
     // Mark this cleanup version complete so it never runs again until the
     // version is bumped again.
     {
+        NvsStorageLock storage_lock;
+        if (!storage_lock) {
+            ESP_LOGW(TAG, "Could not persist legacy-topic cleanup marker");
+            return;
+        }
         nvs_handle_t h;
-        if (nvs_open(CLEANUP_NS, NVS_READWRITE, &h) == ESP_OK) {
-            nvs_set_u8(h, CLEANUP_KEY, CLEANUP_VERSION);
-            nvs_commit(h);
+        esp_err_t marker_result = nvs_open(CLEANUP_NS, NVS_READWRITE, &h);
+        if (marker_result == ESP_OK) {
+            marker_result = nvs_set_u8(h, CLEANUP_KEY, CLEANUP_VERSION);
+            if (marker_result == ESP_OK) marker_result = nvs_commit(h);
             nvs_close(h);
+        }
+        if (marker_result == ESP_OK) {
             ESP_LOGI(TAG, "Legacy retained-topic cleanup performed (v%u); will not repeat",
                      (unsigned)CLEANUP_VERSION);
+        } else {
+            ESP_LOGW(TAG, "Could not persist legacy-topic cleanup marker: %s",
+                     esp_err_to_name(marker_result));
         }
     }
 }
 
 void mqtt_handler_publish_ha_discovery(void)
 {
-    if (!mqtt_can_publish() || !current_mqtt_config.ha_discovery_enabled) {
+    MqttPublishOperation operation;
+    if (!operation || !current_mqtt_config.ha_discovery_enabled) {
         return;
     }
 
@@ -583,9 +848,9 @@ void mqtt_handler_publish_ha_discovery(void)
 
     ESP_LOGI(TAG, "Publishing Home Assistant discovery configs");
 
-    // The token callers must send as payload_press / payload_install so HA
-    // buttons work even when a command_token is configured. Empty token ->
-    // plain "restart" etc. (legacy behaviour).
+    // The token callers must send as payload_press so the HA restart button
+    // works even when a command_token is configured. Empty token -> plain
+    // "restart" (legacy behaviour).
     const char* restart_payload  = current_mqtt_config.command_token[0] ? current_mqtt_config.command_token : "restart";
     // Device Info — use the configurable hostname as the HA device name so
     // multiple HB-RF-ETH boards can be told apart in the UI. Fall back to a
@@ -761,36 +1026,99 @@ void mqtt_handler_publish_ha_discovery(void)
 esp_err_t mqtt_handler_init(void)
 {
     if (mqtt_lifecycle_mutex == NULL) {
-        mqtt_lifecycle_mutex = xSemaphoreCreateMutex();
+        mqtt_lifecycle_mutex =
+            xSemaphoreCreateMutexStatic(&mqtt_lifecycle_mutex_buffer);
+    }
+    if (mqtt_lifecycle_mutex == NULL) {
+        ESP_LOGE(TAG, "MQTT static lifecycle primitives unavailable");
+        return ESP_ERR_NO_MEM;
+    }
+
+    if (mqtt_stop_watchdog_timer == NULL) {
+        mqtt_stop_watchdog_timer = xTimerCreateStatic(
+            "mqtt_stop_guard", pdMS_TO_TICKS(1000), pdTRUE, NULL,
+            mqtt_stop_watchdog_callback, &mqtt_stop_watchdog_timer_buffer);
+    }
+    if (mqtt_stop_watchdog_timer == NULL ||
+        (xTimerIsTimerActive(mqtt_stop_watchdog_timer) == pdFALSE &&
+         xTimerStart(mqtt_stop_watchdog_timer,
+                     pdMS_TO_TICKS(1000)) != pdPASS)) {
+        ESP_LOGE(TAG, "MQTT static stop watchdog unavailable");
+        return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
 
-esp_err_t mqtt_handler_start(const mqtt_config_t *config)
+static esp_err_t mqtt_store_pending_restart_locked(
+    const mqtt_config_t *config)
 {
-    if (mqtt_lifecycle_mutex == NULL) {
-        ESP_LOGE(TAG, "MQTT lifecycle mutex not initialized");
-        return ESP_ERR_INVALID_STATE;
+    mqtt_config_t *copy =
+        static_cast<mqtt_config_t *>(malloc(sizeof(mqtt_config_t)));
+    if (copy == NULL) {
+        ESP_LOGE(TAG, "Could not queue MQTT restart configuration");
+        return ESP_ERR_NO_MEM;
     }
+    memcpy(copy, config, sizeof(*copy));
+    free(mqtt_pending_restart_config);
+    mqtt_pending_restart_config = copy;
+    mqtt_desired_running.store(true, std::memory_order_release);
+    return ESP_OK;
+}
 
-    if (xSemaphoreTake(mqtt_lifecycle_mutex, portMAX_DELAY) != pdTRUE) {
-        return ESP_ERR_INVALID_STATE;
+static void mqtt_cleanup_task(void *parameter);
+
+// Begin teardown without ever invoking esp_mqtt_client_stop() in the calling
+// task. ESP-MQTT 1.0.0 waits for STOPPED_BIT with portMAX_DELAY internally;
+// isolating that wait keeps WebUI/config/firmware-upload tasks schedulable and bounded.
+// Must be called with mqtt_lifecycle_mutex held.
+static esp_err_t mqtt_begin_cleanup_locked()
+{
+    if (mqtt_cleanup_task_handle.load(std::memory_order_acquire) != NULL) {
+        return ESP_OK;
     }
-
-    if (mqtt_running.load()) {
-        ESP_LOGW(TAG, "MQTT already running");
-        xSemaphoreGive(mqtt_lifecycle_mutex);
+    if (client == NULL) {
+        mqtt_running.store(false, std::memory_order_seq_cst);
+        mqtt_connected.store(false, std::memory_order_release);
         return ESP_OK;
     }
 
+    TaskHandle_t cleanup = NULL;
+    if (xTaskCreate(mqtt_cleanup_task, "mqtt_cleanup", 3072,
+                    client, 3, &cleanup) != pdPASS) {
+        ESP_LOGE(TAG, "Could not create bounded MQTT cleanup worker");
+        return ESP_ERR_NO_MEM;
+    }
+
+    mqtt_cleanup_task_handle.store(cleanup, std::memory_order_release);
+    mqtt_running.store(false, std::memory_order_seq_cst);
+    mqtt_connected.store(false, std::memory_order_release);
+    TaskHandle_t publisher =
+        mqtt_publish_task_handle.load(std::memory_order_acquire);
+    if (publisher != NULL) {
+        xTaskNotifyGive(publisher);
+    }
+    // The worker was deliberately created before lifecycle state changed, so
+    // allocation failure leaves the live client untouched and recoverable.
+    xTaskNotifyGive(cleanup);
+    return ESP_OK;
+}
+
+// Starts a completely new client. The lifecycle mutex is held by the caller,
+// client is NULL and no publisher from a previous generation exists.
+static esp_err_t mqtt_start_locked(const mqtt_config_t *config)
+{
     if (!config->enabled) {
-        xSemaphoreGive(mqtt_lifecycle_mutex);
+        mqtt_desired_running.store(false, std::memory_order_release);
         return ESP_OK;
+    }
+
+    if (client != NULL ||
+        mqtt_publish_task_handle.load(std::memory_order_acquire) != NULL) {
+        return ESP_ERR_INVALID_STATE;
     }
 
     if (strlen(config->server) == 0) {
         ESP_LOGE(TAG, "MQTT Server address is empty");
-        xSemaphoreGive(mqtt_lifecycle_mutex);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -824,7 +1152,7 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     }
 
     mqtt_cfg.network.timeout_ms = 2000;
-    mqtt_cfg.network.reconnect_timeout_ms = 30000;
+    mqtt_cfg.network.reconnect_timeout_ms = MQTT_RECONNECT_TIMEOUT_MS;
 
     if (strlen(current_mqtt_config.user) > 0) {
         mqtt_cfg.credentials.username = current_mqtt_config.user;
@@ -846,43 +1174,26 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     client = esp_mqtt_client_init(&mqtt_cfg);
     if (client == NULL) {
         ESP_LOGE(TAG, "Failed to initialize MQTT client");
-        xSemaphoreGive(mqtt_lifecycle_mutex);
         return ESP_FAIL;
     }
 
     esp_mqtt_client_register_event(client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
 
-    // Serialize the initial TLS handshake with other HTTPS subsystems so two
-    // concurrent handshakes do not exhaust the ESP32 heap.
-    bool net_locked = false;
-    if (g_net_fetch_mutex != NULL) {
-        if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(30000)) != pdTRUE) {
-            ESP_LOGE(TAG, "Failed to start MQTT client: HTTPS subsystem busy");
-            esp_mqtt_client_destroy(client);
-            client = NULL;
-            xSemaphoreGive(mqtt_lifecycle_mutex);
-            return ESP_ERR_TIMEOUT;
-        }
-        net_locked = true;
-    }
-
     // Publish guards must already see the correct lifecycle state if a very
     // fast broker dispatches MQTT_EVENT_CONNECTED before start() returns.
-    mqtt_connected.store(false);
-    mqtt_running.store(true);
+    mqtt_tls_gate_held.store(false, std::memory_order_release);
+    mqtt_connected.store(false, std::memory_order_release);
+    mqtt_running.store(true, std::memory_order_release);
+    mqtt_desired_running.store(true, std::memory_order_release);
     esp_err_t err = esp_mqtt_client_start(client);
-    if (net_locked) {
-        xSemaphoreGive(g_net_fetch_mutex);
-    }
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start MQTT client: %s", esp_err_to_name(err));
-        mqtt_running.store(false);
+        mqtt_running.store(false, std::memory_order_release);
+        mqtt_desired_running.store(false, std::memory_order_release);
         esp_mqtt_client_destroy(client);
         client = NULL;
-        xSemaphoreGive(mqtt_lifecycle_mutex);
         return err;
     }
-
     // The publish task formats several status payloads via snprintf into a
     // 96-byte stack buffer and calls esp_mqtt_client_publish — TLS handshakes
     // run in the esp-mqtt client task, not here. The observed high-water mark
@@ -893,18 +1204,233 @@ esp_err_t mqtt_handler_start(const mqtt_config_t *config)
     if (xTaskCreate(mqtt_publish_task, "mqtt_publish", 5120,
                     NULL, 4, &pub_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create MQTT publish task");
-        mqtt_running.store(false);
-        mqtt_connected.store(false);
-        esp_mqtt_client_stop(client);
-        esp_mqtt_client_destroy(client);
-        client = NULL;
-        xSemaphoreGive(mqtt_lifecycle_mutex);
+        // Do not call esp_mqtt_client_stop() here: it contains an unbounded
+        // wait. A dedicated cleanup worker owns that library call.
+        mqtt_desired_running.store(false, std::memory_order_release);
+        esp_err_t cleanup_result = mqtt_begin_cleanup_locked();
+        if (cleanup_result != ESP_OK) {
+            // Allocation failure leaves the client running (without the
+            // optional periodic publisher) rather than destroying live state.
+            mqtt_desired_running.store(true, std::memory_order_release);
+        }
         return ESP_ERR_NO_MEM;
     }
-    mqtt_publish_task_handle.store(pub_handle);
+    mqtt_publish_task_handle.store(pub_handle, std::memory_order_release);
+    return ESP_OK;
+}
+
+static void mqtt_cleanup_task(void *parameter)
+{
+    esp_mqtt_client_handle_t target =
+        static_cast<esp_mqtt_client_handle_t>(parameter);
+    const TaskHandle_t self = xTaskGetCurrentTaskHandle();
+    (void)ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    for (;;) {
+        if (target != NULL) {
+            // ESP-MQTT waits without an internal deadline here. No application
+            // mutex is held, and the static watchdog below resets the device
+            // if the component does not acknowledge stop after the normal
+            // reconnect/transport window.
+            const uint32_t stop_deadline =
+                static_cast<uint32_t>(xTaskGetTickCount()) +
+                static_cast<uint32_t>(
+                    pdMS_TO_TICKS(MQTT_COMPONENT_STOP_WATCHDOG_MS));
+            mqtt_component_stop_deadline_ticks.store(
+                stop_deadline, std::memory_order_release);
+            mqtt_component_stop_in_progress.store(true,
+                                                  std::memory_order_release);
+            esp_err_t stop_result = esp_mqtt_client_stop(target);
+            mqtt_connected.store(false, std::memory_order_release);
+            if (stop_result != ESP_OK) {
+                // `run == false` is ambiguous in ESP-MQTT 1.0.0: the task may
+                // not have entered yet, or may still be tearing down. Never
+                // destroy that state speculatively.
+                ESP_LOGE(TAG, "MQTT component could not acknowledge stop (%s); rebooting safely",
+                         esp_err_to_name(stop_result));
+                ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
+                                            "MQTT stop acknowledgement failed");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_restart();
+                vTaskDelete(NULL);
+                return;
+            }
+
+            // The periodic publisher owns its retirement, while event/syslog
+            // callers may also be inside mqtt_publish_connected(). Both must
+            // drain before destroying the shared client. New callers observe
+            // the sequentially-consistent mqtt_running=false admission close
+            // and leave without reading client.
+            const int drain_iterations =
+                (MQTT_PUBLISH_DRAIN_TIMEOUT_MS + 19) / 20;
+            for (int i = 0; i < drain_iterations; ++i) {
+                if (mqtt_publish_task_handle.load(
+                        std::memory_order_acquire) == NULL &&
+                    mqtt_active_publishers.load(
+                        std::memory_order_seq_cst) == 0) {
+                    break;
+                }
+                vTaskDelay(pdMS_TO_TICKS(20));
+            }
+            if (mqtt_publish_task_handle.load(std::memory_order_acquire) !=
+                    NULL ||
+                mqtt_active_publishers.load(std::memory_order_seq_cst) != 0) {
+                ESP_LOGE(TAG,
+                         "MQTT publishers did not drain within %d ms; rebooting safely",
+                         MQTT_PUBLISH_DRAIN_TIMEOUT_MS);
+                ResetInfo::storeResetReason(
+                    RESET_REASON_SYSTEM_ERROR,
+                    "MQTT publisher lifetime guard timeout");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_restart();
+                vTaskDelete(NULL);
+                return;
+            }
+            const esp_err_t destroy_result =
+                esp_mqtt_client_destroy(target);
+            if (destroy_result != ESP_OK) {
+                ESP_LOGE(TAG, "MQTT client destroy failed (%s); rebooting safely",
+                         esp_err_to_name(destroy_result));
+                ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
+                                            "MQTT client destroy failed");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_restart();
+                vTaskDelete(NULL);
+                return;
+            }
+            mqtt_component_stop_in_progress.store(false,
+                                                   std::memory_order_release);
+            mqtt_release_tls_gate_if_held();
+        }
+
+        // A cleanup worker is the durable owner of a queued restart. If the
+        // restart fails before a new client exists, this same already-created
+        // task retries without needing another heap allocation. If startup
+        // created a client but could not create its publisher/cleanup task, we
+        // adopt and tear down that client before trying again.
+        bool retry_without_client = false;
+        xSemaphoreTake(mqtt_lifecycle_mutex, portMAX_DELAY);
+        if (target != NULL && client == target) client = NULL;
+        target = NULL;
+
+        if (mqtt_desired_running.load(std::memory_order_acquire) &&
+            mqtt_pending_restart_config != NULL &&
+            !monitoring_ota_pause_active()) {
+            mqtt_config_t *candidate = mqtt_pending_restart_config;
+
+            // Temporarily relinquish cleanup ownership so mqtt_start_locked()
+            // may create a cleanup worker if publisher creation fails.
+            mqtt_cleanup_task_handle.store(NULL, std::memory_order_release);
+            esp_err_t restart_result = mqtt_start_locked(candidate);
+            if (restart_result == ESP_OK) {
+                mqtt_pending_restart_config = NULL;
+                free(candidate);
+            } else {
+                // mqtt_start_locked() may clear this flag on a partial startup
+                // failure. The queued candidate remains authoritative until a
+                // later attempt actually succeeds or stop() cancels it.
+                mqtt_desired_running.store(true, std::memory_order_release);
+                ESP_LOGW(TAG, "Deferred MQTT restart failed; retrying: %s",
+                         esp_err_to_name(restart_result));
+
+                if (mqtt_cleanup_task_handle.load(
+                        std::memory_order_acquire) == NULL) {
+                    if (client != NULL) {
+                        target = client;
+                        mqtt_cleanup_task_handle.store(
+                            self, std::memory_order_release);
+                        mqtt_running.store(false,
+                                           std::memory_order_seq_cst);
+                        mqtt_connected.store(false,
+                                             std::memory_order_release);
+                        TaskHandle_t publisher = mqtt_publish_task_handle.load(
+                            std::memory_order_acquire);
+                        if (publisher != NULL) xTaskNotifyGive(publisher);
+                    } else {
+                        mqtt_cleanup_task_handle.store(
+                            self, std::memory_order_release);
+                        retry_without_client = true;
+                    }
+                }
+                // Otherwise mqtt_start_locked() successfully installed a new
+                // cleanup owner. It will retry this still-pending candidate
+                // after retiring the partial generation.
+            }
+        } else {
+            free(mqtt_pending_restart_config);
+            mqtt_pending_restart_config = NULL;
+            mqtt_desired_running.store(false, std::memory_order_release);
+            mqtt_cleanup_task_handle.store(NULL, std::memory_order_release);
+        }
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+
+        if (target != NULL) {
+            continue;
+        }
+        if (retry_without_client) {
+            // start()/stop() notify this handle, so a new candidate or explicit
+            // cancellation wakes the retry immediately instead of waiting the
+            // complete backoff.
+            (void)ulTaskNotifyTake(
+                pdTRUE, pdMS_TO_TICKS(MQTT_RESTART_RETRY_DELAY_MS));
+            continue;
+        }
+        vTaskDelete(NULL);
+        return;
+    }
+}
+
+esp_err_t mqtt_handler_start(const mqtt_config_t *config)
+{
+    if (config == NULL) return ESP_ERR_INVALID_ARG;
+    if (mqtt_lifecycle_mutex == NULL) {
+        ESP_LOGE(TAG, "MQTT lifecycle mutex not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (xSemaphoreTake(mqtt_lifecycle_mutex,
+                       pdMS_TO_TICKS(15000)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (monitoring_ota_pause_active()) {
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (!config->enabled) {
+        mqtt_desired_running.store(false, std::memory_order_release);
+        free(mqtt_pending_restart_config);
+        mqtt_pending_restart_config = NULL;
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+        return ESP_OK;
+    }
+
+    if (mqtt_running.load(std::memory_order_acquire)) {
+        mqtt_desired_running.store(true, std::memory_order_release);
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+        return ESP_OK;
+    }
+
+    if (mqtt_cleanup_task_handle.load(std::memory_order_acquire) != NULL ||
+        client != NULL) {
+        esp_err_t queued = mqtt_store_pending_restart_locked(config);
+        TaskHandle_t cleanup =
+            mqtt_cleanup_task_handle.load(std::memory_order_acquire);
+        if (queued == ESP_OK && cleanup != NULL) {
+            xTaskNotifyGive(cleanup);
+        }
+        xSemaphoreGive(mqtt_lifecycle_mutex);
+        if (queued == ESP_OK) {
+            ESP_LOGW(TAG, "MQTT restart queued until cleanup completes");
+        }
+        return queued;
+    }
+
+    mqtt_desired_running.store(true, std::memory_order_release);
+    esp_err_t result = mqtt_start_locked(config);
 
     xSemaphoreGive(mqtt_lifecycle_mutex);
-    return ESP_OK;
+    return result;
 }
 
 esp_err_t mqtt_handler_stop(void)
@@ -913,41 +1439,53 @@ esp_err_t mqtt_handler_stop(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    if (xSemaphoreTake(mqtt_lifecycle_mutex, portMAX_DELAY) != pdTRUE) {
-        return ESP_ERR_INVALID_STATE;
+    if (xSemaphoreTake(mqtt_lifecycle_mutex,
+                       pdMS_TO_TICKS(15000)) != pdTRUE) {
+        return ESP_ERR_TIMEOUT;
     }
 
-    if (!mqtt_running.load()) {
-        xSemaphoreGive(mqtt_lifecycle_mutex);
-        return ESP_OK;
+    mqtt_desired_running.store(false, std::memory_order_release);
+    free(mqtt_pending_restart_config);
+    mqtt_pending_restart_config = NULL;
+
+    if (mqtt_cleanup_task_handle.load(std::memory_order_acquire) == NULL &&
+        client != NULL) {
+        if (mqtt_running.load(std::memory_order_acquire)) {
+            ESP_LOGI(TAG, "Stopping MQTT client");
+        }
+        esp_err_t begin_result = mqtt_begin_cleanup_locked();
+        if (begin_result != ESP_OK) {
+            xSemaphoreGive(mqtt_lifecycle_mutex);
+            return begin_result;
+        }
+    } else if (client == NULL) {
+        mqtt_running.store(false, std::memory_order_release);
+        mqtt_connected.store(false, std::memory_order_release);
+        TaskHandle_t publisher =
+            mqtt_publish_task_handle.load(std::memory_order_acquire);
+        if (publisher != NULL) xTaskNotifyGive(publisher);
     }
+    TaskHandle_t cleanup =
+        mqtt_cleanup_task_handle.load(std::memory_order_acquire);
+    if (cleanup != NULL) xTaskNotifyGive(cleanup);
+    xSemaphoreGive(mqtt_lifecycle_mutex);
 
-    ESP_LOGI(TAG, "Stopping MQTT client");
-    mqtt_running.store(false);
-    mqtt_connected.store(false);
-
-    if (client) {
-        esp_mqtt_client_stop(client);
-    }
-
-    for (int i = 0; i < 30 && mqtt_publish_task_handle.load() != NULL; i++) {
+    // WAIT_RECONNECT sleeps for reconnect_timeout/2 and stop() does not wake
+    // it. Include that documented component delay plus cleanup margin. A
+    // static watchdog reboots before this deadline if the third-party stop
+    // wait ever wedges permanently, so later starts cannot become false-OK
+    // queued requests behind an immortal cleanup owner.
+    const int wait_iterations = (MQTT_STOP_WAIT_TIMEOUT_MS + 99) / 100;
+    for (int i = 0; i < wait_iterations; ++i) {
+        if (mqtt_cleanup_task_handle.load(std::memory_order_acquire) == NULL &&
+            mqtt_publish_task_handle.load(std::memory_order_acquire) == NULL) {
+            return ESP_OK;
+        }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-
-    TaskHandle_t pub_handle = mqtt_publish_task_handle.load();
-    if (pub_handle != NULL) {
-        ESP_LOGW(TAG, "MQTT publish task did not exit cleanly, force deleting");
-        mqtt_publish_task_handle.store(NULL);
-        vTaskDelete(pub_handle);
-    }
-
-    if (client) {
-        esp_mqtt_client_destroy(client);
-        client = NULL;
-    }
-
-    xSemaphoreGive(mqtt_lifecycle_mutex);
-    return ESP_OK;
+    ESP_LOGW(TAG, "MQTT cleanup still running after %d ms",
+             MQTT_STOP_WAIT_TIMEOUT_MS);
+    return ESP_ERR_TIMEOUT;
 }
 
 bool mqtt_handler_is_connected(void)

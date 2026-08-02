@@ -73,7 +73,7 @@ Retrieve system information including firmware version, hardware details, and ra
   "sysInfo": {
     "serial": "string",
     "currentVersion": "string",
-    "latestVersion": "string",
+    "latestVersion": "n/a",
     "rawUartRemoteAddress": "string",
     "memoryUsage": 0.0,
     "cpuUsage": 0.0,
@@ -100,7 +100,8 @@ Retrieve system information including firmware version, hardware details, and ra
 **System Information:**
 - `serial`: Device serial number
 - `currentVersion`: Currently installed firmware version
-- `latestVersion`: Latest available firmware version
+- `latestVersion`: Compatibility placeholder. Automatic update searches were
+  removed, so current firmware returns `"n/a"`.
 - `boardRevision`: Hardware board revision (e.g., "REV 1.10 (PUB)", "REV 1.8 (SK)")
 - `uptimeSeconds`: System uptime in seconds since last boot
 - `resetReason`: Reason for last system reset (e.g., "Power-On Reset", "Software Reset", "Watchdog")
@@ -137,7 +138,7 @@ curl -X GET http://192.168.1.100/sysinfo.json \
   "sysInfo": {
     "serial": "A1B2C3D4E5F6",
     "currentVersion": "2.2.0",
-    "latestVersion": "2.1.12",
+    "latestVersion": "n/a",
     "boardRevision": "REV 1.10 (PUB)",
     "uptimeSeconds": 345678,
     "resetReason": "Power-On Reset",
@@ -209,9 +210,16 @@ Retrieve current device settings.
     "gpsBaudrate": 9600,
     "ntpServer": "string",
     "ledBrightness": 100,
-    "updateLedBlink": true,
-    "betaChannel": false,
-    "flashPause": false,
+    "ledPrograms": {
+      "idle": 1,
+      "ccu_disconnected": 5,
+      "ccu_connected": 6,
+      "update_available": 4,
+      "error": 10,
+      "booting": 4,
+      "update_in_progress": 5
+    },
+    "flashPause": true,
     "systemLogEnabled": false
   }
 }
@@ -246,8 +254,10 @@ Retrieve current device settings.
 
 **System Settings:**
 - `ledBrightness`: LED brightness (0-100)
-- `updateLedBlink`: Enable/disable LED blinking for update notifications
-- `flashPause`: When `true`, a system restart holds the Ethernet PHY in hardware reset for ~35 seconds before the ESP32 actually reboots. This lets a connected CCU's link-loss watchdog trigger a clean CCU restart so no stale radio-mod connections survive a firmware update. Optional, defaults to `false`. Set via the Settings page; persisted in NVS alongside the other settings.
+- `ledPrograms`: LED patterns for the persisted device states. The legacy
+  `update_available` slot remains for settings compatibility; the firmware no
+  longer performs an automatic update search that would activate it.
+- `flashPause`: Compatibility field that is always reported and enforced as `true`. A system restart holds the Ethernet PHY in hardware reset for ~35 seconds before the ESP32 reboots, allowing the connected CCU's link-loss watchdog to clear stale radio-module connections. Older backups containing `false` cannot disable Restart Sync.
 - `systemLogEnabled`: When `true`, the in-device ring-buffer system log is active and can be read via `/api/log`. Managed from the System Log page rather than the Settings page, but returned here for visibility.
 
 **Example:**
@@ -423,7 +433,7 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
 - `enabled`: Enable/disable Syslog forwarding
 - `server`: Syslog server hostname or IP
 - `port`: Syslog server port (default: 514)
-- `transport`: `0` = UDP, `1` = TCP, `2` = TLS-over-TCP. The TLS transport takes the shared net-fetch mutex, so it is briefly deferred while a firmware OTA download is in progress.
+- `transport`: `0` = UDP, `1` = TCP, `2` = TLS-over-TCP. The TLS transport takes the shared net-fetch mutex, so it is briefly deferred while a manual firmware upload is active.
 - `minSeverity`: Minimum severity to forward (`0` = EMERG … `7` = DEBUG)
 - `hostname`: Override the hostname tag in forwarded messages; empty = device hostname
 
@@ -433,7 +443,7 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
 - `cooldownSeconds`: Per-event-type dedupe window; only one notification per event type is sent within this window
 - `webhookUrl` / `webhookSecret` (`webhookSecretSet`): HTTP POST target and shared secret (sent as `X-HB-RF-ETH-Secret` header). Secret write-only.
 - `telegramToken` (`telegramTokenSet`) / `telegramChatId`: Telegram bot token and target chat ID. Token write-only.
-- `smtpServer` / `smtpPort` / `smtpTls` (`0` = none, `1` = STARTTLS, `2` = implicit TLS) / `smtpUser` / `smtpPassword` (`smtpPasswordSet`) / `smtpFrom` / `smtpTo`: SMTP relay configuration. Password write-only. Note: an SMTP send holds the net-fetch mutex for the duration of the SMTP session; the OTA path defers event delivery until the OTA completes.
+- `smtpServer` / `smtpPort` / `smtpTls` (`0` = none, `1` = STARTTLS, `2` = implicit TLS) / `smtpUser` / `smtpPassword` (`smtpPasswordSet`) / `smtpFrom` / `smtpTo`: SMTP relay configuration. Password write-only. Note: an SMTP send holds the net-fetch mutex for the duration of the SMTP session; an active manual firmware upload defers event delivery until the upload completes.
 
 **Example:**
 ```bash
@@ -517,8 +527,8 @@ Report progress of an OTA firmware upload (manual `POST /ota_update`).
 
 ### POST /ota_update
 
-Upload and install a firmware update from a local file. Use this when the
-device cannot reach GitHub (e.g. air-gapped network) or for custom builds.
+Upload and install a firmware update from a local file. This is the only
+firmware installation endpoint; the device does not fetch an image from a URL.
 
 **Authentication:** Required
 
@@ -529,7 +539,8 @@ device cannot reach GitHub (e.g. air-gapped network) or for custom builds.
 **Response (200 OK):**
 ```json
 {
-  "status": "success"
+  "success": true,
+  "message": "Firmware update completed, restarting in 3 seconds..."
 }
 ```
 
@@ -546,7 +557,8 @@ device cannot reach GitHub (e.g. air-gapped network) or for custom builds.
 ```bash
 curl -X POST http://192.168.1.100/ota_update \
   -H "Authorization: Token YOUR_TOKEN_HERE" \
-  -F "file=@firmware_2_1_0.bin"
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @firmware_2_1_0.bin
 ```
 
 ## System Log Management

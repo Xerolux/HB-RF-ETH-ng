@@ -10,8 +10,8 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 - **Benutzername + Passwort Login**: Standard-Benutzername `admin`, spaeter in den Einstellungen aenderbar
 - **Hostname im Dashboard**: Der konfigurierte Hostname wird im Systemstatus prominent angezeigt
 - **Session-Persistierung**: Login bleibt nach Neustarts erhalten
-- **OTA Success Feedback**: Visueller Bestätigungs-Dialog nach erfolgreichen Updates
-- **Verbesserte TLS-Sicherheit**: Vollständiges Mozilla CA-Bundle für GitHub/Let's Encrypt
+- **Firmware-Update-Feedback**: Visueller Bestätigungs-Dialog nach einem erfolgreichen manuellen Upload
+- **Verbesserte TLS-Sicherheit**: Vollständiges Mozilla-CA-Bundle für optionale ausgehende TLS-Verbindungen
 
 ### Behobene Probleme
 - Watchdog-Resets bei großen Release-Notes (Stack-Overflow)
@@ -26,7 +26,7 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * Bereitstellung des Funkmoduls RPI-RF-MOD oder HM-MOD-RPI-PCB per UDP als raw-uart Gerät inkl. Ansteuerung der LEDs des RPI-RF-MODs
 * Erkennung des Funkmoduls und Ausgabe von Typ, Seriennummer, Funkadresse und SGTIN in der WebUI
 * **Stabile CCU-Verbindung** mit optimiertem UDP-Handling
-  * Non-blocking UDP-Queue (64 Einträge) für zuverlässige Paketverarbeitung
+  * Non-blocking UDP-Queue (32 Einträge) für zuverlässige Paketverarbeitung
   * Intelligentes Keep-Alive mit 10s Timeout und sofortiger Antwort
   * Sichere Disconnect-Erkennung ohne Race Conditions
 * MDNS Server um Platine im Netzwerk bekannt zu machen
@@ -51,9 +51,8 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
   * Nach Updates mit bestehendem Passwort einmalig als `admin` anmelden; der Benutzername kann danach unter Einstellungen geändert werden
 * **Dark/Light Theme Toggle** für helles und dunkles Design
 * **Multi-Language Support** (4 Sprachen: Deutsch, Englisch, Französisch und Italienisch)
-* **System Log Viewer** - Live-Ansicht der Systemlogs mit 3-Sekunden-Polling, Download-Funktion, Ein/Aus-Schalter und manueller Aktualisierung (High-Contrast)
+* **System Log Viewer** - Live-Ansicht über WebSocket mit 5-Sekunden-Polling als Fallback, Download-Funktion, Ein/Aus-Schalter und manueller Aktualisierung (High-Contrast)
   * Aktivierung bleibt ueber Reboots erhalten; beim Deaktivieren bleibt das Log nach dem naechsten Start wieder aus
-* **Changelog Modal** - Vollständiger Changelog direkt in der WebUI mit Markdown-Rendering
 * **Dashboard** mit Gradient-Icons, Hover-Effekten und kompaktem 3-Spalten-Grid auf Mobile
 * **Hostname-Anzeige im Systemstatus und Header** - Der unter Einstellungen/Netzwerk konfigurierte Hostname wird auf der Startseite, in der Kopfzeile und im Browser-Tab angezeigt, hilfreich bei mehreren HB-RF-ETH-ng Boards
 * **Sponsor-Button** im Footer mit verschiedenen Optionen (PayPal, Buy Me a Coffee, Tesla referral)
@@ -67,9 +66,10 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * Barrierefreiheits-Optimierungen (Accessibility, `aria-hidden` für dekorative Icons)
 
 ### Firmware Updates
-* Upload als .bin Datei mit Fortschrittsanzeige in Prozent
-* **Online-Update über URL** über den integrierten Update-Dienst
-* Automatische Prüfung auf neue Versionen mit Update-Banner in der WebUI
+* Manueller Upload einer lokalen `firmware_*.bin` mit Fortschrittsanzeige
+* Keine automatische Update-Suche und kein Download einer Firmware-URL durch
+  das Gerät
+* Keine Firmware-Installation über MQTT oder Home Assistant
 * Automatischer Neustart nach erfolgreichem Update
 * Robuste Fehlerbehandlung verhindert Panic bei fehlerhaften Updates
 * Werksreset per Taster oder über die WebUI
@@ -101,10 +101,10 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
   * **Home Assistant Auto-Discovery** für automatische Einrichtung (Standard: deaktiviert)
   * Konfigurierbarer Server, Port und Authentifizierung
   * **Command Token Security** - Optionaler Token für sichere Befehlsausführung
-  * Status-Publishing für Systemmetriken (adaptives Intervall: 5s idle / 1s bei OTA)
+  * Status-Publishing für Systemmetriken im 60-Sekunden-Takt; explizite Trigger werden binnen etwa 5 Sekunden verarbeitet
   * **HA-Sensoren** für alle Systemmetriken (CPU, RAM, Temperatur, Spannung, Uptime)
-  * **HA-Buttons** für Restart und die geschützte Update-Suche
-  * **Getrennte Versionsanzeige** für installierte und verfügbare Firmware/WebUI
+  * **HA-Button** für den geschützten Neustart
+  * **Versionsanzeige** für die installierte Firmware und WebUI
   * Firmware-Installation und Werksreset bleiben aus Sicherheitsgründen WebUI-Aktionen
   * **TLS/mTLS Support** - Verschlüsselte Verbindungen und Client-Zertifikate
 * **Check_MK Agent**
@@ -164,7 +164,7 @@ Die Firmware kann auf zwei Arten auf Werkseinstellungen zurückgesetzt werden:
 
 **Über die WebUI:**
 1. Anmelden in der WebUI
-2. Zur Seite "Firmware Update" navigieren
+2. Unter "Einstellungen" den Bereich "Systemaktionen" öffnen
 3. Button "Factory Reset" klicken
 4. Bestätigen und Neustart abwarten
 
@@ -176,33 +176,28 @@ Siehe Hilfe zum RPI-RF-MOD
 * Blinken abwechselnd mit grüner Power LED: System bootet
 * Schnelles Blinken der roten Status LED, grüne Power LED leuchtet nicht: Siehe Werksreset
 * Schnelles Blinken der roten Status LED, grüne Power LED leuchtet dauerhaft: Firmware Update wird eingespielt
-* Langsames Blinken der roten Status LED, grüne Power LED leuchtet dauerhaft: Es ist ein Firmware Update verfügbar
+* Das frühere langsame Blinken für ein verfügbares Update wird nicht mehr
+  automatisch ausgelöst, weil das Gerät nicht nach Releases sucht
 * Dauerhaftes Leuchten der grünen Power LED: Sytem ist gestartet
 
 ## Firmware Updates
-Firmware Updates sind fertig kompiliert in den [Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) zu finden und können auf zwei Arten eingespielt werden:
+Fertig kompilierte Firmware finden Sie unter
+[GitHub Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases). Das Gerät
+sucht nicht selbst nach Updates. Eine Firmware wird ausschließlich als lokale
+Raw-`.bin`-Datei installiert:
 
 **Per Webinterface (File Upload):**
-1. Herunterladen der `firmware.bin` Datei aus dem Release
+1. Herunterladen der passenden `firmware_*.bin` Datei aus dem Release
 2. In der WebUI zur Seite "Firmware Update" navigieren
 3. Die .bin Datei hochladen
 4. Update wird automatisch eingespielt und die Platine neu gestartet
-5. **Nach erfolgreichem Update**: Automatische Weiterleitung zur Startseite mit Bestätigungs-Dialog
-
-**Per Webinterface (URL Download):**
-1. In der WebUI zur Seite "Firmware Update" navigieren
-2. Direkte URL zur .bin Datei eingeben (z.B. von GitHub)
-3. Online-Update starten; die WebUI nutzt dafür den konfigurierten Update-Dienst
-4. Firmware wird heruntergeladen, installiert und die Platine neu gestartet
-5. **Nach erfolgreichem Update** (ab v2.2.0-Beta.9): 
-   - Dialog "Update zu Version X erfolgreich" wird angezeigt
-   - Automatisches Schließen nach 10 Sekunden oder bei Benutzerbestätigung
+5. Warten, bis das Gerät neu gestartet und die WebUI wieder erreichbar ist
 
 **Sicherheitshinweise:**
 - Die Standard-Authentifizierung schützt Firmware-Updates ausreichend
 - Die Firmware validiert alle Updates vor der Installation
 - Bei fehlerhaften Updates wird die OTA-Operation korrekt abgebrochen
-- TLS/Zertifikat-Verifikation (ab v2.2.0-Beta.10): Vollständiges Mozilla CA-Bundle für Kompatibilität mit Let's Encrypt / GitHub CDN
+- URL-Download, automatische Suche und MQTT/Home-Assistant-OTA sind entfernt
 
 ## Notfall-Wiederherstellung (Rescue Script)
 Sollte die WebUI nicht mehr erreichbar sein, aber die Platine noch im Netzwerk antworten (Ping), kann die Firmware über das mitgelieferte Python-Script `test_ota_function.py` neu installiert werden.
@@ -216,17 +211,15 @@ Sollte die WebUI nicht mehr erreichbar sein, aber die Platine noch im Netzwerk a
 Das Script befindet sich im Root-Verzeichnis des Repositories.
 
 ```bash
-# Syntax
-python3 test_ota_function.py <IP-ADRESSE> <PASSWORD> [--url <FIRMWARE_URL>]
+# Syntax (Passwort wird sicher abgefragt)
+python3 test_ota_function.py <IP-ADRESSE> <LOKALE-FIRMWARE.bin>
 
-# Beispiel (mit Standard-URL zur neuesten Firmware)
-python3 test_ota_function.py 192.168.1.100 meinPasswort
-
-# Beispiel (mit eigener URL)
-python3 test_ota_function.py 192.168.1.100 meinPasswort --url http://192.168.1.50/firmware.bin
+# Beispiel
+python3 test_ota_function.py 192.168.1.100 build/firmware.bin
 ```
 
-Das Script authentifiziert sich, triggert das OTA-Update und überwacht den Fortschritt bis zum erfolgreichen Neustart.
+Das Script authentifiziert sich und sendet die lokale Datei als
+`application/octet-stream` direkt an `POST /ota_update`.
 
 ## Kompatible CCU-Systeme
 
@@ -287,7 +280,7 @@ Die HB-RF-ETH-ng Firmware bietet eine nahtlose Integration in Home Assistant via
 | LWT Topic | `<prefix>/status/online` | Last Will & Testament, retained, QoS 1 |
 | LWT Payload offline | `offline` (7 Bytes) | Wird vom Broker bei unclean disconnect gesetzt |
 | Birth Payload | `online` | Beim (Re)Connect sofort gesendet, retained QoS 0 |
-| Status-Publish-Intervall | 5 s (idle) / 1 s (OTA laufend) | Adaptives Intervall |
+| Status-Publish-Intervall | 60 s | Explizite Trigger werden binnen etwa 5 s verarbeitet |
 | Command-Subscribe | `<prefix>/command/#` | Nur wenn `commandEnabled` ODER `haDiscoveryEnabled` |
 
 ---
@@ -306,16 +299,17 @@ auf. Generiert aus `main/mqtt_handler.cpp` (Stand v2.2.0-Beta.7).
 └── command/   (Subscriber-Seite) – Steuerkommandos an das Gerät
 
 <ha_prefix>/                      Standard: "homeassistant"
-└── {sensor|binary_sensor|button|update}/hb-rf-eth-<serial>/<obj_id>/config
+└── {sensor|binary_sensor|button}/hb-rf-eth-<serial>/<obj_id>/config
                                   – HA Auto-Discovery Configs (retained, QoS 1)
 ```
 
 ### 1. Status Topics (`<prefix>/status/*`)
 
 Alle Status-Werte sind **retained** und werden mit **QoS 0** veröffentlicht.
-Das Publish-Intervall beträgt 5 Sekunden im Idle-Zustand bzw. 1 Sekunde während
-eines OTA-Updates. Nach jedem (Re)Connect erfolgt sofort ein vollständiger
-Publish-Cycle plus optional eine HA-Discovery-Runde.
+Das reguläre Publish-Intervall beträgt 60 Sekunden; explizite Status-Trigger
+werden spätestens beim nächsten 5-Sekunden-Teilschritt verarbeitet. Nach jedem
+(Re)Connect erfolgt sofort ein vollständiger Publish-Cycle plus optional eine
+HA-Discovery-Runde.
 
 #### Identity & Version
 
@@ -323,10 +317,9 @@ Publish-Cycle plus optional eine HA-Discovery-Runde.
 |-------|-----|----------|--------------|
 | `status/online` | string | `online` / `offline` | LWT-Birth-Marker; "offline" wird vom Broker bei unclean disconnect gesetzt |
 | `status/serial` | string | `A1B2C3D4E5F6` | ESP32-MAC-basierte Geräteseriennr. |
-| `status/version` | string | `2.2.0-Beta.7` | Aktuell laufende Firmware-Version |
+| `status/firmware_version` | string | `2.2.6-Beta.4` | Aktuell laufende Firmware-Version |
+| `status/webui_version` | string | `1.0.0-Beta.16` | Effektiv ausgelieferte WebUI-Version |
 | `status/board_revision` | string | `REV 1.10 (PUB)` | Hardware-Revision der Platine |
-| `status/latest_version` | string | `2.2.0` oder `n/a` | Neueste Version laut GitHub Releases (Beta/Stable je nach Kanal) |
-| `status/update_available` | bool-string | `true` / `false` | `true`, wenn `latest > current` per Semver |
 
 #### System-Metriken
 
@@ -348,10 +341,10 @@ Publish-Cycle plus optional eine HA-Discovery-Runde.
 | `status/eth_link_speed` | int Mbit/s | `100` | Verhandelte Link-Geschwindigkeit |
 | `status/eth_duplex` | string | `Full` / `Half` | Duplex-Modus (nur wenn Link aktiv) |
 | `status/ip_address` | IPv4 | `192.168.1.100` | Aktuelle IPv4-Adresse |
+| `status/netmask` | IPv4 | `255.255.255.0` | Aktuelle IPv4-Netzmaske |
 | `status/gateway` | IPv4 | `192.168.1.1` | Aktuelles IPv4-Gateway |
-
-> IPv6-Topics werden derzeit nicht gepublished; IPv6-Adresse(n) sind über
-> `GET /sysinfo.json` abrufbar.
+| `status/dns1`, `status/dns2` | IPv4 | `192.168.1.1` | DNS-Server |
+| `status/ipv6_addresses` | string | `fe80::1234` | Kommagetrennte IPv6-Adressen oder leer |
 
 #### Funkmodul
 
@@ -368,20 +361,6 @@ Publish-Cycle plus optional eine HA-Discovery-Runde.
 | `status/ntp_synced` | bool-string | `true` | Systemzeit ist synchronisiert |
 | `status/last_ntp_sync` | uint64 | `1735300000` | Unix-Sekunden des letzten erfolgreichen Sync; `0` wenn nie synchron |
 
-#### OTA-Zustand
-
-Die OTA-Topics werden **zusätzlich** in Echtzeit aktualisiert (innerhalb ~1 s
-nach State-Change), nicht nur im 5-Sekunden-Turnus. Progress-Events werden
-höchstens alle ~5 % gepublished, um MQTT-Flooding zu vermeiden.
-
-| Topic | Typ | Beispiel | Beschreibung |
-|-------|-----|----------|--------------|
-| `status/ota_state` | enum-string | `downloading` | `idle`, `checking`, `starting`, `downloading`, `flashing`, `success`, `failed` |
-| `status/ota_progress` | int % | `42` | 0..100; `-1` wenn unbekannt/nicht im Download |
-| `status/ota_error` | string | `Bundle verification failed` | Fehlertext; **nur** wenn `ota_state = failed` |
-
----
-
 ### 2. Event Topics (`<prefix>/event/*`)
 
 Events sind **nicht retained** und werden mit **QoS 0** veröffentlicht – sie
@@ -390,9 +369,6 @@ sind punktuelle Benachrichtigungen für Automatisierungen (HA, Node-RED, …).
 | Topic | Payload | Auslöser |
 |-------|---------|----------|
 | `event/restart` | `requested` | Gerät restartet via MQTT-Kommando (vor dem tatsächlichen Reboot) |
-| `event/update_downloading` | `started` | OTA-State-Wechsel `starting` → `downloading` |
-| `event/update_finished` | `success` oder `failed: <text> (code=0x<hex>)` | OTA-State-Wechsel nach `success` oder `failed` |
-| `event/check_update` | `requested`, `already_in_progress`, `cooldown_or_not_started`, `completed`, `failed`, `skipped_low_heap`, `task_create_failed` oder `updatecheck_unavailable` | Zustand der asynchronen `check_update`-Anfrage |
 | `event/command_rejected` | `rejected cmd=<name> reason=invalid_token` | Kommando mit falschem/fehendem Token empfangen |
 
 ---
@@ -406,10 +382,10 @@ angenommen – auch nicht mit korrektem Token.
 | Command-Topic | Aktion | Vorbedingung |
 |---------------|--------|--------------|
 | `command/restart` | Gerät neustarten (Reset-Grund `USER_RESTART`) | `commandEnabled` |
-| `command/check_update` | GitHub-Releases über den geschützten Timerpfad neu abfragen und MQTT-Status danach sofort aktualisieren | `commandEnabled` |
 
-Werkreset und Firmware-Installation werden bewusst nicht als MQTT-Kommandos
-angeboten. Beide Aktionen erfordern die bestätigten Abläufe der WebUI.
+Werkreset, Update-Suche und Firmware-Installation werden nicht als
+MQTT-Kommandos angeboten. Firmware wird nur als lokale Datei in der WebUI
+installiert.
 
 #### Payload-Regeln
 
@@ -418,8 +394,8 @@ angeboten. Beide Aktionen erfordern die bestätigten Abläufe der WebUI.
 - **Mit Token:** Payload muss Byte-genau dem konfigurierten `command_token`
   entsprechen (8–63 Zeichen, Zeichensatz `A–Z a–z 0–9 - _ .`). Andernfalls wird
   das Kommando verworfen und `event/command_rejected` gepublished.
-- Bei gesetztem Token wird der Token als `payload_press` / `payload_install` in
-  die HA-Discovery-Config geschrieben, so dass HA-Buttons "einfach funktionieren".
+- Bei gesetztem Token wird der Token als `payload_press` in die
+  HA-Discovery-Config geschrieben, so dass der Neustart-Button funktioniert.
 
 ---
 
@@ -440,15 +416,14 @@ aktiv ist.
 | `free_heap` | Free Heap | data_size, measurement | B | `mdi:memory` |
 | `uptime` | Uptime | duration, total_increasing | s | `mdi:clock-outline` |
 | `uptime_text` | Uptime (Text) | – | – | `mdi:clock-outline` |
-| `version` | Current Version | – | – | `mdi:package-variant` |
-| `latest_version` | Latest Version | – | – | `mdi:package-up` |
+| `firmware_version` | Firmware Version | – | – | `mdi:package-variant` |
+| `webui_version` | WebUI Version | – | – | `mdi:web` |
 | `board_revision` | Board Revision | – | – | `mdi:expansion-card` |
 | `eth_link_speed` | Ethernet Speed | data_rate, measurement | Mbit/s | `mdi:speedometer` |
 | `ip_address` | IP Address | – | – | `mdi:ip` |
 | `radio_module_type` | Radio Module | – | – | `mdi:radio-tower` |
 | `radio_module_serial` | Radio Serial | – | – | `mdi:barcode` |
 | `radio_module_firmware` | Radio Firmware | – | – | `mdi:chip` |
-| `ota_progress` | OTA Progress | measurement | % | `mdi:progress-download` |
 
 Alle Sensoren haben `entity_category: "diagnostic"`.
 
@@ -459,7 +434,6 @@ Alle Sensoren haben `entity_category: "diagnostic"`.
 | `online` | Online | connectivity | `online` / `offline` (LWT) |
 | `eth_connected` | Ethernet Link | connectivity | `true` / `false` |
 | `ntp_synced` | NTP Synced | – | `true` / `false` |
-| `update_available` | Update Available | update | `true` / `false` |
 
 Alle haben `entity_category: "diagnostic"`.
 
@@ -468,7 +442,6 @@ Alle haben `entity_category: "diagnostic"`.
 | Object ID | Name | Class | Command | Icon |
 |-----------|------|-------|---------|------|
 | `restart` | Restart | restart | `command/restart` | `mdi:restart` |
-| `check_update` | Check for Update | update | `command/check_update` | `mdi:refresh` |
 
 Buttons werden **nur gepublished, wenn `commandEnabled = true`**. Ansonsten
 sieht HA keinen klickbaren Button.
@@ -476,9 +449,8 @@ sieht HA keinen klickbaren Button.
 `entity_category: "config"`. `payload_press` entspricht dem Token (oder dem
 Kommando-String, wenn kein Token gesetzt ist).
 
-Die frühere installierbare MQTT-Update-Entität wird aktiv entfernt. Firmware-
-und WebUI-Versionen sowie `firmware_update_available` und
-`webui_update_available` bleiben als rein informative Sensoren verfügbar.
+Frühere Update-/OTA-Sensoren, der Check-Button und die installierbare
+MQTT-Update-Entität werden über leere retained Discovery-Nachrichten entfernt.
 
 
 ---
@@ -533,18 +505,6 @@ mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/restart" -m ""
 mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/restart" -m "my-shared-secret-123"
 ```
 
-#### OTA-Update per Skript überwachen
-
-```bash
-# In einem Terminal die Events abonnieren:
-mosquitto_sub -h <broker-ip> -t "hb-rf-eth/event/#" -v
-
-# In einem zweiten Terminal den Status verfolgen:
-mosquitto_sub -h <broker-ip> -t "hb-rf-eth/status/ota_*" -v
-```
-
----
-
 ### Beispiel-HA-Dashboard
 
 Ein typisches Home Assistant Dashboard könnte so aussehen:
@@ -567,32 +527,24 @@ cards:
       - type: entity-button
         entity: button.hb_rf_eth_ng_restart
         name: Neustart
-      - type: entity-button
-        entity: button.hb_rf_eth_ng_factory_reset
-        name: Reset
-      - type: entity-button
-        entity: update.hb_rf_eth_ng_firmware_update
-        name: Update
 
   - type: entities
-    title: Firmware
+    title: Versionen
     entities:
-      - entity: sensor.hb_rf_eth_ng_current_version
-      - entity: sensor.hb_rf_eth_ng_latest_version
-      - entity: binary_sensor.hb_rf_eth_ng_update_available
-      - entity: update.hb_rf_eth_ng_firmware_update
+      - entity: sensor.hb_rf_eth_ng_firmware_version
+      - entity: sensor.hb_rf_eth_ng_webui_version
 ```
 
 ### Sicherheitshinweise
 
 - Die HA-Integration ist standardmäßig **DEAKTIVIERT** und muss explizit aktiviert werden
-- Commands (Restart, Factory Reset, Update, Check Update) sind nur dann per
-  MQTT möglich, wenn `commandEnabled` aktiv ist (Standard: ja)
+- Der einzige MQTT-Befehl `Restart` ist nur dann möglich, wenn
+  `commandEnabled` aktiv ist (Standard: ja)
 - Optional kann ein **Kommando-Token** gesetzt werden: jeder Kommando-Payload
   muss dann exakt diesem Token entsprechen. Ohne Token gilt: jeder MQTT-Client
   mit Publish-Rechten auf `<prefix>/command/#` kann das Gerät steuern
 - Bei gesetztem Token veröffentlicht das HA Discovery JSON den Token als
-  `payload_press` / `payload_install` – die Broker-ACL muss deshalb
+  `payload_press` – die Broker-ACL muss deshalb
   sicherstellen, dass nur das Gerät auf `homeassistant/#` publishen darf
 - TLS/mTLS ist optional und unabhängig vom Token (z. B. für self-hosted
   Mosquitto mit self-signed Cert)

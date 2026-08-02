@@ -62,7 +62,7 @@ HB-RF-ETH-ng/
 
 | Tool | Version |
 |------|---------|
-| ESP-IDF | v6.1-beta1 (cloned fresh in CI from `espressif/esp-idf`) |
+| ESP-IDF | v6.0.2 (stable release, cloned fresh in CI from `espressif/esp-idf`) |
 | IDF target | `esp32` |
 | SDK config | `sdkconfig.defaults;sdkconfig.hb-rf-eth-ng` |
 
@@ -104,13 +104,15 @@ python3 rename_webui_files.py   # gzip-compresses the dist assets idf.py embeds
 
 `main/CMakeLists.txt` embeds `webui/dist/{index.html,main.css,main.js,favicon.ico}.gz` directly into the firmware via `target_add_binary_data` — these gzipped files must exist before the ESP-IDF build runs.
 
-> **Note: automatic update-check removed.** The firmware no longer polls
+> **Note: automatic firmware OTA removed; manual upload retained.** The firmware no longer polls
 > GitHub for new releases and no longer ships the `/api/check_update`,
 > `/api/ota_url`, `/api/changelog` or `/api/firmware_archive` endpoints, nor
-> the embedded `archive.json.gz`. Firmware/WebUI updates are now performed
-> purely manually (upload a `*.bin` via the WebUI). Point users at the GitHub
-> releases page to discover new versions. Any `scripts/update_archive.py` /
-> `main/generated/archive.json*` artifacts left in the tree are dead.
+> the embedded `archive.json.gz`. MQTT/Home Assistant firmware-update triggers
+> were removed as well. The only firmware installation path is a local raw
+> `*.bin` upload to `POST /ota_update` (normally through the WebUI). Point users
+> at the GitHub releases page to discover new versions. Any
+> `scripts/update_archive.py` / `main/generated/archive.json*` artifacts left in
+> the tree are dead.
 
 ### Other Python Scripts
 
@@ -122,7 +124,7 @@ python3 rename_webui_files.py   # gzip-compresses the dist assets idf.py embeds
 | `generate_release_notes.py` | Creates GitHub release notes |
 | `update_headers.py` | Bulk-applies/updates the license header in `.cpp`/`.h` files |
 | `verify_webui.py` | Sanity-checks built WebUI assets |
-| `test_ota_function.py` | Manual OTA endpoint test (`--help` for usage) |
+| `test_ota_function.py` | Uploads a local raw firmware `.bin` to the manual `/ota_update` endpoint |
 | `append_version_to_progname.py` | Leftover from the PlatformIO build; not invoked by the current `idf.py` flow |
 
 ---
@@ -176,8 +178,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `systemclock.cpp` | Unified system time management |
 | `led.cpp` | RGB + status LED control |
 | `pushbuttonhandler.cpp` | Factory reset button logic |
-| `ota_config.cpp` | OTA / shared HTTPS client configuration helper |
-| `ota_config.cpp` | OTA / shared HTTPS client configuration helper |
+| `ota_config.cpp` | Shared outbound HTTPS client configuration helper (legacy filename) |
 | `mdnsserver.cpp` | mDNS / Bonjour advertisement |
 | `validation.cpp` | Input validation (IP, hostname, passwords, etc.) |
 | `log_manager.cpp` | Ring-buffer system log |
@@ -319,7 +320,7 @@ Test suites present:
 - `test_ipv6_validation` — IPv6 address parsing/validation
 - `test_static_ipv4_and_password` — Static IP and password config
 - `test_ntp_validation` — NTP configuration validation
-- `test_ota_config` — OTA update configuration
+- `test_ota_config` — shared outbound HTTPS client defaults (legacy suite name)
 - `test_monitoring_validation` — Monitoring service parameters
 
 ### WebUI Tests (Playwright)
@@ -335,6 +336,8 @@ npx playwright test
 
 ```bash
 python3 test_ota_function.py --help
+# Interactive password prompt:
+python3 test_ota_function.py <device-ip> build/HB-RF-ETH-ng-<version>.bin
 ```
 
 ---
@@ -411,7 +414,7 @@ Follow conventional commits format used in auto-changelog:
 feat: add GPS time sync support
 fix: resolve MQTT reconnect race condition
 docs: update API reference
-chore: bump ESP-IDF to 6.1-beta1
+chore: bump ESP-IDF to 6.0.2
 ```
 
 ### Branch Strategy

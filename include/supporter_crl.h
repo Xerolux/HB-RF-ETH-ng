@@ -9,6 +9,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include "esp_err.h"
 
 // Revocation list (CRL) for supporter keys. Lets the maintainer invalidate a
 // key before its embedded expiry — e.g. after a refund or when a key was
@@ -28,12 +29,17 @@ void supporter_crl_init(void);
 // Starts the background refresh task (~6 h interval, first fetch after 60 s)
 // if it is not already running. Idempotent — safe to call repeatedly, e.g.
 // from the settings-save handler when a supporter key is added at runtime.
-// No-op when the task is already running.
+// No-op when the task is already running; if it is still unwinding a previous
+// stop, requests an in-place restart once cleanup completes.
 void supporter_crl_start_refresh_task(void);
 
-// Stops and deletes the background refresh task, freeing ~8 KB task stack.
-// Called before OTA to maximise free heap for the TLS download.
-void supporter_crl_stop_refresh_task(void);
+// Cooperatively stops the background task, waking its long sleep immediately.
+// The refresh has one absolute network deadline and observes cancellation
+// between non-blocking HTTP steps. Returns ESP_ERR_TIMEOUT if the worker has
+// not released its TLS/global-mutex resources within the lifecycle bound;
+// firmware-upload and restart callers must not proceed in that case. A later
+// stop cancels any pending recovery restart.
+esp_err_t supporter_crl_stop_refresh_task(void);
 
 // Re-fetches revoked_keys.json from GitHub and refreshes the in-RAM + NVS
 // cache. Network call — serialised on g_net_fetch_mutex like every other
@@ -43,5 +49,6 @@ bool supporter_crl_refresh(void);
 // True when the given key's fingerprint is on the cached revocation list.
 // Pure RAM check, no network: SHA-256(normalised key)[:16 bytes] is compared
 // against the cached 128-bit fingerprints. Fast — mbedTLS uses the ESP32's
-// hardware SHA accelerator.
+// hardware SHA accelerator. Returns true (fail closed) if PSA Crypto cannot
+// produce a complete fingerprint.
 bool supporter_crl_is_revoked(const char *key);

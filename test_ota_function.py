@@ -1,124 +1,168 @@
+#!/usr/bin/env python3
+"""Upload a local HB-RF-ETH-ng firmware image through the manual OTA endpoint."""
+
 import argparse
+import getpass
 import json
-import time
-import urllib.request
-import urllib.parse
-import urllib.error
+from pathlib import Path
 import sys
+import urllib.error
+import urllib.request
 
-def get_token(ip, password):
-    url = f"http://{ip}/login.json"
-    headers = {"Content-Type": "application/json"}
-    data = json.dumps({"password": password}).encode("utf-8")
 
+LOGIN_TIMEOUT_SECONDS = 10
+OTA_TIMEOUT_SECONDS = 600
+
+
+def make_base_url(device):
+    """Return a normalized device base URL."""
+    value = device.strip().rstrip("/")
+    if not value:
+        raise ValueError("device address must not be empty")
+    if "://" not in value:
+        value = f"http://{value}"
+    if not value.startswith(("http://", "https://")):
+        raise ValueError("device address must use http:// or https://")
+    return value
+
+
+def decode_json(body, context):
     try:
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body)
-            if res_json.get("isAuthenticated"):
-                return res_json.get("token")
-            else:
-                print(f"Login failed: {res_json.get('error')}")
-                return None
-    except Exception as e:
-        print(f"Error during login: {e}")
-        return None
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        preview = body[:200].decode("utf-8", errors="replace")
+        raise RuntimeError(f"{context} returned invalid JSON: {preview!r}") from exc
 
-def trigger_ota(ip, token, ota_url):
-    url = f"http://{ip}/api/ota_url"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Token {token}"
-    }
-    data = json.dumps({"url": ota_url}).encode("utf-8")
 
-    try:
-        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body)
-            if res_json.get("success"):
-                print(f"OTA Triggered: {res_json.get('message')}")
-                return True
-            else:
-                print(f"OTA Trigger Failed: {res_json.get('error')}")
-                return False
-    except Exception as e:
-        print(f"Error triggering OTA: {e}")
-        return False
+def http_error_message(exc):
+    body = exc.read().decode("utf-8", errors="replace").strip()
+    detail = f": {body}" if body else ""
+    return f"HTTP {exc.code} {exc.reason}{detail}"
 
-def check_status(ip, token):
-    url = f"http://{ip}/api/ota_status"
-    headers = {
-        "Authorization": f"Token {token}"
-    }
 
-    try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode("utf-8")
-            return json.loads(res_body)
-    except Exception as e:
-        # Ignore network errors during reboot phase
-        pass
-        return None
-
-def main():
-    parser = argparse.ArgumentParser(description="Test OTA Update Function on HB-RF-ETH-ng")
-    parser.add_argument("ip", help="IP address of the device")
-    parser.add_argument("password", help="Admin password of the device")
-    parser.add_argument(
-        "--url",
-        default="https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.0-Beta.14/firmware_2.2.0-Beta.14.bin",
-        help="OTA firmware URL to flash (default: the v2.2.0-Beta.14 release asset)",
+def get_token(base_url, username, password):
+    url = f"{base_url}/login.json"
+    data = json.dumps({"username": username, "password": password}).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
 
-    args = parser.parse_args()
+    try:
+        with urllib.request.urlopen(request, timeout=LOGIN_TIMEOUT_SECONDS) as response:
+            result = decode_json(response.read(), "login")
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"login failed: {http_error_message(exc)}") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"login failed: {exc}") from exc
 
-    print(f"Connecting to {args.ip}...")
-    token = get_token(args.ip, args.password)
-
+    token = result.get("token") if result.get("isAuthenticated") else None
     if not token:
-        print("Could not authenticate. Exiting.")
-        sys.exit(1)
+        detail = result.get("error") or "invalid username or password"
+        raise RuntimeError(f"login failed: {detail}")
+    return token
 
-    print(f"Authenticated. Token: {token[:10]}...")
 
-    print(f"Triggering OTA with URL: {args.url}")
-    if not trigger_ota(args.ip, token, args.url):
-        print("Failed to trigger OTA. Exiting.")
-        sys.exit(1)
+def read_firmware(path):
+    firmware_path = path.expanduser().resolve()
+    if not firmware_path.is_file():
+        raise RuntimeError(f"firmware file does not exist: {firmware_path}")
+    if firmware_path.suffix.lower() != ".bin":
+        raise RuntimeError("firmware file must have a .bin extension")
 
-    print("Monitoring OTA progress...")
-    last_progress = -1
+    try:
+        image = firmware_path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError(f"could not read firmware file: {exc}") from exc
 
-    # Timeout after 5 minutes
-    start_time = time.time()
+    if not image:
+        raise RuntimeError("firmware file is empty")
+    if image[0] != 0xE9:
+        raise RuntimeError(
+            "file is not an ESP32 firmware image (expected magic byte 0xE9)"
+        )
+    return firmware_path, image
 
-    while time.time() - start_time < 300:
-        status = check_status(args.ip, token)
 
-        if status:
-            state = status.get("status")
-            progress = status.get("progress", 0)
-            error = status.get("error", "")
+def upload_firmware(base_url, token, image):
+    url = f"{base_url}/ota_update"
+    request = urllib.request.Request(
+        url,
+        data=image,
+        headers={
+            "Authorization": f"Token {token}",
+            "Content-Type": "application/octet-stream",
+            "Content-Length": str(len(image)),
+        },
+        method="POST",
+    )
 
-            if progress != last_progress or state == "failed" or state == "success":
-                print(f"Status: {state}, Progress: {progress}% {f'({error})' if error else ''}")
-                last_progress = progress
+    try:
+        with urllib.request.urlopen(request, timeout=OTA_TIMEOUT_SECONDS) as response:
+            result = decode_json(response.read(), "OTA upload")
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"OTA upload failed: {http_error_message(exc)}") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError(f"OTA upload failed: {exc}") from exc
 
-            if state == "success":
-                print("OTA Update Successful! Device is restarting...")
-                sys.exit(0)
-            elif state == "failed":
-                print(f"OTA Update Failed: {error}")
-                sys.exit(1)
+    if not result.get("success"):
+        detail = result.get("error") or result.get("message") or "unknown error"
+        raise RuntimeError(f"OTA upload failed: {detail}")
+    return result
 
-        time.sleep(1)
 
-    print("Timeout waiting for OTA completion.")
-    sys.exit(1)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Upload a local firmware .bin file to the manual HB-RF-ETH-ng "
+            "POST /ota_update endpoint."
+        )
+    )
+    parser.add_argument(
+        "device",
+        help="device IP/hostname, optionally including http:// or https://",
+    )
+    parser.add_argument("firmware", type=Path, help="path to the local firmware .bin")
+    parser.add_argument(
+        "--username",
+        default="admin",
+        help="administrator username (default: admin)",
+    )
+    parser.add_argument(
+        "--password",
+        help="administrator password (omit to enter it without shell-history exposure)",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    try:
+        base_url = make_base_url(args.device)
+        firmware_path, image = read_firmware(args.firmware)
+        password = args.password
+        if password is None:
+            password = getpass.getpass("Administrator password: ")
+
+        print(f"Authenticating as {args.username} at {base_url}...")
+        token = get_token(base_url, args.username, password)
+        print(
+            f"Uploading {firmware_path.name} ({len(image)} bytes) "
+            "to POST /ota_update..."
+        )
+        result = upload_firmware(base_url, token, image)
+    except (RuntimeError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    message = result.get("message") or "Firmware upload completed."
+    print(message)
+    print("The device should now restart and boot the uploaded firmware.")
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

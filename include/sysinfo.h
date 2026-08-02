@@ -52,11 +52,12 @@ public:
     const char* getResetReason();
 
     // Compact diagnostic summary of all FreeRTOS tasks: name + stack
-    // high-water mark (bytes remaining) for each, sorted by stack usage
-    // descending. Returned pointer is valid until the next call. Exposed
+    // high-water mark (bytes remaining) for each, sorted smallest-first so
+    // tasks closest to stack exhaustion remain visible if output truncates.
+    // Returned pointer is valid until the next call. Exposed
     // via /sysinfo.json (taskStacks) and MQTT status/task_stacks so that
-    // over-provisioned task stacks can be spotted from a remote support
-    // request without needing serial access. Cheap to call (transient
+    // under- and over-provisioned task stacks can be spotted from a remote
+    // support request without needing serial access. Cheap to call (transient
     // ~2 KB scratch for uxTaskGetSystemState), but not free — callers
     // should not poll it more often than once per second.
     const char* getTaskStackInfo();

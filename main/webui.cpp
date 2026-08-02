@@ -48,6 +48,7 @@
 #include "secure_utils.h"
 #include "log_manager.h"
 #include "reset_info.h"
+#include "nvs_storage_lock.h"
 #include "system_reset.h"
 #include "system_overview_api.h"
 #include "theme_api.h"
@@ -202,36 +203,75 @@ static bool read_password_reset_token(httpd_req_t *req, char *token, size_t toke
 }
 
 
+static esp_err_t generate_fresh_admin_token(char *out, size_t out_size)
+{
+    if (!out || out_size == 0 || !_sysInfo) return ESP_ERR_INVALID_ARG;
+    out[0] = '\0';
+
+    char tokenBase[21] = {};
+    uint32_t rnd[2] = {esp_random(), esp_random()};
+    memcpy(tokenBase, rnd, sizeof(rnd));
+    const char *serial_number = _sysInfo->getSerialNumber();
+    if (!serial_number) serial_number = "";
+    strncpy(tokenBase + 2 * sizeof(uint32_t), serial_number,
+            sizeof(tokenBase) - 2 * sizeof(uint32_t) - 1);
+    tokenBase[sizeof(tokenBase) - 1] = '\0';
+
+    unsigned char shaResult[32] = {};
+
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    const mbedtls_md_info_t *md_info =
+        mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    int md_result = md_info ? mbedtls_md_setup(&ctx, md_info, 0) : -1;
+    if (md_result == 0) md_result = mbedtls_md_starts(&ctx);
+    if (md_result == 0) {
+        md_result = mbedtls_md_update(
+            &ctx, reinterpret_cast<unsigned char *>(tokenBase), 20);
+    }
+    if (md_result == 0) md_result = mbedtls_md_finish(&ctx, shaResult);
+    mbedtls_md_free(&ctx);
+    if (md_result != 0) return ESP_FAIL;
+
+    size_t tokenLength = 0;
+    const int encode_result = mbedtls_base64_encode(
+        reinterpret_cast<unsigned char *>(out), out_size, &tokenLength,
+        shaResult, sizeof(shaResult));
+    if (encode_result != 0 || tokenLength >= out_size) {
+        out[0] = '\0';
+        return ESP_ERR_INVALID_SIZE;
+    }
+    out[tokenLength] = '\0';
+    return ESP_OK;
+}
+
+static esp_err_t rotate_admin_token()
+{
+    if (!_settings) return ESP_ERR_INVALID_STATE;
+    char fresh_token[sizeof(_token)] = {};
+    esp_err_t result =
+        generate_fresh_admin_token(fresh_token, sizeof(fresh_token));
+    if (result == ESP_OK) result = _settings->saveAdminToken(fresh_token);
+    // Runtime authorization changes only after the new token is durable.
+    if (result == ESP_OK) {
+        memcpy(_token, fresh_token, sizeof(_token));
+        _token[sizeof(_token) - 1] = '\0';
+    }
+    memset(fresh_token, 0, sizeof(fresh_token));
+    return result;
+}
+
 void generateToken()
 {
     // Try persisted token first (survives reboots — keeps "remember me" valid
     // across firmware updates and restarts).
-    if (_settings && _settings->loadAdminToken(_token, sizeof(_token))) {
-        return;
-    }
+    if (_settings && _settings->loadAdminToken(_token, sizeof(_token))) return;
 
-    char tokenBase[21];
-    uint32_t rnd[2] = {esp_random(), esp_random()};
-    memcpy(tokenBase, rnd, sizeof(rnd));
-    strncpy(tokenBase + 2 * sizeof(uint32_t), _sysInfo->getSerialNumber(), sizeof(tokenBase) - 2 * sizeof(uint32_t) - 1);
-    tokenBase[sizeof(tokenBase) - 1] = '\0';
-
-    unsigned char shaResult[32];
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 0);
-    mbedtls_md_starts(&ctx);
-    mbedtls_md_update(&ctx, (unsigned char *)tokenBase, 20);
-    mbedtls_md_finish(&ctx, shaResult);
-    mbedtls_md_free(&ctx);
-
-    size_t tokenLength;
-    mbedtls_base64_encode((unsigned char *)_token, sizeof(_token), &tokenLength, shaResult, sizeof(shaResult));
-    _token[tokenLength] = 0;
-
-    if (_settings) {
-        _settings->saveAdminToken(_token);
+    _token[0] = '\0';
+    const esp_err_t result = rotate_admin_token();
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not create a durable admin token: %s",
+                 esp_err_to_name(result));
     }
 }
 
@@ -271,6 +311,7 @@ void formatRadioMAC(uint32_t radioMAC, char *buf, size_t bufSize)
 
 esp_err_t validate_auth(httpd_req_t *req)
 {
+    if (_token[0] == '\0') return ESP_FAIL;
     char auth[60] = {0};
     if (httpd_req_get_hdr_value_str(req, "Authorization", auth, sizeof(auth)) != ESP_OK)
         return ESP_FAIL;
@@ -501,16 +542,34 @@ esp_err_t post_password_reset_complete_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Password must be 8-32 characters with uppercase, lowercase, and numbers");
     }
 
+    settings_snapshot_t previous_settings = {};
+    _settings->snapshot(&previous_settings);
+    const esp_err_t token_result = rotate_admin_token();
+    if (token_result != ESP_OK) {
+        ESP_LOGE(TAG, "Physical password reset token rotation failed: %s",
+                 esp_err_to_name(token_result));
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Authentication token could not be persisted");
+    }
     if (!_settings->setAdminPassword(newPassword))
     {
         cJSON_Delete(root);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid password");
     }
-    _settings->save();
+    if (_settings->save() != ESP_OK) {
+        _settings->restoreSnapshot(&previous_settings);
+        const esp_err_t rollback_result = _settings->save();
+        if (rollback_result != ESP_OK) {
+            ESP_LOGE(TAG, "Physical password reset rollback failed: %s",
+                     esp_err_to_name(rollback_result));
+        }
+        cJSON_Delete(root);
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                   "Password could not be persisted");
+    }
     cJSON_Delete(root);
 
-    _settings->clearAdminToken();
-    generateToken();
     reset_password_reset_state();
 
     cJSON *response = cJSON_CreateObject();
@@ -1019,6 +1078,8 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
 
     char *adminUsername = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminUsername"));
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+    char *currentPassword = cJSON_GetStringValue(
+        cJSON_GetObjectItem(root, "currentPassword"));
 
     // Validate the complete request before changing any live setting. This
     // prevents a later invalid NTP/network value from producing a misleading
@@ -1028,11 +1089,40 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return send_json_error(req, "400 Bad Request", "invalid_username",
                                "adminUsername");
     }
-    if (adminPassword && adminPassword[0] != '\0' &&
-        !validateAdminPassword(adminPassword)) {
-        cJSON_Delete(root);
-        return send_json_error(req, "400 Bad Request", "invalid_password",
-                               "adminPassword");
+    bool admin_password_change_requested = false;
+    if (adminPassword && adminPassword[0] != '\0') {
+        // A payload may echo the already-active password. Treat that as an
+        // unchanged field (including legacy/default passwords) and neither
+        // demand re-authentication nor rotate the session token.
+        if (strlen(adminPassword) >= 33) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_password",
+                                   "adminPassword");
+        }
+        admin_password_change_requested =
+            secure_strcmp(adminPassword,
+                          _settings->getAdminPassword()) != 0;
+        if (admin_password_change_requested &&
+            !validateAdminPassword(adminPassword)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_password",
+                                   "adminPassword");
+        }
+    }
+    if (admin_password_change_requested) {
+        if (currentPassword == NULL || currentPassword[0] == '\0') {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request",
+                                   "current_password_required",
+                                   "currentPassword");
+        }
+        if (secure_strcmp(currentPassword,
+                          _settings->getAdminPassword()) != 0) {
+            cJSON_Delete(root);
+            return send_json_error(req, "403 Forbidden",
+                                   "current_password_incorrect",
+                                   "currentPassword");
+        }
     }
     if (hostname && !validateHostname(hostname)) {
         cJSON_Delete(root);
@@ -1161,6 +1251,15 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         }
     }
 
+    std::unique_ptr<settings_snapshot_t> previous_settings(
+        new (std::nothrow) settings_snapshot_t{});
+    if (!previous_settings) {
+        cJSON_Delete(root);
+        return send_json_error(req, "500 Internal Server Error",
+                               "settings_snapshot_allocation", "settings");
+    }
+    _settings->snapshot(previous_settings.get());
+
     if (adminUsername && adminUsername[0] != '\0') {
         if (!_settings->setAdminUsername(adminUsername)) {
             cJSON_Delete(root);
@@ -1169,8 +1268,18 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         }
     }
 
-    if (adminPassword && adminPassword[0] != '\0') {
-        if (!validateAdminPassword(adminPassword) || !_settings->setAdminPassword(adminPassword)) {
+    if (admin_password_change_requested) {
+        const esp_err_t token_result = rotate_admin_token();
+        if (token_result != ESP_OK) {
+            _settings->restoreSnapshot(previous_settings.get());
+            ESP_LOGE(TAG, "Settings password token rotation failed: %s",
+                     esp_err_to_name(token_result));
+            cJSON_Delete(root);
+            return send_json_error(req, "500 Internal Server Error",
+                                   "token_rotation_failed", "adminPassword");
+        }
+        if (!_settings->setAdminPassword(adminPassword)) {
+            _settings->restoreSnapshot(previous_settings.get());
             cJSON_Delete(root);
             return send_json_error(req, "400 Bad Request", "invalid_password",
                                    "adminPassword");
@@ -1191,9 +1300,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setNtpServer(ntpServer);
     }
     _settings->setLEDBrightness(ledBrightness);
-    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
-        LED::setBrightness(ledBrightness);
-    }
 
     if (ledPrograms) {
         const struct {
@@ -1213,7 +1319,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
                 cJSON_GetObjectItem(ledPrograms, program.key), -1);
             if (value >= 0 && value <= 10) {
                 _settings->setLedProgram(program.program, value);
-                LED::setProgram(program.program, (led_state_t)value);
             }
         }
     }
@@ -1239,20 +1344,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
         _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
-        if (cJSON_IsTrue(systemLogEnabledItem)) {
-            LogManager::begin();
-            if (LogManager::instance().isEnabled()) {
-                emit_log_enable_snapshot();
-            }
-        } else {
-            LogManager::stop();
-        }
     }
 
     cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
-        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
     }
     cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
     if (testDesignItem && cJSON_IsBool(testDesignItem)) {
@@ -1272,15 +1368,67 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
             SupporterKeyStatus skStatus;
             if (supporter_key_validate(sk, skStatus)) {
                 _settings->setSupporterKey(sk);
-                // A supporter key is now configured — make sure the CRL
-                // refresh task is running so revocations are picked up.
-                // Idempotent: no-op if the task was already started at boot.
-                supporter_crl_start_refresh_task();
             }
         }
     }
 
-    _settings->save();
+    const esp_err_t settings_result = _settings->save();
+    if (settings_result != ESP_OK) {
+        _settings->restoreSnapshot(previous_settings.get());
+        const esp_err_t rollback_result = _settings->save();
+        if (rollback_result != ESP_OK) {
+            ESP_LOGE(TAG, "Could not roll back failed settings save: %s",
+                     esp_err_to_name(rollback_result));
+        }
+        cJSON_Delete(root);
+        return send_json_error(req, "507 Insufficient Storage",
+                               "settings_persist_failed", "settings");
+    }
+
+    // Apply visible/runtime side effects only after durable persistence.
+    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
+        LED::setBrightness(ledBrightness);
+    }
+    if (ledPrograms) {
+        const struct {
+            const char *key;
+            led_program_t program;
+        } programs[] = {
+            {"idle", LED_PROG_IDLE},
+            {"ccu_disconnected", LED_PROG_CCU_DISCONNECTED},
+            {"ccu_connected", LED_PROG_CCU_CONNECTED},
+            {"update_available", LED_PROG_UPDATE_AVAILABLE},
+            {"error", LED_PROG_ERROR},
+            {"booting", LED_PROG_BOOTING},
+            {"update_in_progress", LED_PROG_UPDATE_IN_PROGRESS},
+        };
+        for (const auto &program : programs) {
+            const int value = cJSON_GetIntValueSafe(
+                cJSON_GetObjectItem(ledPrograms, program.key), -1);
+            if (value >= 0 && value <= 10) {
+                LED::setProgram(program.program, (led_state_t)value);
+            }
+        }
+    }
+    if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
+        if (cJSON_IsTrue(systemLogEnabledItem)) {
+            LogManager::begin();
+            if (LogManager::instance().isEnabled()) {
+                emit_log_enable_snapshot();
+            }
+        } else {
+            LogManager::stop();
+        }
+    }
+    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
+        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
+    }
+    if (supporterKeyItem && cJSON_IsString(supporterKeyItem)) {
+        const char *stored_key = _settings->getSupporterKey();
+        if (stored_key && stored_key[0] != '\0') {
+            supporter_crl_start_refresh_task();
+        }
+    }
 
     cJSON_Delete(root);
 
@@ -1747,6 +1895,22 @@ httpd_uri_t get_backup_handler = {
     .handler = get_backup_handler_func,
     .user_ctx = NULL};
 
+// Serializes restore/factory-reset mutations with monitoring configuration,
+// manual firmware writes and MQTT restarts.  Every early return releases the
+// reservation automatically; a successful reserved restart never returns.
+class ScopedOperationReservation {
+public:
+    ScopedOperationReservation() : held(ota_operation_try_begin()) {}
+    ~ScopedOperationReservation()
+    {
+        if (held) ota_operation_finish();
+    }
+    explicit operator bool() const { return held; }
+
+private:
+    bool held;
+};
+
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -1756,6 +1920,13 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
+    }
+
+    ScopedOperationReservation operation;
+    if (!operation) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(
+            req, "Another configuration or restart operation is active");
     }
 
     // Complete backups include MQTT TLS material and notification credentials,
@@ -1812,6 +1983,8 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
 
     char *adminUsername = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminUsername"));
     char *adminPassword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "adminPassword"));
+    char *currentPassword = cJSON_GetStringValue(
+        cJSON_GetObjectItem(root, "currentPassword"));
     cJSON *passwordChangedItem =
         cJSON_GetObjectItem(root, "passwordChanged");
 
@@ -1840,154 +2013,538 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         cJSON_GetObjectItem(root, "gpsBaudrate"), _settings->getGpsBaudrate());
 
     char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
-
     int ledBrightness = cJSON_GetIntValueSafe(
         cJSON_GetObjectItem(root, "ledBrightness"), _settings->getLEDBrightness());
-    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
-        LED::setBrightness(ledBrightness);
-    }
-
     cJSON *ledPrograms = cJSON_GetObjectItem(root, "ledPrograms");
-    if (ledPrograms) {
-        cJSON *item;
-        int value;
-        item = cJSON_GetObjectItem(ledPrograms, "idle");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_IDLE, value);
-        item = cJSON_GetObjectItem(ledPrograms, "ccu_disconnected");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_CCU_DISCONNECTED, value);
-        item = cJSON_GetObjectItem(ledPrograms, "ccu_connected");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_CCU_CONNECTED, value);
-        item = cJSON_GetObjectItem(ledPrograms, "update_available");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_UPDATE_AVAILABLE, value);
-        item = cJSON_GetObjectItem(ledPrograms, "error");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_ERROR, value);
-        item = cJSON_GetObjectItem(ledPrograms, "booting");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_BOOTING, value);
-        item = cJSON_GetObjectItem(ledPrograms, "update_in_progress");
-        value = cJSON_GetIntValueSafe(item, -1);
-        if (value >= 0) _settings->setLedProgram(LED_PROG_UPDATE_IN_PROGRESS, value);
-    }
-
-    // IPv6
-    bool enableIPv6 = cJSON_GetBoolValue(cJSON_GetObjectItem(root, "enableIPv6"));
-    char *ipv6Mode = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Mode"));
-    char *ipv6Address = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Address"));
+    bool enableIPv6 = cJSON_GetBoolValue(
+        cJSON_GetObjectItem(root, "enableIPv6"));
+    char *ipv6Mode = cJSON_GetStringValue(
+        cJSON_GetObjectItem(root, "ipv6Mode"));
+    char *ipv6Address = cJSON_GetStringValue(
+        cJSON_GetObjectItem(root, "ipv6Address"));
     int ipv6PrefixLength = cJSON_GetIntValueSafe(
         cJSON_GetObjectItem(root, "ipv6PrefixLength"), 64);
     char *ipv6Gateway = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Gateway"));
     char *ipv6Dns1 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns1"));
     char *ipv6Dns2 = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ipv6Dns2"));
+    char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
+    cJSON *systemLogEnabledItem =
+        cJSON_GetObjectItem(root, "systemLogEnabled");
+    cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
+    cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
+    cJSON *supporterKeyItem = cJSON_GetObjectItem(root, "supporterKey");
 
-    if (adminUsername && adminUsername[0] != '\0') {
-        if (!_settings->setAdminUsername(adminUsername)) {
-            cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                       "Username must be 1-32 characters using letters, numbers, dot, dash, or underscore");
-        }
+    // Validate the entire backup and prove NVS capacity before changing any
+    // live or persistent setting. A rejected restore must leave the running
+    // configuration untouched.
+    const bool has_password_changed_flag =
+        passwordChangedItem && cJSON_IsBool(passwordChangedItem);
+    if (adminUsername && adminUsername[0] != '\0' &&
+        !valid_admin_username(adminUsername)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_username",
+                               "adminUsername");
     }
-
+    bool admin_password_change_requested = false;
     if (adminPassword && adminPassword[0] != '\0') {
-        const bool hasPasswordChangedFlag =
-            passwordChangedItem && cJSON_IsBool(passwordChangedItem);
-        const bool restored = hasPasswordChangedFlag
-            ? _settings->restoreAdminPassword(
-                adminPassword, cJSON_IsTrue(passwordChangedItem))
-            : (validateAdminPassword(adminPassword) &&
-               _settings->setAdminPassword(adminPassword));
-        if (!restored) {
+        const size_t password_len = strlen(adminPassword);
+        if (password_len >= 33) {
             cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                       "Invalid password in backup");
+            return send_json_error(req, "400 Bad Request", "invalid_password",
+                                   "adminPassword");
+        }
+        admin_password_change_requested =
+            secure_strcmp(adminPassword,
+                          _settings->getAdminPassword()) != 0;
+        // A same-password backup is configuration-only. For an actual
+        // credential replacement, legacy backups with an explicit flag may
+        // retain their historic password while new-format input must satisfy
+        // the current password policy.
+        const bool password_valid = !admin_password_change_requested ||
+            (has_password_changed_flag
+                ? password_len > 0
+                : validateAdminPassword(adminPassword));
+        if (!password_valid) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_password",
+                                   "adminPassword");
         }
     }
-
+    if (admin_password_change_requested) {
+        if (currentPassword == NULL || currentPassword[0] == '\0') {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request",
+                                   "current_password_required",
+                                   "currentPassword");
+        }
+        if (secure_strcmp(currentPassword,
+                          _settings->getAdminPassword()) != 0) {
+            cJSON_Delete(root);
+            return send_json_error(req, "403 Forbidden",
+                                   "current_password_incorrect",
+                                   "currentPassword");
+        }
+    }
+    if (hostname && !validateHostname(hostname)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_hostname",
+                               "hostname");
+    }
+    if (hostname && !useDHCP) {
+        const bool local_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "localIP"), false, &localIP);
+        const bool netmask_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "netmask"), false, &netmask);
+        const bool gateway_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "gateway"), false, &gateway);
+        if (!local_ok || localIP.addr == IPADDR_ANY ||
+            !validateIPAddress(localIP) ||
+            !netmask_ok || netmask.addr == IPADDR_ANY ||
+            !validateNetmask(netmask) ||
+            !gateway_ok || !validateIPAddress(gateway)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_network",
+                                   "network");
+        }
+    }
     if (hostname) {
-        if (!_settings->setNetworkSettings(hostname, useDHCP, localIP, netmask, gateway, dns1, dns2)) {
+        const bool dns1_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "dns1"), true, &dns1);
+        const bool dns2_ok = parse_ipv4_json(
+            cJSON_GetObjectItem(root, "dns2"), true, &dns2);
+        if (!dns1_ok || !dns2_ok ||
+            (dns1.addr != IPADDR_ANY && !validateIPAddress(dns1)) ||
+            (dns2.addr != IPADDR_ANY && !validateIPAddress(dns2))) {
             cJSON_Delete(root);
-            return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid network settings");
+            return send_json_error(req, "400 Bad Request", "invalid_network",
+                                   "dns");
         }
     }
-    _settings->setTimesource(timesource);
-    _settings->setDcfOffset(dcfOffset);
-    _settings->setGpsBaudrate(gpsBaudrate);
-    if (ntpServer) {
-        _settings->setNtpServer(ntpServer);
+    if (timesource < TIMESOURCE_NTP || timesource > TIMESOURCE_GPS ||
+        !validateDcfOffset(dcfOffset) ||
+        !validateGpsBaudrate(gpsBaudrate) ||
+        !validateLEDBrightness(ledBrightness) ||
+        (ntpServer && !validateNtpServer(ntpServer)) ||
+        (ccuIP && ccuIP[0] != '\0' && !validateCcuAddress(ccuIP))) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup",
+                               "settings");
     }
-    _settings->setLEDBrightness(ledBrightness);
 
-    if (cJSON_GetObjectItem(root, "enableIPv6") ||
+    const bool has_ipv6 =
+        cJSON_GetObjectItem(root, "enableIPv6") ||
         cJSON_GetObjectItem(root, "ipv6Mode") ||
         cJSON_GetObjectItem(root, "ipv6Address") ||
         cJSON_GetObjectItem(root, "ipv6PrefixLength") ||
         cJSON_GetObjectItem(root, "ipv6Gateway") ||
         cJSON_GetObjectItem(root, "ipv6Dns1") ||
-        cJSON_GetObjectItem(root, "ipv6Dns2")) {
-         _settings->setIPv6Settings(
-            cJSON_GetObjectItem(root, "enableIPv6") ? enableIPv6 : _settings->getEnableIPv6(),
-            ipv6Mode ? ipv6Mode : _settings->getIPv6Mode(),
-            ipv6Address ? ipv6Address : _settings->getIPv6Address(),
-            cJSON_GetObjectItem(root, "ipv6PrefixLength") ? ipv6PrefixLength : _settings->getIPv6PrefixLength(),
-            ipv6Gateway ? ipv6Gateway : _settings->getIPv6Gateway(),
-            ipv6Dns1 ? ipv6Dns1 : _settings->getIPv6Dns1(),
-            ipv6Dns2 ? ipv6Dns2 : _settings->getIPv6Dns2()
-        );
-    }
-
-    char *ccuIP = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ccuIP"));
-    if (ccuIP) {
-        _settings->setCCUIP(ccuIP);
-    }
-
-    cJSON *systemLogEnabledItem = cJSON_GetObjectItem(root, "systemLogEnabled");
-    if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
-        _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
-    }
-
-    cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
-    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
-        _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
-        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
-    }
-    cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
-    if (testDesignItem && cJSON_IsBool(testDesignItem)) {
-        _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
-    }
-
-    // Restore supporter key if present in the backup payload.
-    cJSON *supporterKeyItem = cJSON_GetObjectItem(root, "supporterKey");
-    if (supporterKeyItem && cJSON_IsString(supporterKeyItem)) {
-        const char *sk = cJSON_GetStringValue(supporterKeyItem);
-        if (sk == NULL || sk[0] == '\0') {
-            _settings->setSupporterKey("");
-        } else {
-            SupporterKeyStatus skStatus;
-            if (supporter_key_validate(sk, skStatus)) {
-                _settings->setSupporterKey(sk);
+        cJSON_GetObjectItem(root, "ipv6Dns2");
+    if (has_ipv6) {
+        const bool effective_enabled = cJSON_GetObjectItem(root, "enableIPv6")
+            ? enableIPv6 : _settings->getEnableIPv6();
+        const char *effective_mode =
+            ipv6Mode ? ipv6Mode : _settings->getIPv6Mode();
+        const char *effective_address =
+            ipv6Address ? ipv6Address : _settings->getIPv6Address();
+        if (!effective_mode ||
+            (strcmp(effective_mode, "auto") != 0 &&
+             strcmp(effective_mode, "static") != 0 &&
+             strcmp(effective_mode, "disabled") != 0) ||
+            ipv6PrefixLength < 1 || ipv6PrefixLength > 128 ||
+            (effective_enabled && strcmp(effective_mode, "static") == 0 &&
+             (!effective_address || effective_address[0] == '\0' ||
+              !validateIPv6Address(effective_address)))) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_ipv6",
+                                   "ipv6");
+        }
+        const char *optional_ipv6[] = {
+            ipv6Gateway, ipv6Dns1, ipv6Dns2
+        };
+        for (const char *value : optional_ipv6) {
+            if (value && value[0] != '\0' && !validateIPv6Address(value)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request", "invalid_ipv6",
+                                       "ipv6");
             }
         }
     }
 
-    _settings->save();
+    static const char *LED_PROGRAM_KEYS[] = {
+        "idle", "ccu_disconnected", "ccu_connected", "update_available",
+        "error", "booting", "update_in_progress"
+    };
+    if (ledPrograms && !cJSON_IsObject(ledPrograms)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup",
+                               "ledPrograms");
+    }
+    if (ledPrograms) {
+        for (const char *key : LED_PROGRAM_KEYS) {
+            cJSON *item = cJSON_GetObjectItem(ledPrograms, key);
+            if (item && (!cJSON_IsNumber(item) ||
+                         item->valuedouble != item->valueint ||
+                         item->valueint < 0 || item->valueint > 10)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request",
+                                       "invalid_backup", "ledPrograms");
+            }
+        }
+    }
+
+    const char *supporter_key = NULL;
+    if (supporterKeyItem) {
+        if (!cJSON_IsString(supporterKeyItem)) {
+            cJSON_Delete(root);
+            return send_json_error(req, "400 Bad Request", "invalid_backup",
+                                   "supporterKey");
+        }
+        supporter_key = cJSON_GetStringValue(supporterKeyItem);
+        if (supporter_key && supporter_key[0] != '\0') {
+            SupporterKeyStatus status;
+            if (!supporter_key_validate(supporter_key, status)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request",
+                                       "invalid_supporter_key", "supporterKey");
+            }
+        }
+    }
+
+    std::unique_ptr<settings_snapshot_t> previous_settings(
+        new (std::nothrow) settings_snapshot_t{});
+    std::unique_ptr<monitoring_config_t> previous_monitoring;
+    if (!previous_settings) {
+        cJSON_Delete(root);
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_snapshot_allocation", "settings");
+    }
+    _settings->snapshot(previous_settings.get());
+    if (restored_monitoring) {
+        previous_monitoring.reset(
+            new (std::nothrow) monitoring_config_t{});
+        if (!previous_monitoring ||
+            monitoring_get_config(previous_monitoring.get()) != ESP_OK) {
+            cJSON_Delete(root);
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_snapshot_allocation",
+                                   "monitoring");
+        }
+    }
+
+    // Keep every app-owned writer out of the shared 16 KiB NVS partition
+    // from capacity preflight through the final commit. Nested helpers take
+    // this recursive lock as well.
+    NvsStorageLock restore_storage;
+    if (!restore_storage) {
+        cJSON_Delete(root);
+        return send_json_error(req, "503 Service Unavailable",
+                               "restore_storage_busy", "backup");
+    }
 
     if (restored_monitoring &&
-        monitoring_save_config_for_restore(restored_monitoring.get()) != ESP_OK) {
+        monitoring_validate_config_storage(restored_monitoring.get()) !=
+            ESP_OK) {
         cJSON_Delete(root);
-        return send_json_error(req, "500 Internal Server Error",
-                               "restore_monitoring_failed", "monitoring");
+        return send_json_error(req, "507 Insufficient Storage",
+                               "restore_monitoring_capacity", "monitoring");
     }
-    if (has_restored_theme &&
-        theme_api_set_config(restored_theme_scheme,
-                             restored_theme_color) != ESP_OK) {
+
+    // Snapshot the rollbackable theme before changing any persistent value.
+    char previous_theme_scheme[8] = {};
+    char previous_theme_color[8] = {};
+    if (has_restored_theme) {
+        if (theme_api_get_config(previous_theme_scheme,
+                                 sizeof(previous_theme_scheme),
+                                 previous_theme_color,
+                                 sizeof(previous_theme_color)) != ESP_OK) {
+            cJSON_Delete(root);
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_theme_snapshot_failed", "theme");
+        }
+    }
+
+    // Rotate before accepting the replacement password in RAM and before the
+    // restore transaction captures its auth rollback image. The backup will
+    // therefore contain the old durable password paired with the new token.
+    if (admin_password_change_requested) {
+        const esp_err_t token_result = rotate_admin_token();
+        if (token_result != ESP_OK) {
+            ESP_LOGE(TAG, "Restore password token rotation failed: %s",
+                     esp_err_to_name(token_result));
+            cJSON_Delete(root);
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_token_rotation_failed",
+                                   "adminPassword");
+        }
+    }
+
+    // Apply the already-validated Settings candidate in RAM, then require a
+    // successful NVS commit before touching the other namespaces.
+    if (adminUsername && adminUsername[0] != '\0') {
+        (void)_settings->setAdminUsername(adminUsername);
+    }
+    if (admin_password_change_requested) {
+        if (has_password_changed_flag) {
+            (void)_settings->restoreAdminPassword(
+                adminPassword, cJSON_IsTrue(passwordChangedItem));
+        } else {
+            (void)_settings->setAdminPassword(adminPassword);
+        }
+    }
+    if (hostname) {
+        (void)_settings->setNetworkSettings(
+            hostname, useDHCP, localIP, netmask, gateway, dns1, dns2);
+    }
+    _settings->setTimesource(timesource);
+    _settings->setDcfOffset(dcfOffset);
+    _settings->setGpsBaudrate(gpsBaudrate);
+    if (ntpServer) _settings->setNtpServer(ntpServer);
+    _settings->setLEDBrightness(ledBrightness);
+
+    if (ledPrograms) {
+        for (int index = 0; index < 7; ++index) {
+            cJSON *item =
+                cJSON_GetObjectItem(ledPrograms, LED_PROGRAM_KEYS[index]);
+            if (item) {
+                _settings->setLedProgram(index, item->valueint);
+            }
+        }
+    }
+
+    if (has_ipv6) {
+        _settings->setIPv6Settings(
+            cJSON_GetObjectItem(root, "enableIPv6")
+                ? enableIPv6 : _settings->getEnableIPv6(),
+            ipv6Mode ? ipv6Mode : _settings->getIPv6Mode(),
+            ipv6Address ? ipv6Address : _settings->getIPv6Address(),
+            cJSON_GetObjectItem(root, "ipv6PrefixLength")
+                ? ipv6PrefixLength : _settings->getIPv6PrefixLength(),
+            ipv6Gateway ? ipv6Gateway : _settings->getIPv6Gateway(),
+            ipv6Dns1 ? ipv6Dns1 : _settings->getIPv6Dns1(),
+            ipv6Dns2 ? ipv6Dns2 : _settings->getIPv6Dns2());
+    }
+    if (ccuIP) _settings->setCCUIP(ccuIP);
+    if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
+        _settings->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
+    }
+    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
+        _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
+    }
+    if (testDesignItem && cJSON_IsBool(testDesignItem)) {
+        _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
+    }
+    if (supporterKeyItem) {
+        _settings->setSupporterKey(supporter_key ? supporter_key : "");
+    }
+
+    const esp_err_t settings_capacity_result =
+        _settings->validateStorageCapacity();
+    if (settings_capacity_result != ESP_OK) {
+        _settings->restoreSnapshot(previous_settings.get());
         cJSON_Delete(root);
+        if (settings_capacity_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+            return send_json_error(req, "507 Insufficient Storage",
+                                   "restore_settings_capacity", "settings");
+        }
         return send_json_error(req, "500 Internal Server Error",
-                               "restore_theme_failed", "theme");
+                               "restore_settings_validation_failed",
+                               "settings");
     }
+
+    // Arm one durable marker before the first persistent Settings write. It
+    // covers Settings, theme and monitoring as a single restore generation.
+    // restore_storage remains held until the marker is cleared after all
+    // writes, or after a fully successful rollback.
+    const esp_err_t restore_begin_result =
+        Settings::beginRestoreTransaction();
+    if (restore_begin_result != ESP_OK) {
+        _settings->restoreSnapshot(previous_settings.get());
+        cJSON_Delete(root);
+        if (restore_begin_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+            return send_json_error(req, "507 Insufficient Storage",
+                                   "restore_storage_capacity", "backup");
+        }
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_transaction_begin_failed", "backup");
+    }
+
+    auto finish_rollback_transaction = [](
+        const char *context, esp_err_t settings_rollback,
+        esp_err_t monitoring_rollback, esp_err_t theme_rollback) -> bool {
+        if (settings_rollback != ESP_OK || monitoring_rollback != ESP_OK ||
+            theme_rollback != ESP_OK) {
+            ESP_LOGE(TAG,
+                     "%s; restore marker retained: settings=%s monitoring=%s theme=%s",
+                     context, esp_err_to_name(settings_rollback),
+                     esp_err_to_name(monitoring_rollback),
+                     esp_err_to_name(theme_rollback));
+            return false;
+        }
+        const esp_err_t finish_result =
+            Settings::finishRestoreTransaction();
+        if (finish_result != ESP_OK) {
+            ESP_LOGE(TAG, "%s; could not clear restore marker: %s",
+                     context, esp_err_to_name(finish_result));
+            return false;
+        }
+        return true;
+    };
+
+    const esp_err_t settings_save_result = _settings->save();
+    if (settings_save_result != ESP_OK) {
+        _settings->restoreSnapshot(previous_settings.get());
+        const esp_err_t rollback_result = _settings->save();
+        const bool rollback_complete = finish_rollback_transaction(
+            "Could not roll back Settings after failed restore",
+            rollback_result, ESP_OK, ESP_OK);
+        cJSON_Delete(root);
+        if (!rollback_complete) {
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_rollback_failed", "backup");
+        }
+        if (settings_save_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+            return send_json_error(req, "507 Insufficient Storage",
+                                   "restore_settings_failed", "settings");
+        }
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_settings_failed", "settings");
+    }
+
+    bool theme_written = false;
+    if (has_restored_theme) {
+        const esp_err_t theme_result = theme_api_set_config(
+            restored_theme_scheme, restored_theme_color);
+        if (theme_result != ESP_OK) {
+            const esp_err_t theme_rollback = theme_api_set_config(
+                previous_theme_scheme, previous_theme_color);
+            _settings->restoreSnapshot(previous_settings.get());
+            const esp_err_t rollback_result = _settings->save();
+            const bool rollback_complete = finish_rollback_transaction(
+                "Could not fully roll back theme restore failure",
+                rollback_result, ESP_OK, theme_rollback);
+            cJSON_Delete(root);
+            if (!rollback_complete) {
+                return send_json_error(req, "500 Internal Server Error",
+                                       "restore_rollback_failed", "backup");
+            }
+            if (theme_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+                return send_json_error(req, "507 Insufficient Storage",
+                                       "restore_theme_failed", "theme");
+            }
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_theme_failed", "theme");
+        }
+        theme_written = true;
+    }
+
+    if (restored_monitoring) {
+        // Settings and theme share the same physical NVS partition with
+        // monitoring. Repeat the earlier preflight immediately before the
+        // monitoring transaction, while restore_storage still excludes every
+        // other app-owned writer. This catches capacity consumed by the two
+        // preceding commits without ever erasing the known-good monitoring
+        // generation.
+        const esp_err_t final_monitoring_capacity =
+            monitoring_validate_config_storage(restored_monitoring.get());
+        if (final_monitoring_capacity != ESP_OK) {
+            _settings->restoreSnapshot(previous_settings.get());
+            const esp_err_t settings_rollback = _settings->save();
+            esp_err_t theme_rollback = ESP_OK;
+            if (theme_written) {
+                theme_rollback = theme_api_set_config(
+                    previous_theme_scheme, previous_theme_color);
+            }
+            const bool rollback_complete = finish_rollback_transaction(
+                "Restore capacity rollback incomplete", settings_rollback,
+                ESP_OK, theme_rollback);
+            cJSON_Delete(root);
+            if (!rollback_complete) {
+                return send_json_error(req, "500 Internal Server Error",
+                                       "restore_rollback_failed", "backup");
+            }
+
+            if (final_monitoring_capacity ==
+                ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+                return send_json_error(req, "507 Insufficient Storage",
+                                       "restore_monitoring_capacity",
+                                       "monitoring");
+            }
+            ESP_LOGE(TAG, "Final monitoring capacity validation failed: %s",
+                     esp_err_to_name(final_monitoring_capacity));
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_monitoring_validation_failed",
+                                   "monitoring");
+        }
+
+        const esp_err_t monitoring_result =
+            monitoring_save_config_for_restore(restored_monitoring.get());
+        if (monitoring_result != ESP_OK) {
+            _settings->restoreSnapshot(previous_settings.get());
+            const esp_err_t settings_rollback = _settings->save();
+            const esp_err_t monitoring_rollback =
+                monitoring_save_config_for_restore(previous_monitoring.get());
+            esp_err_t theme_rollback = ESP_OK;
+            if (theme_written) {
+                theme_rollback = theme_api_set_config(
+                    previous_theme_scheme, previous_theme_color);
+            }
+            const bool rollback_complete = finish_rollback_transaction(
+                "Restore rollback incomplete", settings_rollback,
+                monitoring_rollback, theme_rollback);
+            cJSON_Delete(root);
+            if (!rollback_complete) {
+                return send_json_error(req, "500 Internal Server Error",
+                                       "restore_rollback_failed", "backup");
+            }
+            if (monitoring_result == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+                return send_json_error(req, "507 Insufficient Storage",
+                                       "restore_monitoring_capacity",
+                                       "monitoring");
+            }
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_monitoring_failed", "monitoring");
+        }
+    }
+
+    const esp_err_t restore_finish_result =
+        Settings::finishRestoreTransaction();
+    if (restore_finish_result != ESP_OK) {
+        _settings->restoreSnapshot(previous_settings.get());
+        const esp_err_t settings_rollback = _settings->save();
+        esp_err_t monitoring_rollback = ESP_OK;
+        if (restored_monitoring) {
+            monitoring_rollback =
+                monitoring_save_config_for_restore(previous_monitoring.get());
+        }
+        esp_err_t theme_rollback = ESP_OK;
+        if (theme_written) {
+            theme_rollback = theme_api_set_config(
+                previous_theme_scheme, previous_theme_color);
+        }
+        const bool rollback_complete = finish_rollback_transaction(
+            "Restore marker finalization failed", settings_rollback,
+            monitoring_rollback, theme_rollback);
+        cJSON_Delete(root);
+        if (!rollback_complete) {
+            return send_json_error(req, "500 Internal Server Error",
+                                   "restore_rollback_failed", "backup");
+        }
+        return send_json_error(req, "500 Internal Server Error",
+                               "restore_transaction_finish_failed", "backup");
+    }
+
+    // Only expose non-persistent side effects after every namespace committed.
+    if (cJSON_GetObjectItem(root, "ledBrightness") != NULL) {
+        LED::setBrightness(ledBrightness);
+    }
+    if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
+        set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
+    }
+
+    // Do not carry the storage lock into the restart cleanup: a late MQTT
+    // callback may need to write its one-shot migration marker before the
+    // cooperative MQTT stop can finish.
+    restore_storage.release();
 
     cJSON_Delete(root);
 
@@ -1997,7 +2554,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     // Restart
     vTaskDelay(pdMS_TO_TICKS(1000));
     refresh_restart_sync_from_settings();
-    full_system_restart();
+    full_system_restart_with_reserved_operation();
 
     return ESP_OK;
 }
@@ -2012,7 +2569,8 @@ httpd_uri_t post_restore_handler = {
 // upload handler) but is now also used on the success path of the upload
 // handler so that heap/network-active subsystems are stopped before the
 // restart. Without this the upload handler would not compile.
-static uint32_t prepare_ota_heap();
+static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring);
+static void resume_tasks_after_ota_failure();
 
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
@@ -2027,9 +2585,10 @@ static uint32_t prepare_ota_heap();
 
 #define OTA_BUFFER_SIZE 4096
 
-// OTA status tracking - shared between the push upload handler (/ota_update)
-// and the URL download handler (/api/ota_url) so the two cannot write the
-// update partition concurrently.
+// OTA status tracking for the remaining manual firmware upload endpoint
+// (/ota_update). Automatic update checks and URL-based OTA were removed, but
+// this gate still prevents two administrators from writing the update
+// partition concurrently.
 enum ota_status_t {
     OTA_IDLE = 0,
     OTA_DOWNLOADING,
@@ -2065,6 +2624,7 @@ static void copy_ota_error(char *dest, size_t size)
 esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
+    bool net_gate_held = false;
 
     if (validate_auth(req) != ESP_OK)
     {
@@ -2082,6 +2642,26 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     _ota_progress = 0;
     set_ota_error("");
 
+    // The inbound upload itself is not TLS, but its 4 KiB buffer plus flash
+    // erase/write pressure must not overlap an outbound TLS handshake on a
+    // WROOM-32. Mark the operation before waiting so best-effort consumers
+    // defer; hold the ownershipless gate only while bytes are streamed.
+    net_fetch_set_ota_active(true);
+    if (g_net_fetch_mutex != NULL) {
+        if (xSemaphoreTake(g_net_fetch_mutex,
+                           pdMS_TO_TICKS(20000)) != pdTRUE) {
+            ESP_LOGE(TAG, "Could not reserve network/TLS gate for OTA upload");
+            _ota_status = OTA_FAILED;
+            set_ota_error("Network/TLS subsystem busy");
+            net_fetch_set_ota_active(false);
+            ota_operation_finish();
+            return httpd_resp_send_err(req,
+                                       HTTPD_500_INTERNAL_SERVER_ERROR,
+                                       "Network/TLS subsystem busy");
+        }
+        net_gate_held = true;
+    }
+
     esp_ota_handle_t ota_handle = 0;
     bool ota_begun = false;
 
@@ -2090,25 +2670,40 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to allocate OTA buffer");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         _ota_status = OTA_FAILED;
+        if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+        net_fetch_set_ota_active(false);
         ota_operation_finish();
         return ESP_FAIL;
     }
 
-    int content_length = req->content_len;
+    const size_t content_length = req->content_len;
     if (content_length == 0x50000) {
         ESP_LOGW(TAG, "Rejected 320 KiB WebUI image on firmware endpoint");
         free(ota_buff);
         _ota_status = OTA_FAILED;
+        if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+        net_fetch_set_ota_active(false);
         ota_operation_finish();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
             "Falsche Datei: Das 327680-Byte-WebUI-/WWW-Image muss unter System -> WebUI installiert werden.");
     }
-    int content_received = 0;
+    size_t content_received = 0;
     int recv_len;
     int timeout_retries = 5;
+    static constexpr int64_t OTA_UPLOAD_TOTAL_TIMEOUT_US =
+        5LL * 60LL * 1000LL * 1000LL;
+    static constexpr int64_t OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US =
+        30LL * 1000LL * 1000LL;
+    const int64_t upload_started_us = esp_timer_get_time();
+    int64_t last_progress_us = upload_started_us;
     bool is_req_body_started = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
     const esp_partition_t *running = NULL;
+    const esp_partition_t *selected_boot = NULL;
+    uint32_t paused_monitoring = 0;
+    esp_err_t prepare_result = ESP_OK;
+    esp_err_t boot_result = ESP_OK;
+    esp_err_t ota_end_result = ESP_OK;
 
     // Validate update partition exists
     if (update_partition == NULL) {
@@ -2117,11 +2712,41 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         goto err;
     }
 
-    ESP_LOGI(TAG, "Starting OTA update, partition: %s, size: %d bytes", update_partition->label, content_length);
+    // HTTP Content-Length is size_t. Narrowing it to int before MIN() could
+    // turn a value above INT_MAX negative and then back into a huge size_t in
+    // httpd_req_recv(), overflowing the fixed 4 KiB buffer. Also reject images
+    // which cannot fit the selected application partition before reading a
+    // single byte from the socket.
+    if (content_length == 0 || content_length > update_partition->size ||
+        content_length > static_cast<size_t>(INT32_MAX)) {
+        ESP_LOGW(TAG, "Rejected OTA content length: %u (partition %u)",
+                 (unsigned)content_length, (unsigned)update_partition->size);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                            "Invalid firmware image size");
+        goto err;
+    }
+
+    ESP_LOGI(TAG, "Starting OTA update, partition: %s, size: %u bytes",
+             update_partition->label, (unsigned)content_length);
 
     do
     {
-        if ((recv_len = httpd_req_recv(req, ota_buff, MIN(content_length - content_received, OTA_BUFFER_SIZE))) < 0)
+        const int64_t now_us = esp_timer_get_time();
+        if (now_us - upload_started_us > OTA_UPLOAD_TOTAL_TIMEOUT_US ||
+            now_us - last_progress_us > OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US) {
+            ESP_LOGE(TAG,
+                     "OTA upload deadline exceeded after %u of %u bytes",
+                     (unsigned)content_received, (unsigned)content_length);
+            set_ota_error("Firmware upload timed out");
+            httpd_resp_set_status(req, "408 Request Timeout");
+            httpd_resp_sendstr(req, "Firmware upload timed out");
+            goto err;
+        }
+
+        const size_t receive_cap =
+            MIN(content_length - content_received,
+                static_cast<size_t>(OTA_BUFFER_SIZE));
+        if ((recv_len = httpd_req_recv(req, ota_buff, receive_cap)) < 0)
         {
             if (recv_len == HTTPD_SOCK_ERR_TIMEOUT && timeout_retries-- > 0)
             {
@@ -2132,7 +2757,9 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
             }
             else
             {
-                ESP_LOGE(TAG, "OTA socket error %d, received %d of %d bytes", recv_len, content_received, content_length);
+                ESP_LOGE(TAG, "OTA socket error %d, received %u of %u bytes",
+                         recv_len, (unsigned)content_received,
+                         (unsigned)content_length);
                 httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Network error during upload");
                 goto err;
             }
@@ -2140,10 +2767,18 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         else if (recv_len == 0)
         {
             // Connection closed by client
-            ESP_LOGE(TAG, "OTA connection closed prematurely, received %d of %d bytes", content_received, content_length);
+            ESP_LOGE(TAG,
+                     "OTA connection closed prematurely, received %u of %u bytes",
+                     (unsigned)content_received, (unsigned)content_length);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete upload");
             goto err;
         }
+
+        // A peer may trickle a few bytes before each socket timeout. Reset the
+        // transient retry budget on real progress, while the independent
+        // no-progress and total deadlines keep the single httpd task bounded.
+        last_progress_us = esp_timer_get_time();
+        timeout_retries = 5;
 
         if (!is_req_body_started)
         {
@@ -2172,60 +2807,70 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
             OTA_CHECK(esp_ota_begin(update_partition, content_length, &ota_handle) == ESP_OK, "Could not start OTA");
             ota_begun = true;
-            ESP_LOGW(TAG, "Begin OTA Update to partition %s, File Size: %d", update_partition->label, content_length);
+            ESP_LOGW(TAG, "Begin OTA Update to partition %s, File Size: %u",
+                     update_partition->label, (unsigned)content_length);
             _statusLED->setState(LED_STATE_BLINK_FAST);
 
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
-            content_received += recv_len;
-            _ota_progress = (int)((int64_t)content_received * 100 / content_length);
-            ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
+            content_received += static_cast<size_t>(recv_len);
+            _ota_progress = static_cast<int>(content_received * 100 /
+                                             content_length);
+            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)",
+                     (unsigned)content_received, (unsigned)content_length,
+                     _ota_progress.load());
         }
         else
         {
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
-            content_received += recv_len;
-            _ota_progress = (int)((int64_t)content_received * 100 / content_length);
-            ESP_LOGI(TAG, "OTA progress: %d / %d bytes (%d%%)", content_received, content_length, (content_received * 100) / content_length);
+            content_received += static_cast<size_t>(recv_len);
+            _ota_progress = static_cast<int>(content_received * 100 /
+                                             content_length);
+            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)",
+                     (unsigned)content_received, (unsigned)content_length,
+                     _ota_progress.load());
         }
     } while (content_received < content_length);
 
     // Verify complete firmware was received
     if (content_received != content_length) {
-        ESP_LOGE(TAG, "Incomplete firmware: received %d of %d bytes", content_received, content_length);
+        ESP_LOGE(TAG, "Incomplete firmware: received %u of %u bytes",
+                 (unsigned)content_received, (unsigned)content_length);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete firmware upload");
         goto err;
     }
 
     // Validate and finalize OTA
-    OTA_CHECK(esp_ota_end(ota_handle) == ESP_OK, "Error finalizing OTA");
-    ota_begun = false;  // Successfully ended, don't abort
+    // esp_ota_end() consumes/removes the OTA handle even when image
+    // verification fails. Clear the ownership flag before testing its result
+    // so the error path never calls esp_ota_abort() on a stale handle.
+    ota_end_result = esp_ota_end(ota_handle);
+    ota_begun = false;
+    OTA_CHECK(ota_end_result == ESP_OK, "Error finalizing OTA");
 
     // Verify the firmware image before setting boot partition
     ESP_LOGI(TAG, "Validating firmware image...");
     running = esp_ota_get_running_partition();
 
-    if (update_partition == running) {
+    if (running == NULL || update_partition == running) {
         ESP_LOGE(TAG, "Cannot update running partition!");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid OTA partition");
         goto err;
     }
 
-    OTA_CHECK(esp_ota_set_boot_partition(update_partition) == ESP_OK, "Error setting boot partition");
-
-    ESP_LOGI(TAG, "OTA finished successfully, restarting in 3 seconds to activate new firmware.");
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware update completed, restarting in 3 seconds...\"}");
-
-    _statusLED->setState(LED_STATE_OFF);
-    _ota_progress = 100;
-    _ota_status = OTA_SUCCESS;
-
-    // Store reset reason for successful firmware update
-    ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
-
-    // Release the upload buffer before entering the restart path.
+    // The image is finalized and no longer needs the upload buffer. Release it
+    // before stopping workers so a fragmented heap does not turn an otherwise
+    // valid update into a cleanup timeout.
     free(ota_buff);
     ota_buff = NULL;
+
+    // Release before stopping MQTT/other workers: an MQTT reconnect callback
+    // may be waiting on this gate and its cooperative stop must be allowed to
+    // finish. No more upload buffer or flash write is active beyond this point.
+    if (net_gate_held) {
+        xSemaphoreGive(g_net_fetch_mutex);
+        net_gate_held = false;
+    }
+    net_fetch_set_ota_active(false);
 
     // Stop heap- and network-active subsystems before the restart so they do
     // not touch lwIP / TLS during the link-down pause (flashPause) or the GPIO
@@ -2235,21 +2880,112 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // flashPause device these kept operating on an Ethernet that had just been
     // stopped, which surfaced as an Exception/Panic during the reboot. The
     // success path ends in a full restart, so the returned paused-mask is
-    // discarded.
-    (void)prepare_ota_heap();
+    // discarded after successful preparation. Crucially, prepare everything
+    // before arming the new boot partition or reporting success: a cleanup
+    // timeout can then leave the currently running firmware selected without
+    // relying on a fallible OTA-data rollback.
+    prepare_result = prepare_ota_heap(&paused_monitoring);
+    if (prepare_result != ESP_OK) {
+        // Do not take Ethernet down or restart while a background worker may
+        // still own the shared TLS mutex/socket. The boot target has not been
+        // changed yet, so resuming the services is sufficient and safe.
+        _statusLED->setState(LED_STATE_OFF);
+        _ota_status = OTA_FAILED;
+        set_ota_error("Restart deferred: background network cleanup failed");
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+        monitoring_resume_after_ota(paused_monitoring);
+        resume_tasks_after_ota_failure();
+        ota_operation_finish();
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "Firmware received but restart preparation failed; update was not activated");
+        return prepare_result;
+    }
+
+    // Arm the new image only after every network/TLS worker has stopped. The
+    // read-back is the authority: it also covers the unlikely case where the
+    // OTA-data write completed but the API returned an error afterwards.
+    boot_result = esp_ota_set_boot_partition(update_partition);
+    selected_boot = esp_ota_get_boot_partition();
+    if (selected_boot != update_partition) {
+        ESP_LOGE(TAG, "Could not select uploaded OTA partition: set=%s selected=%s",
+                 esp_err_to_name(boot_result),
+                 selected_boot ? selected_boot->label : "unknown");
+
+        // Normally the running partition is still selected because no valid
+        // OTA-data update was committed. If the state is ambiguous, make a few
+        // bounded attempts to restore it and verify every write.
+        bool running_restored = (selected_boot == running);
+        for (int attempt = 0; !running_restored && attempt < 3; ++attempt) {
+            esp_err_t restore_result = esp_ota_set_boot_partition(running);
+            selected_boot = esp_ota_get_boot_partition();
+            running_restored =
+                (restore_result == ESP_OK && selected_boot == running);
+            if (!running_restored) {
+                ESP_LOGE(TAG, "Boot partition restore attempt %d failed: set=%s selected=%s",
+                         attempt + 1, esp_err_to_name(restore_result),
+                         selected_boot ? selected_boot->label : "unknown");
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        }
+
+        _statusLED->setState(LED_STATE_OFF);
+        _ota_status = OTA_FAILED;
+        set_ota_error(running_restored
+                          ? "Could not activate uploaded firmware"
+                          : "Boot selection uncertain; restarting safely");
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            running_restored
+                                ? "Could not activate uploaded firmware"
+                                : "Boot selection uncertain; device is restarting");
+
+        if (running_restored) {
+            monitoring_resume_after_ota(paused_monitoring);
+            resume_tasks_after_ota_failure();
+            // Keep the exclusive operation reservation until all services are
+            // running again. Releasing it first would let a concurrent restart
+            // or settings mutation race the rollback path.
+            ota_operation_finish();
+            return boot_result == ESP_OK ? ESP_FAIL : boot_result;
+        }
+
+        // Staying online would defer an indeterminate boot choice to some
+        // unrelated future reset. Cleanup already completed, so reboot now and
+        // let the bootloader select one of the two validated application
+        // images while the failure reason remains recorded.
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        refresh_restart_sync_from_settings();
+        full_system_restart_with_reserved_operation();
+        return ESP_FAIL;
+    }
+    if (boot_result != ESP_OK) {
+        ESP_LOGW(TAG, "OTA boot selection verified despite API result: %s",
+                 esp_err_to_name(boot_result));
+    }
+
+    ESP_LOGI(TAG, "OTA finished successfully, restarting in 3 seconds to activate new firmware.");
+    _statusLED->setState(LED_STATE_OFF);
+    _ota_progress = 100;
+    _ota_status = OTA_SUCCESS;
+    ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware update completed, restarting in 3 seconds...\"}");
 
     // Restart on the existing 8 KiB httpd task. The previous dedicated 2 KiB
     // task overflowed while stopping Ethernet; simply enlarging it is not
     // reliable either because a contiguous stack allocation can fail on the
-    // fragmented post-OTA heap. The response has already been sent, matching
-    // the proven manual-restart handler below.
+    // fragmented post-OTA heap. The response is sent only after cleanup and
+    // verified boot selection have both succeeded.
     vTaskDelay(pdMS_TO_TICKS(3000));
     refresh_restart_sync_from_settings();
-    full_system_restart();
+    full_system_restart_with_reserved_operation();
     return ESP_OK;
 
 err:
     if (ota_buff) free(ota_buff);
+    if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+    net_fetch_set_ota_active(false);
     _statusLED->setState(LED_STATE_OFF);
     _ota_status = OTA_FAILED;
 
@@ -2310,20 +3046,33 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
+    ScopedOperationReservation operation;
+    if (!operation) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        return httpd_resp_sendstr(
+            req, "Another configuration or restart operation is active");
+    }
+
+    // Erase every user-controlled namespace first. reset_info is deliberately
+    // part of Settings::clear(), so store the one allowed post-reset metadata
+    // value and report success only after the complete wipe succeeded.
+    const esp_err_t clear_result = _settings->clear();
+    if (clear_result != ESP_OK) {
+        ESP_LOGE(TAG, "Factory reset failed while clearing settings: %s",
+                 esp_err_to_name(clear_result));
+        return send_json_error(req, "500 Internal Server Error",
+                               "factory_reset_failed", "settings");
+    }
+    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
+
     httpd_resp_set_type(req, "application/json");
     /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
-    // Erase every user-controlled namespace first. reset_info is deliberately
-    // part of Settings::clear(), so store the one allowed post-reset metadata
-    // value only after the wipe.
-    _settings->clear();
-    ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
-
     // Restart after a short delay to allow response to be sent
     vTaskDelay(pdMS_TO_TICKS(1000));
     refresh_restart_sync_from_settings();
-    full_system_restart();
+    full_system_restart_with_reserved_operation();
 
     return ESP_OK;
 }
@@ -2391,23 +3140,38 @@ httpd_uri_t get_ota_status_handler = {
     .handler = get_ota_status_handler_func,
     .user_ctx = NULL};
 
-// Free heap for URL-based OTA by shutting down heap-heavy subsystems.
+// Free heap for the manual firmware upload restart by shutting down heap-heavy
+// subsystems.
 // The ESP32-WROOM-32 has no PSRAM; with MQTT/monitoring/CRL running, only
-// ~60 KB heap can remain — not enough for the GitHub TLS handshake + download
-// (~50 KB plus fragmentation headroom). On OTA success the device restarts and
+// ~60 KB heap can remain. Keeping those workers alive while finalizing the
+// uploaded image and taking Ethernet down also creates avoidable contention.
+// On OTA success the device restarts and
 // everything comes back; on failure the returned mask is used to resume the
 // paused monitoring workers without requiring a manual restart.
-static uint32_t prepare_ota_heap()
+static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring)
 {
-    ESP_LOGI(TAG, "Preparing heap for OTA download (current free: %u KB)",
+    if (!paused_monitoring) return ESP_ERR_INVALID_ARG;
+    *paused_monitoring = 0;
+    ESP_LOGI(TAG, "Preparing heap for manual OTA restart (current free: %u KB)",
              (unsigned)(esp_get_free_heap_size() / 1024));
 
     // Stop MQTT, CheckMK, Prometheus, Syslog and notification workers. Besides
     // TLS state, this can free several task stacks (6-8 KB each) before OTA.
-    uint32_t paused_monitoring = monitoring_pause_for_ota();
+    esp_err_t monitoring_pause_result =
+        monitoring_pause_for_ota(paused_monitoring);
+    if (monitoring_pause_result != ESP_OK) {
+        ESP_LOGE(TAG, "Cannot continue OTA/restart while monitoring is stopping: %s",
+                 esp_err_to_name(monitoring_pause_result));
+        return monitoring_pause_result;
+    }
 
     // Stop CRL refresh task — frees 8 KB task stack
-    supporter_crl_stop_refresh_task();
+    esp_err_t crl_stop_result = supporter_crl_stop_refresh_task();
+    if (crl_stop_result != ESP_OK) {
+        ESP_LOGE(TAG, "Cannot continue OTA/restart while CRL is stopping: %s",
+                 esp_err_to_name(crl_stop_result));
+        return crl_stop_result;
+    }
     ESP_LOGI(TAG, "CRL task stopped for OTA (free heap now %u KB)",
              (unsigned)(esp_get_free_heap_size() / 1024));
 
@@ -2416,7 +3180,7 @@ static uint32_t prepare_ota_heap()
 
     // Brief settle for heap de-fragmentation
     vTaskDelay(pdMS_TO_TICKS(200));
-    return paused_monitoring;
+    return ESP_OK;
 }
 
 // Resume tasks stopped by prepare_ota_heap() after an OTA failure. The success
@@ -2489,20 +3253,31 @@ esp_err_t post_change_password_handler_func(httpd_req_t *req)
                                "invalid_new_password", "newPassword");
     }
 
+    settings_snapshot_t previous_settings = {};
+    _settings->snapshot(&previous_settings);
+    const esp_err_t token_result = rotate_admin_token();
+    if (token_result != ESP_OK) {
+        ESP_LOGE(TAG, "Password-change token rotation failed: %s",
+                 esp_err_to_name(token_result));
+        cJSON_Delete(root);
+        return send_json_error(req, "500 Internal Server Error",
+                               "token_rotation_failed", "newPassword");
+    }
     if (!_settings->setAdminPassword(newPassword))
     {
         cJSON_Delete(root);
         return send_json_error(req, "400 Bad Request",
                                "invalid_new_password", "newPassword");
     }
-    _settings->save();
+    if (_settings->save() != ESP_OK) {
+        _settings->restoreSnapshot(&previous_settings);
+        (void)_settings->save();
+        cJSON_Delete(root);
+        return send_json_error(req, "507 Insufficient Storage",
+                               "password_persist_failed", "newPassword");
+    }
 
     cJSON_Delete(root);
-
-    // Re-generate token for security (clear old persisted one first so
-    // generateToken() creates a fresh token and persists it).
-    _settings->clearAdminToken();
-    generateToken();
 
     httpd_resp_set_type(req, "application/json");
     cJSON *response = cJSON_CreateObject();
@@ -2650,11 +3425,14 @@ esp_err_t get_crash_log_handler_func(httpd_req_t *req)
 
     // Best-effort erase: the snapshot has now been delivered to the UI; we
     // do not want it to reappear on every reload.
-    nvs_handle_t h;
-    if (nvs_open("reset_info", NVS_READWRITE, &h) == ESP_OK) {
-        nvs_erase_key(h, "clog");
-        nvs_commit(h);
-        nvs_close(h);
+    NvsStorageLock storage_lock;
+    if (storage_lock) {
+        nvs_handle_t h;
+        if (nvs_open("reset_info", NVS_READWRITE, &h) == ESP_OK) {
+            nvs_erase_key(h, "clog");
+            nvs_commit(h);
+            nvs_close(h);
+        }
     }
     return ESP_OK;
 }
@@ -2756,11 +3534,20 @@ esp_err_t post_log_enable_handler_func(httpd_req_t *req)
         }
     }
 
+    const bool previous_enabled =
+        _settings ? _settings->getSystemLogEnabled() : false;
     LogManager::begin();
     if (LogManager::instance().isEnabled()) {
         if (_settings) {
             _settings->setSystemLogEnabled(true);
-            _settings->save();
+            if (_settings->save() != ESP_OK) {
+                _settings->setSystemLogEnabled(previous_enabled);
+                (void)_settings->save();
+                if (!previous_enabled) LogManager::stop();
+                return httpd_resp_send_err(
+                    req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                    "Log setting could not be persisted");
+            }
         }
         emit_log_enable_snapshot();
     }
@@ -2799,10 +3586,19 @@ esp_err_t post_log_disable_handler_func(httpd_req_t *req)
         }
     }
 
+    const bool previous_enabled =
+        _settings ? _settings->getSystemLogEnabled() : false;
     LogManager::stop();
     if (_settings) {
         _settings->setSystemLogEnabled(false);
-        _settings->save();
+        if (_settings->save() != ESP_OK) {
+            _settings->setSystemLogEnabled(previous_enabled);
+            (void)_settings->save();
+            if (previous_enabled) LogManager::begin();
+            return httpd_resp_send_err(
+                req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                "Log setting could not be persisted");
+        }
     }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, "{\"enabled\":false}", HTTPD_RESP_USE_STRLEN);

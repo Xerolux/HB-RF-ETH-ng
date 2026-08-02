@@ -40,6 +40,7 @@
 #include "mbedtls/net_sockets.h"
 #include <atomic>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -52,11 +53,23 @@ static const char *TAG = "events";
 // Config snapshot (copied on events_start).
 // ---------------------------------------------------------------------------
 static notify_config_t s_cfg = {};
-static SemaphoreHandle_t s_cfg_mutex = NULL;
 
 static std::atomic<bool>         s_running{false};
+static std::atomic<bool>         s_restart_requested{false};
 static std::atomic<TaskHandle_t> s_task{NULL};
+static std::atomic<int>          s_active_socket{-1};
 static QueueHandle_t             s_queue = NULL;
+static StaticSemaphore_t         s_lifecycle_mutex_buffer;
+
+static SemaphoreHandle_t events_lifecycle_mutex()
+{
+    // Lifecycle coordination must remain available under heap pressure; a
+    // dynamically allocated mutex that fails once in a function-local static
+    // would otherwise disable start/stop until the next reboot.
+    static SemaphoreHandle_t mutex =
+        xSemaphoreCreateMutexStatic(&s_lifecycle_mutex_buffer);
+    return mutex;
+}
 
 struct EventEntry {
     Event   id;
@@ -77,6 +90,168 @@ static MetricsCounter g_failed_total("hbrfeth_notify_failed_total",
                                      "Notification delivery attempts that failed");
 static MetricsCounter g_suppressed_total("hbrfeth_notify_suppressed_total",
                                          "Events suppressed by cooldown window");
+
+static constexpr int EVENT_HTTP_TOTAL_TIMEOUT_MS = 12000;
+static constexpr int SMTP_TOTAL_TIMEOUT_MS = 12000;
+static constexpr int EVENT_HTTP_ASYNC_RETRY_MS = 10;
+
+static int remaining_deadline_ms(int64_t deadline_us)
+{
+    const int64_t remaining_us = deadline_us - esp_timer_get_time();
+    if (remaining_us <= 0) return 0;
+    const int64_t rounded_ms = (remaining_us + 999) / 1000;
+    return rounded_ms > INT32_MAX ? INT32_MAX : static_cast<int>(rounded_ms);
+}
+
+static bool is_https_url(const char *url)
+{
+    return url && strncasecmp(url, "https://", 8) == 0;
+}
+
+static bool prepare_event_http_step(esp_http_client_handle_t client,
+                                    int64_t deadline_us)
+{
+    if (!s_running.load(std::memory_order_acquire)) return false;
+    const int remaining_ms = remaining_deadline_ms(deadline_us);
+    return remaining_ms > 0 &&
+           esp_http_client_set_timeout_ms(client, remaining_ms) == ESP_OK;
+}
+
+static void event_http_retry_delay(int64_t deadline_us)
+{
+    int delay_ms = remaining_deadline_ms(deadline_us);
+    if (delay_ms > EVENT_HTTP_ASYNC_RETRY_MS) {
+        delay_ms = EVENT_HTTP_ASYNC_RETRY_MS;
+    }
+    if (delay_ms > 0) vTaskDelay(pdMS_TO_TICKS(delay_ms));
+}
+
+// Send only the request and parse the response headers. Notification endpoints
+// do not return data we consume, so esp_http_client_perform() would needlessly
+// read an arbitrarily large/slow response body and could keep the worker alive
+// beyond events_stop()'s lifecycle bound. HTTPS uses IDF's asynchronous
+// transport; every retry is checked against one absolute request deadline.
+static esp_err_t post_event_http(esp_http_client_handle_t client,
+                                 const char *body, size_t body_len,
+                                 int64_t deadline_us)
+{
+    if (!client || !body || body_len > static_cast<size_t>(INT32_MAX)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    for (;;) {
+        if (!prepare_event_http_step(client, deadline_us)) {
+            return s_running.load(std::memory_order_acquire)
+                       ? ESP_ERR_TIMEOUT
+                       : ESP_ERR_INVALID_STATE;
+        }
+        const esp_err_t result =
+            esp_http_client_open(client, static_cast<int>(body_len));
+        if (result == ESP_OK) break;
+        if (result != ESP_ERR_HTTP_EAGAIN) return result;
+        event_http_retry_delay(deadline_us);
+    }
+
+    size_t written = 0;
+    while (written < body_len) {
+        if (!prepare_event_http_step(client, deadline_us)) {
+            return s_running.load(std::memory_order_acquire)
+                       ? ESP_ERR_TIMEOUT
+                       : ESP_ERR_INVALID_STATE;
+        }
+        errno = 0;
+        const int result = esp_http_client_write(
+            client, body + written,
+            static_cast<int>(body_len - written));
+        if (result > 0) {
+            written += static_cast<size_t>(result);
+            continue;
+        }
+        if ((result == 0 && (errno == 0 || errno == EAGAIN ||
+                            errno == EWOULDBLOCK)) ||
+            (result < 0 && (errno == EAGAIN || errno == EWOULDBLOCK ||
+                            errno == EINTR))) {
+            event_http_retry_delay(deadline_us);
+            continue;
+        }
+        return ESP_FAIL;
+    }
+
+    for (;;) {
+        if (!prepare_event_http_step(client, deadline_us)) {
+            return s_running.load(std::memory_order_acquire)
+                       ? ESP_ERR_TIMEOUT
+                       : ESP_ERR_INVALID_STATE;
+        }
+        const int64_t result = esp_http_client_fetch_headers(client);
+        if (result >= 0) return ESP_OK;
+        if (result != -ESP_ERR_HTTP_EAGAIN) return ESP_FAIL;
+        event_http_retry_delay(deadline_us);
+    }
+}
+
+static bool apply_socket_deadline(int sock, int64_t deadline_us)
+{
+    const int remaining_ms = remaining_deadline_ms(deadline_us);
+    if (remaining_ms <= 0) return false;
+    struct timeval timeout = {
+        .tv_sec = remaining_ms / 1000,
+        .tv_usec = (remaining_ms % 1000) * 1000,
+    };
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO,
+                      &timeout, sizeof(timeout)) == 0 &&
+           setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO,
+                      &timeout, sizeof(timeout)) == 0;
+}
+
+struct SmtpTlsIoContext {
+    mbedtls_net_context net;
+    int64_t deadline_us;
+};
+
+static int smtp_tls_send(void *ctx, const unsigned char *buf, size_t len)
+{
+    SmtpTlsIoContext *io = static_cast<SmtpTlsIoContext *>(ctx);
+    if (!s_running.load(std::memory_order_acquire) ||
+        !apply_socket_deadline(io->net.fd, io->deadline_us)) {
+        return MBEDTLS_ERR_SSL_TIMEOUT;
+    }
+    return mbedtls_net_send(&io->net, buf, len);
+}
+
+static int smtp_tls_recv_timeout(void *ctx, unsigned char *buf, size_t len,
+                                 uint32_t)
+{
+    SmtpTlsIoContext *io = static_cast<SmtpTlsIoContext *>(ctx);
+    if (!s_running.load(std::memory_order_acquire) ||
+        !apply_socket_deadline(io->net.fd, io->deadline_us)) {
+        return MBEDTLS_ERR_SSL_TIMEOUT;
+    }
+    return mbedtls_net_recv(&io->net, buf, len);
+}
+
+static bool publish_active_socket(int sock)
+{
+    SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+    if (!lifecycle) return false;
+    xSemaphoreTake(lifecycle, portMAX_DELAY);
+    const bool running = s_running.load(std::memory_order_acquire);
+    if (running) s_active_socket.store(sock, std::memory_order_release);
+    xSemaphoreGive(lifecycle);
+    return running;
+}
+
+static void close_plain_socket(int sock)
+{
+    if (sock < 0) return;
+    SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+    if (lifecycle) xSemaphoreTake(lifecycle, portMAX_DELAY);
+    if (s_active_socket.load(std::memory_order_acquire) == sock) {
+        s_active_socket.store(-1, std::memory_order_release);
+    }
+    close(sock);
+    if (lifecycle) xSemaphoreGive(lifecycle);
+}
 
 // ---------------------------------------------------------------------------
 // Event metadata.
@@ -120,9 +295,14 @@ static const EventMeta &meta_for(Event e)
 // ---------------------------------------------------------------------------
 
 // --- Webhook ---
-static bool send_webhook(const EventEntry &e, const EventMeta &m)
+static bool send_webhook(const EventEntry &e, const EventMeta &m,
+                         const notify_config_t &config)
 {
-    if (s_cfg.webhook_url[0] == '\0') {
+    if (config.webhook_url[0] == '\0') {
+        return false;
+    }
+    if (!is_https_url(config.webhook_url)) {
+        ESP_LOGE(TAG, "Rejected non-HTTPS webhook URL");
         return false;
     }
 
@@ -139,31 +319,46 @@ static bool send_webhook(const EventEntry &e, const EventMeta &m)
         m.key, host,
         e.detail[0] ? e.detail : "",
         (long long)(e.timestamp / 1000000LL));
-    if (n <= 0) { free(body); return false; }
+    if (n <= 0 || n >= 512) { free(body); return false; }
 
+    const int64_t deadline_us = esp_timer_get_time() +
+        static_cast<int64_t>(EVENT_HTTP_TOTAL_TIMEOUT_MS) * 1000;
     esp_http_client_config_t cfg = {};
-    cfg.url = s_cfg.webhook_url;
+    cfg.url = config.webhook_url;
     cfg.method = HTTP_METHOD_POST;
-    cfg.timeout_ms = 8000;
+    cfg.timeout_ms = remaining_deadline_ms(deadline_us);
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
-    cfg.disable_auto_redirect = false;
+    // Manual open/write/fetch does not implement redirects. Rejecting them
+    // keeps credentials and the absolute deadline scoped to one endpoint.
+    cfg.disable_auto_redirect = true;
+    // ESP-IDF supports non-blocking esp_http_client only over HTTPS. Requiring
+    // HTTPS above keeps every operation under the absolute deadline.
+    cfg.is_async = true;
 
     bool ok = false;
     // Outbound HTTPS must serialise on g_net_fetch_mutex.
-    if (g_net_fetch_mutex && xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+    const int mutex_wait_ms = remaining_deadline_ms(deadline_us);
+    if (g_net_fetch_mutex && mutex_wait_ms > 0 &&
+        xSemaphoreTake(g_net_fetch_mutex,
+                       pdMS_TO_TICKS(mutex_wait_ms)) == pdTRUE) {
+        if (!s_running.load(std::memory_order_acquire)) {
+            xSemaphoreGive(g_net_fetch_mutex);
+            free(body);
+            return false;
+        }
         esp_http_client_handle_t client = esp_http_client_init(&cfg);
         if (client) {
             esp_http_client_set_header(client, "Content-Type", "application/json");
-            if (s_cfg.webhook_secret[0]) {
-                esp_http_client_set_header(client, "X-HB-RF-ETH-Secret", s_cfg.webhook_secret);
+            if (config.webhook_secret[0]) {
+                esp_http_client_set_header(client, "X-HB-RF-ETH-Secret", config.webhook_secret);
             }
-            esp_http_client_set_post_field(client, body, n);
-
-            esp_err_t err = esp_http_client_perform(client);
+            esp_err_t err = post_event_http(
+                client, body, static_cast<size_t>(n), deadline_us);
             if (err == ESP_OK) {
                 int code = esp_http_client_get_status_code(client);
                 ok = (code >= 200 && code < 300);
             }
+            esp_http_client_close(client);
             esp_http_client_cleanup(client);
         }
         xSemaphoreGive(g_net_fetch_mutex);
@@ -173,9 +368,10 @@ static bool send_webhook(const EventEntry &e, const EventMeta &m)
 }
 
 // --- Telegram ---
-static bool send_telegram(const EventEntry &e, const EventMeta &m)
+static bool send_telegram(const EventEntry &e, const EventMeta &m,
+                          const notify_config_t &config)
 {
-    if (s_cfg.telegram_token[0] == '\0' || s_cfg.telegram_chatid[0] == '\0') {
+    if (config.telegram_token[0] == '\0' || config.telegram_chatid[0] == '\0') {
         return false;
     }
 
@@ -184,34 +380,49 @@ static bool send_telegram(const EventEntry &e, const EventMeta &m)
     if (s && s->getHostname() && s->getHostname()[0]) host = s->getHostname();
 
     char url[256];
-    snprintf(url, sizeof(url), "https://api.telegram.org/bot%s/sendMessage",
-             s_cfg.telegram_token);
+    int url_len = snprintf(url, sizeof(url),
+                           "https://api.telegram.org/bot%s/sendMessage",
+                           config.telegram_token);
+    if (url_len <= 0 || url_len >= static_cast<int>(sizeof(url))) return false;
 
     char *body = (char *)malloc(640);
     if (!body) return false;
     int n = snprintf(body, 640,
         "{\"chat_id\":\"%s\",\"text\":\"[%s] %s: %s\",\"disable_web_page_preview\":true}",
-        s_cfg.telegram_chatid, host, m.default_msg,
+        config.telegram_chatid, host, m.default_msg,
         e.detail[0] ? e.detail : "");
-    if (n <= 0) { free(body); return false; }
+    if (n <= 0 || n >= 640) { free(body); return false; }
 
+    const int64_t deadline_us = esp_timer_get_time() +
+        static_cast<int64_t>(EVENT_HTTP_TOTAL_TIMEOUT_MS) * 1000;
     esp_http_client_config_t cfg = {};
     cfg.url = url;
     cfg.method = HTTP_METHOD_POST;
-    cfg.timeout_ms = 8000;
+    cfg.timeout_ms = remaining_deadline_ms(deadline_us);
     cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    cfg.disable_auto_redirect = true;
+    cfg.is_async = true;
 
     bool ok = false;
-    if (g_net_fetch_mutex && xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+    const int mutex_wait_ms = remaining_deadline_ms(deadline_us);
+    if (g_net_fetch_mutex && mutex_wait_ms > 0 &&
+        xSemaphoreTake(g_net_fetch_mutex,
+                       pdMS_TO_TICKS(mutex_wait_ms)) == pdTRUE) {
+        if (!s_running.load(std::memory_order_acquire)) {
+            xSemaphoreGive(g_net_fetch_mutex);
+            free(body);
+            return false;
+        }
         esp_http_client_handle_t client = esp_http_client_init(&cfg);
         if (client) {
             esp_http_client_set_header(client, "Content-Type", "application/json");
-            esp_http_client_set_post_field(client, body, n);
-            esp_err_t err = esp_http_client_perform(client);
+            esp_err_t err = post_event_http(
+                client, body, static_cast<size_t>(n), deadline_us);
             if (err == ESP_OK) {
                 int code = esp_http_client_get_status_code(client);
                 ok = (code >= 200 && code < 300);
             }
+            esp_http_client_close(client);
             esp_http_client_cleanup(client);
         }
         xSemaphoreGive(g_net_fetch_mutex);
@@ -222,290 +433,292 @@ static bool send_telegram(const EventEntry &e, const EventMeta &m)
 
 // --- Email (SMTP) ---
 // Minimal SMTP client supporting plaintext / STARTTLS / implicit TLS.
-// Reads/writes one line at a time; expects numeric reply codes.
-static int smtp_read_reply(int sock, char *buf, size_t cap)
+// Every connect/handshake/read/write shares one absolute deadline. Socket
+// timeouts are refreshed from the remaining budget before every operation, so
+// a talkative or stalled peer cannot reset the timeout indefinitely.
+static int smtp_read_byte(int sock, mbedtls_ssl_context *ssl,
+                          unsigned char *byte, int64_t deadline_us)
+{
+    while (remaining_deadline_ms(deadline_us) > 0 &&
+           s_running.load(std::memory_order_acquire)) {
+        if (!apply_socket_deadline(sock, deadline_us)) return -1;
+        if (ssl) {
+            int r = mbedtls_ssl_read(ssl, byte, 1);
+            if (r == MBEDTLS_ERR_SSL_WANT_READ ||
+                r == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
+            return r == 1 ? 1 : -1;
+        }
+        ssize_t r = recv(sock, byte, 1, 0);
+        if (r == 1) return 1;
+        if (r < 0 && errno == EINTR) continue;
+        return -1;
+    }
+    return -1;
+}
+
+static int smtp_read_reply(int sock, mbedtls_ssl_context *ssl,
+                           char *buf, size_t cap, int64_t deadline_us)
 {
     size_t total = 0;
-    while (total + 1 < cap) {
-        ssize_t r = recv(sock, (uint8_t *)(buf + total), 1, 0);
-        if (r <= 0) return -1;
-        total += (size_t)r;
-        if (buf[total - 1] == '\n') break;
-    }
-    buf[total] = '\0';
-    // A multi-line reply uses "NNN-" for non-final lines and "NNN " for the
-    // last. We loop until we see "NNN " or hit cap.
-    while (total >= 4 && buf[3] == '-') {
-        size_t line_start = total;
+    int first_code = -1;
+    bool multiline = false;
+    for (;;) {
+        const size_t line_start = total;
         while (total + 1 < cap) {
-            ssize_t r = recv(sock, (uint8_t *)(buf + total), 1, 0);
-            if (r <= 0) return -1;
-            total += (size_t)r;
+            unsigned char byte = 0;
+            if (smtp_read_byte(sock, ssl, &byte, deadline_us) != 1) return -1;
+            buf[total++] = static_cast<char>(byte);
             if (buf[total - 1] == '\n') break;
         }
         buf[total] = '\0';
-        if (total - line_start >= 4 && buf[line_start + 3] == ' ') break;
-        if (total + 1 >= cap) break;
+        if (total - line_start < 4) return -1;
+        if (first_code < 0) {
+            first_code = (buf[0] >= '0' && buf[0] <= '9') ? atoi(buf) : -1;
+            multiline = buf[3] == '-';
+            if (!multiline) return first_code;
+        } else if (buf[line_start + 3] == ' ') {
+            return first_code;
+        }
+        if (total + 1 >= cap) return -1;
     }
-    // Return the numeric code of the first line.
-    return (buf[0] >= '0' && buf[0] <= '9') ? atoi(buf) : -1;
 }
 
-static int smtp_send_line(int sock, const char *line)
+static bool smtp_write_all(int sock, mbedtls_ssl_context *ssl,
+                           const unsigned char *data, size_t len,
+                           int64_t deadline_us)
 {
-    size_t len = strlen(line);
-    const char *p = line;
     while (len > 0) {
-        ssize_t w = send(sock, (const uint8_t *)p, len, 0);
-        if (w <= 0) return -1;
-        p += w; len -= (size_t)w;
+        if (!s_running.load(std::memory_order_acquire) ||
+            !apply_socket_deadline(sock, deadline_us)) return false;
+        int written;
+        if (ssl) {
+            written = mbedtls_ssl_write(ssl, data, len);
+            if (written == MBEDTLS_ERR_SSL_WANT_READ ||
+                written == MBEDTLS_ERR_SSL_WANT_WRITE) continue;
+        } else {
+            ssize_t result = send(sock, data, len, 0);
+            if (result < 0 && errno == EINTR) continue;
+            written = static_cast<int>(result);
+        }
+        if (written <= 0) return false;
+        data += written;
+        len -= static_cast<size_t>(written);
     }
-    // Send CRLF.
-    ssize_t w = send(sock, (const uint8_t *)"\r\n", 2, 0);
-    return (w == 2) ? 0 : -1;
+    return true;
 }
 
-static bool send_email(const EventEntry &e, const EventMeta &m)
+static bool smtp_send_line(int sock, mbedtls_ssl_context *ssl,
+                           const char *line, int64_t deadline_us)
 {
-    if (s_cfg.smtp_server[0] == '\0' || s_cfg.smtp_from[0] == '\0' || s_cfg.smtp_to[0] == '\0') {
+    return smtp_write_all(sock, ssl,
+                          reinterpret_cast<const unsigned char *>(line),
+                          strlen(line), deadline_us) &&
+           smtp_write_all(sock, ssl,
+                          reinterpret_cast<const unsigned char *>("\r\n"),
+                          2, deadline_us);
+}
+
+static bool smtp_setup_tls(mbedtls_ssl_context *ssl,
+                           mbedtls_ssl_config *conf,
+                           SmtpTlsIoContext *io,
+                           int sock, const char *host,
+                           int64_t deadline_us, bool *setup_complete)
+{
+    io->net.fd = sock;
+    io->deadline_us = deadline_us;
+    if (mbedtls_ssl_config_defaults(conf, MBEDTLS_SSL_IS_CLIENT,
+                                    MBEDTLS_SSL_TRANSPORT_STREAM,
+                                    MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
         return false;
     }
+    mbedtls_ssl_conf_authmode(conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    esp_crt_bundle_attach(conf);
+    const int remaining_ms = remaining_deadline_ms(deadline_us);
+    if (remaining_ms <= 0) return false;
+    mbedtls_ssl_conf_read_timeout(conf, static_cast<uint32_t>(remaining_ms));
+    if (mbedtls_ssl_setup(ssl, conf) != 0) return false;
+    *setup_complete = true;
+    mbedtls_ssl_set_bio(ssl, io, smtp_tls_send, NULL,
+                        smtp_tls_recv_timeout);
+    if (mbedtls_ssl_set_hostname(ssl, host) != 0) return false;
+
+    while (remaining_deadline_ms(deadline_us) > 0 &&
+           s_running.load(std::memory_order_acquire)) {
+        if (!apply_socket_deadline(sock, deadline_us)) return false;
+        int r = mbedtls_ssl_handshake(ssl);
+        if (r == 0) return true;
+        if (r != MBEDTLS_ERR_SSL_WANT_READ &&
+            r != MBEDTLS_ERR_SSL_WANT_WRITE) return false;
+    }
+    return false;
+}
+
+static bool send_email(const EventEntry &e, const EventMeta &m,
+                       const notify_config_t &config)
+{
+    if (config.smtp_server[0] == '\0' || config.smtp_from[0] == '\0' ||
+        config.smtp_to[0] == '\0' || !g_net_fetch_mutex) return false;
+
+    const int64_t deadline_us = esp_timer_get_time() +
+        static_cast<int64_t>(SMTP_TOTAL_TIMEOUT_MS) * 1000;
+    int mutex_wait_ms = remaining_deadline_ms(deadline_us);
+    if (mutex_wait_ms <= 0 ||
+        xSemaphoreTake(g_net_fetch_mutex,
+                       pdMS_TO_TICKS(mutex_wait_ms)) != pdTRUE) return false;
 
     // Implicit TLS: full TLS from the start. STARTTLS: plaintext then upgrade.
-    bool use_tls = (s_cfg.smtp_tls == 2);
-    bool use_starttls = (s_cfg.smtp_tls == 1);
+    const bool use_tls = config.smtp_tls == 2;
+    const bool use_starttls = config.smtp_tls == 1;
 
     bool ok = false;
-    if (g_net_fetch_mutex && xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(15000)) == pdTRUE) {
+    struct addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    struct addrinfo *res = NULL;
+    char port_str[8];
+    int sock = -1;
+    int flags = -1;
+    mbedtls_ssl_context ssl;
+    mbedtls_ssl_config conf;
+    SmtpTlsIoContext tls_io;
+    bool tls_setup = false;
+    bool tls_active = false;
+    char line[256];
+    unsigned char obuf[128];
+    size_t olen = 0;
 
-        struct addrinfo hints = {};
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        struct addrinfo *res = NULL;
-        char port_str[8];
-        int sock = -1;
-        int flags = -1;
-        fd_set wset;
-        struct timeval tv = { .tv_sec = 8, .tv_usec = 0 };
-        int soerr = 0;
-        socklen_t sl = sizeof(soerr);
-        mbedtls_ssl_context ssl;
-        mbedtls_ssl_config conf;
-        mbedtls_net_context net_fd;
-        bool tls_active = false;
-        // Whether mbedtls_ssl_setup() has succeeded. Once it has, BOTH ssl and
-        // conf must be torn down on every exit path - even on handshake failure
-        // - or every failed STARTTLS/implicit-TLS attempt leaks the full
-        // mbedtls context (~6-8 KB plus allocation chains). Over hours/days of
-        // link flaps or an unreachable SMTP server this drives free heap below
-        // the watchdog threshold and forces a restart, with the log wiped
-        // because it lives in RAM only. tls_active (data path enabled) is a
-        // separate flag set only after a SUCCESSFUL handshake.
-        // Declared up here so the early `goto release_mutex` paths above do
-        // not cross its initialization (C++ forbids jumping over a decl with
-        // an initializer).
-        bool tls_setup = false;
-        char line[256];
-        int code = 0;
-        char hostbuf[65];
-        int r = 0;
-        unsigned char obuf[128];
-        size_t olen = 0;
+    mbedtls_ssl_init(&ssl);
+    mbedtls_ssl_config_init(&conf);
+    mbedtls_net_init(&tls_io.net);
+    tls_io.deadline_us = deadline_us;
 
-        mbedtls_ssl_init(&ssl);
-        mbedtls_ssl_config_init(&conf);
-        mbedtls_net_init(&net_fd);
-
-        snprintf(port_str, sizeof(port_str), "%u", s_cfg.smtp_port ? s_cfg.smtp_port : 587);
-        if (getaddrinfo(s_cfg.smtp_server, port_str, &hints, &res) != ESP_OK || !res) {
-            goto release_mutex;
-        }
+    do {
+        snprintf(port_str, sizeof(port_str), "%u",
+                 config.smtp_port ? config.smtp_port : 587);
+        if (getaddrinfo(config.smtp_server, port_str, &hints, &res) != ESP_OK ||
+            !res || remaining_deadline_ms(deadline_us) <= 0 ||
+            !s_running.load(std::memory_order_acquire)) break;
 
         sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-        if (sock < 0) { freeaddrinfo(res); goto release_mutex; }
+        if (sock < 0) break;
+        if (!publish_active_socket(sock)) break;
 
-        // 8s connect timeout.
         flags = fcntl(sock, F_GETFL, 0);
         if (flags >= 0) fcntl(sock, F_SETFL, flags | O_NONBLOCK);
-        if (connect(sock, res->ai_addr, res->ai_addrlen) != 0
-            && errno != EINPROGRESS && errno != EWOULDBLOCK) {
-            close(sock); freeaddrinfo(res); goto release_mutex;
-        }
-        freeaddrinfo(res);
+        int connect_result = connect(sock, res->ai_addr, res->ai_addrlen);
+        if (connect_result != 0 && errno != EINPROGRESS &&
+            errno != EWOULDBLOCK) break;
 
-        FD_ZERO(&wset); FD_SET(sock, &wset);
-        if (select(sock + 1, NULL, &wset, NULL, &tv) <= 0) {
-            close(sock); goto release_mutex;
+        if (connect_result != 0) {
+            const int connect_ms = remaining_deadline_ms(deadline_us);
+            if (connect_ms <= 0) break;
+            fd_set wset;
+            FD_ZERO(&wset);
+            FD_SET(sock, &wset);
+            struct timeval timeout = {
+                .tv_sec = connect_ms / 1000,
+                .tv_usec = (connect_ms % 1000) * 1000,
+            };
+            if (select(sock + 1, NULL, &wset, NULL, &timeout) <= 0) break;
+            int soerr = 0;
+            socklen_t sl = sizeof(soerr);
+            if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soerr, &sl) != 0 ||
+                soerr != 0) break;
         }
-        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soerr, &sl) != 0 || soerr != 0) {
-            close(sock); goto release_mutex;
-        }
-        if (flags >= 0) fcntl(sock, F_SETFL, flags);  // restore blocking
+        if (flags >= 0) fcntl(sock, F_SETFL, flags);
+        if (!apply_socket_deadline(sock, deadline_us)) break;
 
-        // For implicit TLS we wrap the socket in mbedtls before SMTP talk.
         if (use_tls) {
-            net_fd.fd = sock;
-            if (mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT,
-                                            MBEDTLS_SSL_TRANSPORT_STREAM,
-                                            MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
-                goto smtp_fail;
-            }
-            mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-            esp_crt_bundle_attach(&conf);
-            if (mbedtls_ssl_setup(&ssl, &conf) != 0) {
-                goto smtp_fail;
-            }
-            tls_setup = true;
-            mbedtls_ssl_set_bio(&ssl, &net_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
-            snprintf(hostbuf, sizeof(hostbuf), "%s", s_cfg.smtp_server);
-            mbedtls_ssl_set_hostname(&ssl, hostbuf);
-            while ((r = mbedtls_ssl_handshake(&ssl)) != 0) {
-                if (r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) {
-                    goto smtp_fail;
-                }
-            }
+            if (!smtp_setup_tls(&ssl, &conf, &tls_io, sock,
+                                config.smtp_server, deadline_us,
+                                &tls_setup)) break;
             tls_active = true;
         }
+        mbedtls_ssl_context *active_ssl = tls_active ? &ssl : NULL;
 
-        // Helper macros for line-oriented SMTP I/O.
-        #define SMTP_RECV(expected) do { \
-            code = tls_active ? -1 : smtp_read_reply(sock, line, sizeof(line)); \
-            if (tls_active) { \
-                size_t read = 0; \
-                while (read + 1 < sizeof(line)) { \
-                    int r = mbedtls_ssl_read(&ssl, (unsigned char *)(line + read), 1); \
-                    if (r <= 0) break; \
-                    read += (size_t)r; \
-                    if (line[read - 1] == '\n') break; \
-                } \
-                line[read] = '\0'; \
-                while (read >= 4 && line[3] == '-') { \
-                    size_t start = read; \
-                    while (read + 1 < sizeof(line)) { \
-                        int rr = mbedtls_ssl_read(&ssl, (unsigned char *)(line + read), 1); \
-                        if (rr <= 0) break; \
-                        read += (size_t)rr; \
-                        if (line[read - 1] == '\n') break; \
-                    } \
-                    line[read] = '\0'; \
-                    if (read - start >= 4 && line[start + 3] == ' ') break; \
-                    if (read + 1 >= sizeof(line)) break; \
-                } \
-                code = atoi(line); \
-            } \
-            if (code / 100 != (expected) / 100) goto smtp_fail; \
-        } while (0)
-
-        #define SMTP_SEND(s) do { \
-            if (tls_active) { \
-                const char *p = (s); size_t ln = strlen(p); \
-                while (ln > 0) { \
-                    int w = mbedtls_ssl_write(&ssl, (const unsigned char *)p, ln); \
-                    if (w <= 0) goto smtp_fail; \
-                    p += w; ln -= (size_t)w; \
-                } \
-                int w = mbedtls_ssl_write(&ssl, (const unsigned char *)"\r\n", 2); \
-                if (w != 2) goto smtp_fail; \
-            } else { \
-                if (smtp_send_line(sock, (s)) != 0) goto smtp_fail; \
-            } \
-        } while (0)
-
-        SMTP_RECV(220);
-        SMTP_SEND("EHLO hb-rf-eth-ng");
-        SMTP_RECV(250);
+        if (smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2 ||
+            !smtp_send_line(sock, active_ssl, "EHLO hb-rf-eth-ng", deadline_us) ||
+            smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2) break;
 
         if (use_starttls) {
-            SMTP_SEND("STARTTLS");
-            SMTP_RECV(220);
-            // Upgrade to TLS.
-            net_fd.fd = sock;
-            if (mbedtls_ssl_config_defaults(&conf, MBEDTLS_SSL_IS_CLIENT,
-                                            MBEDTLS_SSL_TRANSPORT_STREAM,
-                                            MBEDTLS_SSL_PRESET_DEFAULT) != 0) goto smtp_fail;
-            mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
-            esp_crt_bundle_attach(&conf);
-            if (mbedtls_ssl_setup(&ssl, &conf) != 0) goto smtp_fail;
-            tls_setup = true;
-            mbedtls_ssl_set_bio(&ssl, &net_fd, mbedtls_net_send, mbedtls_net_recv, NULL);
-            snprintf(hostbuf, sizeof(hostbuf), "%s", s_cfg.smtp_server);
-            mbedtls_ssl_set_hostname(&ssl, hostbuf);
-            while ((r = mbedtls_ssl_handshake(&ssl)) != 0) {
-                if (r != MBEDTLS_ERR_SSL_WANT_READ && r != MBEDTLS_ERR_SSL_WANT_WRITE) goto smtp_fail;
-            }
+            if (!smtp_send_line(sock, NULL, "STARTTLS", deadline_us) ||
+                smtp_read_reply(sock, NULL, line, sizeof(line), deadline_us) / 100 != 2 ||
+                !smtp_setup_tls(&ssl, &conf, &tls_io, sock,
+                                config.smtp_server, deadline_us,
+                                &tls_setup)) break;
             tls_active = true;
-            SMTP_SEND("EHLO hb-rf-eth-ng");
-            SMTP_RECV(250);
+            active_ssl = &ssl;
+            if (!smtp_send_line(sock, active_ssl, "EHLO hb-rf-eth-ng", deadline_us) ||
+                smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2) break;
         }
 
-        // AUTH LOGIN (base64) — only if user is configured.
-        if (s_cfg.smtp_user[0]) {
-            SMTP_SEND("AUTH LOGIN");
-            SMTP_RECV(334);
-            mbedtls_base64_encode(obuf, sizeof(obuf), &olen,
-                                  (const unsigned char *)s_cfg.smtp_user, strlen(s_cfg.smtp_user));
+        if (config.smtp_user[0]) {
+            if (!smtp_send_line(sock, active_ssl, "AUTH LOGIN", deadline_us) ||
+                smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 3) break;
+            if (mbedtls_base64_encode(obuf, sizeof(obuf) - 1, &olen,
+                    reinterpret_cast<const unsigned char *>(config.smtp_user),
+                    strlen(config.smtp_user)) != 0 || olen >= sizeof(obuf)) break;
             obuf[olen] = '\0';
-            SMTP_SEND((const char *)obuf);
-            SMTP_RECV(334);
-            mbedtls_base64_encode(obuf, sizeof(obuf), &olen,
-                                  (const unsigned char *)s_cfg.smtp_password, strlen(s_cfg.smtp_password));
+            if (!smtp_send_line(sock, active_ssl,
+                                reinterpret_cast<const char *>(obuf), deadline_us) ||
+                smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 3) break;
+            if (mbedtls_base64_encode(obuf, sizeof(obuf) - 1, &olen,
+                    reinterpret_cast<const unsigned char *>(config.smtp_password),
+                    strlen(config.smtp_password)) != 0 || olen >= sizeof(obuf)) break;
             obuf[olen] = '\0';
-            SMTP_SEND((const char *)obuf);
-            SMTP_RECV(235);
+            if (!smtp_send_line(sock, active_ssl,
+                                reinterpret_cast<const char *>(obuf), deadline_us) ||
+                smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2) break;
         }
 
-        snprintf(line, sizeof(line), "MAIL FROM:<%s>", s_cfg.smtp_from);
-        SMTP_SEND(line);
-        SMTP_RECV(250);
-        snprintf(line, sizeof(line), "RCPT TO:<%s>", s_cfg.smtp_to);
-        SMTP_SEND(line);
-        SMTP_RECV(250);
-        SMTP_SEND("DATA");
-        SMTP_RECV(354);
+        snprintf(line, sizeof(line), "MAIL FROM:<%s>", config.smtp_from);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us) ||
+            smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2) break;
+        snprintf(line, sizeof(line), "RCPT TO:<%s>", config.smtp_to);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us) ||
+            smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2 ||
+            !smtp_send_line(sock, active_ssl, "DATA", deadline_us) ||
+            smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 3) break;
 
-        // Build the message headers + body. Sent line by line via SMTP_SEND.
-        snprintf(line, sizeof(line), "From: %s", s_cfg.smtp_from);
-        SMTP_SEND(line);
-        snprintf(line, sizeof(line), "To: %s", s_cfg.smtp_to);
-        SMTP_SEND(line);
-        snprintf(line, sizeof(line), "Subject: [%s] %s", s_cfg.smtp_from, m.default_msg);
-        SMTP_SEND(line);
-        SMTP_SEND("Content-Type: text/plain; charset=utf-8");
-        SMTP_SEND("");
-
-        snprintf(line, sizeof(line), "%s: %s",
-                 m.default_msg,
+        snprintf(line, sizeof(line), "From: %s", config.smtp_from);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us)) break;
+        snprintf(line, sizeof(line), "To: %s", config.smtp_to);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us)) break;
+        snprintf(line, sizeof(line), "Subject: [%s] %s",
+                 config.smtp_from, m.default_msg);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us) ||
+            !smtp_send_line(sock, active_ssl,
+                            "Content-Type: text/plain; charset=utf-8", deadline_us) ||
+            !smtp_send_line(sock, active_ssl, "", deadline_us)) break;
+        snprintf(line, sizeof(line), "%s: %s", m.default_msg,
                  e.detail[0] ? e.detail : "");
-        SMTP_SEND(line);
+        if (!smtp_send_line(sock, active_ssl, line, deadline_us) ||
+            !smtp_send_line(sock, active_ssl, ".", deadline_us) ||
+            smtp_read_reply(sock, active_ssl, line, sizeof(line), deadline_us) / 100 != 2) break;
 
-        SMTP_SEND(".");
-        SMTP_RECV(250);
-        SMTP_SEND("QUIT");
-
+        (void)smtp_send_line(sock, active_ssl, "QUIT", deadline_us);
         ok = true;
-    smtp_fail:
-        // Defensive teardown keyed on tls_setup, NOT tls_active: a failed
-        // handshake leaves tls_active=false but ssl_setup() has already
-        // allocated ~6-8 KB on the heap via mbedtls_ssl_setup(). The previous
-        // branch here only ran close(sock) in that case, leaking the entire
-        // mbedtls context on every STARTTLS/implicit-TLS failure - the slow
-        // drip that eventually pushes free heap below the watchdog floor and
-        // restarts the device. mbedtls_net_free is safe to call (it just
-        // closes the fd) whenever net_fd.fd was assigned.
-        if (tls_setup) {
-            if (tls_active) {
-                mbedtls_ssl_close_notify(&ssl);
-            }
-            mbedtls_ssl_free(&ssl);
-            mbedtls_ssl_config_free(&conf);
-            // mbedtls_net_free closes the underlying socket.
-            mbedtls_net_free(&net_fd);
-        } else if (sock >= 0) {
-            close(sock);
-        }
-    release_mutex:
-        if (g_net_fetch_mutex) xSemaphoreGive(g_net_fetch_mutex);
+    } while (false);
+
+    if (res) freeaddrinfo(res);
+    if (tls_active && remaining_deadline_ms(deadline_us) > 0) {
+        (void)apply_socket_deadline(sock, deadline_us);
+        (void)mbedtls_ssl_close_notify(&ssl);
     }
+    mbedtls_ssl_free(&ssl);
+    mbedtls_ssl_config_free(&conf);
+    if (tls_setup) {
+        SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+        if (lifecycle) xSemaphoreTake(lifecycle, portMAX_DELAY);
+        if (s_active_socket.load(std::memory_order_acquire) == sock) {
+            s_active_socket.store(-1, std::memory_order_release);
+        }
+        mbedtls_net_free(&tls_io.net);
+        if (lifecycle) xSemaphoreGive(lifecycle);
+    } else if (sock >= 0) {
+        close_plain_socket(sock);
+    }
+    xSemaphoreGive(g_net_fetch_mutex);
     return ok;
 }
 
@@ -514,64 +727,90 @@ static bool send_email(const EventEntry &e, const EventMeta &m)
 // ---------------------------------------------------------------------------
 static void events_task(void *)
 {
-    ESP_LOGI(TAG, "event worker started");
-    while (s_running.load()) {
-        EventEntry e;
-        if (xQueueReceive(s_queue, &e, pdMS_TO_TICKS(500)) != pdTRUE) continue;
+    for (;;) {
+        ESP_LOGI(TAG, "event worker started");
+        while (s_running.load(std::memory_order_acquire)) {
+            EventEntry e;
+            if (xQueueReceive(s_queue, &e, pdMS_TO_TICKS(500)) != pdTRUE) continue;
+            if (!s_running.load(std::memory_order_acquire)) break;
 
-        // Defer notification delivery while a firmware OTA download is in
-        // progress. The OTA path holds g_net_fetch_mutex for the whole TLS
-        // download; if we tried to send (webhook/telegram/email) at the same
-        // time we would either block on that mutex for tens of seconds or,
-        // worse, starve the OTA of heap by opening a second TLS context.
-        // We poll up to ~3 minutes; if OTA still isn't done, the event is
-        // dropped (acceptable for non-critical notifications, and the cooldown
-        // logic will suppress duplicates once delivery resumes).
-        if (net_fetch_ota_active()) {
-            int waited = 0;
-            while (s_running.load() && net_fetch_ota_active() && waited < 180000) {
-                vTaskDelay(pdMS_TO_TICKS(500));
-                waited += 500;
-            }
+            // Defer notification delivery while a manual firmware upload is in
+            // progress. The upload reserves heap and flash bandwidth; starting
+            // webhook/Telegram/email TLS work at the same time could starve it.
+            // We poll up to ~3 minutes; if the upload still isn't done, the event is
+            // dropped (acceptable for non-critical notifications, and the cooldown
+            // logic will suppress duplicates once delivery resumes).
             if (net_fetch_ota_active()) {
-                ESP_LOGW(TAG, "dropping event %d: OTA still active after wait",
-                         (int)e.id);
-                continue;
+                int waited = 0;
+                while (s_running.load(std::memory_order_acquire) &&
+                       net_fetch_ota_active() && waited < 180000) {
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    waited += 500;
+                }
+                if (!s_running.load(std::memory_order_acquire)) break;
+                if (net_fetch_ota_active()) {
+                    ESP_LOGW(TAG, "dropping event %d: firmware upload still active after wait",
+                             (int)e.id);
+                    continue;
+                }
             }
-        }
 
-        if ((int)e.id >= 0 && (int)e.id < MAX_EVENT_ID) {
-            int64_t now = esp_timer_get_time();
-            int64_t cooldown_us = (int64_t)s_cfg.cooldown_seconds * 1000000LL;
-            if (cooldown_us > 0 && (now - s_last_sent[e.id]) < cooldown_us) {
-                g_suppressed_total.inc();
-                continue;
+            notify_config_t config;
+            SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+            xSemaphoreTake(lifecycle, portMAX_DELAY);
+            memcpy(&config, &s_cfg, sizeof(config));
+            xSemaphoreGive(lifecycle);
+
+            if ((int)e.id < MAX_EVENT_ID) {
+                int64_t now = esp_timer_get_time();
+                int64_t cooldown_us = (int64_t)config.cooldown_seconds * 1000000LL;
+                if (cooldown_us > 0 && (now - s_last_sent[e.id]) < cooldown_us) {
+                    g_suppressed_total.inc();
+                    continue;
+                }
+                s_last_sent[e.id] = now;
             }
-            s_last_sent[e.id] = now;
-        }
 
-        const EventMeta &m = meta_for(e.id);
+            const EventMeta &m = meta_for(e.id);
 
-        // Snapshot the channels bitmask
-        uint8_t channels = s_cfg.channels;
-        bool any_ok = false;
+            // Snapshot the channels bitmask
+            uint8_t channels = config.channels;
+            bool any_ok = false;
 
-        if (channels & NOTIFY_CHANNEL_WEBHOOK) {
-            if (send_webhook(e, m)) any_ok = true;
-        }
-        if (channels & NOTIFY_CHANNEL_TELEGRAM) {
-            if (send_telegram(e, m)) any_ok = true;
-        }
-        if (channels & NOTIFY_CHANNEL_EMAIL) {
-            if (send_email(e, m)) any_ok = true;
-        }
+            if (channels & NOTIFY_CHANNEL_WEBHOOK) {
+                if (send_webhook(e, m, config)) any_ok = true;
+            }
+            if (s_running.load(std::memory_order_acquire) &&
+                (channels & NOTIFY_CHANNEL_TELEGRAM)) {
+                if (send_telegram(e, m, config)) any_ok = true;
+            }
+            if (s_running.load(std::memory_order_acquire) &&
+                (channels & NOTIFY_CHANNEL_EMAIL)) {
+                if (send_email(e, m, config)) any_ok = true;
+            }
 
-        if (any_ok) g_sent_total.inc();
-        else        g_failed_total.inc();
+            if (any_ok) g_sent_total.inc();
+            else        g_failed_total.inc();
+        }
+        ESP_LOGI(TAG, "event worker stopped");
+        SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+        xSemaphoreTake(lifecycle, portMAX_DELAY);
+        if (s_restart_requested.exchange(false, std::memory_order_acq_rel)) {
+            // A stop timed out and its caller requested restoration while this
+            // worker was still unwinding TLS/socket state. Reuse the existing
+            // task/stack after cleanup instead of racing a second task creation.
+            xQueueReset(s_queue);
+            s_active_socket.store(-1, std::memory_order_release);
+            s_running.store(true, std::memory_order_release);
+            xSemaphoreGive(lifecycle);
+            ESP_LOGI(TAG, "event worker restart completed after deferred stop");
+            continue;
+        }
+        s_running.store(false, std::memory_order_release);
+        s_task.store(NULL, std::memory_order_release);
+        xSemaphoreGive(lifecycle);
+        break;
     }
-    ESP_LOGI(TAG, "event worker stopped");
-    s_running.store(false);
-    s_task.store(NULL);
     vTaskDelete(NULL);
 }
 
@@ -580,62 +819,94 @@ static void events_task(void *)
 // ---------------------------------------------------------------------------
 void events_init(void)
 {
-    if (s_cfg_mutex == NULL) s_cfg_mutex = xSemaphoreCreateMutex();
-    if (s_queue == NULL) {
+    SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+    if (!lifecycle) return;
+    xSemaphoreTake(lifecycle, portMAX_DELAY);
+    if (!s_queue) {
         s_queue = xQueueCreate(QUEUE_DEPTH, sizeof(EventEntry));
     }
+    xSemaphoreGive(lifecycle);
 }
 
 esp_err_t events_start(const notify_config_t *config)
 {
     if (!config) return ESP_ERR_INVALID_ARG;
     if (!config->enabled) {
-        // Stop the worker if it's running, since we just got disabled.
-        if (s_running.load()) events_stop();
-        return ESP_OK;
+        return events_stop();
     }
     events_init();
 
-    if (s_cfg_mutex) {
-        xSemaphoreTake(s_cfg_mutex, portMAX_DELAY);
+    SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+    if (!lifecycle || !s_queue) return ESP_ERR_NO_MEM;
+    xSemaphoreTake(lifecycle, portMAX_DELAY);
+
+    TaskHandle_t existing = s_task.load(std::memory_order_acquire);
+    if (existing != NULL) {
+        if (!s_running.load(std::memory_order_acquire)) {
+            memcpy(&s_cfg, config, sizeof(s_cfg));
+            s_restart_requested.store(true, std::memory_order_release);
+            xSemaphoreGive(lifecycle);
+            ESP_LOGW(TAG, "event worker restart queued until cleanup completes");
+            return ESP_OK;
+        }
+        // Refresh the immutable-per-delivery snapshot used by the worker.
         memcpy(&s_cfg, config, sizeof(s_cfg));
-        xSemaphoreGive(s_cfg_mutex);
-    } else {
-        memcpy(&s_cfg, config, sizeof(s_cfg));
+        xSemaphoreGive(lifecycle);
+        return ESP_OK;
     }
 
-    if (s_running.load()) {
-        return ESP_OK;  // already running, just refreshed config
-    }
+    memcpy(&s_cfg, config, sizeof(s_cfg));
+    xQueueReset(s_queue);
+    s_active_socket.store(-1, std::memory_order_release);
+    s_restart_requested.store(false, std::memory_order_release);
+    s_running.store(true, std::memory_order_release);
 
-    s_running.store(true);
     TaskHandle_t h = NULL;
     // 8 KB stack — SMTP path uses mbedtls + base64 helpers.
     if (xTaskCreate(events_task, "events", 8192, NULL, 3, &h) != pdPASS) {
         ESP_LOGE(TAG, "task create failed");
-        s_running.store(false);
+        s_running.store(false, std::memory_order_release);
+        xSemaphoreGive(lifecycle);
         return ESP_FAIL;
     }
-    s_task.store(h);
+    s_task.store(h, std::memory_order_release);
+    xSemaphoreGive(lifecycle);
     return ESP_OK;
 }
 
 esp_err_t events_stop(void)
 {
-    if (!s_running.load()) return ESP_OK;
-    s_running.store(false);
+    SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
+    if (!lifecycle) return ESP_ERR_NO_MEM;
+    xSemaphoreTake(lifecycle, portMAX_DELAY);
+    TaskHandle_t task = s_task.load(std::memory_order_acquire);
+    // An explicit stop always supersedes a restart queued by rollback.
+    s_restart_requested.store(false, std::memory_order_release);
+    if (!task) {
+        s_running.store(false, std::memory_order_release);
+        xSemaphoreGive(lifecycle);
+        return ESP_OK;
+    }
+
+    s_running.store(false, std::memory_order_release);
     // Wake the worker if it's blocked on the queue.
     EventEntry dummy = {};
     if (s_queue) xQueueSend(s_queue, &dummy, 0);
 
-    for (int i = 0; i < 30 && s_task.load() != NULL; i++) {
+    // The worker remains the sole close owner. shutdown() only wakes a blocked
+    // plain or mbedTLS socket operation; cleanup then clears and closes the fd
+    // under this same lifecycle mutex, preventing descriptor-reuse races.
+    int active_socket = s_active_socket.load(std::memory_order_acquire);
+    if (active_socket >= 0) shutdown(active_socket, SHUT_RDWR);
+    xSemaphoreGive(lifecycle);
+
+    for (int i = 0; i < 300 &&
+         s_task.load(std::memory_order_acquire) != NULL; i++) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    TaskHandle_t h = s_task.load();
-    if (h) {
-        ESP_LOGW(TAG, "worker did not exit cleanly, force-deleting");
-        s_task.store(NULL);
-        vTaskDelete(h);
+    if (s_task.load(std::memory_order_acquire) != NULL) {
+        ESP_LOGW(TAG, "event worker still stopping after timeout");
+        return ESP_ERR_TIMEOUT;
     }
     return ESP_OK;
 }

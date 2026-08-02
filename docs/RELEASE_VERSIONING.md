@@ -24,8 +24,10 @@ The release contains:
 - separate firmware and WebUI version files
 - WebUI compatibility metadata
 
-The repository's `latest.json` or `beta.json` firmware fields and `webui` block
-are updated together. A stable full release may become GitHub's Latest release.
+The release workflow still updates the repository's `latest.json` or
+`beta.json` metadata for release tooling and older external clients. The device
+does not fetch these files and does not use them for automatic update searches.
+A stable full release may become GitHub's Latest release.
 
 The WebUI image keeps its own version. Reusing an unchanged WebUI in a newer
 firmware release does not create a fake WebUI version bump.
@@ -71,11 +73,12 @@ The contract is satisfied only when both conditions are true:
    including prerelease identifiers).
 
 `apiVersion` and `minFirmwareVersion` are embedded into
-`webui-manifest.json` inside `spiffs.bin` and published in the update manifest.
-The browser sends the release contract as preflight headers before a normal
-upload, allowing the ESP32 to reject an incompatible release without erasing
-the currently installed WebUI. The internal image manifest remains the
-authoritative value and is checked again after writing.
+`webui-manifest.json` inside `spiffs.bin` and may also be published as release
+metadata. The local-upload page sends only the raw image. The internal image
+manifest is therefore authoritative and is checked after writing. The HTTP API
+continues to accept optional compatibility and SHA-256 headers for external
+upload clients, but the bundled WebUI neither searches a release manifest nor
+adds those headers.
 
 At every boot and after every WebUI upload, the firmware validates image size,
 SHA-256 when supplied, product, design, image format, required assets, API
@@ -83,11 +86,11 @@ version and minimum firmware. An incompatible external WebUI is never served.
 The firmware uses its embedded WebUI fallback and the fallback displays a
 persistent compatibility warning with a link to the WebUI repair page.
 
-The manual upload remains an expert/recovery path. Use only the image and
-compatibility metadata from the matching GitHub release. A file that cannot be
-matched to the currently advertised release has no preflight metadata, so the
-ESP32 can validate its internal contract only after writing it. An incompatible
-manual image is invalidated and the embedded fallback stays active.
+Manual local upload is the supported installation path. Use only the WebUI
+image from a compatible GitHub release. Because the bundled browser sends no
+preflight metadata, the ESP32 validates the image's internal contract after
+writing it. An incompatible image is invalidated and the embedded fallback
+stays active.
 
 ### Mandatory change rules
 

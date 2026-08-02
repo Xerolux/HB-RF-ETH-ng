@@ -33,7 +33,9 @@
 // subscribed at the same time; each receives every log line the moment
 // LogManager::write() captures it.
 
-// Initialise internal state. Idempotent; safe to call once at boot.
+// Initialise internal state. Idempotent; safe to call once at boot. The
+// publish queue, LogManager subscription and worker remain dormant until the
+// first WebSocket client connects.
 void log_stream_init(void);
 
 // GET /api/log/stream — handler for frames received after the authenticated

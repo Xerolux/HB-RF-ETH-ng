@@ -10,3 +10,4 @@ using BaseType_t = int;
 #define pdTRUE 1
 #define pdFALSE 0
 #define pdMS_TO_TICKS(ms) (static_cast<TickType_t>(ms))
+#define portMAX_DELAY (static_cast<TickType_t>(UINT32_MAX))

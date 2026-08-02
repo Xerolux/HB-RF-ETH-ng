@@ -41,8 +41,10 @@ typedef struct {
 // created.
 esp_err_t prometheus_start(const prometheus_config_t *config);
 
-// Stop the exporter and close the listening socket. Blocks up to ~2.5 s
-// waiting for the task to exit cleanly.
+// Cooperatively stop the exporter. Active listening/client sockets are shut
+// down to wake bounded I/O, but only the worker closes them. Returns
+// ESP_ERR_TIMEOUT if cleanup is still active after five seconds; a new start
+// during cleanup is queued and reuses the existing task after socket release.
 esp_err_t prometheus_stop(void);
 
 // True while the exporter is accepting connections. Used by the diagnostic.

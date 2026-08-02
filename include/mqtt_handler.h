@@ -46,7 +46,7 @@ bool mqtt_handler_is_connected(void);
 void mqtt_handler_publish_status(void);
 
 // Publish a one-shot event payload under <prefix>/<subtopic> (non-retained).
-// Used for transient events like OTA started / finished / command rejected.
+// Used for transient events such as command rejection and service failures.
 void mqtt_handler_publish_event(const char *subtopic, const char *payload);
 
 // Publish the FreeRTOS task stack high-water marks under
@@ -54,8 +54,8 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload);
 // task; safe to call from elsewhere but not on the hot 5 s status cycle.
 void mqtt_handler_publish_task_stacks(void);
 
-// Force a single immediate status publish cycle (e.g. after a setting changed
-// or after OTA state changed). Safe to call from any task; returns immediately
+// Force a single immediate status publish cycle (e.g. after a setting changed).
+// Safe to call from any task; returns immediately
 // and schedules the publish on the periodic task if it is running.
 void mqtt_handler_trigger_status_publish(void);
 

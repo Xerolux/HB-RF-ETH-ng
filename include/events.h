@@ -53,7 +53,11 @@ typedef enum : uint8_t {
 void events_init(void);
 
 // Apply a new notification configuration. Spawns or stops the worker task
-// depending on `config->enabled`. Safe to call repeatedly.
+// depending on `config->enabled`. Safe to call repeatedly. Stop is cooperative:
+// it wakes active socket I/O and lets the worker release TLS, heap and mutex
+// resources itself. Returns ESP_ERR_TIMEOUT if bounded cleanup is still active;
+// a new start while cleanup is active is queued and reuses that worker task
+// once its socket/TLS resources have been released.
 esp_err_t events_start(const notify_config_t *config);
 esp_err_t events_stop(void);
 
