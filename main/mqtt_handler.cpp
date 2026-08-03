@@ -294,6 +294,7 @@ static void mqtt_take_tls_gate_if_needed()
                      (unsigned)waited_ms);
             ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
                                         "MQTT TLS serialization gate wedged");
+            emergency_network_stop_before_reboot();
             esp_restart();
             return;
         }
@@ -333,6 +334,7 @@ static void mqtt_stop_watchdog_callback(TimerHandle_t)
              MQTT_COMPONENT_STOP_WATCHDOG_MS);
     ResetInfo::storeResetReason(RESET_REASON_SYSTEM_ERROR,
                                 "MQTT component stop watchdog");
+    emergency_network_stop_before_reboot();
     esp_restart();
 }
 

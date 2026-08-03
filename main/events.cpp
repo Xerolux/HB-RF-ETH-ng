@@ -893,11 +893,11 @@ esp_err_t events_stop(void)
     EventEntry dummy = {};
     if (s_queue) xQueueSend(s_queue, &dummy, 0);
 
-    // The worker remains the sole close owner. shutdown() only wakes a blocked
-    // plain or mbedTLS socket operation; cleanup then clears and closes the fd
-    // under this same lifecycle mutex, preventing descriptor-reuse races.
-    int active_socket = s_active_socket.load(std::memory_order_acquire);
-    if (active_socket >= 0) shutdown(active_socket, SHUT_RDWR);
+    // Do NOT tear down the active socket from here. The worker owns the
+    // mbedTLS context; calling shutdown() while a TLS handshake or data
+    // exchange is in progress can leave mbedTLS in an inconsistent state
+    // and corrupt the heap on the ESP32. SMTP deadlines (≤ 12 s) guarantee
+    // the worker will unblock naturally well within our 30 s wait loop.
     xSemaphoreGive(lifecycle);
 
     for (int i = 0; i < 300 &&

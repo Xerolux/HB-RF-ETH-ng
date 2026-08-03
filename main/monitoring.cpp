@@ -1977,40 +1977,35 @@ esp_err_t monitoring_pause_for_ota(uint32_t *paused_mask)
         mqtt_start_deferred.store(false);
         esp_err_t result = mqtt_handler_stop();
         if (result != ESP_OK) {
-            return rollback_ota_pause(paused | OTA_PAUSED_MQTT,
-                                      "MQTT", result);
+            return rollback_ota_pause(paused, "MQTT", result);
         }
         paused |= OTA_PAUSED_MQTT;
     }
     if (notify_enabled) {
         esp_err_t result = events_stop();
         if (result != ESP_OK) {
-            return rollback_ota_pause(paused | OTA_PAUSED_NOTIFY,
-                                      "Events", result);
+            return rollback_ota_pause(paused, "Events", result);
         }
         paused |= OTA_PAUSED_NOTIFY;
     }
     if (syslog_enabled) {
         esp_err_t result = syslog_stop();
         if (result != ESP_OK) {
-            return rollback_ota_pause(paused | OTA_PAUSED_SYSLOG,
-                                      "Syslog", result);
+            return rollback_ota_pause(paused, "Syslog", result);
         }
         paused |= OTA_PAUSED_SYSLOG;
     }
     if (prometheus_enabled) {
         esp_err_t result = prometheus_stop();
         if (result != ESP_OK) {
-            return rollback_ota_pause(paused | OTA_PAUSED_PROMETHEUS,
-                                      "Prometheus", result);
+            return rollback_ota_pause(paused, "Prometheus", result);
         }
         paused |= OTA_PAUSED_PROMETHEUS;
     }
     if (checkmk_enabled) {
         esp_err_t result = checkmk_stop();
         if (result != ESP_OK) {
-            return rollback_ota_pause(paused | OTA_PAUSED_CHECKMK,
-                                      "CheckMK", result);
+            return rollback_ota_pause(paused, "CheckMK", result);
         }
         paused |= OTA_PAUSED_CHECKMK;
     }

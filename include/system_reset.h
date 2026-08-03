@@ -13,3 +13,6 @@ void full_system_restart_with_reserved_operation();
 void set_flash_pause_enabled(bool enabled);
 void register_restart_eth_pause_callback(restart_eth_pause_fn_t cb);
 void register_restart_network_stop_callback(restart_network_stop_fn_t cb);
+// Stop Ethernet MAC before a forced reboot when worker quiesce failed.
+// Safe to call from any task; no-op if no callback is registered.
+void emergency_network_stop_before_reboot();

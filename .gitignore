@@ -72,6 +72,8 @@ webui/playwright-report/
 tools/generate_supporter_key.py
 tools/supporter_key_manager.py
 tools/supporter_registry.json
+tools/supporter_contacts.json
+tools/revoked_keys.json
 # PyInstaller artifacts for the standalone .exe build (also private):
 tools/SupporterKeyManager.exe
 tools/SupporterKeyManager.spec

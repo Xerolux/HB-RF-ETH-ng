@@ -110,6 +110,9 @@ static void full_system_restart_impl(bool operation_reserved) {
                     // generation from becoming active on the next boot.
                     ESP_LOGE(TAG,
                              "Config update did not quiesce; restarting directly");
+                    if (g_eth_pause_cb) {
+                        g_eth_pause_cb();
+                    }
                     esp_restart();
                     return;
                 }
@@ -125,10 +128,21 @@ static void full_system_restart_impl(bool operation_reserved) {
     // Ethernet MAC and PHY are held down for 35 seconds. Otherwise MQTT,
     // notifications, Syslog, CRL, CheckMK or Prometheus can touch sockets
     // after esp_eth_stop(), which was one path to watchdog/panic resets.
+    //
+    // Always call monitoring_pause_for_ota even when the flag appears set.
+    // monitoring_update_config can restart workers via rollback while
+    // g_monitoring_ota_paused is true, then return before the restart sees
+    // the flag and skips this call — leaving workers alive when Ethernet
+    // is torn down.
     esp_err_t prepare_result = ESP_OK;
-    if (!monitoring_ota_pause_active()) {
+    {
         uint32_t ignored_pause_mask = 0;
         prepare_result = monitoring_pause_for_ota(&ignored_pause_mask);
+        if (prepare_result == ESP_ERR_INVALID_STATE) {
+            // Flag was already set by another caller (config-update rollback,
+            // concurrent restart). Workers are already stopped; proceed.
+            prepare_result = ESP_OK;
+        }
     }
     if (prepare_result == ESP_OK) {
         prepare_result = supporter_crl_stop_refresh_task();
@@ -140,11 +154,14 @@ static void full_system_restart_impl(bool operation_reserved) {
         prepare_result = g_network_stop_cb();
     }
     if (prepare_result != ESP_OK) {
-        // A worker still owns network/library state. Reboot the ESP32 without
-        // first tearing Ethernet out from under it; the CCU link-down pause is
-        // less important than avoiding another corrupted shutdown.
-        ESP_LOGE(TAG, "Worker quiesce failed (%s); restarting without link-down pause",
+        // A worker still owns network/library state. Stop Ethernet at the MAC
+        // level before rebooting so the link partner sees carrier loss and we
+        // avoid another corrupted shutdown through active sockets.
+        ESP_LOGE(TAG, "Worker quiesce failed (%s); stopping Ethernet and rebooting",
                  esp_err_to_name(prepare_result));
+        if (g_eth_pause_cb) {
+            g_eth_pause_cb();
+        }
         vTaskDelay(pdMS_TO_TICKS(100));
         esp_restart();
         return;
@@ -197,4 +214,11 @@ void full_system_restart() {
 
 void full_system_restart_with_reserved_operation() {
     full_system_restart_impl(true);
+}
+
+void emergency_network_stop_before_reboot()
+{
+    if (g_eth_pause_cb) {
+        g_eth_pause_cb();
+    }
 }
