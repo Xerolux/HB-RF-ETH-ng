@@ -612,6 +612,7 @@ static bool send_email(const EventEntry &e, const EventMeta &m,
         if (connect_result != 0) {
             const int connect_ms = remaining_deadline_ms(deadline_us);
             if (connect_ms <= 0) break;
+            if (sock < 0 || sock >= FD_SETSIZE) break;
             fd_set wset;
             FD_ZERO(&wset);
             FD_SET(sock, &wset);

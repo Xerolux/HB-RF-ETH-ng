@@ -1296,7 +1296,7 @@ static void heap_watchdog_task(void *pvParameters)
             size_t largest_now = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
             size_t min_ever = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
             size_t internal_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            uint32_t secs = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
+            uint32_t secs = (uint32_t)((uint64_t)xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
             crash_blackbox_update((uint32_t)free_heap, (uint32_t)largest_now,
                                   (uint32_t)min_ever, (uint32_t)internal_free,
                                   secs, (uint32_t)low_heap_streak);
@@ -1311,7 +1311,7 @@ static void heap_watchdog_task(void *pvParameters)
             {
                 size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
                 size_t min_ever = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
-                uint32_t secs = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
+                uint32_t secs = (uint32_t)((uint64_t)xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
                 // Keep in sync with last_diag_buffer[96] in reset_info.cpp —
                 // the snapshot stored here is later surfaced through that
                 // buffer, so it must not exceed 96 bytes.
@@ -2224,6 +2224,11 @@ static esp_err_t tcp_probe_endpoint(const char *host, uint16_t port, int timeout
         if (ret == 0) {
             probe_result = ESP_OK;
         } else if (errno == EINPROGRESS || errno == EWOULDBLOCK) {
+            if (sock < 0 || sock >= FD_SETSIZE) {
+                ESP_LOGE(TAG, "socket fd %d exceeds FD_SETSIZE %d", sock, FD_SETSIZE);
+                close(sock);
+                continue;
+            }
             fd_set writefds;
             FD_ZERO(&writefds);
             FD_SET(sock, &writefds);

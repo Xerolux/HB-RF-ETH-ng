@@ -281,6 +281,12 @@ static int resolve_and_connect_tcp(const char *host, uint16_t port)
         }
 
         if (errno == EINPROGRESS || errno == EWOULDBLOCK) {
+            if (sock < 0 || sock >= FD_SETSIZE) {
+                ESP_LOGE(TAG, "socket fd %d exceeds FD_SETSIZE %d", sock, FD_SETSIZE);
+                close(sock);
+                sock = -1;
+                break;
+            }
             fd_set wset;
             FD_ZERO(&wset);
             FD_SET(sock, &wset);
