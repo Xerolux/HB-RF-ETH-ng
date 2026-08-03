@@ -2571,6 +2571,8 @@ httpd_uri_t post_restore_handler = {
 // restart. Without this the upload handler would not compile.
 static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring);
 static void resume_tasks_after_ota_failure();
+struct ota_finalize_ctx;
+static void ota_finalize_task(void *pv);
 
 #define OTA_CHECK(a, str, ...)                                                    \
     do                                                                            \
@@ -2592,6 +2594,7 @@ static void resume_tasks_after_ota_failure();
 enum ota_status_t {
     OTA_IDLE = 0,
     OTA_DOWNLOADING,
+    OTA_FINALIZING,
     OTA_SUCCESS,
     OTA_FAILED
 };
@@ -2699,10 +2702,6 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     bool is_req_body_started = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
     const esp_partition_t *running = NULL;
-    const esp_partition_t *selected_boot = NULL;
-    uint32_t paused_monitoring = 0;
-    esp_err_t prepare_result = ESP_OK;
-    esp_err_t boot_result = ESP_OK;
     esp_err_t ota_end_result = ESP_OK;
 
     // Validate update partition exists
@@ -2872,114 +2871,35 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     }
     net_fetch_set_ota_active(false);
 
-    // Stop heap- and network-active subsystems before the restart so they do
-    // not touch lwIP / TLS during the link-down pause (flashPause) or the GPIO
-    // reconfiguration in full_system_restart(). Without this the WebUI upload
-    // was the only full_system_restart() caller that left MQTT, the CRL refresh
-    // task and the WebSocket publish worker running into the restart. On a
-    // flashPause device these kept operating on an Ethernet that had just been
-    // stopped, which surfaced as an Exception/Panic during the reboot. The
-    // success path ends in a full restart, so the returned paused-mask is
-    // discarded after successful preparation. Crucially, prepare everything
-    // before arming the new boot partition or reporting success: a cleanup
-    // timeout can then leave the currently running firmware selected without
-    // relying on a fallible OTA-data rollback.
-    prepare_result = prepare_ota_heap(&paused_monitoring);
-    if (prepare_result != ESP_OK) {
-        // Do not take Ethernet down or restart while a background worker may
-        // still own the shared TLS mutex/socket. The boot target has not been
-        // changed yet, so resuming the services is sufficient and safe.
-        _statusLED->setState(LED_STATE_OFF);
-        _ota_status = OTA_FAILED;
-        set_ota_error("Restart deferred: background network cleanup failed");
-        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
-        monitoring_resume_after_ota(paused_monitoring);
-        resume_tasks_after_ota_failure();
-        ota_operation_finish();
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                            "Firmware received but restart preparation failed; update was not activated");
-        return prepare_result;
-    }
-
-    // Arm the new image only after every network/TLS worker has stopped. The
-    // read-back is the authority: it also covers the unlikely case where the
-    // OTA-data write completed but the API returned an error afterwards.
-    boot_result = esp_ota_set_boot_partition(update_partition);
-    selected_boot = esp_ota_get_boot_partition();
-    if (selected_boot != update_partition) {
-        ESP_LOGE(TAG, "Could not select uploaded OTA partition: set=%s selected=%s",
-                 esp_err_to_name(boot_result),
-                 selected_boot ? selected_boot->label : "unknown");
-
-        // Normally the running partition is still selected because no valid
-        // OTA-data update was committed. If the state is ambiguous, make a few
-        // bounded attempts to restore it and verify every write.
-        bool running_restored = (selected_boot == running);
-        for (int attempt = 0; !running_restored && attempt < 3; ++attempt) {
-            esp_err_t restore_result = esp_ota_set_boot_partition(running);
-            selected_boot = esp_ota_get_boot_partition();
-            running_restored =
-                (restore_result == ESP_OK && selected_boot == running);
-            if (!running_restored) {
-                ESP_LOGE(TAG, "Boot partition restore attempt %d failed: set=%s selected=%s",
-                         attempt + 1, esp_err_to_name(restore_result),
-                         selected_boot ? selected_boot->label : "unknown");
-                vTaskDelay(pdMS_TO_TICKS(50));
-            }
-        }
-
-        _statusLED->setState(LED_STATE_OFF);
-        _ota_status = OTA_FAILED;
-        set_ota_error(running_restored
-                          ? "Could not activate uploaded firmware"
-                          : "Boot selection uncertain; restarting safely");
-        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
-                            running_restored
-                                ? "Could not activate uploaded firmware"
-                                : "Boot selection uncertain; device is restarting");
-
-        if (running_restored) {
-            monitoring_resume_after_ota(paused_monitoring);
-            resume_tasks_after_ota_failure();
-            // Keep the exclusive operation reservation until all services are
-            // running again. Releasing it first would let a concurrent restart
-            // or settings mutation race the rollback path.
-            ota_operation_finish();
-            return boot_result == ESP_OK ? ESP_FAIL : boot_result;
-        }
-
-        // Staying online would defer an indeterminate boot choice to some
-        // unrelated future reset. Cleanup already completed, so reboot now and
-        // let the bootloader select one of the two validated application
-        // images while the failure reason remains recorded.
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        refresh_restart_sync_from_settings();
-        full_system_restart_with_reserved_operation();
-        return ESP_FAIL;
-    }
-    if (boot_result != ESP_OK) {
-        ESP_LOGW(TAG, "OTA boot selection verified despite API result: %s",
-                 esp_err_to_name(boot_result));
-    }
-
-    ESP_LOGI(TAG, "OTA finished successfully, restarting in 3 seconds to activate new firmware.");
-    _statusLED->setState(LED_STATE_OFF);
-    _ota_progress = 100;
-    _ota_status = OTA_SUCCESS;
-    ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
+    // Offload the post-upload sequence (worker stop → boot select → restart)
+    // to a background task so the httpd thread stays free to serve status
+    // polls during the potentially 90 s sequential worker-stop phase.
+    _ota_status = OTA_FINALIZING;
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware update completed, restarting in 3 seconds...\"}");
+    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware received, finalizing and restarting...\"}");
 
-    // Restart on the existing 8 KiB httpd task. The previous dedicated 2 KiB
-    // task overflowed while stopping Ethernet; simply enlarging it is not
-    // reliable either because a contiguous stack allocation can fail on the
-    // fragmented post-OTA heap. The response is sent only after cleanup and
-    // verified boot selection have both succeeded.
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    refresh_restart_sync_from_settings();
-    full_system_restart_with_reserved_operation();
+    ota_finalize_ctx *ctx = (ota_finalize_ctx *)calloc(1, sizeof(ota_finalize_ctx));
+    if (!ctx) {
+        ESP_LOGE(TAG, "Could not allocate OTA finalize context");
+        _ota_status = OTA_FAILED;
+        set_ota_error("Memory allocation failed during finalize");
+        ota_operation_finish();
+        return ESP_OK;
+    }
+    ctx->update_partition = update_partition;
+    ctx->running = running;
+
+    if (xTaskCreate(ota_finalize_task, "ota_finalize", 8192,
+                    ctx, 2, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Could not create OTA finalize task");
+        _ota_status = OTA_FAILED;
+        set_ota_error("Could not start finalize task");
+        free(ctx);
+        ota_operation_finish();
+        return ESP_OK;
+    }
+
     return ESP_OK;
 
 err:
@@ -3096,6 +3016,7 @@ static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
     const ota_status_t status = _ota_status.load();
     switch (status) {
         case OTA_DOWNLOADING: status_str = "downloading"; break;
+        case OTA_FINALIZING:  status_str = "finalizing"; break;
         case OTA_SUCCESS:     status_str = "success"; break;
         case OTA_FAILED:      status_str = "failed"; break;
         default:              status_str = "idle"; break;
@@ -3201,6 +3122,86 @@ static void resume_tasks_after_ota_failure()
                      (unsigned)(esp_get_free_heap_size() / 1024));
         }
     }
+}
+
+// Background finalize task: stop workers, select boot partition, restart.
+// Runs on its own task so the httpd thread is free to serve status polls
+// during the (potentially 90 s) sequential worker-stop phase.
+struct ota_finalize_ctx {
+    const esp_partition_t *update_partition;
+    const esp_partition_t *running;
+};
+
+static void ota_finalize_task(void *pv)
+{
+    ota_finalize_ctx *ctx = static_cast<ota_finalize_ctx *>(pv);
+    uint32_t paused_monitoring = 0;
+
+    esp_err_t prepare_result = prepare_ota_heap(&paused_monitoring);
+    if (prepare_result != ESP_OK) {
+        _statusLED->setState(LED_STATE_OFF);
+        _ota_status = OTA_FAILED;
+        set_ota_error("Restart deferred: background network cleanup failed");
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+        monitoring_resume_after_ota(paused_monitoring);
+        resume_tasks_after_ota_failure();
+        ota_operation_finish();
+        free(ctx);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    esp_err_t boot_result = esp_ota_set_boot_partition(ctx->update_partition);
+    const esp_partition_t *selected_boot = esp_ota_get_boot_partition();
+    if (selected_boot != ctx->update_partition) {
+        ESP_LOGE(TAG, "Could not select uploaded OTA partition: set=%s selected=%s",
+                 esp_err_to_name(boot_result),
+                 selected_boot ? selected_boot->label : "unknown");
+
+        bool running_restored = (selected_boot == ctx->running);
+        for (int attempt = 0; !running_restored && attempt < 3; ++attempt) {
+            esp_err_t restore_result = esp_ota_set_boot_partition(ctx->running);
+            selected_boot = esp_ota_get_boot_partition();
+            running_restored =
+                (restore_result == ESP_OK && selected_boot == ctx->running);
+            if (!running_restored) {
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+        }
+
+        _statusLED->setState(LED_STATE_OFF);
+        _ota_status = OTA_FAILED;
+        set_ota_error(running_restored
+                          ? "Could not activate uploaded firmware"
+                          : "Boot selection uncertain; restarting safely");
+        ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
+
+        if (running_restored) {
+            monitoring_resume_after_ota(paused_monitoring);
+            resume_tasks_after_ota_failure();
+            ota_operation_finish();
+            free(ctx);
+            vTaskDelete(NULL);
+            return;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        refresh_restart_sync_from_settings();
+        full_system_restart_with_reserved_operation();
+        free(ctx);
+        return;
+    }
+
+    ESP_LOGI(TAG, "OTA finished successfully, restarting to activate new firmware.");
+    _statusLED->setState(LED_STATE_OFF);
+    _ota_progress = 100;
+    _ota_status = OTA_SUCCESS;
+    ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
+
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    refresh_restart_sync_from_settings();
+    full_system_restart_with_reserved_operation();
+    free(ctx);
 }
 
 esp_err_t post_change_password_handler_func(httpd_req_t *req)

@@ -144,6 +144,7 @@ const newEntriesCount = ref(0)
 const crashTail = ref('')
 const showCrashModal = ref(false)
 let pollTimer = null
+let mounted = true
 // Suppresses the logEnabled watcher while we sync the toggle from the backend
 // status on mount (so the initial state does not trigger a redundant enable
 // POST).
@@ -387,6 +388,7 @@ const closeLogStream = () => {
 const startPolling = async () => {
   stopPolling()
   await fetchLog()
+  if (!mounted) return
   if (!logEnabled.value) return
   openLogStream()
   scheduleNextPoll()
@@ -553,17 +555,21 @@ onMounted(async () => {
   // the device persists that choice and restores capture after a reboot.
   try {
     const response = await axios.get('/api/log/status', { silent: true })
+    if (!mounted) return
     syncingFromBackend = true
     logEnabled.value = !!response.data.enabled
     // Vue batches watchers until the next tick. Keep the guard set until the
     // watcher has observed this backend-driven assignment, otherwise both the
     // watcher and the explicit start below create a WebSocket.
     await nextTick()
+    if (!mounted) return
     syncingFromBackend = false
   } catch (e) {
+    if (!mounted) return
     syncingFromBackend = false
     logEnabled.value = false
   }
+  if (!mounted) return
   if (logEnabled.value) {
     await startPolling()
   }
@@ -574,6 +580,7 @@ onMounted(async () => {
   // surfaces once after a real crash — not on every page load.
   try {
     const r = await axios.get('/api/crash_log', { silent: true })
+    if (!mounted) return
     if (r.data && r.data.available && r.data.tail) {
       crashTail.value = r.data.tail
       showCrashModal.value = true
@@ -584,6 +591,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  mounted = false
   stopPolling()
 })
 </script>

@@ -1475,62 +1475,13 @@ static void mqtt_network_ready_handler(void *handler_args,
         config_mutex == NULL) {
         return;
     }
-    if (g_monitoring_ota_paused.load(std::memory_order_acquire) ||
-        monitoring_config_update_active()) {
-        // Preserve mqtt_start_deferred. A failed OTA rollback will clear the
-        // pause and explicitly resume; the retry worker waits for a config
-        // transaction to publish its candidate before reading current_config.
-        if (mqtt_start_deferred.load(std::memory_order_acquire)) {
-            schedule_mqtt_retry();
-        }
-        return;
-    }
-    if (!mqtt_start_deferred.exchange(false)) {
-        return;
-    }
-
-    // mqtt_config_t contains up to 6 KB of TLS certificates. The default ESP
-    // event-loop task has a small stack, so take the snapshot on the heap.
-    mqtt_config_t *mqtt_config = (mqtt_config_t *)malloc(sizeof(mqtt_config_t));
-    if (mqtt_config == NULL) {
-        mqtt_start_deferred.store(true, std::memory_order_release);
+    // Offload the full MQTT-start sequence (config snapshot +
+    // mqtt_handler_start which can hold mqtt_lifecycle_mutex for up to 15 s)
+    // to the retry worker. Running it inline blocks the default event loop
+    // and starves every other event subscriber (Ethernet link, NTP, etc.).
+    if (mqtt_start_deferred.load(std::memory_order_acquire)) {
         schedule_mqtt_retry();
-        ESP_LOGE(TAG, "Failed to allocate deferred MQTT configuration");
-        return;
     }
-
-    xSemaphoreTake(config_mutex, portMAX_DELAY);
-    const bool transition_active =
-        g_monitoring_ota_paused.load(std::memory_order_acquire) ||
-        monitoring_config_update_active();
-    if (!transition_active) {
-        memcpy(mqtt_config, &current_config.mqtt, sizeof(*mqtt_config));
-    }
-
-    // Keep config_mutex held across the final decision and start call. If a
-    // config update wins first, the shared operation state is visible and this path
-    // defers. If this path wins first, the updater cannot snapshot/stop MQTT
-    // until the old start is complete, after which it replaces it normally.
-    if (transition_active) {
-        mqtt_start_deferred.store(true, std::memory_order_release);
-        schedule_mqtt_retry();
-        xSemaphoreGive(config_mutex);
-        free(mqtt_config);
-        return;
-    }
-
-    if (mqtt_config->enabled) {
-        ESP_LOGI(TAG, "IPv4 ready; starting deferred MQTT client");
-        esp_err_t result = mqtt_handler_start(mqtt_config);
-        if (result != ESP_OK) {
-            mqtt_start_deferred.store(true, std::memory_order_release);
-            schedule_mqtt_retry();
-            ESP_LOGW(TAG, "IPv4 MQTT start failed, retry scheduled: %s",
-                     esp_err_to_name(result));
-        }
-    }
-    xSemaphoreGive(config_mutex);
-    free(mqtt_config);
 }
 
 // Initialize monitoring subsystem

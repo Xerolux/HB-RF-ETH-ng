@@ -539,7 +539,7 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMonitoringStore, useUiStore } from './stores.js'
 import { storeToRefs } from 'pinia'
@@ -557,6 +557,7 @@ const diagnosticBusy = ref({ checkmk: false, mqtt: false, prometheus: false, sys
 const hasChanges = ref(false)
 const originalConfig = ref('')
 const loadError = ref('')
+let mounted = true
 
 const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false,
                             webhookSecretClear: false, telegramTokenClear: false, smtpPasswordClear: false })
@@ -758,6 +759,10 @@ onMounted(async () => {
   }
 })
 
+onBeforeUnmount(() => {
+  mounted = false
+})
+
 const serializeConfig = () => JSON.stringify({
   checkmk: { ...checkmkConfig.value },
   mqtt: { ...mqttConfig.value },
@@ -883,7 +888,9 @@ const runDiagnostic = async (target) => {
   } catch (error) {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: error.response?.data?.error || t('monitoring.diagnosticFailed') })
   } finally {
-    diagnosticBusy.value[target] = false
+    if (mounted) {
+      diagnosticBusy.value[target] = false
+    }
   }
 }
 </script>

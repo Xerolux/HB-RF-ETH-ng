@@ -207,15 +207,17 @@ void syslog_subscriber(const char *line, size_t len, uint64_t end_offset)
     if (severity > static_cast<int>(
             s_min_severity.load(std::memory_order_relaxed))) return;
 
-    struct syslog_entry e;
-    e.len = len < sizeof(e.line) ? len : sizeof(e.line);
-    memcpy(e.line, line, e.len);
+    // Heap-allocate: syslog_entry is ~392 bytes and this hook runs on
+    // whichever task issued ESP_LOG — including the 4 KB timer-service
+    // task. xQueueSend copies into the queue's internal storage, so the
+    // allocation is transient and freed immediately.
+    struct syslog_entry *e = (struct syslog_entry *)malloc(sizeof(*e));
+    if (!e) return;
+    e->len = len < sizeof(e->line) ? len : sizeof(e->line);
+    memcpy(e->line, line, e->len);
 
-    // Non-blocking enqueue. Drop on full (best-effort, ring buffer remains
-    // authoritative).
-    if (xQueueSend(s_queue, &e, 0) != pdPASS) {
-        // No metric here — would re-enter LogManager via ESP_LOGW.
-    }
+    xQueueSend(s_queue, e, 0);
+    free(e);
 }
 
 // ---------------------------------------------------------------------------

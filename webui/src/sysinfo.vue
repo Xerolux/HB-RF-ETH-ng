@@ -312,6 +312,7 @@ const copyValue = async (value, label) => {
 }
 
 let updateTimer = null
+let mounted = true
 
 const startPolling = async () => {
   if (updateTimer) return
@@ -322,6 +323,7 @@ const startPolling = async () => {
   } finally {
     isLoading.value = false
   }
+  if (!mounted) return
   updateTimer = setInterval(() => {
     sysInfoStore.update().catch(() => { /* logged in the store; avoid unhandled rejection per tick */ })
   }, 5000)
@@ -348,6 +350,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  mounted = false
   stopPolling()
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })

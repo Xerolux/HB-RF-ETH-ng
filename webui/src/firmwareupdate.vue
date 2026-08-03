@@ -174,7 +174,7 @@ const uploadFirmware = async () => {
       }
     })
     uiStore.pushToast({ type: 'success', title: t('firmware.uploadCompleteTitle'), message: t('firmware.uploadCompleteMessage'), duration: 2500 })
-    restartUiStore.start({ includeFlashPause: true, syncSeconds: 40, restartSeconds: 30 })
+    restartUiStore.start({ includeFlashPause: true, syncSeconds: 120, restartSeconds: 30 })
   } catch (error) {
     const message = typeof error.response?.data === 'string'
       ? error.response.data

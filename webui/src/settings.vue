@@ -1300,6 +1300,9 @@ const loadSettings = () => {
   v$.value.$reset()
 }
 
+let restartTimer = null
+let mounted = true
+
 onMounted(async () => {
   await settingsStore.load()
   loadSettings()
@@ -1307,6 +1310,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  mounted = false
+  if (restartTimer) {
+    clearTimeout(restartTimer)
+    restartTimer = null
+  }
   window.removeEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -1383,7 +1391,7 @@ const saveSettingsClick = async () => {
       message: t('settings.saveSuccess'),
       duration: 2200
     })
-    setTimeout(() => {
+    restartTimer = setTimeout(() => {
       restartAfterSettingsSave.value = true
       showRestartModal.value = true
     }, 700)
@@ -1472,6 +1480,7 @@ const restoreSettings = async () => {
   try {
     const reader = new FileReader()
     reader.onload = async (e) => {
+      if (!mounted) return
       try {
         const json = JSON.parse(e.target.result)
         // Sanity-check that this looks like a settings backup before POSTing
