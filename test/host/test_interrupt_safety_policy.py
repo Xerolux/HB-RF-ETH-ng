@@ -89,7 +89,8 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn("std::atomic<int>          s_active_socket{-1}", events)
         self.assertIn("SO_RCVTIMEO", events)
         self.assertIn("SO_SNDTIMEO", events)
-        self.assertIn("shutdown(active_socket, SHUT_RDWR)", events)
+        self.assertNotIn("shutdown(active_socket, SHUT_RDWR)", events)
+        self.assertIn("Do NOT tear down the active socket", events)
         self.assertIn("EVENT_HTTP_TOTAL_TIMEOUT_MS", events)
         self.assertIn("cfg.is_async = true", events)
         self.assertIn("post_event_http(", events)
@@ -639,24 +640,31 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         ]
         self.assertIn("OTA_UPLOAD_TOTAL_TIMEOUT_US", upload)
         self.assertIn("OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US", upload)
-        self.assertIn("full_system_restart_with_reserved_operation()", upload)
-        uncertain = upload[
-            upload.index("Boot selection uncertain") :
-            upload.index("OTA finished successfully")
+
+        # The finalize logic (prepare → boot-select → restart) runs on a
+        # background task so httpd stays responsive during worker shutdown.
+        finalize = webui[
+            webui.index("static void ota_finalize_task") :
+            webui.index("esp_err_t post_change_password_handler_func")
+        ]
+        self.assertIn("full_system_restart_with_reserved_operation()", finalize)
+        uncertain = finalize[
+            finalize.index("Boot selection uncertain") :
+            finalize.index("OTA finished successfully")
         ]
         self.assertIn("full_system_restart_with_reserved_operation()", uncertain)
         self.assertNotIn("full_system_restart();", uncertain)
         rollback = uncertain[
             uncertain.index("if (running_restored)") :
-            uncertain.index("// Staying online")
+            uncertain.index("vTaskDelay(pdMS_TO_TICKS(1000))")
         ]
         self.assertLess(
             rollback.index("resume_tasks_after_ota_failure()"),
             rollback.index("ota_operation_finish()"),
         )
-        prepare_failure = upload[
-            upload.index("if (prepare_result != ESP_OK)") :
-            upload.index("// Arm the new image")
+        prepare_failure = finalize[
+            finalize.index("if (prepare_result != ESP_OK)") :
+            finalize.index("esp_err_t boot_result")
         ]
         self.assertLess(
             prepare_failure.index("monitoring_resume_after_ota"),
