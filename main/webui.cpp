@@ -2571,7 +2571,10 @@ httpd_uri_t post_restore_handler = {
 // restart. Without this the upload handler would not compile.
 static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring);
 static void resume_tasks_after_ota_failure();
-struct ota_finalize_ctx;
+struct ota_finalize_ctx {
+    const esp_partition_t *update_partition;
+    const esp_partition_t *running;
+};
 static void ota_finalize_task(void *pv);
 
 #define OTA_CHECK(a, str, ...)                                                    \
@@ -2879,25 +2882,30 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware received, finalizing and restarting...\"}");
 
-    ota_finalize_ctx *ctx = (ota_finalize_ctx *)calloc(1, sizeof(ota_finalize_ctx));
-    if (!ctx) {
-        ESP_LOGE(TAG, "Could not allocate OTA finalize context");
-        _ota_status = OTA_FAILED;
-        set_ota_error("Memory allocation failed during finalize");
-        ota_operation_finish();
-        return ESP_OK;
-    }
-    ctx->update_partition = update_partition;
-    ctx->running = running;
+    // Scope ctx so goto err (from the upload phase above) cannot jump over
+    // its initialization — C++ forbids crossing a declaration with an
+    // initializer even for pointer types.
+    {
+        ota_finalize_ctx *ctx = (ota_finalize_ctx *)calloc(1, sizeof(ota_finalize_ctx));
+        if (!ctx) {
+            ESP_LOGE(TAG, "Could not allocate OTA finalize context");
+            _ota_status = OTA_FAILED;
+            set_ota_error("Memory allocation failed during finalize");
+            ota_operation_finish();
+            return ESP_OK;
+        }
+        ctx->update_partition = update_partition;
+        ctx->running = running;
 
-    if (xTaskCreate(ota_finalize_task, "ota_finalize", 8192,
-                    ctx, 2, NULL) != pdPASS) {
-        ESP_LOGE(TAG, "Could not create OTA finalize task");
-        _ota_status = OTA_FAILED;
-        set_ota_error("Could not start finalize task");
-        free(ctx);
-        ota_operation_finish();
-        return ESP_OK;
+        if (xTaskCreate(ota_finalize_task, "ota_finalize", 8192,
+                        ctx, 2, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "Could not create OTA finalize task");
+            _ota_status = OTA_FAILED;
+            set_ota_error("Could not start finalize task");
+            free(ctx);
+            ota_operation_finish();
+            return ESP_OK;
+        }
     }
 
     return ESP_OK;
@@ -3127,11 +3135,6 @@ static void resume_tasks_after_ota_failure()
 // Background finalize task: stop workers, select boot partition, restart.
 // Runs on its own task so the httpd thread is free to serve status polls
 // during the (potentially 90 s) sequential worker-stop phase.
-struct ota_finalize_ctx {
-    const esp_partition_t *update_partition;
-    const esp_partition_t *running;
-};
-
 static void ota_finalize_task(void *pv)
 {
     ota_finalize_ctx *ctx = static_cast<ota_finalize_ctx *>(pv);
