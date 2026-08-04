@@ -195,7 +195,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         webui = self.read("main/webui.cpp")
         self.assertIn("prepare_result = prepare_ota_heap", webui)
         self.assertIn("if (prepare_result != ESP_OK)", webui)
-        self.assertIn("esp_ota_set_boot_partition(running)", webui)
+        self.assertIn("esp_ota_set_boot_partition(ctx->running)", webui)
         self.assertIn("monitoring_pause_for_ota(paused_monitoring)", webui)
 
         log_stream = self.read("main/log_stream.cpp")
