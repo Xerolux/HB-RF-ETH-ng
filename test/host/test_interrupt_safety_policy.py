@@ -188,12 +188,9 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             "esp_err_t monitoring_pause_for_ota(uint32_t *paused_mask)",
             monitoring,
         )
-        self.assertIn("rollback_ota_pause(paused | OTA_PAUSED_NOTIFY", monitoring)
-        self.assertIn("rollback_ota_pause(paused | OTA_PAUSED_SYSLOG", monitoring)
-        self.assertIn(
-            "rollback_ota_pause(paused | OTA_PAUSED_PROMETHEUS",
-            monitoring,
-        )
+        self.assertIn("rollback_ota_pause(paused, \"Events\"", monitoring)
+        self.assertIn("rollback_ota_pause(paused, \"Syslog\"", monitoring)
+        self.assertIn("rollback_ota_pause(paused, \"Prometheus\"", monitoring)
 
         webui = self.read("main/webui.cpp")
         self.assertIn("prepare_result = prepare_ota_heap", webui)
