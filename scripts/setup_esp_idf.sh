@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ESP_IDF_DIR="${ESP_IDF_DIR:-${HOME}/esp-idf}"
-ESP_IDF_VERSION="${ESP_IDF_VERSION:-v6.0.2}"
+ESP_IDF_VERSION="${ESP_IDF_VERSION:-v6.1-beta1}"
 
 if [[ ! -d "${ESP_IDF_DIR}" ]]; then
   git clone --depth 1 --branch "${ESP_IDF_VERSION}" https://github.com/espressif/esp-idf.git "${ESP_IDF_DIR}"

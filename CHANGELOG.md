@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+- build: upgrade ESP-IDF from v6.0.2 to v6.1-beta1 in all CI workflows and dependency metadata (build, release, pr-check, security, release-webui)
+
 ## [2.2.6-Beta.6] - 2026-08-05
 
 ### Changes

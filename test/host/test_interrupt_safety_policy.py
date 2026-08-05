@@ -4,7 +4,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-STABLE_IDF = "v6.0.2"
+STABLE_IDF = "v6.1-beta1"
+LOCKFILE_IDF_VERSION = "6.1.0"
+SDKCONFIG_IDF_INIT_VERSION = "6.1.0"
 FIRMWARE_WORKFLOWS = (
     ".github/workflows/build.yml",
     ".github/workflows/pr-check.yml",
@@ -32,20 +34,20 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             with self.subTest(workflow=workflow):
                 content = self.read(workflow)
                 self.assertIn(expected_clone, content)
-                self.assertNotIn("-beta", content)
 
         lockfile = self.read("dependencies.lock")
-        self.assertIn("\n    version: 6.0.2\n", lockfile)
+        self.assertIn(f"\n    version: {LOCKFILE_IDF_VERSION}\n", lockfile)
 
         sdkconfig = self.read("sdkconfig.hb-rf-eth-ng")
-        self.assertIn('CONFIG_IDF_INIT_VERSION="6.0.2"', sdkconfig)
+        self.assertIn(
+            f'CONFIG_IDF_INIT_VERSION="{SDKCONFIG_IDF_INIT_VERSION}"', sdkconfig
+        )
 
         setup_script = self.read("scripts/setup_esp_idf.sh")
-        self.assertIn('ESP_IDF_VERSION="${ESP_IDF_VERSION:-v6.0.2}"', setup_script)
+        self.assertIn(f'ESP_IDF_VERSION="${{ESP_IDF_VERSION:-{STABLE_IDF}}}"', setup_script)
 
         readme = self.read("README.md")
-        self.assertIn("ESP-IDF 6.0.2", readme)
-        self.assertNotIn("ESP-IDF 6.1-beta1", readme)
+        self.assertIn("ESP-IDF 6.1-beta1", readme)
 
     def test_watchdog_remains_a_fault_detector(self) -> None:
         sdkconfig = self.read("sdkconfig.hb-rf-eth-ng")
