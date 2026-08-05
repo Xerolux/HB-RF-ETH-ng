@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.6] - 2026-08-05
+
+### Changes
+- docs(debug): update interrupt-watchdog analysis with Beta.5 field findings
+- fix(stability): remove IRAM-ATTR UDP wrapper, DHCP event-loop churn, restore ETH DMA buffers
+
 ## [2.2.6-Beta.4] - 2026-08-02
 
 ### Changes
