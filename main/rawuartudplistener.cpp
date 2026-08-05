@@ -54,7 +54,14 @@ void _raw_uart_udpQueueHandlerTask(void *parameter)
     ((RawUartUdpListener *)parameter)->_udpQueueHandler();
 }
 
-void IRAM_ATTR _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
+// Deliberately NOT IRAM_ATTR: this lwIP UDP recv callback runs in the tcpip
+// thread (task context, not ISR), so there is no cache-off execution
+// requirement. Keeping the wrapper in IRAM while the callee chain
+// (_udpReceivePacket -> ESP_LOGW) stays in flash recreates the exact
+// cache-disabled-access hazard that caused interrupt-watchdog hangs during
+// flash/NVS windows on the other core (see .planning interrupt-watchdog
+// analysis). lwIP's recv callbacks always run with cache enabled.
+void _raw_uart_udpReceivePaket(void *arg, udp_pcb *pcb, pbuf *pb, const ip_addr_t *addr, uint16_t port)
 {
     // A pbuf chain is one UDP datagram, not multiple packets. Transfer the
     // complete chain to the worker; splitting it corrupts larger CCU frames.

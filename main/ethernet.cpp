@@ -355,14 +355,11 @@ void Ethernet::_handleETHEvent(esp_event_base_t event_base, int32_t event_id, vo
         ESP_LOGI(TAG, "Link Up");
         ESP_LOGI(TAG, "HW Addr %02x:%02x:%02x:%02x:%02x:%02x", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
         ESP_LOGI(TAG, "Speed %dMbps, %s duplex", linkSpeed == ETH_SPEED_100M ? 100 : 10, duplexMode == ETH_DUPLEX_FULL ? "full" : "half");
-        // Restart DHCP on link-up to ensure IP renewal after cabling events
-        // or a temporary DHCP server outage. Without this the device can stay
-        // offline permanently after a link flap.
-        if (_settings && _settings->getUseDHCP()) {
-            esp_netif_dhcpc_stop(_eth_netif);
-            esp_netif_dhcpc_start(_eth_netif);
-            ESP_LOGI(TAG, "DHCP client restarted on link-up");
-        }
+        // Note: no esp_netif_dhcpc_stop/start here. Those block the default
+        // event loop task on the lwIP tcpip thread on EVERY link-up and caused
+        // repeated DHCP churn / event-loop stalls on link flaps. ESP-IDF's
+        // esp_netif glue already renews DHCP when the netif comes up after a
+        // disconnect, so the explicit restart is not required.
         }
         break;
     case ETHERNET_EVENT_DISCONNECTED:
