@@ -10,9 +10,6 @@ SETTINGS = (ROOT / "main" / "settings.cpp").read_text(encoding="utf-8")
 HEADER = (ROOT / "include" / "settings.h").read_text(encoding="utf-8")
 BUTTON = (ROOT / "main" / "pushbuttonhandler.cpp").read_text(encoding="utf-8")
 WEBUI = (ROOT / "main" / "webui.cpp").read_text(encoding="utf-8")
-SUPPORTER_CRL = (ROOT / "main" / "supporter_crl.cpp").read_text(
-    encoding="utf-8"
-)
 MQTT = (ROOT / "main" / "mqtt_handler.cpp").read_text(encoding="utf-8")
 
 
@@ -182,10 +179,14 @@ class SettingsTransactionPolicyTest(unittest.TestCase):
             "THEME_NVS_NAMESPACE",
             "RESET_INFO_NVS_NAMESPACE",
             "UPDATE_CACHE_NVS_NAMESPACE",
-            "SUPPORTER_CRL_NVS_NAMESPACE",
             "MQTT_CLEANUP_NVS_NAMESPACE",
         ):
             self.assertIn(f"erase_nvs_namespace({namespace})", recovery)
+        # Devices that once stored a supporter-CRL cache must purge the
+        # residue on factory reset; the legacy namespace lives on for that.
+        self.assertIn(
+            "erase_nvs_namespace(LEGACY_SUPPORTER_CRL_NVS_NAMESPACE)", recovery
+        )
         self.assertNotIn("restore_auth_backup", recovery)
         self.assertGreater(
             recovery.index("erase_nvs_namespace(SETTINGS_TXN_NVS_NAMESPACE)"),
@@ -333,25 +334,7 @@ class SettingsTransactionPolicyTest(unittest.TestCase):
                 )
                 self.assertGreaterEqual(setter_guard, rotation_guard)
 
-    def test_crl_and_mqtt_markers_use_dedicated_namespaces(self) -> None:
-        self.assertIn('NVS_NAMESPACE = "supporter_crl"', SUPPORTER_CRL)
-        self.assertIn('LEGACY_NVS_NAMESPACE = "HB-RF-ETH"', SUPPORTER_CRL)
-        crl_load = function_body(
-            SUPPORTER_CRL, "static void load_from_nvs()", "static esp_err_t save_to_nvs()"
-        )
-        self.assertLess(
-            crl_load.index("NVS_NAMESPACE, true"),
-            crl_load.index("LEGACY_NVS_NAMESPACE, false"),
-        )
-        self.assertIn("result != ESP_ERR_NVS_NOT_FOUND", crl_load)
-        self.assertLess(
-            crl_load.index("write_cache_to_new_namespace"),
-            crl_load.index("erase_legacy_cache_best_effort"),
-        )
-        crl_save = SUPPORTER_CRL[SUPPORTER_CRL.index("static esp_err_t save_to_nvs()") :]
-        self.assertIn("write_cache_to_new_namespace", crl_save)
-        self.assertNotIn("LEGACY_NVS_NAMESPACE", crl_save)
-
+    def test_mqtt_cleanup_marker_uses_dedicated_namespace(self) -> None:
         mqtt_cleanup = function_body(
             MQTT,
             "static void publish_legacy_topic_cleanup(void)",

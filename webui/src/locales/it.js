@@ -121,7 +121,6 @@ export default {
     tabTime: 'Ora',
     tabBackup: 'Backup e reset',
     tabDesign: 'Design',
-    tabLicense: 'Licenza',
     tabExperimental: 'Sperimentale',
     advancedTitle: 'Avanzate',
     showExperimental: 'Mostra funzioni sperimentali',
@@ -688,35 +687,4 @@ webuiUpdate: {
     title: 'Privacy',
     updateCheck: 'Il dispositivo non cerca più aggiornamenti automaticamente e non si connette a GitHub a tale scopo. Le nuove versioni sono disponibili su GitHub; il firmware locale viene caricato direttamente dal browser al dispositivo. Le funzioni opzionali si collegano solo ai server configurati quando sono abilitate.',
   },
-
-
-  // Supporter
-  supporter: {
-    title: 'Chiave sostenitore',
-    active: 'Sostenitore',
-    badgeLabel: 'Licenza di sostegno',
-    intro: 'Sostieni questo progetto con un piccolo contributo (es. un caffè) e ricevi una chiave personale. Il badge è puramente estetico — nessuna funzione viene bloccata.',
-    thanksTitle: 'Grazie per il tuo supporto!',
-    thanksBody: 'Il tuo stato di sostenitore è valido fino al {date}.',
-    remove: 'Rimuovi chiave',
-    placeholder: 'XXXX-XXXX-XXXX-XXXX',
-    activate: 'Attiva',
-    activated: 'Chiave sostenitore attivata — grazie per il supporto!',
-    activateFailed: 'Impossibile attivare la chiave sostenitore.',
-    removed: 'Chiave sostenitore rimossa.',
-    revokedTitle: 'Questa chiave è stata revocata',
-    revokedBody: 'La chiave è stata aggiunta alla mia lista di revoca e non è più valida. Se è un errore, contattami.',
-    invalid: 'Chiave non valida — controlla l’inserimento.',
-    expired: 'Questa chiave è scaduta il {date}.',
-    validHint: 'Valida — scade il {date}.',
-    footnote: 'Ogni chiave è unica e valida per un periodo limitato. Viene salvata su questo dispositivo.',
-    chipActive: 'Sostenitore attivo',
-    chipInactive: 'Sostieni il progetto',
-    chipTooltip: 'Sostenitore — valido fino al {date}',
-    chipInactiveTooltip: 'Questo progetto dipende dal sostegno volontario — diventa sostenitore',
-    expiredPromptTitle: 'La tua chiave sostenitore è scaduta',
-    expiredPromptSupport: 'Sostieni di nuovo',
-    expiredPromptLater: 'Forse più tardi',
-    expiredPromptBody: 'La tua chiave sostenitore è scaduta. Con un piccolo contributo (es. un caffè) sostieni lo sviluppo continuo di questo progetto e ricevi una nuova chiave come ringraziamento. Grazie! ❤'
-  }
 }

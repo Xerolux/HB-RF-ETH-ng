@@ -78,7 +78,6 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         worker_sources = {
             "events": self.read("main/events.cpp"),
             "prometheus": self.read("main/prometheus.cpp"),
-            "supporter_crl": self.read("main/supporter_crl.cpp"),
             "syslog": self.read("main/syslog.cpp"),
         }
         external_delete = re.compile(r"vTaskDelete\s*\(\s*(?!NULL\s*\))")
@@ -110,15 +109,6 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn("if (!body) body = (char *)malloc(RESP_CAP)", prometheus)
         self.assertEqual(prometheus.count("free(body)"), 1)
         self.assertIn("return ESP_ERR_TIMEOUT", prometheus)
-
-        supporter_crl = worker_sources["supporter_crl"]
-        self.assertIn("std::atomic<bool> s_stop_requested{false}", supporter_crl)
-        self.assertIn("ulTaskNotifyTake", supporter_crl)
-        self.assertIn("xTaskNotifyGive(task)", supporter_crl)
-        self.assertIn("CRL_REFRESH_TOTAL_TIMEOUT_MS", supporter_crl)
-        self.assertIn("config.is_async = true", supporter_crl)
-        self.assertIn("crl_cancelled_or_expired", supporter_crl)
-        self.assertIn("return ESP_ERR_TIMEOUT", supporter_crl)
 
         syslog = worker_sources["syslog"]
         self.assertIn("SYSLOG_STOP_TIMEOUT_MS = 15000", syslog)
@@ -249,100 +239,6 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             "hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;", task_stack
         )
         self.assertNotIn("sizeof(StackType_t)", task_stack)
-
-    def test_supporter_crl_cache_crypto_and_restart_are_fail_safe(self) -> None:
-        source = self.read("main/supporter_crl.cpp")
-
-        read_cache = source[
-            source.index("static esp_err_t read_cache_from_namespace") :
-            source.index("static esp_err_t write_cache_to_new_namespace")
-        ]
-        self.assertIn(
-            "len == 0 || len > sizeof(s_fp) || len % CRL_FP_BYTES != 0",
-            read_cache,
-        )
-        self.assertIn("size_t read_len = len", read_cache)
-        self.assertIn(
-            "nvs_get_blob(h, NVS_KEY, data, &read_len)", read_cache
-        )
-        self.assertLess(
-            read_cache.index("len > sizeof(s_fp)"),
-            read_cache.index("nvs_get_blob(h, NVS_KEY, data, &read_len)"),
-        )
-        self.assertIn("result != ESP_OK || read_len != len", read_cache)
-
-        load_nvs = source[
-            source.index("static void load_from_nvs()") :
-            source.index("static esp_err_t save_to_nvs()")
-        ]
-        self.assertIn("result != ESP_ERR_NVS_NOT_FOUND", load_nvs)
-        self.assertLess(
-            load_nvs.index("write_cache_to_new_namespace"),
-            load_nvs.index("erase_legacy_cache_best_effort"),
-        )
-
-        compute = source[
-            source.index("static bool compute_fingerprint") :
-            source.index("// ---- persistence ----")
-        ]
-        self.assertIn("memset(out, 0, CRL_FP_BYTES)", compute)
-        self.assertIn("unsigned char full[32] = {}", compute)
-        self.assertIn("const psa_status_t hash_status", compute)
-        self.assertIn(
-            "hash_status != PSA_SUCCESS || out_len != sizeof(full)", compute
-        )
-        self.assertNotIn("psa_crypto_init()", compute)
-
-        init = source[
-            source.index("void supporter_crl_init()") :
-            source.index("void supporter_crl_start_refresh_task()")
-        ]
-        self.assertIn("std::atomic<bool> s_psa_ready{false}", source)
-        self.assertIn("const psa_status_t init_status = psa_crypto_init()", init)
-        self.assertIn("if (init_status == PSA_SUCCESS)", init)
-        self.assertIn("s_psa_ready.store(true", init)
-        self.assertLess(
-            init.index("xSemaphoreTake(lifecycle"),
-            init.index("psa_crypto_init()"),
-        )
-
-        is_revoked = source[
-            source.index("bool supporter_crl_is_revoked") :
-            source.index("bool supporter_crl_refresh()")
-        ]
-        self.assertRegex(
-            is_revoked,
-            r"(?s)if \(!compute_fingerprint\(norm, fp\)\) \{.*?return true;",
-        )
-        self.assertIn("treating supporter key as revoked", is_revoked)
-
-        task = source[
-            source.index("static void crl_refresh_task") :
-            source.index("void supporter_crl_init()")
-        ]
-        start = source[
-            source.index("void supporter_crl_start_refresh_task()") :
-            source.index("esp_err_t supporter_crl_stop_refresh_task()")
-        ]
-        stop = source[source.index("esp_err_t supporter_crl_stop_refresh_task()") :]
-        self.assertIn("std::atomic<bool> s_restart_requested{false}", source)
-        self.assertIn("for (;;)", task)
-        self.assertIn("s_restart_requested.exchange(false", task)
-        self.assertIn("s_refresh_task.store(NULL", task)
-        self.assertRegex(
-            task,
-            r"(?s)if \(restart\) \{\s*"
-            r"s_stop_requested\.store\(false.*?\} else \{\s*"
-            r"s_refresh_task\.store\(NULL",
-        )
-        self.assertRegex(
-            start,
-            r"if \(s_stop_requested\.load\(.*?\)\) \{\s*"
-            r"s_restart_requested\.store\(true",
-        )
-        clear_restart = stop.index("s_restart_requested.store(false")
-        load_task = stop.index("TaskHandle_t task")
-        self.assertLess(clear_restart, load_task)
 
     def test_mqtt_tls_stop_and_retry_paths_remain_self_healing(self) -> None:
         for config_path in ("sdkconfig.defaults", "sdkconfig.hb-rf-eth-ng"):
@@ -499,7 +395,6 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             "main/mqtt_handler.cpp",
             "main/reset_info.cpp",
             "main/settings.cpp",
-            "main/supporter_crl.cpp",
             "main/theme_api.cpp",
             "main/webui.cpp",
             "main/webui_storage.cpp",
@@ -658,7 +553,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             uncertain.index("vTaskDelay(pdMS_TO_TICKS(1000))")
         ]
         self.assertLess(
-            rollback.index("resume_tasks_after_ota_failure()"),
+            rollback.index("monitoring_resume_after_ota("),
             rollback.index("ota_operation_finish()"),
         )
         prepare_failure = finalize[
@@ -667,10 +562,6 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         ]
         self.assertLess(
             prepare_failure.index("monitoring_resume_after_ota"),
-            prepare_failure.index("ota_operation_finish()"),
-        )
-        self.assertLess(
-            prepare_failure.index("resume_tasks_after_ota_failure()"),
             prepare_failure.index("ota_operation_finish()"),
         )
 

@@ -341,14 +341,7 @@ export const useSysInfoStore = defineStore('sysInfo', {
     radioModuleFirmwareVersion: "",
     radioModuleBidCosRadioMAC: "",
     radioModuleHmIPRadioMAC: "",
-    radioModuleSGTIN: "",
-    // Supporter badge — computed by the firmware from the stored key
-    // (see main/supporter_key.cpp). Polled with the rest of /sysinfo.json.
-    supporterActive: false,
-    supporterValid: false,
-    supporterExpired: false,
-    supporterRevoked: false,
-    supporterExpiresAt: ""
+    radioModuleSGTIN: ""
   }),
   actions: {
     async update() {
@@ -357,23 +350,7 @@ export const useSysInfoStore = defineStore('sysInfo', {
         // connection-error toasts while the device reboots or is offline.
         const response = await axios.get(`/sysinfo.json?t=${Date.now()}`, { timeout: 5000, silent: true })
         if (response.data?.sysInfo) {
-          const { supporter, ...rest } = response.data.sysInfo
-          Object.assign(this.$state, rest)
-          // Flatten the nested supporter object into reactive scalars so
-          // components can bind supporterActive / supporterExpiresAt directly.
-          if (supporter) {
-            this.supporterActive = !!supporter.active
-            this.supporterValid = !!supporter.valid
-            this.supporterExpired = !!supporter.expired
-            this.supporterRevoked = !!supporter.revoked
-            this.supporterExpiresAt = supporter.expiresAt || ""
-          } else {
-            this.supporterActive = false
-            this.supporterValid = false
-            this.supporterExpired = false
-            this.supporterRevoked = false
-            this.supporterExpiresAt = ""
-          }
+          Object.assign(this.$state, response.data.sysInfo)
         } else {
           throw new Error('Invalid response format: missing sysInfo')
         }
@@ -396,7 +373,6 @@ export const useSettingsStore = defineStore('settings', {
     // wide via that store's setTestDesignEnabled(). Keeping it out of here
     // prevents the "toggle springs back" bug where a settings reload pushed
     // the server value back into the experimental store on every watcher fire.
-    supporterKey: "",
     useDHCP: true,
     localIP: "",
     netmask: "",

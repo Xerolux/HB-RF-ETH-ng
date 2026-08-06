@@ -381,7 +381,6 @@ void test_factory_reset_erases_all_user_namespaces(void)
         "ui_theme",
         "reset_info",
         "upd_cache",
-        "supporter_crl",
         "mqtt_cleanup",
     };
 
@@ -518,7 +517,7 @@ void test_unknown_transaction_marker_wipes_stale_auth_backup(void)
 
 void test_settings_save_preserves_dedicated_foreign_namespaces(void)
 {
-    const char *namespaces[] = {"supporter_crl", "mqtt_cleanup"};
+    const char *namespaces[] = {"mqtt_cleanup"};
     for (const char *namespace_name : namespaces)
     {
         nvs_handle_t handle;

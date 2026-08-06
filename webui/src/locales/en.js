@@ -121,7 +121,6 @@ export default {
     tabTime: 'Time',
     tabBackup: 'Backup & Reset',
     tabDesign: 'Design',
-    tabLicense: 'License',
     tabExperimental: 'Experimental',
     advancedTitle: 'Advanced',
     showExperimental: 'Show experimental features',
@@ -685,37 +684,6 @@ export default {
   // Privacy
   privacy: {
     title: 'Privacy',
-    updateCheck: 'The device no longer checks for updates automatically and does not connect to GitHub for that purpose. New versions can be found on GitHub; the firmware upload happens directly from your browser to the device. Optional features (MQTT, syslog, supporter-key CRL) only connect to their configured servers when enabled.'
+    updateCheck: 'The device no longer checks for updates automatically and does not connect to GitHub for that purpose. New versions can be found on GitHub; the firmware upload happens directly from your browser to the device. Optional features (MQTT, syslog) only connect to their configured servers when enabled.'
   },
-
-
-  // Supporter
-  supporter: {
-    title: 'Supporter Key',
-    active: 'Supporter',
-    badgeLabel: 'Support Licence',
-    intro: 'Support this project with a small contribution (e.g. a coffee) and receive a personal supporter key. The badge is purely cosmetic — no functionality is ever locked.',
-    thanksTitle: 'Thank you for your support!',
-    thanksBody: 'Your supporter status is valid until {date}.',
-    remove: 'Remove key',
-    placeholder: 'XXXX-XXXX-XXXX-XXXX',
-    activate: 'Activate',
-    activated: 'Supporter key activated — thank you for your support!',
-    activateFailed: 'Could not activate the supporter key.',
-    removed: 'Supporter key removed.',
-    revokedTitle: 'This key has been revoked',
-    revokedBody: 'The key was added to my revocation list and is no longer valid. If this is a mistake, please contact me.',
-    invalid: 'Invalid key — please check your input.',
-    expired: 'This key expired on {date}.',
-    validHint: 'Valid — expires on {date}.',
-    footnote: 'Each key is unique and valid for a limited time. It is stored on this device.',
-    chipActive: 'Active Supporter',
-    chipInactive: 'Support Project',
-    chipTooltip: 'Supporter — valid until {date}',
-    chipInactiveTooltip: 'This project relies on voluntary support — become a supporter',
-    expiredPromptTitle: 'Your supporter key has expired',
-    expiredPromptSupport: 'Support again',
-    expiredPromptLater: 'Maybe later',
-    expiredPromptBody: 'Your supporter key has expired. With a small contribution (e.g. a coffee) you support the ongoing development of this project and receive a fresh supporter key as a thank you. Thank you! ❤'
-  }
 }

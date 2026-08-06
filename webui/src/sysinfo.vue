@@ -19,17 +19,6 @@
           <AppIcon name="time" />
           {{ uptimeFormatted }}
         </span>
-        <router-link
-          class="meta-chip supporter-hero-chip"
-          :class="{ 'is-active': sysInfoStore.supporterActive }"
-          to="/settings?tab=license"
-          :title="sysInfoStore.supporterActive
-            ? t('supporter.chipTooltip', { date: sysInfoStore.supporterExpiresAt || '—' })
-            : t('supporter.chipInactiveTooltip')"
-        >
-          <AppIcon :name="sysInfoStore.supporterActive ? 'heart' : 'coffee'" />
-          {{ sysInfoStore.supporterActive ? t('supporter.chipActive') : t('supporter.chipInactive') }}
-        </router-link>
       </div>
     </section>
 
@@ -533,38 +522,5 @@ onBeforeUnmount(() => {
   .radio-stat.wide {
     grid-column: auto;
   }
-}
-
-/* Supporter status chip in the dashboard hero. Links to the settings page
-   where the key can be entered. Two states: filled/warm when active, plain
-   outline otherwise (acts as a call-to-action). */
-.supporter-hero-chip {
-  text-decoration: none;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
-}
-
-.supporter-hero-chip .app-icon {
-  color: var(--color-text-secondary);
-}
-
-.supporter-hero-chip.is-active {
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-strong) 100%);
-  border-color: transparent;
-  box-shadow: 0 4px 14px var(--color-primary-soft);
-}
-
-.supporter-hero-chip.is-active .app-icon {
-  color: #fff;
-}
-
-.supporter-hero-chip:hover {
-  border-color: var(--color-primary-soft);
-}
-
-.supporter-hero-chip:not(.is-active):hover {
-  color: var(--color-primary-strong);
-  background: var(--color-primary-soft);
 }
 </style>

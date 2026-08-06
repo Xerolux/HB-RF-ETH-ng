@@ -217,7 +217,7 @@ esp_err_t checkmk_start(const checkmk_config_t *config);
 esp_err_t checkmk_stop(void);
 
 // Ownershipless binary semaphore which serializes external HTTPS requests
-// (supporter CRL, syslog/events and MQTT TLS) so two TLS connections never
+// (syslog/events and MQTT TLS) so two TLS connections never
 // occupy the heap at once. It is intentionally not a FreeRTOS mutex because
 // MQTT teardown may need to release a gate acquired by its library task.
 extern SemaphoreHandle_t g_net_fetch_mutex;

@@ -146,7 +146,7 @@ export const BModal = defineComponent({
     // Footer-button props (bootstrap-compatible). When hideFooter is false and
     // no default footer slot is supplied, BModal renders a default OK / Cancel
     // pair so every dismissible modal has a visible close affordance — fixes
-    // the "Supporter-Key-Dialog blocks the page" bug where modals with only
+    // the "modal blocks the page" bug where modals with only
     // ok-title/cancel-title props previously rendered NO buttons at all.
     okTitle: { type: String, default: 'OK' },
     cancelTitle: { type: String, default: 'Abbrechen' },

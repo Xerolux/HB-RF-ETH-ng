@@ -50,7 +50,6 @@
 #include "esp_ota_ops.h"
 #include "monitoring.h"
 #include "log_manager.h"
-#include "supporter_crl.h"
 #include "metrics.h"
 #include "events.h"
 #include "reset_info.h"
@@ -73,10 +72,10 @@ extern "C"
 
 // Keep a freshly installed OTA image in PENDING_VERIFY just long enough to
 // confirm the critical boot sequence (Ethernet, radio module, WebUI) survived.
-// The previous 60-second window overlapped with the CRL refresh (60s) and
-// deferred log-retry (10s) TLS fetches — on a device already starved of
-// sockets/heap those fetches could destabilise the system inside the self-test
-// window and trigger an unwanted bootloader rollback.
+// The previous 60-second window overlapped with TLS-heavy startup work — on a
+// device already starved of sockets/heap those fetches could destabilise the
+// system inside the self-test window and trigger an unwanted bootloader
+// rollback.
 // 15 seconds is enough for all services to start and for the first httpd
 // request to be served, while staying well clear of the TLS-heavy window.
 static void validate_running_firmware_task(void *parameter)
@@ -144,18 +143,6 @@ void app_main()
     // subscribers (syslog forwarder, WebSocket log stream) to receive lines
     // without each having to install their own hook.
     LogManager::init();
-    supporter_crl_init();
-    // Only spin up the CRL refresh task when a supporter key is actually
-    // configured. Without a key there is nothing to revoke, but the task
-    // still costs 8 KB of task stack and a 30-50 KB TLS heap spike every
-    // refresh cycle — costs most key-less devices never benefit from.
-    {
-        const char *sk = settings.getSupporterKey();
-        if (sk && sk[0] != '\0')
-        {
-            supporter_crl_start_refresh_task();
-        }
-    }
 
     // Initialise the metrics registry so counters can be registered by any
     // subsystem from this point on. The Prometheus exporter (Phase A) reads
@@ -354,7 +341,7 @@ void app_main()
 
     // If system logging was enabled in settings but the ring buffer could not
     // be allocated during early boot (heap was too tight — typically because
-    // an early TLS fetch such as the CRL refresh was running), retry once
+    // of TLS-heavy startup work), retry once
     // after all subsystems have finished initialising. By then free heap has
     // usually recovered enough for at least the reduced buffer to fit, so the
     // "not enough memory" state after a restart resolves itself.

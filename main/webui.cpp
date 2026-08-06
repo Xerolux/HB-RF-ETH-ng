@@ -60,8 +60,6 @@
 #include "semver.h"
 #include "validation.h"
 #include "log_stream.h"
-#include "supporter_key.h"
-#include "supporter_crl.h"
 #include "pins.h"
 
 static const char *TAG = "WebUI";
@@ -718,23 +716,6 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
         httpd_resp_send_chunk(req, stack_buf, pos);
     }
 
-    // Supporter key logic
-    if (_settings->getSupporterKey() && strlen(_settings->getSupporterKey()) > 0) {
-        SupporterKeyStatus sk;
-        bool skValid = supporter_key_validate(_settings->getSupporterKey(), sk);
-        if (skValid && supporter_crl_is_revoked(_settings->getSupporterKey())) {
-            sk.revoked = true;
-            sk.active = false;
-        }
-        snprintf(buf, sizeof(buf), ",\"supporter\":{\"active\":%s,\"valid\":%s,\"expired\":%s,\"revoked\":%s,\"expiresAt\":\"%s\"}",
-                 (skValid && sk.active) ? "true" : "false",
-                 skValid ? "true" : "false",
-                 (skValid && sk.expired) ? "true" : "false",
-                 (skValid && sk.revoked) ? "true" : "false",
-                 skValid ? sk.expiresAt : "");
-        httpd_resp_send_chunk(req, buf, strlen(buf));
-    }
-
     // Close sysInfo and root
     snprintf(buf, sizeof(buf), "}}");
     httpd_resp_send_chunk(req, buf, strlen(buf));
@@ -875,7 +856,6 @@ void add_settings(cJSON *root)
     cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
     cJSON_AddBoolToObject(settings, "flashPause", _settings->getFlashPause());
     cJSON_AddBoolToObject(settings, "testDesignEnabled", _settings->getTestDesignEnabled());
-    cJSON_AddStringToObject(settings, "supporterKey", _settings->getSupporterKey());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -1355,23 +1335,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
     }
 
-    // Supporter key (cosmetic). Only a checksum-valid key is stored; an
-    // invalid one is silently ignored so the rest of the settings payload
-    // still saves successfully. The frontend validates for instant feedback,
-    // this is the defensive backend check.
-    cJSON *supporterKeyItem = cJSON_GetObjectItem(root, "supporterKey");
-    if (supporterKeyItem && cJSON_IsString(supporterKeyItem)) {
-        const char *sk = cJSON_GetStringValue(supporterKeyItem);
-        if (sk == NULL || sk[0] == '\0') {
-            _settings->setSupporterKey("");
-        } else {
-            SupporterKeyStatus skStatus;
-            if (supporter_key_validate(sk, skStatus)) {
-                _settings->setSupporterKey(sk);
-            }
-        }
-    }
-
     const esp_err_t settings_result = _settings->save();
     if (settings_result != ESP_OK) {
         _settings->restoreSnapshot(previous_settings.get());
@@ -1422,12 +1385,6 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     }
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         set_flash_pause_enabled(cJSON_IsTrue(flashPauseItem));
-    }
-    if (supporterKeyItem && cJSON_IsString(supporterKeyItem)) {
-        const char *stored_key = _settings->getSupporterKey();
-        if (stored_key && stored_key[0] != '\0') {
-            supporter_crl_start_refresh_task();
-        }
     }
 
     cJSON_Delete(root);
@@ -2032,7 +1989,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         cJSON_GetObjectItem(root, "systemLogEnabled");
     cJSON *flashPauseItem = cJSON_GetObjectItem(root, "flashPause");
     cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
-    cJSON *supporterKeyItem = cJSON_GetObjectItem(root, "supporterKey");
 
     // Validate the entire backup and prove NVS capacity before changing any
     // live or persistent setting. A rejected restore must leave the running
@@ -2192,24 +2148,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         }
     }
 
-    const char *supporter_key = NULL;
-    if (supporterKeyItem) {
-        if (!cJSON_IsString(supporterKeyItem)) {
-            cJSON_Delete(root);
-            return send_json_error(req, "400 Bad Request", "invalid_backup",
-                                   "supporterKey");
-        }
-        supporter_key = cJSON_GetStringValue(supporterKeyItem);
-        if (supporter_key && supporter_key[0] != '\0') {
-            SupporterKeyStatus status;
-            if (!supporter_key_validate(supporter_key, status)) {
-                cJSON_Delete(root);
-                return send_json_error(req, "400 Bad Request",
-                                       "invalid_supporter_key", "supporterKey");
-            }
-        }
-    }
-
     std::unique_ptr<settings_snapshot_t> previous_settings(
         new (std::nothrow) settings_snapshot_t{});
     std::unique_ptr<monitoring_config_t> previous_monitoring;
@@ -2332,9 +2270,6 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     }
     if (testDesignItem && cJSON_IsBool(testDesignItem)) {
         _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
-    }
-    if (supporterKeyItem) {
-        _settings->setSupporterKey(supporter_key ? supporter_key : "");
     }
 
     const esp_err_t settings_capacity_result =
@@ -2570,7 +2505,6 @@ httpd_uri_t post_restore_handler = {
 // handler so that heap/network-active subsystems are stopped before the
 // restart. Without this the upload handler would not compile.
 static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring);
-static void resume_tasks_after_ota_failure();
 struct ota_finalize_ctx {
     const esp_partition_t *update_partition;
     const esp_partition_t *running;
@@ -3071,7 +3005,7 @@ httpd_uri_t get_ota_status_handler = {
 
 // Free heap for the manual firmware upload restart by shutting down heap-heavy
 // subsystems.
-// The ESP32-WROOM-32 has no PSRAM; with MQTT/monitoring/CRL running, only
+// The ESP32-WROOM-32 has no PSRAM; with MQTT/monitoring running, only
 // ~60 KB heap can remain. Keeping those workers alive while finalizing the
 // uploaded image and taking Ethernet down also creates avoidable contention.
 // On OTA success the device restarts and
@@ -3094,42 +3028,12 @@ static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring)
         return monitoring_pause_result;
     }
 
-    // Stop CRL refresh task — frees 8 KB task stack
-    esp_err_t crl_stop_result = supporter_crl_stop_refresh_task();
-    if (crl_stop_result != ESP_OK) {
-        ESP_LOGE(TAG, "Cannot continue OTA/restart while CRL is stopping: %s",
-                 esp_err_to_name(crl_stop_result));
-        return crl_stop_result;
-    }
-    ESP_LOGI(TAG, "CRL task stopped for OTA (free heap now %u KB)",
-             (unsigned)(esp_get_free_heap_size() / 1024));
-
     // Note: the automatic update-check feature (former UpdateCheck esp_timer)
     // was removed, so there is no background fetch task left to stop here.
 
     // Brief settle for heap de-fragmentation
     vTaskDelay(pdMS_TO_TICKS(200));
     return ESP_OK;
-}
-
-// Resume tasks stopped by prepare_ota_heap() after an OTA failure. The success
-// path ends in a full system restart, so this only matters on failure. Without
-// it the CRL task stays dead after the first failed attempt, leaving the device
-// with more free heap than before — which is exactly the asymmetry that makes
-// a second "Install" click succeed where the first one failed. Restarting it
-// restores the pre-OTA heap layout so retries are not silently biased. Mirrors
-// the same gating used at boot (main.cpp) and on supporter-key save: the CRL
-// task only runs when a key is configured.
-static void resume_tasks_after_ota_failure()
-{
-    if (_settings) {
-        const char *sk = _settings->getSupporterKey();
-        if (sk && sk[0] != '\0') {
-            supporter_crl_start_refresh_task();
-            ESP_LOGI(TAG, "CRL refresh task resumed after OTA failure (free heap %u KB)",
-                     (unsigned)(esp_get_free_heap_size() / 1024));
-        }
-    }
 }
 
 // Background finalize task: stop workers, select boot partition, restart.
@@ -3147,7 +3051,6 @@ static void ota_finalize_task(void *pv)
         set_ota_error("Restart deferred: background network cleanup failed");
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
         monitoring_resume_after_ota(paused_monitoring);
-        resume_tasks_after_ota_failure();
         ota_operation_finish();
         free(ctx);
         vTaskDelete(NULL);
@@ -3181,7 +3084,6 @@ static void ota_finalize_task(void *pv)
 
         if (running_restored) {
             monitoring_resume_after_ota(paused_monitoring);
-            resume_tasks_after_ota_failure();
             ota_operation_finish();
             free(ctx);
             vTaskDelete(NULL);

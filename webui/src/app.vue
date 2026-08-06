@@ -63,8 +63,7 @@
     <!-- Restart countdown overlay (from the restart UI store) + global overlays
          live OUTSIDE the layout branch so they work in both layouts: an OTA-
          success can land on the login page after reboot, toasts and the
-         supporter prompt can surface anywhere, and the restart countdown may
-         fire regardless of which page is active. -->
+         restart countdown may fire regardless of which page is active. -->
     <div v-if="restartUiStore.visible" class="countdown-overlay restart-countdown-overlay">
       <div class="countdown-card">
         <div class="spinner-container">
@@ -83,22 +82,6 @@
       </div>
     </div>
 
-    <BModal
-      v-model="showSupporterExpiredPrompt"
-      :title="t('supporter.expiredPromptTitle')"
-      :ok-title="t('supporter.expiredPromptSupport')"
-      :cancel-title="t('supporter.expiredPromptLater')"
-      ok-variant="primary"
-      no-close-on-backdrop
-      @ok="showSponsorModal = true"
-      @cancel="showSupporterExpiredPrompt = false"
-    >
-      <div class="expired-prompt-body">
-        <div class="expired-prompt-icon"><AppIcon name="heart" /></div>
-        <p class="expired-prompt-text">{{ t('supporter.expiredPromptBody') }}</p>
-      </div>
-    </BModal>
-
     <AppToastContainer />
     <SponsorModal v-model="showSponsorModal" />
   </div>
@@ -110,7 +93,6 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import { useLoginStore, useRestartUiStore, useSysInfoStore } from './stores.js'
-import { safeSession } from './composables/useSafeStorage'
 import NewDesignHeader from './components/NewDesignHeader.vue'
 import SponsorModal from './components/SponsorModal.vue'
 import AppToastContainer from './components/AppToastContainer.vue'
@@ -121,7 +103,6 @@ const loginStore = useLoginStore()
 const sysInfoStore = useSysInfoStore()
 const restartUiStore = useRestartUiStore()
 const showSponsorModal = ref(false)
-const showSupporterExpiredPrompt = ref(false)
 const webUiVersion = ref(typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : 'unbekannt')
 const webUiStatus = ref({
   version: '',
@@ -203,25 +184,6 @@ const applyWebUiStatus = (nextStatus) => {
 const handleWebUiStatusChanged = (event) => {
   applyWebUiStatus(event.detail)
 }
-
-// Remind a returning supporter whose key has expired to renew — shown once
-// per browser session, right after login / first sysinfo load. A gentle
-// nudge toward re-supporting rather than a hard gate (no functionality is
-// ever locked). Dismissing or opening the sponsor modal sets a sessionStorage
-// flag so it won't pester again until the next real login session.
-// An in-memory ref guards the same session too — Safari private mode silently
-// rejects sessionStorage writes, so without this guard a flapping
-// supporterExpired flag (sysinfo polls every 5s) would re-open the prompt.
-const supporterPromptShownThisMount = ref(false)
-watch(() => [sysInfoStore.supporterExpired, loginStore.isLoggedIn], ([expired, loggedIn]) => {
-  if (!expired || !loggedIn) return
-  if (sysInfoStore.supporterActive) return
-  if (supporterPromptShownThisMount.value) return
-  if (safeSession.get('supporterPromptShown') === '1') return
-  supporterPromptShownThisMount.value = true
-  safeSession.set('supporterPromptShown', '1')
-  showSupporterExpiredPrompt.value = true
-})
 
 // Idle timeout is handled globally in main.js via the login store's
 // activity tracking (5-minute timeout with cross-tab sync via localStorage).

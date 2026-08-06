@@ -54,7 +54,9 @@ static const char *MONITORING_TXN_NVS_NAMESPACE = "monitoring_txn";
 static const char *THEME_NVS_NAMESPACE = "ui_theme";
 static const char *RESET_INFO_NVS_NAMESPACE = "reset_info";
 static const char *UPDATE_CACHE_NVS_NAMESPACE = "upd_cache";
-static const char *SUPPORTER_CRL_NVS_NAMESPACE = "supporter_crl";
+// Legacy namespace from the removed supporter-key/CRL feature. Kept only so a
+// factory reset on devices that once stored a CRL cache can purge the residue.
+static const char *LEGACY_SUPPORTER_CRL_NVS_NAMESPACE = "supporter_crl";
 static const char *MQTT_CLEANUP_NVS_NAMESPACE = "mqtt_cleanup";
 
 static constexpr uint8_t STORAGE_SCOPE_SETTINGS = 1U << 0;
@@ -375,7 +377,7 @@ static esp_err_t recover_factory_reset_transaction()
                        &result);
   remember_first_error(erase_nvs_namespace(UPDATE_CACHE_NVS_NAMESPACE),
                        &result);
-  remember_first_error(erase_nvs_namespace(SUPPORTER_CRL_NVS_NAMESPACE),
+  remember_first_error(erase_nvs_namespace(LEGACY_SUPPORTER_CRL_NVS_NAMESPACE),
                        &result);
   remember_first_error(erase_nvs_namespace(MQTT_CLEANUP_NVS_NAMESPACE),
                        &result);
@@ -539,7 +541,6 @@ void Settings::resetToSafeDefaultsLocked()
   _systemLogEnabled = false;
   _flashPause = true;
   _testDesignEnabled = true;
-  _supporterKey[0] = '\0';
 }
 
 void Settings::lockAuthenticationAfterStorageFailureLocked()
@@ -813,15 +814,66 @@ esp_err_t Settings::load()
   _flashPause = true;
   _testDesignEnabled = true;
 
-  // Supporter key (optional, cosmetic). Stored verbatim — validation happens
-  // on read so an expired or malformed key is harmless.
+  // One-time purge of the removed supporter-key/CRL feature. Older firmware
+  // versions stored the supporter key string and a CRL cache in this
+  // namespace; the feature is gone, so delete any leftover keys so nothing
+  // of the old system survives a plain firmware update (no factory reset
+  // needed). Best-effort: a failure only logs and leaves stale bytes.
   {
-    size_t skLen = sizeof(_supporterKey);
-    if (nvs_get_str(handle, "supporterKey", _supporterKey, &skLen) != ESP_OK)
-      _supporterKey[0] = 0;
+    bool erased_any = false;
+    esp_err_t purge_err = ESP_OK;
+    const char *legacy_keys[] = {"supporterKey", "supCrl", "cacheValid"};
+    for (const char *legacy_key : legacy_keys) {
+      esp_err_t erase_result = nvs_erase_key(handle, legacy_key);
+      if (erase_result == ESP_OK) {
+        erased_any = true;
+      } else if (erase_result != ESP_ERR_NVS_NOT_FOUND) {
+        purge_err = erase_result;
+      }
+    }
+    if (erased_any && purge_err == ESP_OK) {
+      purge_err = nvs_commit(handle);
+    }
+    if (purge_err != ESP_OK) {
+      ESP_LOGW(TAG, "Could not purge legacy supporter-key/CRL NVS residue: %s",
+               esp_err_to_name(purge_err));
+    } else if (erased_any) {
+      ESP_LOGI(TAG, "Purged legacy supporter-key/CRL residue from Settings namespace");
+    }
   }
 
   nvs_close(handle);
+
+  // Purge the dedicated CRL cache namespace of the removed supporter-key
+  // feature on every boot. Idempotent and cheap (open + erase-all + commit;
+  // NOT_FOUND is success). Runs under the storage lock because it is a flash
+  // write, and best-effort so a failure never blocks settings loading.
+  {
+    NvsStorageLock storage_lock(pdMS_TO_TICKS(50));
+    if (!storage_lock) {
+      ESP_LOGW(TAG, "Could not reserve NVS storage to purge legacy CRL cache");
+    } else {
+      nvs_handle_t crl_handle = 0;
+      esp_err_t crl_open = nvs_open(LEGACY_SUPPORTER_CRL_NVS_NAMESPACE,
+                                    NVS_READWRITE, &crl_handle);
+      if (crl_open == ESP_OK) {
+        esp_err_t crl_erase = nvs_erase_all(crl_handle);
+        esp_err_t crl_commit = crl_erase == ESP_OK
+            ? nvs_commit(crl_handle) : crl_erase;
+        nvs_close(crl_handle);
+        if (crl_commit != ESP_OK) {
+          ESP_LOGW(TAG, "Could not purge legacy CRL cache namespace: %s",
+                   esp_err_to_name(crl_commit));
+        } else {
+          ESP_LOGI(TAG, "Purged legacy CRL cache namespace '%s'",
+                   LEGACY_SUPPORTER_CRL_NVS_NAMESPACE);
+        }
+      } else if (crl_open != ESP_ERR_NVS_NOT_FOUND) {
+        ESP_LOGW(TAG, "Could not open legacy CRL cache namespace for purge: %s",
+                 esp_err_to_name(crl_open));
+      }
+    }
+  }
 
   if (!persist_defaults) _storageHealthy = true;
 
@@ -882,7 +934,6 @@ esp_err_t Settings::validateStorageCapacityLocked(
   COUNT_STRING(ipv6Dns1);
   COUNT_STRING(ipv6Dns2);
   COUNT_STRING(ccuIP);
-  COUNT_STRING(supporterKey);
 #undef COUNT_STRING
   if (err != ESP_OK) return err;
 
@@ -1089,7 +1140,6 @@ esp_err_t Settings::save()
   SAVE_STEP(nvs_set_i8(handle, "sysLogEnabled", _systemLogEnabled ? 1 : 0));
   SAVE_STEP(nvs_set_i8(handle, "flashPause", _flashPause ? 1 : 0));
   SAVE_STEP(nvs_set_i8(handle, "testDesign", _testDesignEnabled ? 1 : 0));
-  SAVE_STEP(nvs_set_str(handle, "supporterKey", _supporterKey));
   if (preserve_admin_token) {
     SAVE_STEP(nvs_set_str(handle, "adminToken", admin_token));
   }
@@ -1145,7 +1195,6 @@ void Settings::snapshot(settings_snapshot_t *out)
   SNAPSHOT_COPY(systemLogEnabled);
   SNAPSHOT_COPY(flashPause);
   SNAPSHOT_COPY(testDesignEnabled);
-  SNAPSHOT_COPY(supporterKey);
 #undef SNAPSHOT_COPY
 
   if (_mutex) xSemaphoreGive(_mutex);
@@ -1185,7 +1234,6 @@ void Settings::restoreSnapshot(const settings_snapshot_t *snapshot)
   SNAPSHOT_RESTORE(systemLogEnabled);
   SNAPSHOT_RESTORE(flashPause);
   SNAPSHOT_RESTORE(testDesignEnabled);
-  SNAPSHOT_RESTORE(supporterKey);
 #undef SNAPSHOT_RESTORE
 
   if (_mutex) xSemaphoreGive(_mutex);
@@ -1756,30 +1804,6 @@ void Settings::setTestDesignEnabled(bool enabled)
 {
   (void)enabled;
   _testDesignEnabled = true;
-}
-
-char *Settings::getSupporterKey()
-{
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  char *result = _supporterKey;
-  if (_mutex) xSemaphoreGive(_mutex);
-  return result;
-}
-
-void Settings::setSupporterKey(const char *key)
-{
-  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
-  if (!key || key[0] == '\0')
-  {
-    _supporterKey[0] = 0;
-  }
-  else
-  {
-    // Copy raw input; validation/normalisation is the caller's responsibility
-    // (webui.cpp validates via supporter_key_validate before storing).
-    snprintf(_supporterKey, sizeof(_supporterKey), "%s", key);
-  }
-  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 // ---- Admin token persistence (survives reboots) ---------------------------

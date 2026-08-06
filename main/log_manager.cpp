@@ -184,7 +184,7 @@ void LogManager::_begin(size_t size) {
 
     // Try the requested size first, then fall back to progressively smaller
     // buffers. The ESP32-WROOM-32 has no PSRAM and only ~250 KB internal
-    // heap; a single TLS handshake (for example supporter CRL or MQTT) can
+    // heap; a single TLS handshake (for example MQTT) can
     // drop free heap by 30-50 KB, so an 8 KB contiguous allocation can fail
     // even though a 4 KB or 2 KB one still fits. A smaller log is strictly
     // better than no log — and the user's "not enough memory" error goes

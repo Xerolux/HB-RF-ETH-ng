@@ -66,15 +66,13 @@ Thumbs.db
 webui/test-results/
 webui/playwright-report/
 
-# Supporter key generator — MUST stay private. If this is pushed, anyone can
-# mint their own supporter keys and the whole point of the badge is gone.
-# Only the maintainer keeps a local copy to issue keys to supporters.
+# Legacy supporter-key tooling (feature removed) — keep ignored so a local
+# copy of the generator can never be committed by accident.
 tools/generate_supporter_key.py
 tools/supporter_key_manager.py
 tools/supporter_registry.json
 tools/supporter_contacts.json
 tools/revoked_keys.json
-# PyInstaller artifacts for the standalone .exe build (also private):
 tools/SupporterKeyManager.exe
 tools/SupporterKeyManager.spec
 tools/pyi_build/

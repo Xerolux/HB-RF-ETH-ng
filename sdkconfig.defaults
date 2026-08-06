@@ -18,7 +18,7 @@ CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT=y
 CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
 
 # TLS certificate verification: use the full Mozilla root CA bundle for the
-# optional outbound HTTPS clients (supporter-key CRL, HTTPS webhooks, TLS
+# optional outbound HTTPS clients (HTTPS webhooks, TLS
 # syslog and MQTT). Manual firmware uploads arrive from the browser and do not
 # download an image over HTTPS on the ESP32.
 CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
@@ -67,7 +67,7 @@ CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
 CONFIG_LWIP_MAX_SOCKETS=16
 
 # Reduce TCP TIME_WAIT from the default 60s to 15s. The 60s MSL meant that
-# after every outbound HTTPS fetch (for example a CRL refresh or webhook)
+# after every outbound HTTPS fetch (for example a webhook)
 # the socket FD was unavailable for a full minute,
 # compounding the socket-exhaustion problem above.
 CONFIG_LWIP_TCP_MSL=15000

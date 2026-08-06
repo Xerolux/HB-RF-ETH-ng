@@ -68,7 +68,6 @@ typedef struct {
   bool systemLogEnabled;
   bool flashPause;
   bool testDesignEnabled;
-  char supporterKey[24];
 } settings_snapshot_t;
 
 class Settings
@@ -124,11 +123,6 @@ private:
   // Experimental WebUI layout. Persisted on the device so the selection
   // survives device restarts and browser reloads after login.
   bool _testDesignEnabled;
-
-  // Optional supporter key (cosmetic "Supporter" badge). Stored raw; validity
-  // (CRC + expiry) is evaluated on read by supporter_key_validate(). Empty on
-  // first boot. 24 bytes is enough for "XXXX-XXXX-XXXX-XXXX" (19 chars) + NUL.
-  char _supporterKey[24] = {0};
 
   // Serializes concurrent reads/writes across FreeRTOS tasks.
   SemaphoreHandle_t _mutex = NULL;
@@ -218,10 +212,6 @@ public:
 
   bool getTestDesignEnabled();
   void setTestDesignEnabled(bool enabled);
-
-  // Supporter key persistence (cosmetic badge, no functional gating).
-  char *getSupporterKey();
-  void setSupporterKey(const char *key);
 
   // Authentication token persistence (NVS).  The token survives reboots so
   // the browser "remember me" stays valid after a firmware update or restart.

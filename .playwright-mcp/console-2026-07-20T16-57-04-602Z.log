@@ -1,2 +1,0 @@
-[      50ms] [ERROR] Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-dCoTTBu981DWbT0Xd8cSdJ5bnQKZoCi7flRfJ9WWR6A='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked. @ http://192.168.178.56/recovery:21
-[      94ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ http://192.168.178.56/recovery:0

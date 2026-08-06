@@ -121,7 +121,6 @@ export default {
     tabTime: 'Heure',
     tabBackup: 'Sauvegarde et réinitialisation',
     tabDesign: 'Design',
-    tabLicense: 'Licence',
     tabExperimental: 'Expérimental',
     advancedTitle: 'Avancé',
     showExperimental: 'Afficher les fonctions expérimentales',
@@ -688,35 +687,4 @@ export default {
     title: 'Confidentialité',
     updateCheck: 'L’appareil ne recherche plus automatiquement les mises à jour et ne se connecte pas à GitHub à cette fin. Les nouvelles versions sont disponibles sur GitHub ; le micrologiciel local est téléversé directement du navigateur vers l’appareil. Les fonctions facultatives ne se connectent qu’aux serveurs configurés lorsqu’elles sont activées.',
   },
-
-
-  // Supporter
-  supporter: {
-    title: 'Clé de soutien',
-    active: 'Soutien',
-    badgeLabel: 'Licence de soutien',
-    intro: 'Soutenez ce projet avec une petite contribution (par ex. un café) et recevez une clé de soutien personnelle. Le badge est purement cosmétique — aucune fonctionnalité n’est verrouillée.',
-    thanksTitle: 'Merci pour votre soutien !',
-    thanksBody: 'Votre statut de soutien est valide jusqu’au {date}.',
-    remove: 'Retirer la clé',
-    placeholder: 'XXXX-XXXX-XXXX-XXXX',
-    activate: 'Activer',
-    activated: 'Clé de soutien activée — merci pour votre soutien !',
-    activateFailed: 'Impossible d’activer la clé de soutien.',
-    removed: 'Clé de soutien supprimée.',
-    revokedTitle: 'Cette clé a été révoquée',
-    revokedBody: 'La clé a été ajoutée à ma liste de révocation et n’est plus valable. Si c’est une erreur, contactez-moi.',
-    invalid: 'Clé invalide — vérifiez votre saisie.',
-    expired: 'Cette clé a expiré le {date}.',
-    validHint: 'Valide — expire le {date}.',
-    footnote: 'Chaque clé est unique et valable pour une durée limitée. Elle est stockée sur cet appareil.',
-    chipActive: 'Soutien actif',
-    chipInactive: 'Soutenir le projet',
-    chipTooltip: 'Soutien — valide jusqu’au {date}',
-    chipInactiveTooltip: 'Ce projet dépend du soutien volontaire — devenez soutien',
-    expiredPromptTitle: 'Votre clé de soutien a expiré',
-    expiredPromptSupport: 'Soutenir à nouveau',
-    expiredPromptLater: 'Peut-être plus tard',
-    expiredPromptBody: 'Votre clé de soutien a expiré. Avec une petite contribution (par exemple un café), vous soutenez le développement continu de ce projet et recevez en remerciement une nouvelle clé de soutien. Merci ! ❤'
-  }
 }

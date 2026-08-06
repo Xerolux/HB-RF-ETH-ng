@@ -167,7 +167,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `rawuartudplistener.cpp` | UDP↔UART bridge (the core protocol relay) |
 | `webui.cpp` | HTTP server + all REST API endpoint handlers (largest file) |
 | `settings.cpp` | Persistent config via NVS Flash |
-| `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (supporter CRL, syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
+| `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
 | `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`) |
 | `monitoring_api.cpp` | REST endpoints for monitoring config |
 | `ntpclient.cpp` | NTP time sync client |
@@ -196,7 +196,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 - HTTP handler functions in `webui.cpp` follow the pattern `esp_err_t <name>_handler_func(httpd_req_t *req)`, registered via a matching `httpd_uri_t` struct.
 - Settings persistence uses `settings.cpp` — avoid direct NVS calls elsewhere.
 - **`vTaskDelay(pdMS_TO_TICKS(ms))` overflows for large `ms` values.** `pdMS_TO_TICKS` multiplies `ms * configTICK_RATE_HZ` in 32-bit `TickType_t` arithmetic before dividing by 1000; a 24h value (86,400,000 ms) overflows `uint32_t` and silently wraps to a much shorter delay. For long delays, loop in smaller chunks (e.g. N × 1h) instead of passing the full duration directly.
-- Any code performing an outbound TLS/HTTPS request should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `supporter_crl.cpp` for the pattern.
+- Any code performing an outbound TLS/HTTPS request should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `events.cpp` for the pattern.
 
 ---
 
@@ -448,7 +448,7 @@ chore: bump ESP-IDF to 6.0.2
 - Thread safety is critical — all monitoring state access must be guarded by the monitoring mutex
 - See `main/monitoring.cpp` for the mutex pattern
 - Both MQTT and CheckMK share the same configuration structure
-- Outbound TLS fetches elsewhere in the firmware (supporter CRL, syslog) take `g_net_fetch_mutex` (declared in `monitoring.h`, created in `monitoring.cpp`) to avoid concurrent TLS handshakes exhausting heap — keep new HTTPS call sites consistent with this
+- Outbound TLS fetches elsewhere in the firmware (syslog) take `g_net_fetch_mutex` (declared in `monitoring.h`, created in `monitoring.cpp`) to avoid concurrent TLS handshakes exhausting heap — keep new HTTPS call sites consistent with this
 
 ### Updating the WebUI
 

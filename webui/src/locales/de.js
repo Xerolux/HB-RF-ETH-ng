@@ -121,7 +121,6 @@ export default {
     tabTime: 'Zeit',
     tabBackup: 'Backup & Reset',
     tabDesign: 'Design',
-    tabLicense: 'Lizenz',
     tabExperimental: 'Experimentell',
     advancedTitle: 'Erweitert',
     showExperimental: 'Experimentelle Funktionen anzeigen',
@@ -686,37 +685,6 @@ export default {
   // Privacy
   privacy: {
     title: 'Datenschutz',
-    updateCheck: 'Das Gerät sucht nicht mehr automatisch nach Updates und baut dafür keine Verbindungen zu GitHub auf. Neue Versionen finden Sie auf GitHub; der Upload der Firmware erfolgt direkt vom Browser an das Gerät. Optionale Funktionen (MQTT, Syslog, Unterstützerschlüssel-CRL) verbinden sich nur bei aktivierter Funktion mit den entsprechend konfigurierten Servern.'
+    updateCheck: 'Das Gerät sucht nicht mehr automatisch nach Updates und baut dafür keine Verbindungen zu GitHub auf. Neue Versionen finden Sie auf GitHub; der Upload der Firmware erfolgt direkt vom Browser an das Gerät. Optionale Funktionen (MQTT, Syslog) verbinden sich nur bei aktivierter Funktion mit den entsprechend konfigurierten Servern.'
   },
-
-
-  // Supporter
-  supporter: {
-    title: 'Supporter-Key',
-    active: 'Supporter',
-    badgeLabel: 'Support-Lizenz',
-    intro: 'Unterstütze dieses Projekt mit einem kleinen Beitrag (z. B. einem Kaffee) und erhalte einen persönlichen Supporter-Key. Das Badge ist rein kosmetisch — keine Funktion wird gesperrt.',
-    thanksTitle: 'Danke für Ihre Unterstützung!',
-    thanksBody: 'Dein Supporter-Status ist gültig bis zum {date}.',
-    remove: 'Key entfernen',
-    placeholder: 'XXXX-XXXX-XXXX-XXXX',
-    activate: 'Aktivieren',
-    activated: 'Supporter-Key aktiviert — danke für die Unterstützung!',
-    activateFailed: 'Supporter-Key konnte nicht aktiviert werden.',
-    removed: 'Supporter-Key entfernt.',
-    revokedTitle: 'Dieser Key wurde widerrufen',
-    revokedBody: 'Der Key wurde auf meine Widerrufungsliste gesetzt und ist nicht mehr gültig. Falls das ein Fehler ist, melden Sie sich bitte bei mir.',
-    invalid: 'Ungültiger Key — bitte prüfe die Eingabe.',
-    expired: 'Dieser Key ist am {date} abgelaufen.',
-    validHint: 'Gültig — läuft am {date} ab.',
-    footnote: 'Jeder Key ist einzigartig und zeitlich begrenzt gültig. Er wird auf diesem Gerät gespeichert.',
-    chipActive: 'Aktiver Supporter',
-    chipInactive: 'Projekt unterstützen',
-    chipTooltip: 'Supporter — gültig bis {date}',
-    chipInactiveTooltip: 'Dieses Projekt lebt von freiwilliger Unterstützung — jetzt Supporter werden',
-    expiredPromptTitle: 'Dein Supporter-Key ist abgelaufen',
-    expiredPromptSupport: 'Jetzt erneut unterstützen',
-    expiredPromptLater: 'Vielleicht später',
-    expiredPromptBody: 'Die Gültigkeit deines Supporter-Keys ist leider abgelaufen. Mit einem kleinen Beitrag (z. B. einem Kaffee) unterstützen Sie die Weiterentwicklung dieses Projekts und erhältst als Dankeschön einen frischen Supporter-Key. Danke! ❤'
-  }
 }

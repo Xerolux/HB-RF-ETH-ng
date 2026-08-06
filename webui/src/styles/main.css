@@ -2022,11 +2022,11 @@ body.newdesign-active .newdesign-shell .form-check-input:not(.form-switch .form-
 }
 
 /* Generic links: accent colour, no underline by default. */
-body.newdesign-active .newdesign-shell a:not(.btn):not(.nav-link):not(.nav-item):not(.brand):not(.follow-x-btn):not(.sponsor-btn):not(.mobile-link):not(.utility-row):not(.supporter-chip):not(.status-chip):not(.mobile-locale) {
+body.newdesign-active .newdesign-shell a:not(.btn):not(.nav-link):not(.nav-item):not(.brand):not(.follow-x-btn):not(.sponsor-btn):not(.mobile-link):not(.utility-row):not(.status-chip):not(.mobile-locale) {
   color: var(--newdesign-primary) !important;
   text-decoration: none !important;
 }
-body.newdesign-active .newdesign-shell a:not(.btn):not(.nav-link):not(.nav-item):not(.brand):not(.follow-x-btn):not(.sponsor-btn):not(.mobile-link):not(.utility-row):not(.supporter-chip):not(.status-chip):not(.mobile-locale):hover {
+body.newdesign-active .newdesign-shell a:not(.btn):not(.nav-link):not(.nav-item):not(.brand):not(.follow-x-btn):not(.sponsor-btn):not(.mobile-link):not(.utility-row):not(.status-chip):not(.mobile-locale):hover {
   text-decoration: underline !important;
 }
 
@@ -2070,31 +2070,6 @@ body.newdesign-active .newdesign-shell .diag-message {
   color: var(--newdesign-text-soft) !important;
 }
 
-/* ---- settings.vue: supporter card internals (medallion handled in Phase 6) ---- */
-body.newdesign-active .newdesign-shell .supporter-input {
-  border-radius: var(--newdesign-radius-input) !important;
-  background: var(--newdesign-panel-soft) !important;
-  border: 1px solid var(--newdesign-border) !important;
-  box-shadow: none !important;
-}
-body.newdesign-active .newdesign-shell .supporter-activate-btn {
-  border-radius: var(--newdesign-radius-button) !important;
-  box-shadow: none !important;
-}
-body.newdesign-active .newdesign-shell .supporter-feedback {
-  border-radius: var(--newdesign-radius-card) !important;
-  border: 1px solid var(--newdesign-border) !important;
-  background: var(--newdesign-panel-soft) !important;
-  box-shadow: none !important;
-}
-body.newdesign-active .newdesign-shell .supporter-revoked-panel,
-body.newdesign-active .newdesign-shell .supporter-thanks-panel {
-  border-radius: var(--newdesign-radius-card) !important;
-  border: 1px solid var(--newdesign-border) !important;
-  background: var(--newdesign-panel-soft) !important;
-  box-shadow: none !important;
-}
-
 body.newdesign-active .newdesign-shell .forgot-link {
   color: var(--color-primary) !important;
 }
@@ -2131,20 +2106,12 @@ body.newdesign-active .newdesign-shell .lib-license {
   color: var(--newdesign-text-soft) !important;
 }
 
-/* ---- sysinfo.vue: board-sense hint pill + supporter hero chip active ---- */
+/* ---- sysinfo.vue: board-sense hint pill ---- */
 body.newdesign-active .newdesign-shell .board-sense-hint {
   border-radius: var(--newdesign-radius-chip) !important;
   background: var(--color-warning-soft) !important;
   border: 1px solid var(--newdesign-border) !important;
 }
-/* Tone down the neon active state of the supporter hero chip so it sits in
-   the flat theme: keep the accent but reduce the glow. */
-body.newdesign-active .newdesign-shell .supporter-hero-chip.is-active {
-  background: var(--newdesign-primary-soft) !important;
-  border-color: var(--newdesign-hover-border) !important;
-  box-shadow: none !important;
-}
-
 /* ---- change-password.vue: flatten the orange gradient card header ---- */
 body.newdesign-active .newdesign-shell .change-password-card .card-header {
   background: transparent !important;
@@ -2173,29 +2140,4 @@ body.newdesign-active .newdesign-shell code:not(pre code) {
   border: 1px solid var(--newdesign-border) !important;
   border-radius: var(--newdesign-radius-chip) !important;
   padding: 1px 5px !important;
-}
-
-/* ---- Supporter medallion (settings.vue): keep the animation, tone it down ----
-   The base medallion uses heavy multi-colour gradients + strong orange glows
-   that look neon against the otherwise flat theme. Here we soften the glow,
-   drop the inset highlight, and derive the accent from tokens so it matches
-   the brand without overpowering the card. The float/spin/twinkle animations
-   are preserved. */
-body.newdesign-active .newdesign-shell .medallion {
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.22), transparent 55%),
-    linear-gradient(135deg, var(--newdesign-primary) 0%, var(--newdesign-primary-strong) 100%);
-  box-shadow: var(--newdesign-shadow) !important;
-}
-body.newdesign-active .newdesign-shell .medallion-shine {
-  background: conic-gradient(from 0deg, transparent 70%, rgba(255, 255, 255, 0.4) 85%, transparent 96%);
-}
-body.newdesign-active .newdesign-shell .medallion-spark {
-  color: var(--newdesign-primary-strong);
-  opacity: 0.7;
-}
-body.newdesign-active .newdesign-shell .medallion-label {
-  color: var(--newdesign-primary-strong) !important;
-  background: var(--newdesign-primary-soft) !important;
-  border-radius: var(--newdesign-radius-chip) !important;
 }

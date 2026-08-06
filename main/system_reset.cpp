@@ -29,7 +29,6 @@
 #include "freertos/task.h"
 #include "pins.h"
 #include "monitoring.h"
-#include "supporter_crl.h"
 #include <atomic>
 
 static const char *TAG = "SystemReset";
@@ -126,7 +125,7 @@ static void full_system_restart_impl(bool operation_reserved) {
 
     // Every caller—not only a post-upload restart—must stop lwIP/TLS users before the
     // Ethernet MAC and PHY are held down for 35 seconds. Otherwise MQTT,
-    // notifications, Syslog, CRL, CheckMK or Prometheus can touch sockets
+    // notifications, Syslog, CheckMK or Prometheus can touch sockets
     // after esp_eth_stop(), which was one path to watchdog/panic resets.
     //
     // Always call monitoring_pause_for_ota even when the flag appears set.
@@ -143,9 +142,6 @@ static void full_system_restart_impl(bool operation_reserved) {
             // concurrent restart). Workers are already stopped; proceed.
             prepare_result = ESP_OK;
         }
-    }
-    if (prepare_result == ESP_OK) {
-        prepare_result = supporter_crl_stop_refresh_task();
     }
     if (prepare_result == ESP_OK && g_network_stop_cb != NULL) {
         // Raw-UART owns a UDP PCB/queue outside the monitoring subsystem.
