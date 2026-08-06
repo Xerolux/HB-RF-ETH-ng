@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.8] - 2026-08-06
+
+### Changes
+- feat: remove supporter key and CRL feature completely
+
 ## [2.2.6-Beta.7] - 2026-08-05
 
 ### Changes
