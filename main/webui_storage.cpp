@@ -133,8 +133,11 @@ void set_error_locked(const char *message, esp_err_t error = ESP_OK)
     }
     else
     {
-        snprintf(s_status.lastError, sizeof(s_status.lastError), "%s: %s",
-                 local_message, esp_err_to_name(error));
+        // Keep room for the separator, the ESP error name, and the terminator.
+        // Both inputs are bounded so GCC can prove the status buffer cannot
+        // be truncated under either -Os or -O2.
+        snprintf(s_status.lastError, sizeof(s_status.lastError), "%.*s: %.*s",
+                 63, local_message, 28, esp_err_to_name(error));
     }
     ESP_LOGE(TAG, "%s", s_status.lastError);
 }
