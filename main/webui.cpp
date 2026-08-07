@@ -626,7 +626,9 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     char fwVersionStr[16];
     snprintf(fwVersionStr, sizeof(fwVersionStr), "%d.%d.%d", fwVersion[0], fwVersion[1], fwVersion[2]);
 
-    char buf[256];
+    // The escaped OTA error can use up to twice the 128-byte source buffer.
+    // Leave enough room for the surrounding JSON without truncating it.
+    char buf[384];
 
     // Start sysInfo object
     snprintf(buf, sizeof(buf), "{\"sysInfo\":{");
