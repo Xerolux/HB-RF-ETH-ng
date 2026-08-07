@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.9] - 2026-08-07
+
+### Changes
+- fix(webui): bound persisted error formatting under size builds
+- fix(ota): apply response buffer sizing to status handler
+- fix(ota): size status response for escaped errors
+- fix(stability): restore size optimization from v2.1.10
+- chore: update WebUI manifest for webui-v1.0.0-Beta.17
+
 ## [2.2.6-Beta.8] - 2026-08-06
 
 ### Changes

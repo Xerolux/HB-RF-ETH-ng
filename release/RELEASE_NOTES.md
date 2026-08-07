@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.6-Beta.4
+# 🚀 HB-RF-ETH-ng v2.2.6-Beta.9
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,24 +11,14 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.6-Beta.4?
+## 🆕 Was ist neu in v2.2.6-Beta.9?
 
 ### Changes
-- fix(stability): remove emulated 64-bit atomics from Raw-UART hot paths and use native 32-bit, rollover-safe state
-- fix(logging): eliminate subscriber races, activate live-log forwarding only on demand, and move Syslog formatting out of producer tasks
-- fix(lifecycle): stop TLS and monitoring workers cooperatively with bounded network I/O instead of force-deleting resource owners
-- fix(ethernet): restore cache-aware EMAC interrupt handling and disable Ethernet IRAM optimization
-- fix(raw-uart): make UDP callback/task teardown race-free and drain queued pbufs on every startup-failure path
-- fix(monitoring): serialize config writes and firmware/reset operations with one native 32-bit CAS and fail closed on corrupt listener allowlists
-- fix(storage): make Settings, theme, monitoring, CRL and MQTT-marker NVS updates transactional and recover interrupted factory resets without restoring stale credentials
-- fix(auth): require current-password reauthentication for real bulk password changes and make unequal-length credential comparison bounds-safe
-- fix(restart): serialize manual firmware upload, restore, MQTT restart and system reset while preserving cooperative worker shutdown
-- build: pin every firmware workflow and dependency metadata to stable ESP-IDF v6.0.2
-- test(stability): add 32 policy regressions, strict host lifecycle tests, counter rollover/concurrency stress and bounds-sanitized credential tests
-- fix(version): identify the firmware as Beta.4; the Beta.3 tag accidentally still embedded Beta.2
-- docs(update): clarify that automatic checks, URL-OTA and MQTT/Home-Assistant OTA are removed; only manual `.bin` upload remains
-
-> Hinweis: Beta.4 ist ein Pre-Release. Die gehärteten Pfade passen zum beobachteten Interrupt-Watchdog-Reset; ohne Panic-Backtrace lässt sich jedoch keine einzelne Absturzstelle beweisen. Ein mehrtägiger Praxistest auf betroffener Hardware bleibt empfohlen.
+- fix(webui): bound persisted error formatting under size builds
+- fix(ota): apply response buffer sizing to status handler
+- fix(ota): size status response for escaped errors
+- fix(stability): restore size optimization from v2.1.10
+- chore: update WebUI manifest for webui-v1.0.0-Beta.17
 
 ## ✨ Hauptfunktionen
 
@@ -65,8 +55,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.6-Beta.4.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.16.bin`)
+- **Firmware-Binary** (`firmware_2.2.6-Beta.9.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -107,6 +97,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.0-Beta.16`
+- WebUI version: `1.0.0-Beta.17`
 - WebUI API: `1`
 - Minimum firmware: `2.2.5-Beta.1`
