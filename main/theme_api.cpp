@@ -126,7 +126,7 @@ void load_theme(char *scheme, size_t scheme_size,
 {
     set_default_theme(scheme, scheme_size, color, color_size);
 
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "theme.load");
     if (!storage_lock)
     {
         ESP_LOGE(TAG, "Could not acquire NVS storage lock while loading theme");
@@ -310,7 +310,7 @@ esp_err_t theme_api_set_config(const char *scheme, const char *color)
     snprintf(config.color, sizeof(config.color), "%s", color);
     config.checksum = config_checksum(config);
 
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "theme.save");
     if (!storage_lock) return ESP_ERR_NO_MEM;
 
     nvs_handle_t handle = 0;

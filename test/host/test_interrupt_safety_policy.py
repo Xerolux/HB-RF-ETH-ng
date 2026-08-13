@@ -225,8 +225,12 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         crash_tail = log_manager_source[
             log_manager_source.index("bool LogManager::saveCrashTailNvs") :
         ]
+        # The bounded 20 ms timeout is the invariant that matters here (this
+        # runs on the path immediately before a protective restart and must
+        # never wait unboundedly); the crash_blackbox op-tag argument after
+        # it is an additive diagnostic, not part of the contract.
         self.assertIn(
-            "NvsStorageLock storage_lock(pdMS_TO_TICKS(20))", crash_tail
+            "NvsStorageLock storage_lock(pdMS_TO_TICKS(20)", crash_tail
         )
         self.assertLess(
             crash_tail.index("NvsStorageLock storage_lock"),

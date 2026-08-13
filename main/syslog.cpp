@@ -24,6 +24,7 @@
 #include "syslog.h"
 #include "log_manager.h"
 #include "monitoring.h"
+#include "crash_blackbox.h"
 #include "settings.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -560,6 +561,7 @@ static void syslog_task(void *pv)
             // upload of heap. The log line is dropped; the queue keeps moving.
             if (!net_fetch_ota_active() && g_net_fetch_mutex) {
                 if (xSemaphoreTake(g_net_fetch_mutex, 0) == pdTRUE) {
+                    crash_blackbox_net_op_begin("syslog_tls");
                     // Stop may race with the non-blocking mutex acquisition.
                     // Recheck after ownership so no TLS setup begins while the
                     // lifecycle is already unwinding.
@@ -567,6 +569,7 @@ static void syslog_task(void *pv)
                         syslog_tls_send(&tls, s_cfg.server, s_cfg.port,
                                         wire, wire_len);
                     }
+                    crash_blackbox_net_op_end();
                     xSemaphoreGive(g_net_fetch_mutex);
                 }
             }

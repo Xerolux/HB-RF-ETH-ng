@@ -21,6 +21,7 @@
 #include "nvs.h"
 
 #include "monitoring.h"
+#include "crash_blackbox.h"
 #include "nvs_storage_lock.h"
 #include "security_headers.h"
 #include "webui_compatibility.h"
@@ -165,7 +166,7 @@ void reset_manifest_metadata_locked()
 
 esp_err_t set_transaction_pending_locked(bool pending)
 {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "webui_storage.transaction_pending");
     if (!storage_lock) return ESP_ERR_NO_MEM;
 
     nvs_handle_t handle = 0;
@@ -832,6 +833,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
                                               "Update subsystem busy");
         }
         net_locked = true;
+        crash_blackbox_net_op_begin("webui_storage_upload");
     }
 
     char expected_sha256[SHA256_HEX_LENGTH + 1] = {};
@@ -845,7 +847,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
         static_cast<size_t>(req->content_len), expected_sha256);
     if (result != ESP_OK)
     {
-        if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+        if (net_locked) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
         const WebUIStorageStatus status = webui_storage_get_status();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
                                    status.lastError[0]
@@ -857,7 +859,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
     if (!buffer)
     {
         webui_storage_update_abort();
-        if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+        if (net_locked) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
                                    "Could not allocate WWW upload buffer");
     }
@@ -910,7 +912,7 @@ esp_err_t post_webui_update_handler(httpd_req_t *req)
         webui_storage_update_abort();
     }
 
-    if (net_locked) xSemaphoreGive(g_net_fetch_mutex);
+    if (net_locked) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
 
     if (result != ESP_OK)
     {

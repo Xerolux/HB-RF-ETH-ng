@@ -575,7 +575,7 @@ static bool valid_stored_admin_username(const char *value)
 
 esp_err_t Settings::load()
 {
-  NvsStorageLock storage_lock;
+  NvsStorageLock storage_lock(portMAX_DELAY, "settings.load");
   if (!storage_lock) {
     ESP_LOGE(TAG, "Could not reserve NVS storage while loading settings");
     if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
@@ -849,7 +849,7 @@ esp_err_t Settings::load()
   // NOT_FOUND is success). Runs under the storage lock because it is a flash
   // write, and best-effort so a failure never blocks settings loading.
   {
-    NvsStorageLock storage_lock(pdMS_TO_TICKS(50));
+    NvsStorageLock storage_lock(pdMS_TO_TICKS(50), "settings.purge_legacy_crl");
     if (!storage_lock) {
       ESP_LOGW(TAG, "Could not reserve NVS storage to purge legacy CRL cache");
     } else {
@@ -994,7 +994,7 @@ esp_err_t Settings::validateStorageCapacityLocked(
 
 esp_err_t Settings::validateStorageCapacity()
 {
-  NvsStorageLock storage_lock;
+  NvsStorageLock storage_lock(portMAX_DELAY, "settings.capacity_check");
   if (!storage_lock) return ESP_ERR_NO_MEM;
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
 
@@ -1011,7 +1011,7 @@ esp_err_t Settings::validateStorageCapacity()
 
 esp_err_t Settings::beginRestoreTransaction()
 {
-  NvsStorageLock storage_lock;
+  NvsStorageLock storage_lock(portMAX_DELAY, "settings.restore_begin");
   if (!storage_lock) return ESP_ERR_NO_MEM;
   if (s_restore_transaction_active) return ESP_ERR_INVALID_STATE;
 
@@ -1027,7 +1027,7 @@ esp_err_t Settings::beginRestoreTransaction()
 
 esp_err_t Settings::finishRestoreTransaction()
 {
-  NvsStorageLock storage_lock;
+  NvsStorageLock storage_lock(portMAX_DELAY, "settings.restore_finish");
   if (!storage_lock) return ESP_ERR_NO_MEM;
   if (!s_restore_transaction_active) return ESP_ERR_INVALID_STATE;
 
@@ -1038,7 +1038,7 @@ esp_err_t Settings::finishRestoreTransaction()
 
 esp_err_t Settings::save()
 {
-  NvsStorageLock storage_lock;
+  NvsStorageLock storage_lock(portMAX_DELAY, "settings.save");
   if (!storage_lock) return ESP_ERR_NO_MEM;
   if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
 
@@ -1249,7 +1249,7 @@ esp_err_t Settings::clear()
   // WebUI image/transaction metadata; factory reset must not uninstall the
   // firmware or the separately installed WebUI.
   {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "settings.factory_reset");
     if (!storage_lock) {
       ESP_LOGE(TAG, "Could not reserve NVS storage for factory reset");
       return ESP_ERR_NO_MEM;
@@ -1810,7 +1810,7 @@ void Settings::setTestDesignEnabled(bool enabled)
 
 bool Settings::loadAdminToken(char *out, size_t size)
 {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "settings.load_admin_token");
     if (!storage_lock) return false;
     if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
     if (!out || size == 0) {
@@ -1836,7 +1836,7 @@ bool Settings::loadAdminToken(char *out, size_t size)
 
 esp_err_t Settings::saveAdminToken(const char *token)
 {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "settings.save_admin_token");
     if (!storage_lock) {
       return ESP_ERR_NO_MEM;
     }
@@ -1860,7 +1860,7 @@ esp_err_t Settings::saveAdminToken(const char *token)
 
 esp_err_t Settings::clearAdminToken()
 {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "settings.clear_admin_token");
     if (!storage_lock) {
       return ESP_ERR_NO_MEM;
     }

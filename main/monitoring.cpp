@@ -822,7 +822,7 @@ static esp_err_t save_config_to_nvs(const monitoring_config_t *config)
         config_nvs_entry_requirement(config, &required_entries);
     if (err != ESP_OK) return err;
 
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "monitoring.save_config");
     if (!storage_lock) return ESP_ERR_NO_MEM;
 
     nvs_handle_t config_handle;
@@ -908,7 +908,7 @@ esp_err_t monitoring_validate_config_storage(
         config_nvs_entry_requirement(config, &required_entries);
     if (err != ESP_OK) return err;
 
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "monitoring.validate_storage");
     if (!storage_lock) return ESP_ERR_NO_MEM;
     nvs_handle_t config_handle;
     err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &config_handle);
@@ -1219,7 +1219,7 @@ static esp_err_t load_config_from_nvs(monitoring_config_t *config)
     // value and the combined monitoring form can no longer save MQTT.
     monitoring_config_set_defaults(config);
 
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "monitoring.load_config");
     if (!storage_lock) return ESP_ERR_NO_MEM;
 
     nvs_handle_t nvs_handle;

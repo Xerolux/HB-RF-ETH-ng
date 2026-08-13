@@ -51,6 +51,23 @@
 extern "C" {
 #endif
 
+// Op-tag flight recorder: names the blocking operation in flight, if any,
+// at the moment of an Interrupt-Watchdog/panic reset. This is what actually
+// answers "what was the firmware doing" for issue #362 — the periodic heap
+// sample above only bounds the picture (rules out slow heap exhaustion), it
+// cannot name a specific call site.
+//
+// Both tracked domains already have a single project-wide serialization
+// primitive (NvsStorageLock's recursive mutex; g_net_fetch_mutex, a plain
+// binary semaphore), so at most one task ever owns a domain's tag at a time.
+// That makes plain (unlocked) RTC writes from crash_blackbox_*_op_begin/end
+// race-free by construction: only the current owner of the underlying mutex
+// ever writes its domain's slot. The NVS domain uses a small stack because
+// the recursive mutex lets its owning task nest calls; the net-fetch domain
+// is a single slot because that semaphore never nests.
+#define CRASH_BLACKBOX_TAG_LEN 24
+#define CRASH_BLACKBOX_NVS_STACK_DEPTH 4
+
 typedef struct {
     uint32_t magic;         // CRASH_BLACKBOX_MAGIC when the slot holds a valid sample
     uint32_t free_heap;     // heap_caps_get_free_size(MALLOC_CAP_DEFAULT) at sample time
@@ -60,6 +77,13 @@ typedef struct {
     uint32_t uptime_s;      // xTaskGetTickCount()/portTICK_PERIOD_MS/1000 at sample time
     uint32_t low_streak;    // heap_watchdog low-heap streak at sample time
     uint32_t sample_count;  // number of samples written since first boot of this RTC cycle
+
+    uint32_t nvs_op_magic;  // set on first push since this RTC cycle started
+    uint8_t  nvs_op_depth;  // number of NvsStorageLock instances currently held
+    char     nvs_op_stack[CRASH_BLACKBOX_NVS_STACK_DEPTH][CRASH_BLACKBOX_TAG_LEN];
+
+    uint32_t net_op_magic;  // set while g_net_fetch_mutex is held with a tag
+    char     net_op_tag[CRASH_BLACKBOX_TAG_LEN];
 } crash_blackbox_t;
 
 // Record a fresh sample. Called periodically (e.g. every 60 s) from the
@@ -77,6 +101,28 @@ const crash_blackbox_t *crash_blackbox_read(void);
 // Invalidate the slot so a subsequent normal reboot does not surface stale
 // crash data. Called after the boot path has consumed and logged the sample.
 void crash_blackbox_clear(void);
+
+// Push/pop a short tag naming the NVS operation an NvsStorageLock instance
+// guards. Called from NvsStorageLock's constructor/destructor; never call
+// directly. Safe (no-op) beyond CRASH_BLACKBOX_NVS_STACK_DEPTH nesting —
+// depth is still tracked so end() stays balanced, just without a label for
+// levels past the array.
+void crash_blackbox_nvs_op_begin(const char *tag);
+void crash_blackbox_nvs_op_end(void);
+
+// Record/clear the tag naming the operation currently holding
+// g_net_fetch_mutex. Call begin() right after a successful take and end()
+// right before the matching give.
+void crash_blackbox_net_op_begin(const char *tag);
+void crash_blackbox_net_op_end(void);
+
+// If the previous boot's RTC slot shows an operation that was pushed but
+// never popped (i.e. still "in flight" when the reset happened), returns a
+// short static description such as "nvs:settings.save" or
+// "nvs:settings.save net:mqtt_tls" (both domains stuck at once). Returns
+// NULL if nothing was stuck. Does not clear any state — callers still own
+// crash_blackbox_clear().
+const char *crash_blackbox_describe_stuck_op(void);
 
 #ifdef __cplusplus
 }

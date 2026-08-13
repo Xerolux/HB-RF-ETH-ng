@@ -49,6 +49,7 @@
 #include "log_manager.h"
 #include "reset_info.h"
 #include "nvs_storage_lock.h"
+#include "crash_blackbox.h"
 #include "system_reset.h"
 #include "system_overview_api.h"
 #include "theme_api.h"
@@ -2172,7 +2173,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     // Keep every app-owned writer out of the shared 16 KiB NVS partition
     // from capacity preflight through the final commit. Nested helpers take
     // this recursive lock as well.
-    NvsStorageLock restore_storage;
+    NvsStorageLock restore_storage(portMAX_DELAY, "webui.restore");
     if (!restore_storage) {
         cJSON_Delete(root);
         return send_json_error(req, "503 Service Unavailable",
@@ -2600,6 +2601,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
                                        "Network/TLS subsystem busy");
         }
         net_gate_held = true;
+        crash_blackbox_net_op_begin("webui_ota_upload");
     }
 
     esp_ota_handle_t ota_handle = 0;
@@ -2610,7 +2612,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGE(TAG, "Failed to allocate OTA buffer");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         _ota_status = OTA_FAILED;
-        if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+        if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
         net_fetch_set_ota_active(false);
         ota_operation_finish();
         return ESP_FAIL;
@@ -2621,7 +2623,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGW(TAG, "Rejected 320 KiB WebUI image on firmware endpoint");
         free(ota_buff);
         _ota_status = OTA_FAILED;
-        if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+        if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
         net_fetch_set_ota_active(false);
         ota_operation_finish();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
@@ -2803,6 +2805,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // may be waiting on this gate and its cooperative stop must be allowed to
     // finish. No more upload buffer or flash write is active beyond this point.
     if (net_gate_held) {
+        crash_blackbox_net_op_end();
         xSemaphoreGive(g_net_fetch_mutex);
         net_gate_held = false;
     }
@@ -2846,7 +2849,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
 err:
     if (ota_buff) free(ota_buff);
-    if (net_gate_held) xSemaphoreGive(g_net_fetch_mutex);
+    if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
     net_fetch_set_ota_active(false);
     _statusLED->setState(LED_STATE_OFF);
     _ota_status = OTA_FAILED;
@@ -3333,7 +3336,7 @@ esp_err_t get_crash_log_handler_func(httpd_req_t *req)
 
     // Best-effort erase: the snapshot has now been delivered to the UI; we
     // do not want it to reappear on every reload.
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "webui.crash_tail_erase");
     if (storage_lock) {
         nvs_handle_t h;
         if (nvs_open("reset_info", NVS_READWRITE, &h) == ESP_OK) {

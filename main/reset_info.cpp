@@ -70,7 +70,7 @@ static const char* get_reason_text(reset_reason_type_t reason) {
 }
 
 void ResetInfo::init() {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "reset_info.nvs_init");
     if (!storage_lock) {
         ESP_LOGE(TAG, "Could not reserve NVS storage during initialization");
         return;
@@ -89,7 +89,7 @@ void ResetInfo::storeResetReason(reset_reason_type_t reason) {
 }
 
 void ResetInfo::storeResetReason(reset_reason_type_t reason, const char *diag) {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "reset_info.store_reason");
     if (!storage_lock) {
         ESP_LOGE(TAG, "Could not reserve NVS storage for reset reason");
         return;
@@ -244,8 +244,28 @@ const char* ResetInfo::getResetDetails() {
                 if (hw == ESP_RST_INT_WDT || hw == ESP_RST_TASK_WDT ||
                     hw == ESP_RST_WDT || hw == ESP_RST_PANIC ||
                     hw == ESP_RST_BROWNOUT) {
+                    // The op-tag flight recorder answers "what was the
+                    // firmware doing", which is strictly more actionable than
+                    // the heap snapshot below (that only rules heap exhaustion
+                    // in or out). Prefer it whenever an operation was still
+                    // in flight — pushed by NvsStorageLock/g_net_fetch_mutex
+                    // but never popped — when the reset hit.
+                    const char *stuck_op = crash_blackbox_describe_stuck_op();
                     const crash_blackbox_t *bb = crash_blackbox_read();
-                    if (bb) {
+                    if (stuck_op) {
+                        if (bb) {
+                            snprintf(diag_bounded, sizeof(diag_bounded),
+                                     "stuck op: %s (up=%us free=%u)",
+                                     stuck_op, (unsigned)bb->uptime_s,
+                                     (unsigned)bb->free_heap);
+                        } else {
+                            snprintf(diag_bounded, sizeof(diag_bounded),
+                                     "stuck op: %s", stuck_op);
+                        }
+                        ESP_LOGI(TAG,
+                                 "Crash black box: operation still in flight "
+                                 "at reset time: %s", stuck_op);
+                    } else if (bb) {
                         snprintf(diag_bounded, sizeof(diag_bounded),
                                  "pre-crash heap: free=%u larg=%u min=%u int=%u up=%us",
                                  (unsigned)bb->free_heap,
@@ -264,6 +284,8 @@ const char* ResetInfo::getResetDetails() {
                                  (unsigned)bb->uptime_s,
                                  (unsigned)bb->low_streak,
                                  (unsigned)bb->sample_count);
+                    }
+                    if (bb) {
                         crash_blackbox_clear();
                     }
                 }
@@ -287,7 +309,7 @@ const char* ResetInfo::getResetDetails() {
 }
 
 void ResetInfo::clearResetReason() {
-    NvsStorageLock storage_lock;
+    NvsStorageLock storage_lock(portMAX_DELAY, "reset_info.clear_reason");
     if (!storage_lock) return;
 
     nvs_handle_t nvs_handle;
