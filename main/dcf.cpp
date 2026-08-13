@@ -197,12 +197,30 @@ static void handlePinChange(int64_t flankTime, int state)
                 dcf_tm.tm_min = bcd2bin((int)((_buffer >> 21) & 0x7f));
                 dcf_tm.tm_sec = 0;
 
-                struct timeval tv;
-                tv.tv_sec = dcf2epoch(&dcf_tm, timezone);
-                tv.tv_usec = esp_timer_get_time() - _secondMark + _settings->getDcfOffset();
+                // bcd2bin() is a pseudo-BCD decode with no defined behavior for
+                // non-BCD nibbles (e.g. bcd2bin(0x1f)=25), and the parity checks
+                // above only cover even-parity over bit ranges, not the decoded
+                // field's plausible value range. Without this, a noisy/malformed
+                // signal that happens to pass parity can produce tm_mon up to 24,
+                // and dcf2epoch()'s "for (i=0; i<tm_mon; ++i) res += ndays[i];"
+                // would then read past the 12-element ndays[] array.
+                if (dcf_tm.tm_mon < 0 || dcf_tm.tm_mon > 11 ||
+                    dcf_tm.tm_mday < 1 || dcf_tm.tm_mday > 31 ||
+                    dcf_tm.tm_hour < 0 || dcf_tm.tm_hour > 23 ||
+                    dcf_tm.tm_min < 0 || dcf_tm.tm_min > 59)
+                {
+                    ESP_LOGE(TAG, "Received frame with out-of-range field(s): mon=%d mday=%d hour=%d min=%d",
+                             dcf_tm.tm_mon, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min);
+                }
+                else
+                {
+                    struct timeval tv;
+                    tv.tv_sec = dcf2epoch(&dcf_tm, timezone);
+                    tv.tv_usec = esp_timer_get_time() - _secondMark + _settings->getDcfOffset();
 
-                ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900, dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, tv.tv_usec, timezone == 2 ? "CET" : "CEST");
-                _clk->setTime(&tv);
+                    ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900, dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, tv.tv_usec, timezone == 2 ? "CET" : "CEST");
+                    _clk->setTime(&tv);
+                }
             }
 
             _buffer = pulseValue;

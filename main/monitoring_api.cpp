@@ -640,6 +640,13 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 cJSON_Delete(root);
                 return send_json_error(req, "Webhook secret too long");
             }
+            // The secret is sent verbatim as an HTTP header value
+            // (X-HB-RF-ETH-Secret); an embedded CR/LF would let it inject
+            // extra request headers.
+            if (!validateNoControlChars(nws->valuestring)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Webhook secret contains invalid characters");
+            }
             copy_string_field(config.notify.webhook_secret, sizeof(config.notify.webhook_secret), nws->valuestring);
         }
         cJSON *ntgtok = cJSON_GetObjectItem(notify, "telegramTokenClear");
@@ -702,6 +709,13 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
                 cJSON_Delete(root);
                 return send_json_error(req, "SMTP from too long");
             }
+            // Interpolated verbatim into raw "MAIL FROM:<%s>" / "From: %s"
+            // protocol lines; an embedded CR/LF would inject extra SMTP
+            // commands/headers.
+            if (!validateNoControlChars(nsf->valuestring)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP from contains invalid characters");
+            }
             copy_string_field(config.notify.smtp_from, sizeof(config.notify.smtp_from), nsf->valuestring);
         }
         cJSON *nsto = cJSON_GetObjectItem(notify, "smtpTo");
@@ -709,6 +723,13 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
             if (!validateStringLength(nsto->valuestring, sizeof(config.notify.smtp_to) - 1)) {
                 cJSON_Delete(root);
                 return send_json_error(req, "SMTP to too long");
+            }
+            // Interpolated verbatim into raw "RCPT TO:<%s>" / "To: %s"
+            // protocol lines; an embedded CR/LF would inject extra SMTP
+            // commands/headers.
+            if (!validateNoControlChars(nsto->valuestring)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "SMTP to contains invalid characters");
             }
             copy_string_field(config.notify.smtp_to, sizeof(config.notify.smtp_to), nsto->valuestring);
         }

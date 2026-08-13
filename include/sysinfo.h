@@ -24,6 +24,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 typedef enum
 {
@@ -43,7 +44,12 @@ public:
     const char* getCurrentVersion();
     const char *getSerialNumber();
     board_type_t getBoardType();
-    const char* getBoardRevisionString();
+    // Returns by value (not a shared static buffer): this is called
+    // concurrently from the WebUI HTTP task and the MQTT publish task, and a
+    // shared static char[] previously let one task's write tear a
+    // concurrently-running task's read (data race), corrupting whichever
+    // caller lost the race.
+    std::string getBoardRevisionString();
     // Raw ADC voltage (in millivolts) from the board-revision sense pin, captured
     // during detectBoard(). Useful for support / diagnostics when the revision
     // resolves to "Unknown" — exposes what the divider actually produced.
@@ -54,11 +60,12 @@ public:
     // Compact diagnostic summary of all FreeRTOS tasks: name + stack
     // high-water mark (bytes remaining) for each, sorted smallest-first so
     // tasks closest to stack exhaustion remain visible if output truncates.
-    // Returned pointer is valid until the next call. Exposed
+    // Returned by value (see getBoardRevisionString() above for why — same
+    // concurrent WebUI/MQTT caller race applied here too). Exposed
     // via /sysinfo.json (taskStacks) and MQTT status/task_stacks so that
     // under- and over-provisioned task stacks can be spotted from a remote
     // support request without needing serial access. Cheap to call (transient
     // ~2 KB scratch for uxTaskGetSystemState), but not free — callers
     // should not poll it more often than once per second.
-    const char* getTaskStackInfo();
+    std::string getTaskStackInfo();
 };

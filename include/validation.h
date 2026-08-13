@@ -71,3 +71,10 @@ bool validateCcuAddress(const char *address);
 // that are unambiguously safe in any context (no spaces, quotes, slashes,
 // control chars). Length: 8..63 characters. Allowed: A-Z a-z 0-9 - _ .
 bool validateMqttCommandToken(const char *token);
+
+// Rejects CR/LF and other C0 control characters. Required for any field that
+// is later interpolated verbatim into a line-oriented protocol (raw SMTP
+// command/header lines, an HTTP header value) — without this, an embedded
+// \r\n lets the value break out into additional protocol lines/headers
+// (command/header injection). Empty strings are valid (field is optional).
+bool validateNoControlChars(const char *str);
