@@ -23,6 +23,11 @@
 
 #include "crash_blackbox.h"
 #include "esp_attr.h" // RTC_NOINIT_ATTR
+#include <cstdio>
+#include <cstring>
+
+#define CRASH_BLACKBOX_NVS_OP_MAGIC 0xA55AF00Du
+#define CRASH_BLACKBOX_NET_OP_MAGIC 0xA55AF00Eu
 
 // RTC_NOINIT_ATTR places this struct in the ".rtc_noinit" section of RTC slow
 // memory. ESP-IDF does NOT initialize this section at boot, so its contents
@@ -62,4 +67,76 @@ void crash_blackbox_clear(void)
 {
     s_blackbox.magic = 0;
     s_blackbox.sample_count = 0;
+}
+
+static void nvs_op_stack_reset_if_stale(void)
+{
+    if (s_blackbox.nvs_op_magic != CRASH_BLACKBOX_NVS_OP_MAGIC) {
+        s_blackbox.nvs_op_magic = CRASH_BLACKBOX_NVS_OP_MAGIC;
+        s_blackbox.nvs_op_depth = 0;
+    }
+}
+
+void crash_blackbox_nvs_op_begin(const char *tag)
+{
+    nvs_op_stack_reset_if_stale();
+
+    if (s_blackbox.nvs_op_depth < CRASH_BLACKBOX_NVS_STACK_DEPTH) {
+        char *dst = s_blackbox.nvs_op_stack[s_blackbox.nvs_op_depth];
+        strncpy(dst, tag ? tag : "?", CRASH_BLACKBOX_TAG_LEN - 1);
+        dst[CRASH_BLACKBOX_TAG_LEN - 1] = '\0';
+    }
+    // Depth still counts past the array capacity so a deeply-nested caller's
+    // end() calls stay balanced with begin(); only the label is dropped.
+    if (s_blackbox.nvs_op_depth < 255) {
+        s_blackbox.nvs_op_depth++;
+    }
+}
+
+void crash_blackbox_nvs_op_end(void)
+{
+    if (s_blackbox.nvs_op_magic == CRASH_BLACKBOX_NVS_OP_MAGIC &&
+        s_blackbox.nvs_op_depth > 0) {
+        s_blackbox.nvs_op_depth--;
+    }
+}
+
+void crash_blackbox_net_op_begin(const char *tag)
+{
+    s_blackbox.net_op_magic = CRASH_BLACKBOX_NET_OP_MAGIC;
+    strncpy(s_blackbox.net_op_tag, tag ? tag : "?", CRASH_BLACKBOX_TAG_LEN - 1);
+    s_blackbox.net_op_tag[CRASH_BLACKBOX_TAG_LEN - 1] = '\0';
+}
+
+void crash_blackbox_net_op_end(void)
+{
+    s_blackbox.net_op_magic = 0;
+    s_blackbox.net_op_tag[0] = '\0';
+}
+
+const char *crash_blackbox_describe_stuck_op(void)
+{
+    static char buf[CRASH_BLACKBOX_TAG_LEN * 2 + 8];
+
+    const bool nvs_stuck = s_blackbox.nvs_op_magic == CRASH_BLACKBOX_NVS_OP_MAGIC &&
+                            s_blackbox.nvs_op_depth > 0;
+    const bool net_stuck = s_blackbox.net_op_magic == CRASH_BLACKBOX_NET_OP_MAGIC &&
+                            s_blackbox.net_op_tag[0] != '\0';
+
+    if (!nvs_stuck && !net_stuck) {
+        return NULL;
+    }
+
+    // The outermost (index 0) NVS frame names the top-level operation the
+    // caller started; that is more useful than the innermost helper it
+    // happened to be nested in when the reset hit.
+    if (nvs_stuck && net_stuck) {
+        snprintf(buf, sizeof(buf), "nvs:%s net:%s",
+                 s_blackbox.nvs_op_stack[0], s_blackbox.net_op_tag);
+    } else if (nvs_stuck) {
+        snprintf(buf, sizeof(buf), "nvs:%s", s_blackbox.nvs_op_stack[0]);
+    } else {
+        snprintf(buf, sizeof(buf), "net:%s", s_blackbox.net_op_tag);
+    }
+    return buf;
 }

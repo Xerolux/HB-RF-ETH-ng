@@ -1,4 +1,5 @@
 #include "nvs_storage_lock.h"
+#include "crash_blackbox.h"
 
 namespace {
 
@@ -13,11 +14,16 @@ SemaphoreHandle_t nvs_storage_mutex()
 
 } // namespace
 
-NvsStorageLock::NvsStorageLock(TickType_t timeout)
+NvsStorageLock::NvsStorageLock(TickType_t timeout, const char *tag)
     : mutex_(nvs_storage_mutex()),
       locked_(mutex_ != nullptr &&
-              xSemaphoreTakeRecursive(mutex_, timeout) == pdTRUE)
+              xSemaphoreTakeRecursive(mutex_, timeout) == pdTRUE),
+      tracked_(false)
 {
+    if (locked_ && tag != nullptr) {
+        crash_blackbox_nvs_op_begin(tag);
+        tracked_ = true;
+    }
 }
 
 NvsStorageLock::~NvsStorageLock()
@@ -28,6 +34,10 @@ NvsStorageLock::~NvsStorageLock()
 void NvsStorageLock::release()
 {
     if (locked_) {
+        if (tracked_) {
+            crash_blackbox_nvs_op_end();
+            tracked_ = false;
+        }
         xSemaphoreGiveRecursive(mutex_);
         locked_ = false;
     }

@@ -23,6 +23,7 @@
 
 #include "events.h"
 #include "monitoring.h"
+#include "crash_blackbox.h"
 #include "settings.h"
 #include "metrics.h"
 #include "esp_log.h"
@@ -341,7 +342,9 @@ static bool send_webhook(const EventEntry &e, const EventMeta &m,
     if (g_net_fetch_mutex && mutex_wait_ms > 0 &&
         xSemaphoreTake(g_net_fetch_mutex,
                        pdMS_TO_TICKS(mutex_wait_ms)) == pdTRUE) {
+        crash_blackbox_net_op_begin("events_webhook");
         if (!s_running.load(std::memory_order_acquire)) {
+            crash_blackbox_net_op_end();
             xSemaphoreGive(g_net_fetch_mutex);
             free(body);
             return false;
@@ -361,6 +364,7 @@ static bool send_webhook(const EventEntry &e, const EventMeta &m,
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
         }
+        crash_blackbox_net_op_end();
         xSemaphoreGive(g_net_fetch_mutex);
     }
     free(body);
@@ -408,7 +412,9 @@ static bool send_telegram(const EventEntry &e, const EventMeta &m,
     if (g_net_fetch_mutex && mutex_wait_ms > 0 &&
         xSemaphoreTake(g_net_fetch_mutex,
                        pdMS_TO_TICKS(mutex_wait_ms)) == pdTRUE) {
+        crash_blackbox_net_op_begin("events_telegram");
         if (!s_running.load(std::memory_order_acquire)) {
+            crash_blackbox_net_op_end();
             xSemaphoreGive(g_net_fetch_mutex);
             free(body);
             return false;
@@ -425,6 +431,7 @@ static bool send_telegram(const EventEntry &e, const EventMeta &m,
             esp_http_client_close(client);
             esp_http_client_cleanup(client);
         }
+        crash_blackbox_net_op_end();
         xSemaphoreGive(g_net_fetch_mutex);
     }
     free(body);
@@ -565,6 +572,7 @@ static bool send_email(const EventEntry &e, const EventMeta &m,
     if (mutex_wait_ms <= 0 ||
         xSemaphoreTake(g_net_fetch_mutex,
                        pdMS_TO_TICKS(mutex_wait_ms)) != pdTRUE) return false;
+    crash_blackbox_net_op_begin("events_smtp");
 
     // Implicit TLS: full TLS from the start. STARTTLS: plaintext then upgrade.
     const bool use_tls = config.smtp_tls == 2;
@@ -719,6 +727,7 @@ static bool send_email(const EventEntry &e, const EventMeta &m,
     } else if (sock >= 0) {
         close_plain_socket(sock);
     }
+    crash_blackbox_net_op_end();
     xSemaphoreGive(g_net_fetch_mutex);
     return ok;
 }

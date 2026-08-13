@@ -497,7 +497,7 @@ bool LogManager::saveCrashTailNvs(const char *tag) {
     // This path runs immediately before a protective restart. Never let a
     // concurrent configuration transaction turn best-effort diagnostics into
     // an unbounded wait which prevents that restart.
-    NvsStorageLock storage_lock(pdMS_TO_TICKS(20));
+    NvsStorageLock storage_lock(pdMS_TO_TICKS(20), "log.save_crash_tail");
     if (!storage_lock) return false;
 
     nvs_handle_t h;

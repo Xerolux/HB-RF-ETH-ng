@@ -26,6 +26,7 @@
 #include "sysinfo.h"
 #include "webui_storage.h"
 #include "reset_info.h"
+#include "crash_blackbox.h"
 #include "system_reset.h"
 #include "nvs_storage_lock.h"
 #include "events.h"
@@ -300,12 +301,14 @@ static void mqtt_take_tls_gate_if_needed()
         }
     }
     mqtt_tls_gate_held.store(true, std::memory_order_release);
+    crash_blackbox_net_op_begin("mqtt_tls");
 }
 
 static void mqtt_release_tls_gate_if_held()
 {
     if (mqtt_tls_gate_held.exchange(false, std::memory_order_acq_rel) &&
         g_net_fetch_mutex != NULL) {
+        crash_blackbox_net_op_end();
         xSemaphoreGive(g_net_fetch_mutex);
     }
 }
@@ -750,7 +753,7 @@ static void publish_legacy_topic_cleanup(void)
     static const uint8_t CLEANUP_VERSION = 2;
     bool needs_cleanup = false;
     {
-        NvsStorageLock storage_lock;
+        NvsStorageLock storage_lock(portMAX_DELAY, "mqtt.legacy_marker_read");
         if (!storage_lock) return;
         nvs_handle_t h;
         esp_err_t marker_result = nvs_open(CLEANUP_NS, NVS_READWRITE, &h);
@@ -814,7 +817,7 @@ static void publish_legacy_topic_cleanup(void)
     // Mark this cleanup version complete so it never runs again until the
     // version is bumped again.
     {
-        NvsStorageLock storage_lock;
+        NvsStorageLock storage_lock(portMAX_DELAY, "mqtt.legacy_marker_write");
         if (!storage_lock) {
             ESP_LOGW(TAG, "Could not persist legacy-topic cleanup marker");
             return;

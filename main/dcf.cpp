@@ -111,9 +111,28 @@ time_t dcf2epoch(struct tm *dcf_tm, uint8_t tz)
     return res;
 }
 
+// GPIO 34-39 (including DCF_PIN) are input-only on the ESP32 and have no
+// internal pull-up/pull-down; gpio_config() cannot compensate. Without a
+// receiver physically attached (or on a wiring fault), ANYEDGE on a floating
+// input can free-run at a rate bound only by pin capacitance/noise, far above
+// any real DCF77 signal. A genuine DCF77 edge never repeats faster than the
+// shortest pulse validated in handlePinChange() (80 ms); gate the ISR to a
+// fraction of that so a floating/storming pin cannot monopolize interrupt
+// time on this core, while every legitimate edge still passes through
+// untouched.
+static constexpr int64_t DCF_MIN_ISR_INTERVAL_US = 5000; // 5 ms, well under the 80 ms floor
+static volatile int64_t _last_isr_time = 0;
+
 static void IRAM_ATTR onPinChange(void *arg)
 {
     int64_t flankTime = esp_timer_get_time();
+
+    if (flankTime - _last_isr_time < DCF_MIN_ISR_INTERVAL_US)
+    {
+        return;
+    }
+    _last_isr_time = flankTime;
+
     int state = gpio_get_level(DCF_PIN);
 
     flank_event_t event;
