@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.10] - 2026-08-13
+
+### Changes
+- fix(stability): add op-tag flight recorder to name stuck operations at reset (#418)
+- chore: update manifests for v2.2.6-Beta.9
+
 ## [2.2.6-Beta.9] - 2026-08-07
 
 ### Changes
