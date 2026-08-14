@@ -282,7 +282,7 @@ const char *SysInfo::getCurrentVersion()
     return _currentVersion;
 }
 
-const char* SysInfo::getBoardRevisionString()
+std::string SysInfo::getBoardRevisionString()
 {
     switch (_board)
     {
@@ -298,7 +298,7 @@ const char* SysInfo::getBoardRevisionString()
         // Include the raw ADC reading so a user looking at the WebUI / log
         // share can immediately see what the divider produced — usually one
         // of: open pin, unsupported board rev, or ADC calibration drift.
-        static char unknown_buf[40];
+        char unknown_buf[40];
         snprintf(unknown_buf, sizeof(unknown_buf), "Unknown (%" PRIu32 " mV)", _lastBoardSenseVoltage);
         return unknown_buf;
     }
@@ -322,15 +322,13 @@ const char* SysInfo::getResetReason()
     return ResetInfo::getResetDetails();
 }
 
-const char* SysInfo::getTaskStackInfo()
+std::string SysInfo::getTaskStackInfo()
 {
     // Build a compact "name=hwm_bytes" list sorted by HWM ascending.
     // The high-water mark (uxTaskGetStackHighWaterMark) is the minimum free
     // stack ever observed for a task — small values flag tasks close to
     // overflow, large values flag over-provisioned stacks that waste heap.
-    // Returned pointer is a static buffer so callers must copy if they need
-    // to keep the value across another call.
-    static char out[512];
+    char out[512];
 
     // uxTaskGetSystemState needs CONFIG_FREERTOS_USE_TRACE_FACILITY (set in
     // sdkconfig.defaults). Estimate an upper bound on the task count so the

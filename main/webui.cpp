@@ -43,6 +43,7 @@
 #include "mbedtls/base64.h"
 #include "monitoring_api.h"
 #include "monitoring.h"
+#include "events.h"
 #include "rate_limiter.h"
 #include "security_headers.h"
 #include "secure_utils.h"
@@ -363,15 +364,19 @@ esp_err_t post_login_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
-    // Check rate limit, but allow whitelisted IP
-    // Prioritize manual setting, fallback to dynamic raw uart listener
+    // Check rate limit, but allow the whitelisted CCU IP. Only an explicitly,
+    // authenticated-admin-configured static CCU address is trusted here.
+    // The previous fallback to _rawUartUdpListener->getConnectedRemoteAddress()
+    // let any LAN host bypass the login brute-force throttle for free: that
+    // address is set by the unauthenticated raw-uart protocol (port 3008)
+    // whenever ANY host sends a 5-byte "connect" packet — no credential or
+    // proof of being the real CCU required. Trusting it for a security
+    // control was an unauthenticated-network-signal-based bypass.
     ip4_addr_t ccu_ip = {0};
     const char* storedCCUIP = _settings->getCCUIP();
 
     if (storedCCUIP && strlen(storedCCUIP) > 0) {
         ip4addr_aton(storedCCUIP, &ccu_ip);
-    } else {
-        ccu_ip = _rawUartUdpListener->getConnectedRemoteAddress();
     }
 
     if (!rate_limiter_is_whitelisted(req, &ccu_ip) && !rate_limiter_check_login(req))
@@ -646,7 +651,7 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"boardRevision\":\"%s\",\"boardSenseVoltage\":%" PRIu32 ",\"resetReason\":\"%s\",",
-             _sysInfo->getBoardRevisionString(), (uint32_t)_sysInfo->getBoardSenseVoltage(), _sysInfo->getResetReason());
+             _sysInfo->getBoardRevisionString().c_str(), (uint32_t)_sysInfo->getBoardSenseVoltage(), _sysInfo->getResetReason());
     httpd_resp_send_chunk(req, buf, strlen(buf));
 
     snprintf(buf, sizeof(buf), "\"ethernetConnected\":%s,\"ethernetSpeed\":%d,\"ethernetDuplex\":\"%s\",",
@@ -700,13 +705,13 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     // are legal in JSON strings; only escape quotes and backslashes (defensive
     // — task names are bounded ASCII).
     {
-        const char *stacks = _sysInfo->getTaskStackInfo();
+        std::string stacks = _sysInfo->getTaskStackInfo();
         char stack_buf[640];
         size_t pos = 0;
         stack_buf[0] = 0;
         pos += snprintf(stack_buf + pos, sizeof(stack_buf) - pos,
                         ",\"taskStacks\":\"");
-        for (const char *p = stacks; *p && pos + 4 < sizeof(stack_buf); p++) {
+        for (const char *p = stacks.c_str(); *p && pos + 4 < sizeof(stack_buf); p++) {
             if (*p == '"' || *p == '\\') {
                 stack_buf[pos++] = '\\';
             }
@@ -1692,6 +1697,20 @@ static esp_err_t parse_monitoring_backup(
         backup_get_uint(notify, "cooldownSeconds", UINT16_MAX, &number);
     if (valid) {
         config->notify.cooldown_seconds = static_cast<uint16_t>(number);
+    }
+    // Same CRLF/control-char rejection as the normal POST /api/monitoring
+    // path (monitoring_api.cpp): these three fields are interpolated
+    // verbatim into raw SMTP protocol lines / an HTTP header, so a crafted
+    // or corrupted backup file must not be able to reintroduce header/command
+    // injection through the restore path.
+    if (valid && config->notify.webhook_secret[0] != '\0') {
+        valid = validateNoControlChars(config->notify.webhook_secret);
+    }
+    if (valid && config->notify.smtp_from[0] != '\0') {
+        valid = validateNoControlChars(config->notify.smtp_from);
+    }
+    if (valid && config->notify.smtp_to[0] != '\0') {
+        valid = validateNoControlChars(config->notify.smtp_to);
     }
 
     if (!valid) {
@@ -2888,6 +2907,13 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     // Store reset reason before restart
     ResetInfo::storeResetReason(RESET_REASON_USER_RESTART);
 
+    // Queue the notification before the delay below so the events worker has
+    // a chance to pick it up (queue poll: 500ms) and start delivery before
+    // full_system_restart()'s monitoring_pause_for_ota() stops the worker —
+    // that stop path waits up to 30s for an in-flight send to finish, but
+    // only if the worker already dequeued the entry.
+    events_emit(EVENT_RESTART, "manual restart via WebUI/API");
+
     // Restart after a short delay to allow response to be sent
     vTaskDelay(pdMS_TO_TICKS(1000));
     refresh_restart_sync_from_settings();
@@ -2917,6 +2943,13 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
         return httpd_resp_sendstr(
             req, "Another configuration or restart operation is active");
     }
+
+    // Queue the notification against the still-live (pre-wipe) notify config
+    // before anything is erased. Same delivery-window reasoning as
+    // post_restart_handler_func: the events worker gets the 1s pre-restart
+    // delay plus up to 30s inside monitoring_pause_for_ota() to actually
+    // send it, as long as it dequeues the entry before that stop begins.
+    events_emit(EVENT_FACTORY_RESET, "factory reset via WebUI/API");
 
     // Erase every user-controlled namespace first. reset_info is deliberately
     // part of Settings::clear(), so store the one allowed post-reset metadata

@@ -398,7 +398,13 @@ static bool syslog_tls_connect(syslog_tls_session *s, const char *host, uint16_t
         syslog_tls_teardown(s);
         return false;
     }
-    mbedtls_ssl_conf_authmode(&s->conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    // VERIFY_REQUIRED, not OPTIONAL: with OPTIONAL, mbedtls_ssl_handshake()
+    // returns 0 (success) even for an invalid/expired/hostname-mismatched
+    // peer certificate — the failure only shows up in
+    // mbedtls_ssl_get_verify_result(), which this code never checked. That
+    // silently accepted a MITM'd syslog TLS session. REQUIRED makes the
+    // handshake itself fail closed on a bad certificate.
+    mbedtls_ssl_conf_authmode(&s->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
     esp_crt_bundle_attach(&s->conf);
     if (mbedtls_ssl_setup(&s->ssl, &s->conf) != 0) {
         syslog_tls_teardown(s);

@@ -537,13 +537,13 @@ void mqtt_handler_publish_task_stacks(void)
     SysInfo *sysInfo = monitoring_get_sysinfo();
     if (!sysInfo) return;
 
-    const char *stacks = sysInfo->getTaskStackInfo();
-    if (!stacks || !stacks[0]) return;
+    std::string stacks = sysInfo->getTaskStackInfo();
+    if (stacks.empty()) return;
 
     char topic[160];
     snprintf(topic, sizeof(topic), "%s/status/task_stacks",
              current_mqtt_config.topic_prefix);
-    mqtt_publish_connected(topic, stacks, 0, 0, 1);
+    mqtt_publish_connected(topic, stacks.c_str(), 0, 0, 1);
 }
 
 // Publish one value under <prefix>/<subtopic> with retain=1, QoS=0.
@@ -602,7 +602,7 @@ void mqtt_handler_publish_status(void)
     char webuiVersion[32] = {};
     webui_storage_get_effective_version(webuiVersion, sizeof(webuiVersion));
     PUBLISH_STR("status/webui_version", webuiVersion);
-    PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString());
+    PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString().c_str());
 
     // ---- System metrics ---------------------------------------------------
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
@@ -874,7 +874,7 @@ void mqtt_handler_publish_ha_discovery(void)
     cJSON_AddStringToObject(device, "model", "HB-RF-ETH-ng");
     cJSON_AddStringToObject(device, "manufacturer", "Xerolux");
     cJSON_AddStringToObject(device, "sw_version", sysInfo->getCurrentVersion());
-    cJSON_AddStringToObject(device, "hw_version", sysInfo->getBoardRevisionString());
+    cJSON_AddStringToObject(device, "hw_version", sysInfo->getBoardRevisionString().c_str());
 
     // Helper: publish a sensor / binary_sensor / button / update config.
     auto publish_config = [&](const char* component, const char* object_id, const char* name,

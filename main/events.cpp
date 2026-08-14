@@ -538,7 +538,14 @@ static bool smtp_setup_tls(mbedtls_ssl_context *ssl,
                                     MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
         return false;
     }
-    mbedtls_ssl_conf_authmode(conf, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    // VERIFY_REQUIRED, not OPTIONAL: with OPTIONAL, mbedtls_ssl_handshake()
+    // returns 0 (success) even for an invalid/expired/hostname-mismatched
+    // peer certificate — the failure only shows up in
+    // mbedtls_ssl_get_verify_result(), which this code never checked. That
+    // silently accepted a MITM'd SMTP session, exposing the AUTH LOGIN
+    // credentials sent right after. REQUIRED makes the handshake itself fail
+    // closed on a bad certificate.
+    mbedtls_ssl_conf_authmode(conf, MBEDTLS_SSL_VERIFY_REQUIRED);
     esp_crt_bundle_attach(conf);
     const int remaining_ms = remaining_deadline_ms(deadline_us);
     if (remaining_ms <= 0) return false;

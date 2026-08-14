@@ -238,7 +238,11 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         )
 
         sysinfo = self.read("main/sysinfo.cpp")
-        task_stack = sysinfo[sysinfo.index("const char* SysInfo::getTaskStackInfo()") :]
+        # Returns std::string (not a shared static char buffer) so concurrent
+        # WebUI/MQTT callers can't tear each other's read (see
+        # SysInfo::getBoardRevisionString()'s doc comment in sysinfo.h for the
+        # data-race this replaced).
+        task_stack = sysinfo[sysinfo.index("std::string SysInfo::getTaskStackInfo()") :]
         self.assertIn(
             "hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;", task_stack
         )

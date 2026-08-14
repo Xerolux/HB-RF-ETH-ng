@@ -764,3 +764,21 @@ bool validateMqttCommandToken(const char *token)
     }
     return true;
 }
+
+bool validateNoControlChars(const char *str)
+{
+    if (str == NULL) {
+        return false;
+    }
+    for (const unsigned char *p = (const unsigned char *)str; *p; p++) {
+        // Reject the full C0 control range (0x00-0x1F) and DEL (0x7F). This
+        // covers \r and \n specifically (the SMTP/HTTP-header line-injection
+        // vector) plus other bytes that have no legitimate reason to appear
+        // in an email address, SMTP header field, or HTTP header value.
+        if (*p < 0x20 || *p == 0x7F) {
+            ESP_LOGW(TAG, "Rejected string with control character 0x%02x", *p);
+            return false;
+        }
+    }
+    return true;
+}
