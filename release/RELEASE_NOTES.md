@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.6-Beta.10
+# 🚀 HB-RF-ETH-ng v2.2.6-Beta.11
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,11 +11,11 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.6-Beta.10?
+## 🆕 Was ist neu in v2.2.6-Beta.11?
 
 ### Changes
-- fix(stability): add op-tag flight recorder to name stuck operations at reset (#418)
-- chore: update manifests for v2.2.6-Beta.9
+- fix(security): TLS cert verification, rate-limiter bypass, header injection (#419)
+- chore: update manifests for v2.2.6-Beta.10
 
 ## ✨ Hauptfunktionen
 
@@ -52,7 +52,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.6-Beta.10.bin`)
+- **Firmware-Binary** (`firmware_2.2.6-Beta.11.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
