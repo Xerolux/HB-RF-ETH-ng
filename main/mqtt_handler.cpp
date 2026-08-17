@@ -30,6 +30,7 @@
 #include "system_reset.h"
 #include "nvs_storage_lock.h"
 #include "events.h"
+#include "rawuartudplistener.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
@@ -628,6 +629,22 @@ void mqtt_handler_publish_status(void)
         PUBLISH_UINT64("status/min_free_heap", esp_get_minimum_free_heap_size());
     }
 
+    // ---- CCU relay latency -------------------------------------------------
+    // The numbers users actually need when switching commands arrive late
+    // (issues #411 / #362): whether a datagram sat in our receive queue, and
+    // how often. Published in milliseconds because a Home Assistant graph in
+    // microseconds is unreadable, and because sub-millisecond precision does
+    // not matter when the reported symptom is measured in tens of seconds.
+    {
+        raw_uart_latency_t latency = {};
+        raw_uart_get_latency(&latency);
+        PUBLISH_UINT64("status/ccu_queue_wait_max_ms", latency.queue_wait_max_us / 1000);
+        PUBLISH_UINT64("status/ccu_queue_depth_max", latency.queue_depth_max);
+        PUBLISH_UINT64("status/ccu_delayed_frames",
+                       latency.wait_over_10ms + latency.wait_over_100ms + latency.wait_over_1s);
+        PUBLISH_UINT64("status/ccu_dropped_frames", latency.drops);
+    }
+
     // Reset reason (combines app-level stored reason + ESP hardware reason).
     if (sysInfo->getResetReason()) {
         PUBLISH_STR("status/last_reset_reason", sysInfo->getResetReason());
@@ -931,6 +948,15 @@ void mqtt_handler_publish_ha_discovery(void)
     remove_config("sensor", "supply_voltage");
     remove_config("sensor", "temperature");
     publish_config("sensor", "uptime", "Uptime", "duration", "total_increasing", "s", NULL, "diagnostic", "mdi:clock-outline");
+    // CCU relay latency — diagnostic entities for the delayed-switching reports.
+    publish_config("sensor", "ccu_queue_wait_max_ms", "CCU Queue Wait (max)", "duration",
+                   "measurement", "ms", NULL, "diagnostic", "mdi:timer-alert-outline");
+    publish_config("sensor", "ccu_queue_depth_max", "CCU Queue Depth (max)", NULL, "measurement",
+                   NULL, NULL, "diagnostic", "mdi:tray-full");
+    publish_config("sensor", "ccu_delayed_frames", "CCU Delayed Frames", NULL, "total_increasing",
+                   NULL, NULL, "diagnostic", "mdi:timer-sand");
+    publish_config("sensor", "ccu_dropped_frames", "CCU Dropped Frames", NULL, "total_increasing",
+                   NULL, NULL, "diagnostic", "mdi:package-variant-remove");
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
     // Remove the legacy short-named version sensors (renamed to
     // firmware_version / webui_version below). Empty retained discovery

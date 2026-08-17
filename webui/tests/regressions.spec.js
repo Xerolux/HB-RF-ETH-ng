@@ -796,6 +796,48 @@ test('CCU connection changes and low heap are emitted as notifiable events', asy
   expect(watchdog).toContain('if (low_heap_streak == 1)')
 })
 
+test('CCU relay latency is measured in the receive path and reported to MQTT', async () => {
+  const listenerSource = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+  const udpHelper = await readFile('../include/udphelper.h', 'utf8')
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+  const metricsSource = await readFile('../main/metrics.cpp', 'utf8')
+
+  // The timestamp has to be taken in the lwIP callback, not in the handler
+  // task — taking it after dequeue would measure nothing at all, since the
+  // whole point is the gap between those two moments.
+  expect(udpHelper).toContain('uint32_t enqueued_us')
+  const receiveCallback = listenerSource.slice(
+    listenerSource.indexOf('bool RawUartUdpListener::_udpReceivePacket'),
+    listenerSource.indexOf('Index 0 - Type:')
+  )
+  expect(receiveCallback).toContain('event.enqueued_us = (uint32_t)esp_timer_get_time()')
+
+  // Unsigned subtraction, so the 32-bit microsecond wraparound is not a
+  // special case. A signed or widened subtraction here would report absurd
+  // latencies roughly every 71 minutes.
+  expect(listenerSource).toContain('(uint32_t)esp_timer_get_time() - event.enqueued_us')
+  expect(listenerSource).toContain('g_queue_wait_max.record(waited_us)')
+  expect(listenerSource).toContain('g_queue_depth_max.record')
+
+  // Disjoint buckets: an else-if chain, so one slow datagram counts once.
+  expect(listenerSource).toMatch(
+    /if \(waited_us > 1000000u\) \{[\s\S]*?\} else if \(waited_us > 100000u\) \{[\s\S]*?\} else if \(waited_us > 10000u\) \{/
+  )
+
+  // The gauge must be a genuine high-water mark, not a last-value store.
+  expect(metricsSource).toContain('compare_exchange_weak')
+  expect(metricsSource).toContain('while (value > observed)')
+  expect(metricsSource).toContain('# TYPE %s gauge')
+
+  // Reported to MQTT as well as Prometheus: the users hitting this are
+  // watching Home Assistant, not scraping /metrics.
+  expect(mqttSource).toContain('status/ccu_queue_wait_max_ms')
+  expect(mqttSource).toContain('status/ccu_queue_depth_max')
+  expect(mqttSource).toContain('status/ccu_delayed_frames')
+  expect(mqttSource).toContain('status/ccu_dropped_frames')
+  expect(mqttSource).toContain('publish_config("sensor", "ccu_queue_wait_max_ms"')
+})
+
 test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
   const source = await readFile('../main/rawuartudplistener.cpp', 'utf8')
 

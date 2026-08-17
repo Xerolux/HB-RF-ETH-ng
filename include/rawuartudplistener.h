@@ -69,3 +69,24 @@ public:
     void _udpQueueHandler();
     bool _udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port);
 };
+
+// Snapshot of the CCU relay latency instrumentation. The values are already
+// exported through the Prometheus endpoint; this accessor exists so the MQTT
+// status batch can surface them too, since the users reporting delayed
+// switching commands (issues #411 / #362) are watching Home Assistant rather
+// than scraping /metrics.
+typedef struct {
+    uint32_t queue_wait_max_us; // high-water since boot or last reset
+    uint32_t queue_depth_max;   // high-water queue occupancy
+    uint64_t wait_over_10ms;    // datagrams delayed 10 ms .. 100 ms
+    uint64_t wait_over_100ms;   // datagrams delayed 100 ms .. 1 s
+    uint64_t wait_over_1s;      // datagrams delayed more than 1 s
+    uint64_t drops;             // datagrams dropped (queue full / invalid)
+} raw_uart_latency_t;
+
+void raw_uart_get_latency(raw_uart_latency_t *out);
+
+// Clear the high-water marks so an operator can observe a fresh window after
+// changing something, instead of reading a mark set days earlier. The
+// bucket counters are monotonic and deliberately not reset.
+void raw_uart_reset_latency_high_water(void);

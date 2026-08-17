@@ -820,6 +820,30 @@ Exposed metrics (non-exhaustive):
   `hbrfeth_udp_keepalive_total`, `hbrfeth_udp_drop_total` (counter)
 - `hbrfeth_notify_sent_total`, `hbrfeth_notify_failed_total`,
   `hbrfeth_notify_suppressed_total` (counter)
+- `hbrfeth_udp_queue_wait_max_us` (gauge) — longest time a received CCU
+  datagram waited between the lwIP receive callback and the handler task
+  being scheduled. High-water mark since boot.
+- `hbrfeth_udp_queue_depth_max` (gauge) — highest observed occupancy of the
+  32-slot receive queue.
+- `hbrfeth_udp_queue_wait_over_10ms_total`,
+  `hbrfeth_udp_queue_wait_over_100ms_total`,
+  `hbrfeth_udp_queue_wait_over_1s_total` (counter) — disjoint buckets, so one
+  slow datagram is counted exactly once. Use these to tell a single outlier
+  apart from sustained stalling.
+
+### Diagnosing delayed switching commands
+
+If commands to the CCU execute late, these metrics separate the two possible
+causes. A rising `hbrfeth_udp_queue_wait_max_us` together with a non-zero
+`hbrfeth_udp_queue_wait_over_1s_total` means the datagram reached the device
+promptly but waited for the handler task — the delay is on the device. If
+both stay near zero while the delay is still observed, the device forwarded
+everything without hesitation and the delay is upstream of it.
+
+The same four figures are published to MQTT as
+`status/ccu_queue_wait_max_ms`, `status/ccu_queue_depth_max`,
+`status/ccu_delayed_frames` and `status/ccu_dropped_frames`, and announced as
+Home Assistant diagnostic entities, so no Prometheus scrape is required.
 
 ## Rate Limiting
 

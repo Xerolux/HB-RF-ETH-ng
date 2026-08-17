@@ -76,6 +76,12 @@ typedef struct
   pbuf *pb;
   ip4_addr_t addr;
   uint16_t port;
+  // esp_timer microseconds, truncated to 32 bit, taken when the lwIP receive
+  // callback enqueued this datagram. The consumer subtracts it from its own
+  // reading to measure how long the packet waited for the handler task; the
+  // subtraction is unsigned and therefore correct across the ~71 minute
+  // wraparound, which is far longer than any latency worth reporting.
+  uint32_t enqueued_us;
 } udp_event_t;
 
 static err_t _udp_remove_api(struct tcpip_api_call_data *api_call_msg)

@@ -53,6 +53,20 @@ static metrics_counter s_counters[MAX_COUNTERS];
 static int s_counter_count = 0;
 static SemaphoreHandle_t s_registry_mutex = NULL;
 
+// High-water gauges. A single 32-bit atomic is enough: the value is a
+// maximum, not an accumulator, so there is no 64-bit rollover to track and
+// no writer-count/generation protocol to make the read coherent.
+static constexpr int MAX_GAUGES = 8;
+
+struct metrics_gauge {
+    const char *name;
+    const char *help;
+    std::atomic<uint32_t> high_water{0};
+};
+
+static metrics_gauge s_gauges[MAX_GAUGES];
+static int s_gauge_count = 0;
+
 #ifdef METRICS_TEST_HOOKS
 extern "C" void metrics_test_after_low_update(void);
 #endif
@@ -158,6 +172,60 @@ extern "C" uint64_t metrics_get(metrics_counter_t counter)
     return metrics_snapshot(counter);
 }
 
+extern "C" metrics_gauge_t metrics_register_gauge(const char *name, const char *help)
+{
+    if (s_registry_mutex == NULL) {
+        metrics_init();
+    }
+
+    metrics_gauge_t handle = NULL;
+    xSemaphoreTake(s_registry_mutex, portMAX_DELAY);
+    for (int i = 0; i < s_gauge_count; i++) {
+        if (strcmp(s_gauges[i].name, name) == 0) {
+            handle = &s_gauges[i];
+            break;
+        }
+    }
+    if (handle == NULL && s_gauge_count < MAX_GAUGES) {
+        s_gauges[s_gauge_count].name = name;
+        s_gauges[s_gauge_count].help = help ? help : "";
+        s_gauges[s_gauge_count].high_water.store(0, std::memory_order_relaxed);
+        handle = &s_gauges[s_gauge_count];
+        s_gauge_count++;
+    } else if (handle == NULL) {
+        ESP_LOGE(TAG, "gauge registry full (%d), cannot register %s", MAX_GAUGES, name);
+    }
+    xSemaphoreGive(s_registry_mutex);
+    return handle;
+}
+
+extern "C" void metrics_gauge_record_max(metrics_gauge_t gauge, uint32_t value)
+{
+    if (!gauge) return;
+    // Retry only while a concurrent writer raised the mark below `value`.
+    // Once the observed maximum is already at least as large there is nothing
+    // to do, so the common case costs a single relaxed load.
+    uint32_t observed = gauge->high_water.load(std::memory_order_relaxed);
+    while (value > observed) {
+        if (gauge->high_water.compare_exchange_weak(observed, value, std::memory_order_release,
+                                                    std::memory_order_relaxed)) {
+            return;
+        }
+    }
+}
+
+extern "C" uint32_t metrics_gauge_get(metrics_gauge_t gauge)
+{
+    if (!gauge) return 0;
+    return gauge->high_water.load(std::memory_order_acquire);
+}
+
+extern "C" void metrics_gauge_reset(metrics_gauge_t gauge)
+{
+    if (!gauge) return;
+    gauge->high_water.store(0, std::memory_order_release);
+}
+
 extern "C" size_t metrics_render_prometheus(char *out, size_t cap, size_t offset)
 {
     if (!out || cap == 0) return offset;
@@ -177,6 +245,18 @@ extern "C" size_t metrics_render_prometheus(char *out, size_t cap, size_t offset
                                "# HELP %s %s\n# TYPE %s counter\n%s %llu\n",
                                c.name, c.help[0] ? c.help : "counter",
                                c.name, c.name, (unsigned long long)v);
+        if (written < 0) break;
+        size_t adv = (size_t)written;
+        if (adv >= cap - offset) adv = cap - offset - 1;
+        offset += adv;
+    }
+    int gauges = s_gauge_count;
+    for (int i = 0; i < gauges; i++) {
+        if (offset + 1 >= cap) break;
+        const metrics_gauge &g = s_gauges[i];
+        int written = snprintf(out + offset, cap - offset, "# HELP %s %s\n# TYPE %s gauge\n%s %u\n",
+                               g.name, g.help[0] ? g.help : "gauge", g.name, g.name,
+                               (unsigned)g.high_water.load(std::memory_order_acquire));
         if (written < 0) break;
         size_t adv = (size_t)written;
         if (adv >= cap - offset) adv = cap - offset - 1;

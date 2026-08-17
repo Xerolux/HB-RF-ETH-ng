@@ -101,10 +101,12 @@ size_t metrics_render_prometheus(char *out, size_t cap, size_t offset);
 // Usage:
 //   static MetricsCounter udp_rx("hbrfeth_udp_frames_total", "...");
 //   udp_rx.inc();
-class MetricsCounter {
+class MetricsCounter
+{
 public:
     MetricsCounter(const char *name, const char *help)
-        : _handle(metrics_register_counter(name, help)) {}
+        : _handle(metrics_register_counter(name, help))
+    {}
 
     void inc() { metrics_inc_one(_handle); }
     void inc(uint32_t delta) { metrics_inc(_handle, delta); }
@@ -112,5 +114,24 @@ public:
 
 private:
     metrics_counter_t _handle;
+};
+
+// Convenience RAII wrapper around a metrics_gauge_t looked up at boot.
+// Usage:
+//   static MetricsHighWater wait("hbrfeth_udp_queue_wait_max_us", "...");
+//   wait.record(elapsed_us);
+class MetricsHighWater
+{
+public:
+    MetricsHighWater(const char *name, const char *help)
+        : _handle(metrics_register_gauge(name, help))
+    {}
+
+    void record(uint32_t value) { metrics_gauge_record_max(_handle, value); }
+    uint32_t get() const { return metrics_gauge_get(_handle); }
+    void reset() { metrics_gauge_reset(_handle); }
+
+private:
+    metrics_gauge_t _handle;
 };
 #endif
