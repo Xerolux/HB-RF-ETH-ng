@@ -111,8 +111,14 @@ static char _token[46];
 // Read-only handles for the handler units extracted out of this file
 // (webui_backup.cpp, webui_ota.cpp). They stay static here so this
 // translation unit remains the only writer; see webui_internal.h.
-Settings *webui_settings() { return _settings; }
-LED *webui_status_led() { return _statusLED; }
+Settings *webui_settings()
+{
+    return _settings;
+}
+LED *webui_status_led()
+{
+    return _statusLED;
+}
 
 static void emit_log_enable_snapshot();
 int recv_full_body(httpd_req_t *req, char *buf, size_t buf_size);
@@ -935,8 +941,7 @@ bool cJSON_GetBoolValue(const cJSON *item)
     return (item && cJSON_IsBool(item)) ? cJSON_IsTrue(item) : false;
 }
 
-esp_err_t send_json_error(httpd_req_t *req, const char *status,
-                          const char *code, const char *field)
+esp_err_t send_json_error(httpd_req_t *req, const char *status, const char *code, const char *field)
 {
     cJSON *root = cJSON_CreateObject();
     if (!root) {
@@ -974,8 +979,7 @@ bool valid_admin_username(const char *value)
     return true;
 }
 
-bool parse_ipv4_json(const cJSON *item, bool optional,
-                     ip4_addr_t *address)
+bool parse_ipv4_json(const cJSON *item, bool optional, ip4_addr_t *address)
 {
     if (!item || !cJSON_IsString(item) || !address) return false;
     const char *value = cJSON_GetStringValue(item);

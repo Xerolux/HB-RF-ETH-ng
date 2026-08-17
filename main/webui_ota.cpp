@@ -74,15 +74,13 @@ struct ota_finalize_ctx {
 };
 static void ota_finalize_task(void *pv);
 
-#define OTA_CHECK(a, str, ...)                                                    \
-    do                                                                            \
-    {                                                                             \
-        if (!(a))                                                                 \
-        {                                                                         \
-            ESP_LOGE(TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, str);       \
-            goto err;                                                             \
-        }                                                                         \
+#define OTA_CHECK(a, str, ...)                                                                     \
+    do {                                                                                           \
+        if (!(a)) {                                                                                \
+            ESP_LOGE(TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__);                  \
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, str);                        \
+            goto err;                                                                              \
+        }                                                                                          \
     } while (0)
 
 #define OTA_BUFFER_SIZE 4096
@@ -91,17 +89,11 @@ static void ota_finalize_task(void *pv);
 // (/ota_update). Automatic update checks and URL-based OTA were removed, but
 // this gate still prevents two administrators from writing the update
 // partition concurrently.
-enum ota_status_t {
-    OTA_IDLE = 0,
-    OTA_DOWNLOADING,
-    OTA_FINALIZING,
-    OTA_SUCCESS,
-    OTA_FAILED
-};
+enum ota_status_t { OTA_IDLE = 0, OTA_DOWNLOADING, OTA_FINALIZING, OTA_SUCCESS, OTA_FAILED };
 
 static std::atomic<ota_status_t> _ota_status{OTA_IDLE};
-static std::atomic<int> _ota_progress{0};  // 0-100
-static char _ota_error[128] = {0};
+static std::atomic<int> _ota_progress{0}; // 0-100
+static char _ota_error[128]        = {0};
 static portMUX_TYPE _ota_error_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static void set_ota_error(const char *format, ...)
@@ -129,19 +121,17 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     add_security_headers(req);
     bool net_gate_held = false;
 
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         httpd_resp_set_status(req, "401 Not authorized");
         httpd_resp_sendstr(req, "401 Not authorized");
         return ESP_OK;
     }
 
-    if (!ota_operation_try_begin())
-    {
+    if (!ota_operation_try_begin()) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "OTA update already in progress");
         return ESP_OK;
     }
-    _ota_status = OTA_DOWNLOADING;
+    _ota_status   = OTA_DOWNLOADING;
     _ota_progress = 0;
     set_ota_error("");
 
@@ -151,15 +141,13 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // defer; hold the ownershipless gate only while bytes are streamed.
     net_fetch_set_ota_active(true);
     if (g_net_fetch_mutex != NULL) {
-        if (xSemaphoreTake(g_net_fetch_mutex,
-                           pdMS_TO_TICKS(20000)) != pdTRUE) {
+        if (xSemaphoreTake(g_net_fetch_mutex, pdMS_TO_TICKS(20000)) != pdTRUE) {
             ESP_LOGE(TAG, "Could not reserve network/TLS gate for OTA upload");
             _ota_status = OTA_FAILED;
             set_ota_error("Network/TLS subsystem busy");
             net_fetch_set_ota_active(false);
             ota_operation_finish();
-            return httpd_resp_send_err(req,
-                                       HTTPD_500_INTERNAL_SERVER_ERROR,
+            return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
                                        "Network/TLS subsystem busy");
         }
         net_gate_held = true;
@@ -167,14 +155,17 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     }
 
     esp_ota_handle_t ota_handle = 0;
-    bool ota_begun = false;
+    bool ota_begun              = false;
 
     char *ota_buff = (char *)malloc(OTA_BUFFER_SIZE);
     if (!ota_buff) {
         ESP_LOGE(TAG, "Failed to allocate OTA buffer");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
         _ota_status = OTA_FAILED;
-        if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
+        if (net_gate_held) {
+            crash_blackbox_net_op_end();
+            xSemaphoreGive(g_net_fetch_mutex);
+        }
         net_fetch_set_ota_active(false);
         ota_operation_finish();
         return ESP_FAIL;
@@ -185,25 +176,27 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         ESP_LOGW(TAG, "Rejected 320 KiB WebUI image on firmware endpoint");
         free(ota_buff);
         _ota_status = OTA_FAILED;
-        if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
+        if (net_gate_held) {
+            crash_blackbox_net_op_end();
+            xSemaphoreGive(g_net_fetch_mutex);
+        }
         net_fetch_set_ota_active(false);
         ota_operation_finish();
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-            "Falsche Datei: Das 327680-Byte-WebUI-/WWW-Image muss unter System -> WebUI installiert werden.");
+                                   "Falsche Datei: Das 327680-Byte-WebUI-/WWW-Image muss unter "
+                                   "System -> WebUI installiert werden.");
     }
     size_t content_received = 0;
     int recv_len;
-    int timeout_retries = 5;
-    static constexpr int64_t OTA_UPLOAD_TOTAL_TIMEOUT_US =
-        5LL * 60LL * 1000LL * 1000LL;
-    static constexpr int64_t OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US =
-        30LL * 1000LL * 1000LL;
-    const int64_t upload_started_us = esp_timer_get_time();
-    int64_t last_progress_us = upload_started_us;
-    bool is_req_body_started = false;
+    int timeout_retries                                        = 5;
+    static constexpr int64_t OTA_UPLOAD_TOTAL_TIMEOUT_US       = 5LL * 60LL * 1000LL * 1000LL;
+    static constexpr int64_t OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US = 30LL * 1000LL * 1000LL;
+    const int64_t upload_started_us                            = esp_timer_get_time();
+    int64_t last_progress_us                                   = upload_started_us;
+    bool is_req_body_started                                   = false;
     const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
-    const esp_partition_t *running = NULL;
-    esp_err_t ota_end_result = ESP_OK;
+    const esp_partition_t *running          = NULL;
+    esp_err_t ota_end_result                = ESP_OK;
 
     // Validate update partition exists
     if (update_partition == NULL) {
@@ -219,23 +212,20 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // single byte from the socket.
     if (content_length == 0 || content_length > update_partition->size ||
         content_length > static_cast<size_t>(INT32_MAX)) {
-        ESP_LOGW(TAG, "Rejected OTA content length: %u (partition %u)",
-                 (unsigned)content_length, (unsigned)update_partition->size);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                            "Invalid firmware image size");
+        ESP_LOGW(TAG, "Rejected OTA content length: %u (partition %u)", (unsigned)content_length,
+                 (unsigned)update_partition->size);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid firmware image size");
         goto err;
     }
 
-    ESP_LOGI(TAG, "Starting OTA update, partition: %s, size: %u bytes",
-             update_partition->label, (unsigned)content_length);
+    ESP_LOGI(TAG, "Starting OTA update, partition: %s, size: %u bytes", update_partition->label,
+             (unsigned)content_length);
 
-    do
-    {
+    do {
         const int64_t now_us = esp_timer_get_time();
         if (now_us - upload_started_us > OTA_UPLOAD_TOTAL_TIMEOUT_US ||
             now_us - last_progress_us > OTA_UPLOAD_NO_PROGRESS_TIMEOUT_US) {
-            ESP_LOGE(TAG,
-                     "OTA upload deadline exceeded after %u of %u bytes",
+            ESP_LOGE(TAG, "OTA upload deadline exceeded after %u of %u bytes",
                      (unsigned)content_received, (unsigned)content_length);
             set_ota_error("Firmware upload timed out");
             httpd_resp_set_status(req, "408 Request Timeout");
@@ -244,31 +234,23 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         }
 
         const size_t receive_cap =
-            MIN(content_length - content_received,
-                static_cast<size_t>(OTA_BUFFER_SIZE));
-        if ((recv_len = httpd_req_recv(req, ota_buff, receive_cap)) < 0)
-        {
-            if (recv_len == HTTPD_SOCK_ERR_TIMEOUT && timeout_retries-- > 0)
-            {
+            MIN(content_length - content_received, static_cast<size_t>(OTA_BUFFER_SIZE));
+        if ((recv_len = httpd_req_recv(req, ota_buff, receive_cap)) < 0) {
+            if (recv_len == HTTPD_SOCK_ERR_TIMEOUT && timeout_retries-- > 0) {
                 // Transient timeout - retry a bounded number of times. An
                 // unbounded retry loop would wedge the single httpd task
                 // forever if the client stalls mid-upload.
                 continue;
-            }
-            else
-            {
-                ESP_LOGE(TAG, "OTA socket error %d, received %u of %u bytes",
-                         recv_len, (unsigned)content_received,
-                         (unsigned)content_length);
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Network error during upload");
+            } else {
+                ESP_LOGE(TAG, "OTA socket error %d, received %u of %u bytes", recv_len,
+                         (unsigned)content_received, (unsigned)content_length);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                                    "Network error during upload");
                 goto err;
             }
-        }
-        else if (recv_len == 0)
-        {
+        } else if (recv_len == 0) {
             // Connection closed by client
-            ESP_LOGE(TAG,
-                     "OTA connection closed prematurely, received %u of %u bytes",
+            ESP_LOGE(TAG, "OTA connection closed prematurely, received %u of %u bytes",
                      (unsigned)content_received, (unsigned)content_length);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete upload");
             goto err;
@@ -278,17 +260,17 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
         // transient retry budget on real progress, while the independent
         // no-progress and total deadlines keep the single httpd task bounded.
         last_progress_us = esp_timer_get_time();
-        timeout_retries = 5;
+        timeout_retries  = 5;
 
-        if (!is_req_body_started)
-        {
+        if (!is_req_body_started) {
             is_req_body_started = true;
 
             if (recv_len <= 0 || static_cast<unsigned char>(ota_buff[0]) != 0xE9) {
                 ESP_LOGW(TAG, "Rejected non-ESP firmware image (magic 0x%02x)",
                          recv_len > 0 ? static_cast<unsigned char>(ota_buff[0]) : 0);
                 httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                    "Falsche Datei: kein gueltiges ESP32-Firmware-Abbild. WebUI unter System -> WebUI installieren.");
+                                    "Falsche Datei: kein gueltiges ESP32-Firmware-Abbild. WebUI "
+                                    "unter System -> WebUI installieren.");
                 goto err;
             }
 
@@ -298,14 +280,18 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
             // full content length (loop never terminated) and wrote the
             // trailing boundary into flash.
             char content_type[64] = {0};
-            if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type, sizeof(content_type)) == ESP_OK &&
+            if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type,
+                                            sizeof(content_type)) == ESP_OK &&
                 strstr(content_type, "multipart/form-data") != NULL) {
-                ESP_LOGE(TAG, "Multipart firmware uploads are not supported - send the raw binary as request body");
-                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Multipart uploads not supported, send raw binary body");
+                ESP_LOGE(TAG, "Multipart firmware uploads are not supported - send the raw binary "
+                              "as request body");
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                    "Multipart uploads not supported, send raw binary body");
                 goto err;
             }
 
-            OTA_CHECK(esp_ota_begin(update_partition, content_length, &ota_handle) == ESP_OK, "Could not start OTA");
+            OTA_CHECK(esp_ota_begin(update_partition, content_length, &ota_handle) == ESP_OK,
+                      "Could not start OTA");
             ota_begun = true;
             ESP_LOGW(TAG, "Begin OTA Update to partition %s, File Size: %u",
                      update_partition->label, (unsigned)content_length);
@@ -313,28 +299,22 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += static_cast<size_t>(recv_len);
-            _ota_progress = static_cast<int>(content_received * 100 /
-                                             content_length);
-            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)",
-                     (unsigned)content_received, (unsigned)content_length,
-                     _ota_progress.load());
-        }
-        else
-        {
+            _ota_progress = static_cast<int>(content_received * 100 / content_length);
+            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)", (unsigned)content_received,
+                     (unsigned)content_length, _ota_progress.load());
+        } else {
             OTA_CHECK(esp_ota_write(ota_handle, ota_buff, recv_len) == ESP_OK, "Error writing OTA");
             content_received += static_cast<size_t>(recv_len);
-            _ota_progress = static_cast<int>(content_received * 100 /
-                                             content_length);
-            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)",
-                     (unsigned)content_received, (unsigned)content_length,
-                     _ota_progress.load());
+            _ota_progress = static_cast<int>(content_received * 100 / content_length);
+            ESP_LOGI(TAG, "OTA progress: %u / %u bytes (%d%%)", (unsigned)content_received,
+                     (unsigned)content_length, _ota_progress.load());
         }
     } while (content_received < content_length);
 
     // Verify complete firmware was received
     if (content_received != content_length) {
-        ESP_LOGE(TAG, "Incomplete firmware: received %u of %u bytes",
-                 (unsigned)content_received, (unsigned)content_length);
+        ESP_LOGE(TAG, "Incomplete firmware: received %u of %u bytes", (unsigned)content_received,
+                 (unsigned)content_length);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Incomplete firmware upload");
         goto err;
     }
@@ -344,7 +324,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     // verification fails. Clear the ownership flag before testing its result
     // so the error path never calls esp_ota_abort() on a stale handle.
     ota_end_result = esp_ota_end(ota_handle);
-    ota_begun = false;
+    ota_begun      = false;
     OTA_CHECK(ota_end_result == ESP_OK, "Error finalizing OTA");
 
     // Verify the firmware image before setting boot partition
@@ -379,7 +359,8 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     _ota_status = OTA_FINALIZING;
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"success\":true,\"message\":\"Firmware received, finalizing and restarting...\"}");
+    httpd_resp_sendstr(
+        req, "{\"success\":true,\"message\":\"Firmware received, finalizing and restarting...\"}");
 
     // Scope ctx so goto err (from the upload phase above) cannot jump over
     // its initialization — C++ forbids crossing a declaration with an
@@ -394,10 +375,9 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
             return ESP_OK;
         }
         ctx->update_partition = update_partition;
-        ctx->running = running;
+        ctx->running          = running;
 
-        if (xTaskCreate(ota_finalize_task, "ota_finalize", 8192,
-                        ctx, 2, NULL) != pdPASS) {
+        if (xTaskCreate(ota_finalize_task, "ota_finalize", 8192, ctx, 2, NULL) != pdPASS) {
             ESP_LOGE(TAG, "Could not create OTA finalize task");
             _ota_status = OTA_FAILED;
             set_ota_error("Could not start finalize task");
@@ -411,7 +391,10 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
 
 err:
     if (ota_buff) free(ota_buff);
-    if (net_gate_held) { crash_blackbox_net_op_end(); xSemaphoreGive(g_net_fetch_mutex); }
+    if (net_gate_held) {
+        crash_blackbox_net_op_end();
+        xSemaphoreGive(g_net_fetch_mutex);
+    }
     net_fetch_set_ota_active(false);
     webui_status_led()->setState(LED_STATE_OFF);
     _ota_status = OTA_FAILED;
@@ -428,18 +411,16 @@ err:
     return ESP_FAIL;
 }
 
-httpd_uri_t post_ota_update_handler = {
-    .uri = "/ota_update",
-    .method = HTTP_POST,
-    .handler = post_ota_update_handler_func,
-    .user_ctx = NULL};
+httpd_uri_t post_ota_update_handler = {.uri      = "/ota_update",
+                                       .method   = HTTP_POST,
+                                       .handler  = post_ota_update_handler_func,
+                                       .user_ctx = NULL};
 
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
@@ -465,26 +446,23 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     return ESP_OK;
 }
 
-httpd_uri_t post_restart_handler = {
-    .uri = "/api/restart",
-    .method = HTTP_POST,
-    .handler = post_restart_handler_func,
-    .user_ctx = NULL};
+httpd_uri_t post_restart_handler = {.uri      = "/api/restart",
+                                    .method   = HTTP_POST,
+                                    .handler  = post_restart_handler_func,
+                                    .user_ctx = NULL};
 
 esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
     ScopedOperationReservation operation;
     if (!operation) {
         httpd_resp_set_status(req, "503 Service Unavailable");
-        return httpd_resp_sendstr(
-            req, "Another configuration or restart operation is active");
+        return httpd_resp_sendstr(req, "Another configuration or restart operation is active");
     }
 
     // Queue the notification against the still-live (pre-wipe) notify config
@@ -501,8 +479,8 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     if (clear_result != ESP_OK) {
         ESP_LOGE(TAG, "Factory reset failed while clearing settings: %s",
                  esp_err_to_name(clear_result));
-        return send_json_error(req, "500 Internal Server Error",
-                               "factory_reset_failed", "settings");
+        return send_json_error(req, "500 Internal Server Error", "factory_reset_failed",
+                               "settings");
     }
     ResetInfo::storeResetReason(RESET_REASON_FACTORY_RESET);
 
@@ -518,32 +496,41 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     return ESP_OK;
 }
 
-httpd_uri_t post_factory_reset_handler = {
-    .uri = "/api/factory-reset",
-    .method = HTTP_POST,
-    .handler = post_factory_reset_handler_func,
-    .user_ctx = NULL};
+httpd_uri_t post_factory_reset_handler = {.uri      = "/api/factory-reset",
+                                          .method   = HTTP_POST,
+                                          .handler  = post_factory_reset_handler_func,
+                                          .user_ctx = NULL};
 
 static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
 
-    if (validate_auth(req) != ESP_OK)
-    {
+    if (validate_auth(req) != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
     const char *status_str;
     const ota_status_t status = _ota_status.load();
     switch (status) {
-        case OTA_DOWNLOADING: status_str = "downloading"; break;
-        case OTA_FINALIZING:  status_str = "finalizing"; break;
-        case OTA_SUCCESS:     status_str = "success"; break;
-        case OTA_FAILED:      status_str = "failed"; break;
-        default:              status_str = "idle"; break;
+        case OTA_DOWNLOADING:
+            status_str = "downloading";
+            break;
+        case OTA_FINALIZING:
+            status_str = "finalizing";
+            break;
+        case OTA_SUCCESS:
+            status_str = "success";
+            break;
+        case OTA_FAILED:
+            status_str = "failed";
+            break;
+        default:
+            status_str = "idle";
+            break;
     }
 
-    const char* flashPause = (webui_settings() && webui_settings()->getFlashPause()) ? "true" : "false";
+    const char *flashPause =
+        (webui_settings() && webui_settings()->getFlashPause()) ? "true" : "false";
     // The escaped OTA error can use up to twice the 128-byte source buffer.
     // Leave enough room for the surrounding JSON without truncating it.
     char buf[384];
@@ -554,14 +541,15 @@ static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
         if (error[0] != '\0') {
             // Escape any quotes in the error string just in case
             char esc_error[sizeof(_ota_error) * 2] = {0};
-            int j = 0;
+            int j                                  = 0;
             for (int i = 0; error[i] && j < sizeof(esc_error) - 2; i++) {
                 if (error[i] == '"' || error[i] == '\\') {
                     esc_error[j++] = '\\';
                 }
                 esc_error[j++] = error[i];
             }
-            snprintf(buf, sizeof(buf), "{\"status\":\"%s\",\"progress\":%d,\"flashPause\":%s,\"error\":\"%s\"}",
+            snprintf(buf, sizeof(buf),
+                     "{\"status\":\"%s\",\"progress\":%d,\"flashPause\":%s,\"error\":\"%s\"}",
                      status_str, _ota_progress.load(), flashPause, esc_error);
         } else {
             snprintf(buf, sizeof(buf), "{\"status\":\"%s\",\"progress\":%d,\"flashPause\":%s}",
@@ -578,11 +566,10 @@ static esp_err_t get_ota_status_handler_func(httpd_req_t *req)
     return ESP_OK;
 }
 
-httpd_uri_t get_ota_status_handler = {
-    .uri = "/api/ota_status",
-    .method = HTTP_GET,
-    .handler = get_ota_status_handler_func,
-    .user_ctx = NULL};
+httpd_uri_t get_ota_status_handler = {.uri      = "/api/ota_status",
+                                      .method   = HTTP_GET,
+                                      .handler  = get_ota_status_handler_func,
+                                      .user_ctx = NULL};
 
 // Free heap for the manual firmware upload restart by shutting down heap-heavy
 // subsystems.
@@ -601,8 +588,7 @@ static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring)
 
     // Stop MQTT, CheckMK, Prometheus, Syslog and notification workers. Besides
     // TLS state, this can free several task stacks (6-8 KB each) before OTA.
-    esp_err_t monitoring_pause_result =
-        monitoring_pause_for_ota(paused_monitoring);
+    esp_err_t monitoring_pause_result = monitoring_pause_for_ota(paused_monitoring);
     if (monitoring_pause_result != ESP_OK) {
         ESP_LOGE(TAG, "Cannot continue OTA/restart while monitoring is stopping: %s",
                  esp_err_to_name(monitoring_pause_result));
@@ -622,7 +608,7 @@ static esp_err_t prepare_ota_heap(uint32_t *paused_monitoring)
 // during the (potentially 90 s) sequential worker-stop phase.
 static void ota_finalize_task(void *pv)
 {
-    ota_finalize_ctx *ctx = static_cast<ota_finalize_ctx *>(pv);
+    ota_finalize_ctx *ctx      = static_cast<ota_finalize_ctx *>(pv);
     uint32_t paused_monitoring = 0;
 
     esp_err_t prepare_result = prepare_ota_heap(&paused_monitoring);
@@ -638,19 +624,17 @@ static void ota_finalize_task(void *pv)
         return;
     }
 
-    esp_err_t boot_result = esp_ota_set_boot_partition(ctx->update_partition);
+    esp_err_t boot_result                = esp_ota_set_boot_partition(ctx->update_partition);
     const esp_partition_t *selected_boot = esp_ota_get_boot_partition();
     if (selected_boot != ctx->update_partition) {
         ESP_LOGE(TAG, "Could not select uploaded OTA partition: set=%s selected=%s",
-                 esp_err_to_name(boot_result),
-                 selected_boot ? selected_boot->label : "unknown");
+                 esp_err_to_name(boot_result), selected_boot ? selected_boot->label : "unknown");
 
         bool running_restored = (selected_boot == ctx->running);
         for (int attempt = 0; !running_restored && attempt < 3; ++attempt) {
             esp_err_t restore_result = esp_ota_set_boot_partition(ctx->running);
-            selected_boot = esp_ota_get_boot_partition();
-            running_restored =
-                (restore_result == ESP_OK && selected_boot == ctx->running);
+            selected_boot            = esp_ota_get_boot_partition();
+            running_restored         = (restore_result == ESP_OK && selected_boot == ctx->running);
             if (!running_restored) {
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
@@ -658,9 +642,8 @@ static void ota_finalize_task(void *pv)
 
         webui_status_led()->setState(LED_STATE_OFF);
         _ota_status = OTA_FAILED;
-        set_ota_error(running_restored
-                          ? "Could not activate uploaded firmware"
-                          : "Boot selection uncertain; restarting safely");
+        set_ota_error(running_restored ? "Could not activate uploaded firmware"
+                                       : "Boot selection uncertain; restarting safely");
         ResetInfo::storeResetReason(RESET_REASON_UPDATE_FAILED);
 
         if (running_restored) {
@@ -681,7 +664,7 @@ static void ota_finalize_task(void *pv)
     ESP_LOGI(TAG, "OTA finished successfully, restarting to activate new firmware.");
     webui_status_led()->setState(LED_STATE_OFF);
     _ota_progress = 100;
-    _ota_status = OTA_SUCCESS;
+    _ota_status   = OTA_SUCCESS;
     ResetInfo::storeResetReason(RESET_REASON_FIRMWARE_UPDATE);
 
     vTaskDelay(pdMS_TO_TICKS(3000));
@@ -689,4 +672,3 @@ static void ota_finalize_task(void *pv)
     full_system_restart_with_reserved_operation();
     free(ctx);
 }
-
