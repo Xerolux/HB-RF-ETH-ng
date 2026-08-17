@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.6-Beta.12] - 2026-08-17
+
+### Changes
+- feat: notification event selection, CCU latency diagnostics, CI gates and webui.cpp split (#420)
+- fix(ota): drop the unused varargs from the OTA error setter
+- test: follow the WebUI handlers into their new translation units
+- style(webui): apply clang-format to the extracted WebUI units
+- refactor(webui): split backup/restore and OTA out of webui.cpp
+- fix(diag): repair the stack, CPU and NVS diagnostics used to size the device
+- feat(diag): measure CCU relay latency so delayed switching can be diagnosed
+- fix(ci): move ESLint to 10.x and drop a redundant assignment it caught
+- feat(notify): let users choose which events trigger a notification
+- ci: add ESLint, C++ format ratchet and Playwright gate; drop dead artifacts
+- chore: update manifests for v2.2.6-Beta.11
+
 ## [2.2.6-Beta.11] - 2026-08-14
 
 ### Changes

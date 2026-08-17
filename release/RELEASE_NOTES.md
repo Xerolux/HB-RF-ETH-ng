@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.6-Beta.11
+# 🚀 HB-RF-ETH-ng v2.2.6-Beta.12
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,11 +11,20 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.6-Beta.11?
+## 🆕 Was ist neu in v2.2.6-Beta.12?
 
 ### Changes
-- fix(security): TLS cert verification, rate-limiter bypass, header injection (#419)
-- chore: update manifests for v2.2.6-Beta.10
+- feat: notification event selection, CCU latency diagnostics, CI gates and webui.cpp split (#420)
+- fix(ota): drop the unused varargs from the OTA error setter
+- test: follow the WebUI handlers into their new translation units
+- style(webui): apply clang-format to the extracted WebUI units
+- refactor(webui): split backup/restore and OTA out of webui.cpp
+- fix(diag): repair the stack, CPU and NVS diagnostics used to size the device
+- feat(diag): measure CCU relay latency so delayed switching can be diagnosed
+- fix(ci): move ESLint to 10.x and drop a redundant assignment it caught
+- feat(notify): let users choose which events trigger a notification
+- ci: add ESLint, C++ format ratchet and Playwright gate; drop dead artifacts
+- chore: update manifests for v2.2.6-Beta.11
 
 ## ✨ Hauptfunktionen
 
@@ -52,7 +61,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.6-Beta.11.bin`)
+- **Firmware-Binary** (`firmware_2.2.6-Beta.12.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
