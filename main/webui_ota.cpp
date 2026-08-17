@@ -96,16 +96,33 @@ static std::atomic<int> _ota_progress{0}; // 0-100
 static char _ota_error[128]        = {0};
 static portMUX_TYPE _ota_error_mux = portMUX_INITIALIZER_UNLOCKED;
 
-static void set_ota_error(const char *format, ...)
+// Takes a plain string, not a format. Every one of the six call sites passes
+// a bare literal with no arguments, so the varargs/vsnprintf machinery this
+// used to carry was entirely unused — while still being the exact shape
+// static analysis flags as a format-string hazard, and still able to accept a
+// future caller's stray "%s" with nothing to substitute. Dropping it removes
+// both the risk and the indirection.
+//
+// Truncation happens outside the critical section, exactly as it did before:
+// portENTER_CRITICAL disables interrupts on this core, and this firmware has
+// a documented history of interrupt-watchdog resets, so the guarded window
+// stays a fixed-size copy rather than a bounded string operation.
+static void set_ota_error(const char *message)
 {
     char text[sizeof(_ota_error)];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(text, sizeof(text), format, args);
-    va_end(args);
+    snprintf(text, sizeof(text), "%s", message ? message : "");
 
     portENTER_CRITICAL(&_ota_error_mux);
-    snprintf(_ota_error, sizeof(_ota_error), "%s", text);
+    memcpy(_ota_error, text, sizeof(_ota_error));
+    portEXIT_CRITICAL(&_ota_error_mux);
+}
+
+// Clearing the message is not the same operation as setting one, and spelling
+// it as set_ota_error("") reads as a mistake.
+static void clear_ota_error()
+{
+    portENTER_CRITICAL(&_ota_error_mux);
+    _ota_error[0] = '\0';
     portEXIT_CRITICAL(&_ota_error_mux);
 }
 
@@ -133,7 +150,7 @@ esp_err_t post_ota_update_handler_func(httpd_req_t *req)
     }
     _ota_status   = OTA_DOWNLOADING;
     _ota_progress = 0;
-    set_ota_error("");
+    clear_ota_error();
 
     // The inbound upload itself is not TLS, but its 4 KiB buffer plus flash
     // erase/write pressure must not overlap an outbound TLS handshake on a
