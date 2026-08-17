@@ -838,6 +838,52 @@ test('CCU relay latency is measured in the receive path and reported to MQTT', a
   expect(mqttSource).toContain('publish_config("sensor", "ccu_queue_wait_max_ms"')
 })
 
+test('stack and NVS diagnostics report the whole picture, not a truncated prefix', async () => {
+  const sysinfoSource = await readFile('../main/sysinfo.cpp', 'utf8')
+  const webuiSource = await readFile('../main/webui.cpp', 'utf8')
+  const prometheusSource = await readFile('../main/prometheus.cpp', 'utf8')
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+
+  const stackInfo = sysinfoSource.slice(
+    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()'),
+    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()') + 3000
+  )
+
+  // uxTaskGetSystemState returns 0 rather than a partial list when the array
+  // is too small, so a fixed bound turns the whole diagnostic into
+  // "no-tasks" once enough services are enabled to exceed it.
+  expect(stackInfo).toContain('uxTaskGetNumberOfTasks()')
+  expect(stackInfo).not.toContain('const size_t MAX_TASKS = 32')
+
+  // Same API, same trap in the CPU-usage sampler: a zero count there does not
+  // read as an error, it silently reports a fabricated 100% CPU forever.
+  expect(sysinfoSource).not.toContain('static const UBaseType_t MAX_TASKS = 32')
+  const cpuTask = sysinfoSource.slice(
+    sysinfoSource.indexOf('void updateCPUUsageTask'),
+    sysinfoSource.indexOf('uint32_t get_voltage(')
+  )
+  expect(cpuTask).toContain('if (taskCount == 0)')
+  expect(cpuTask).toContain('continue;')
+
+  // The list is sorted danger-first, so a fixed output buffer drops exactly
+  // the over-provisioned tasks — the ones worth reclaiming stack from.
+  expect(stackInfo).toContain('CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 8')
+  expect(stackInfo).not.toContain('char out[512]')
+
+  // Same defect one layer up: /sysinfo.json escaped the string into a fixed
+  // 640-byte buffer.
+  expect(webuiSource).not.toContain('char stack_buf[640]')
+  expect(webuiSource).toContain('stacks.size() * 2')
+  expect(webuiSource).toContain('taskStacks\\":\\"alloc-failed')
+
+  // NVS occupancy is exported: exhausting the 16 KiB partition presents as
+  // settings that will not save, with no obvious error.
+  expect(prometheusSource).toContain('hbrfeth_nvs_entries')
+  expect(prometheusSource).toContain('nvs_get_stats(NULL, &nvs)')
+  expect(mqttSource).toContain('status/nvs_usage')
+  expect(mqttSource).toContain('publish_config("sensor", "nvs_usage"')
+})
+
 test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
   const source = await readFile('../main/rawuartudplistener.cpp', 'utf8')
 

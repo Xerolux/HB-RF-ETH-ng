@@ -704,22 +704,37 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     // buf above, so emit it as its own chunk with a dedicated buffer. Spaces
     // are legal in JSON strings; only escape quotes and backslashes (defensive
     // — task names are bounded ASCII).
+    //
+    // Sized from the string rather than a fixed bound: the list is sorted
+    // danger-first, so a fixed buffer silently drops the over-provisioned
+    // tasks at the tail, which are exactly the ones worth reclaiming stack
+    // from. Falls back to a truncated-but-valid chunk if the allocation
+    // fails, so a low-heap device still answers /sysinfo.json.
     {
         std::string stacks = _sysInfo->getTaskStackInfo();
-        char stack_buf[640];
-        size_t pos = 0;
-        stack_buf[0] = 0;
-        pos += snprintf(stack_buf + pos, sizeof(stack_buf) - pos,
-                        ",\"taskStacks\":\"");
-        for (const char *p = stacks.c_str(); *p && pos + 4 < sizeof(stack_buf); p++) {
-            if (*p == '"' || *p == '\\') {
-                stack_buf[pos++] = '\\';
+        const size_t prefix_len = sizeof(",\"taskStacks\":\"") - 1;
+        // Worst case every character needs an escape, plus the closing quote
+        // and the NUL.
+        const size_t stack_buf_size = prefix_len + stacks.size() * 2 + 2;
+        char *stack_buf             = (char *)malloc(stack_buf_size);
+        if (stack_buf) {
+            size_t pos   = 0;
+            stack_buf[0] = 0;
+            pos += snprintf(stack_buf + pos, stack_buf_size - pos, ",\"taskStacks\":\"");
+            for (const char *p = stacks.c_str(); *p && pos + 4 < stack_buf_size; p++) {
+                if (*p == '"' || *p == '\\') {
+                    stack_buf[pos++] = '\\';
+                }
+                stack_buf[pos++] = *p;
             }
-            stack_buf[pos++] = *p;
+            stack_buf[pos++] = '"';
+            stack_buf[pos]   = 0;
+            httpd_resp_send_chunk(req, stack_buf, pos);
+            free(stack_buf);
+        } else {
+            static const char empty[] = ",\"taskStacks\":\"alloc-failed\"";
+            httpd_resp_send_chunk(req, empty, sizeof(empty) - 1);
         }
-        stack_buf[pos++] = '"';
-        stack_buf[pos] = 0;
-        httpd_resp_send_chunk(req, stack_buf, pos);
     }
 
     // Close sysInfo and root

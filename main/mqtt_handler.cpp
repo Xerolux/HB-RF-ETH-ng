@@ -645,6 +645,19 @@ void mqtt_handler_publish_status(void)
         PUBLISH_UINT64("status/ccu_dropped_frames", latency.drops);
     }
 
+    // NVS fill level. 16 KiB shared by settings, MQTT credentials, TLS key
+    // material, theme state and the WebUI record; exhaustion shows up as
+    // settings that will not save rather than as an obvious error.
+    {
+        nvs_stats_t nvs = {};
+        if (nvs_get_stats(NULL, &nvs) == ESP_OK && nvs.total_entries > 0) {
+            PUBLISH_UINT64("status/nvs_used_entries", nvs.used_entries);
+            PUBLISH_UINT64("status/nvs_free_entries", nvs.available_entries);
+            PUBLISH_DOUBLE("status/nvs_usage",
+                           (100.0 * (double)nvs.used_entries) / (double)nvs.total_entries, 1);
+        }
+    }
+
     // Reset reason (combines app-level stored reason + ESP hardware reason).
     if (sysInfo->getResetReason()) {
         PUBLISH_STR("status/last_reset_reason", sysInfo->getResetReason());
@@ -957,6 +970,9 @@ void mqtt_handler_publish_ha_discovery(void)
                    NULL, NULL, "diagnostic", "mdi:timer-sand");
     publish_config("sensor", "ccu_dropped_frames", "CCU Dropped Frames", NULL, "total_increasing",
                    NULL, NULL, "diagnostic", "mdi:package-variant-remove");
+    // NVS fill level — a full partition presents as "settings will not save".
+    publish_config("sensor", "nvs_usage", "NVS Usage", NULL, "measurement", "%", NULL, "diagnostic",
+                   "mdi:database-settings");
     publish_config("sensor", "uptime_text", "Uptime (Text)", NULL, NULL, NULL, NULL, "diagnostic", "mdi:clock-outline");
     // Remove the legacy short-named version sensors (renamed to
     // firmware_version / webui_version below). Empty retained discovery

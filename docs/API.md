@@ -830,6 +830,15 @@ Exposed metrics (non-exhaustive):
   `hbrfeth_udp_queue_wait_over_1s_total` (counter) — disjoint buckets, so one
   slow datagram is counted exactly once. Use these to tell a single outlier
   apart from sustained stalling.
+- `hbrfeth_nvs_entries{state="used|free|available|total"}` (gauge) and
+  `hbrfeth_nvs_namespaces` (gauge) — occupancy of the 16 KiB NVS partition,
+  which holds the device settings together with MQTT credentials, TLS key
+  material, theme state and the WebUI record. Exhausting it does not announce
+  itself; writes simply start failing, which users experience as settings
+  that will not save or that vanish after an update. Also published to MQTT
+  as `status/nvs_used_entries`, `status/nvs_free_entries` and
+  `status/nvs_usage` (percent, announced as a Home Assistant diagnostic
+  entity).
 
 ### Diagnosing delayed switching commands
 
