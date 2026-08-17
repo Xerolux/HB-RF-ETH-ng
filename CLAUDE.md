@@ -166,7 +166,10 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `radiomoduledetector.cpp` | Auto-detects HM radio module type (UART/I2C probe) |
 | `radiomoduleconnector.cpp` | UART/I2C bridge to radio module |
 | `rawuartudplistener.cpp` | UDP↔UART bridge (the core protocol relay) |
-| `webui.cpp` | HTTP server + all REST API endpoint handlers (largest file) |
+| `webui.cpp` | HTTP server, auth/login, settings, ping, log and password endpoints; owns `WebUI::start()` route registration |
+| `webui_backup.cpp` | `/api/backup` and `/api/restore` — full settings export/import |
+| `webui_ota.cpp` | `/ota_update`, `/api/ota_status`, `/api/restart`, `/api/factory-reset` |
+| `webui_internal.h` | Shared surface between the three WebUI handler units (internal to `main/`, not public API) |
 | `settings.cpp` | Persistent config via NVS Flash |
 | `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
 | `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`) |
@@ -194,7 +197,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 - Use `ESP_LOGI/LOGW/LOGE` macros for logging — never `printf` directly.
 - NVS namespace keys are short strings (max 15 chars per ESP-IDF NVS constraint).
 - Thread safety: mutexes (`SemaphoreHandle_t`) are used wherever data is shared across FreeRTOS tasks. The monitoring/MQTT subsystem was specifically refactored for thread-safety.
-- HTTP handler functions in `webui.cpp` follow the pattern `esp_err_t <name>_handler_func(httpd_req_t *req)`, registered via a matching `httpd_uri_t` struct.
+- HTTP handler functions follow the pattern `esp_err_t <name>_handler_func(httpd_req_t *req)`, registered via a matching `httpd_uri_t` struct. They live in `webui.cpp`, `webui_backup.cpp` or `webui_ota.cpp`; every route is registered from `WebUI::start()` in `webui.cpp`, so a handler defined outside it needs an `extern httpd_uri_t` entry in `webui_internal.h`.
 - Settings persistence uses `settings.cpp` — avoid direct NVS calls elsewhere.
 - **`vTaskDelay(pdMS_TO_TICKS(ms))` overflows for large `ms` values.** `pdMS_TO_TICKS` multiplies `ms * configTICK_RATE_HZ` in 32-bit `TickType_t` arithmetic before dividing by 1000; a 24h value (86,400,000 ms) overflows `uint32_t` and silently wraps to a much shorter delay. For long delays, loop in smaller chunks (e.g. N × 1h) instead of passing the full duration directly.
 - Any code performing an outbound TLS/HTTPS request should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `events.cpp` for the pattern.
@@ -431,8 +434,8 @@ chore: bump ESP-IDF to 6.0.2
 
 ### Adding a New REST Endpoint
 
-1. Add handler function in `main/webui.cpp` following the pattern of existing handlers
-2. Register the URI in the `httpd_uri_t` array at the bottom of `webui.cpp`
+1. Add the handler function in whichever WebUI unit fits — `main/webui.cpp` for general endpoints, `main/webui_backup.cpp` for backup/restore, `main/webui_ota.cpp` for firmware/restart actions
+2. Register the URI in `WebUI::start()` in `webui.cpp`; if the handler lives in another unit, also declare its `httpd_uri_t` in `main/webui_internal.h`
 3. Add corresponding frontend API call in the appropriate Vue component
 4. Document the endpoint in `docs/API.md` and `docs/openapi.yaml`
 
@@ -478,7 +481,7 @@ python3 rename_webui_files.py
 |------|---------------|
 | `include/pins.h` | GPIO assignments — consult before any hardware-related change |
 | `main/settings.cpp` | All persistent config logic lives here |
-| `main/webui.cpp` | All HTTP/REST API handlers — largest file |
+| `main/webui.cpp` | HTTP/REST handlers and route registration; backup/restore and OTA live in `webui_backup.cpp` / `webui_ota.cpp` |
 | `main/monitoring.cpp` | MQTT + CheckMK logic; thread-safety critical; owns `g_net_fetch_mutex` |
 | `main/radiomoduledetector.cpp` | Core HomeMatic protocol detection |
 | `main/CMakeLists.txt` | ESP-IDF component registration, dependency `REQUIRES`, embedded WebUI assets |
