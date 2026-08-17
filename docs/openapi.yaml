@@ -592,6 +592,27 @@ components:
               description: Per-event-type dedupe window in seconds
               minimum: 0
               example: 300
+            eventMask:
+              type: integer
+              description: >-
+                Bitmask selecting which events trigger a notification
+                (1 = Ethernet link lost, 2 = Ethernet link restored,
+                4 = radio module lost, 8 = radio module detected,
+                16 = MQTT disconnected, 32 = MQTT reconnected,
+                64 = factory reset, 128 = restart, 256 = CCU connected,
+                512 = CCU disconnected, 1024 = low heap). 0 = notify about
+                nothing. The test notification ignores this mask. Bits outside
+                eventMaskSupported are rejected with 400.
+              minimum: 0
+              maximum: 2047
+              example: 2047
+            eventMaskSupported:
+              type: integer
+              readOnly: true
+              description: >-
+                Bitmask of every event this firmware can emit. Render the
+                event selection from this value rather than a hardcoded list.
+              example: 2047
             webhookUrl:
               type: string
               description: HTTP POST target for webhook notifications

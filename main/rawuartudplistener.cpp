@@ -28,6 +28,7 @@
 #include <string.h>
 #include "udphelper.h"
 #include "metrics.h"
+#include "events.h"
 
 static const char *TAG = "RawUartUdpListener";
 
@@ -163,6 +164,12 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             _radioModuleConnector->setLED(true, true, false);
 
             ESP_LOGI(TAG, "CCU 3 connected from %s:%u", ip4addr_ntoa(&addr), port);
+            {
+                char detail[64];
+                snprintf(detail, sizeof(detail), "CCU connected from %s:%u", ip4addr_ntoa(&addr),
+                         port);
+                events_emit(EVENT_CCU_CONNECTED, detail);
+            }
 
             response_buffer[0] = 1;
             response_buffer[1] = data[1];
@@ -194,6 +201,12 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             _radioModuleConnector->setLED(true, true, false);
 
             ESP_LOGI(TAG, "CCU 3 reconnected from %s:%u", ip4addr_ntoa(&addr), port);
+            {
+                char detail[64];
+                snprintf(detail, sizeof(detail), "CCU reconnected from %s:%u", ip4addr_ntoa(&addr),
+                         port);
+                events_emit(EVENT_CCU_CONNECTED, detail);
+            }
 
             response_buffer[0] = 2;
             response_buffer[1] = data[1];
@@ -208,6 +221,7 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
     case 1: // disconnect
         ESP_LOGI(TAG, "CCU 3 disconnected");
+        events_emit(EVENT_CCU_DISCONNECTED, "CCU sent an explicit disconnect");
         atomic_store(&_connectionStarted, false);
         atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_remoteAddress, 0u);
@@ -534,6 +548,11 @@ void RawUartUdpListener::_udpQueueHandler()
                 connection_timeout)
             { // 10 sec
                 ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 10 seconds)");
+                // Deliberately distinct from the explicit disconnect above:
+                // a silent timeout is the symptom users report as "switching
+                // commands stopped working", and the two are not the same
+                // failure at all.
+                events_emit(EVENT_CCU_DISCONNECTED, "no keep-alive from the CCU for 10 seconds");
                 atomic_store(&_connectionStarted, false);
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);

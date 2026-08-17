@@ -721,6 +721,81 @@ test('MQTT startup waits for Ethernet IPv4 readiness without losing the GOT_IP r
   expect(init).not.toContain('mqtt_handler_start(&current_config.mqtt)')
 })
 
+test('notification event selection stays consistent across firmware, API and WebUI', async () => {
+  const monitoringHeader = await readFile('../include/monitoring.h', 'utf8')
+  const eventsHeader = await readFile('../include/events.h', 'utf8')
+  const eventsSource = await readFile('../main/events.cpp', 'utf8')
+  const configSource = await readFile('../main/monitoring_config.cpp', 'utf8')
+  const apiSource = await readFile('../main/monitoring_api.cpp', 'utf8')
+  const componentSource = await readFile('src/monitoring.vue', 'utf8')
+
+  // Every NOTIFY_EVENT_* bit the firmware defines must be mapped by
+  // events_mask_bit() and offered by the WebUI. A bit defined but unmapped
+  // would be permanently unfilterable; a bit mapped but not offered would be
+  // impossible to switch off.
+  const firmwareBits = [...monitoringHeader.matchAll(/#define (NOTIFY_EVENT_[A-Z0-9_]+)\s+\(1u << (\d+)\)/g)]
+    .map(match => ({ name: match[1], shift: Number(match[2]) }))
+  expect(firmwareBits.length).toBeGreaterThan(0)
+
+  for (const bit of firmwareBits) {
+    expect(eventsSource).toContain(`return ${bit.name};`)
+    expect(componentSource).toContain(`{ bit: 1 << ${bit.shift},`)
+  }
+
+  const uiBits = [...componentSource.matchAll(/\{ bit: 1 << (\d+),/g)].map(match => Number(match[1]))
+  expect(uiBits.sort((a, b) => a - b))
+    .toEqual(firmwareBits.map(bit => bit.shift).sort((a, b) => a - b))
+
+  // NOTIFY_EVENT_ALL must actually cover every defined bit, since it is both
+  // the factory default and the value an upgrading device keeps.
+  const allMatch = monitoringHeader.match(/#define NOTIFY_EVENT_ALL\s+\(\(uint16_t\)0x([0-9A-Fa-f]+)u\)/)
+  expect(allMatch).not.toBeNull()
+  const expectedAll = firmwareBits.reduce((mask, bit) => mask | (1 << bit.shift), 0)
+  expect(parseInt(allMatch[1], 16)).toBe(expectedAll)
+
+  // The test notification must stay unfilterable, otherwise the diagnostic
+  // button silently does nothing once a user deselects everything.
+  expect(eventsHeader).toContain('EVENT_TEST')
+  expect(eventsSource).toMatch(/default:\s*return 0;/)
+
+  // Defaults and migration: a fresh config selects everything, and the NVS
+  // loader must allow a stored zero so "notify nothing" survives a reboot.
+  expect(configSource).toContain('config->notify.event_mask = NOTIFY_EVENT_ALL')
+  expect(configSource).toContain('config->notify.event_mask &= NOTIFY_EVENT_ALL')
+
+  // The API both reports the selection and advertises what the firmware
+  // supports, so a newer WebUI does not offer events the device cannot emit.
+  expect(apiSource).toContain('cJSON_AddNumberToObject(notify, "eventMask"')
+  expect(apiSource).toContain('cJSON_AddNumberToObject(notify, "eventMaskSupported", NOTIFY_EVENT_ALL)')
+  expect(apiSource).toContain('Invalid notification event mask')
+})
+
+test('CCU connection changes and low heap are emitted as notifiable events', async () => {
+  const listenerSource = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+  const monitoringSource = await readFile('../main/monitoring.cpp', 'utf8')
+
+  // Both connect paths report the same event; both disconnect paths report
+  // the same event with distinguishing detail. An explicit CCU disconnect and
+  // a silent keep-alive timeout are very different failures and the
+  // notification has to say which one happened.
+  expect(listenerSource.match(/events_emit\(EVENT_CCU_CONNECTED/g)).toHaveLength(2)
+  expect(listenerSource.match(/events_emit\(EVENT_CCU_DISCONNECTED/g)).toHaveLength(2)
+  expect(listenerSource).toContain('CCU sent an explicit disconnect')
+  expect(listenerSource).toContain('no keep-alive from the CCU for 10 seconds')
+
+  // The low-heap warning has to leave the device before the watchdog reboots
+  // it, so it is emitted on the first hit of the streak and not next to
+  // esp_restart().
+  expect(monitoringSource).toContain('events_emit(EVENT_LOW_HEAP')
+  const watchdog = monitoringSource.slice(
+    monitoringSource.indexOf('static void heap_watchdog_task'),
+    monitoringSource.indexOf('static void schedule_mqtt_retry();')
+  )
+  expect(watchdog.indexOf('events_emit(EVENT_LOW_HEAP'))
+    .toBeLessThan(watchdog.indexOf('esp_restart()'))
+  expect(watchdog).toContain('if (low_heap_streak == 1)')
+})
+
 test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
   const source = await readFile('../main/rawuartudplistener.cpp', 'utf8')
 

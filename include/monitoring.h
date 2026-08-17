@@ -83,8 +83,33 @@ typedef struct {
     char hostname[32];      // override; empty = Settings::getHostname()
 } syslog_config_t;
 
+// Bit positions for notify_config_t.event_mask — one per notifiable event.
+//
+// The numeric `Event` ids in events.h are sparse (retired events left gaps)
+// and are part of the wire format, so the mask uses its own dense numbering
+// instead of shifting by the event id. events_mask_bit() maps between the
+// two. Append only: renumbering a bit would silently re-target an existing
+// user's saved selection.
+#define NOTIFY_EVENT_ETH_LINK_DOWN     (1u << 0)
+#define NOTIFY_EVENT_ETH_LINK_UP       (1u << 1)
+#define NOTIFY_EVENT_RF_MODULE_LOST    (1u << 2)
+#define NOTIFY_EVENT_RF_MODULE_DETECT  (1u << 3)
+#define NOTIFY_EVENT_MQTT_DISCONNECTED (1u << 4)
+#define NOTIFY_EVENT_MQTT_RECONNECTED  (1u << 5)
+#define NOTIFY_EVENT_FACTORY_RESET     (1u << 6)
+#define NOTIFY_EVENT_RESTART           (1u << 7)
+#define NOTIFY_EVENT_CCU_CONNECTED     (1u << 8)
+#define NOTIFY_EVENT_CCU_DISCONNECTED  (1u << 9)
+#define NOTIFY_EVENT_LOW_HEAP          (1u << 10)
+
+// Every currently defined event. This is the factory default and also what a
+// device upgrading from a firmware without the mask keeps, because the NVS
+// loader leaves the field untouched when its key is missing.
+#define NOTIFY_EVENT_ALL ((uint16_t)0x07FFu)
+
 // Event notification configuration (Phase C/D). Multi-channel: any subset of
-// webhook / telegram / email can be enabled via the `channels` bitmask.
+// webhook / telegram / email can be enabled via the `channels` bitmask, and
+// any subset of events via `event_mask`.
 typedef struct {
     bool enabled;
     uint8_t channels;          // bitmask: 1=webhook, 2=telegram, 4=email
@@ -100,6 +125,7 @@ typedef struct {
     char smtp_from[49];
     char smtp_to[49];
     uint16_t cooldown_seconds; // per-event-type debounce window (default 300)
+    uint16_t event_mask;       // NOTIFY_EVENT_* bitmask; 0 = notify nothing
 } notify_config_t;
 
 // Monitoring configuration

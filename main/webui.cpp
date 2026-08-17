@@ -1539,6 +1539,7 @@ static esp_err_t add_monitoring_backup(cJSON *root)
                             config->notify.smtp_to);
     cJSON_AddNumberToObject(notify, "cooldownSeconds",
                             config->notify.cooldown_seconds);
+    cJSON_AddNumberToObject(notify, "eventMask", config->notify.event_mask);
 
     delete config;
     return ESP_OK;
@@ -1697,6 +1698,14 @@ static esp_err_t parse_monitoring_backup(
         backup_get_uint(notify, "cooldownSeconds", UINT16_MAX, &number);
     if (valid) {
         config->notify.cooldown_seconds = static_cast<uint16_t>(number);
+    }
+    // Optional on purpose: backups written before the event selection existed
+    // have no such key, and requiring it would make every one of them fail to
+    // restore the whole notify block. A missing key keeps the default, which
+    // is the same "everything" behaviour those backups were taken under.
+    unsigned event_mask = 0;
+    if (backup_get_uint(notify, "eventMask", NOTIFY_EVENT_ALL, &event_mask)) {
+        config->notify.event_mask = static_cast<uint16_t>(event_mask);
     }
     // Same CRLF/control-char rejection as the normal POST /api/monitoring
     // path (monitoring_api.cpp): these three fields are interpolated

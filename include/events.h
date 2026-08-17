@@ -35,18 +35,29 @@
 #define NOTIFY_CHANNEL_EMAIL     (1u << 2)
 
 // Stable event identifiers. The numeric value is part of the wire format
-// (webhook JSON, email subject) — do not renumber existing entries.
+// (webhook JSON, email subject) — do not renumber existing entries. Ids 4-6
+// are retired and deliberately left unused so an old consumer can never
+// mistake a new event for one it used to know.
 typedef enum : uint8_t {
-    EVENT_ETH_LINK_DOWN     = 0,
-    EVENT_ETH_LINK_UP       = 1,
-    EVENT_RF_MODULE_LOST    = 2,
-    EVENT_RF_MODULE_DETECTED= 3,
-    EVENT_MQTT_DISCONNECTED = 7,
-    EVENT_MQTT_RECONNECTED  = 8,
-    EVENT_FACTORY_RESET     = 9,
-    EVENT_RESTART           = 10,
-    EVENT_TEST              = 254,  // emitted by the diagnostic endpoint
+    EVENT_ETH_LINK_DOWN      = 0,
+    EVENT_ETH_LINK_UP        = 1,
+    EVENT_RF_MODULE_LOST     = 2,
+    EVENT_RF_MODULE_DETECTED = 3,
+    EVENT_MQTT_DISCONNECTED  = 7,
+    EVENT_MQTT_RECONNECTED   = 8,
+    EVENT_FACTORY_RESET      = 9,
+    EVENT_RESTART            = 10,
+    EVENT_CCU_CONNECTED      = 11,
+    EVENT_CCU_DISCONNECTED   = 12,
+    EVENT_LOW_HEAP           = 13,
+    EVENT_TEST               = 254, // emitted by the diagnostic endpoint
 } Event;
+
+// Map an event to its NOTIFY_EVENT_* bit in notify_config_t.event_mask.
+// Returns 0 for events that are not user-filterable — currently only
+// EVENT_TEST, which must always be delivered so the diagnostic button in the
+// WebUI keeps working regardless of the selection.
+uint16_t events_mask_bit(Event event);
 
 // Initialise the event subsystem (queue + worker task). Idempotent.
 // The worker task is created suspended; it only runs after events_start().

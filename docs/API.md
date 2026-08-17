@@ -385,6 +385,8 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
     "enabled": false,
     "channels": 0,
     "cooldownSeconds": 300,
+    "eventMask": 2047,
+    "eventMaskSupported": 2047,
     "webhookUrl": "",
     "webhookSecretSet": false,
     "telegramTokenSet": false,
@@ -441,6 +443,24 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
 - `enabled`: Master switch for the notification subsystem
 - `channels`: Bitmask of active channels (`1` = webhook, `2` = Telegram, `4` = email)
 - `cooldownSeconds`: Per-event-type dedupe window; only one notification per event type is sent within this window
+- `eventMask`: Bitmask selecting which events trigger a notification. Writable. A value of `0` means "notify about nothing"; the test notification is delivered regardless of this mask. Values with bits outside `eventMaskSupported` are rejected with `400`.
+- `eventMaskSupported`: Read-only. Bitmask of every event this firmware can emit — use it to render the selection instead of hardcoding the list. Sending it back is rejected.
+
+  | Bit | Value | Event |
+  |-----|-------|-------|
+  | 0 | 1 | Ethernet link lost |
+  | 1 | 2 | Ethernet link restored |
+  | 2 | 4 | Radio module stopped responding |
+  | 3 | 8 | Radio module detected |
+  | 4 | 16 | MQTT connection lost |
+  | 5 | 32 | MQTT connection restored |
+  | 6 | 64 | Factory reset triggered |
+  | 7 | 128 | Restart triggered |
+  | 8 | 256 | CCU connected |
+  | 9 | 512 | CCU disconnected (explicit disconnect or keep-alive timeout — the detail text distinguishes them) |
+  | 10 | 1024 | Free heap dropped below the watchdog threshold |
+
+  A device upgrading from a firmware without this field keeps receiving every event: the stored configuration has no `eventMask` key, so the factory default (all bits set) stays in effect.
 - `webhookUrl` / `webhookSecret` (`webhookSecretSet`): HTTP POST target and shared secret (sent as `X-HB-RF-ETH-Secret` header). Secret write-only.
 - `telegramToken` (`telegramTokenSet`) / `telegramChatId`: Telegram bot token and target chat ID. Token write-only.
 - `smtpServer` / `smtpPort` / `smtpTls` (`0` = none, `1` = STARTTLS, `2` = implicit TLS) / `smtpUser` / `smtpPassword` (`smtpPasswordSet`) / `smtpFrom` / `smtpTo`: SMTP relay configuration. Password write-only. Note: an SMTP send holds the net-fetch mutex for the duration of the SMTP session; an active manual firmware upload defers event delivery until the upload completes.

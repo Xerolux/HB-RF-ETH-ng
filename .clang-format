@@ -3,7 +3,18 @@
 # These values were derived from the existing code base rather than imposed on
 # it: 4-space indent, Allman braces for function and type definitions, attached
 # braces for control flow, pointers bound to the identifier, and a 100-column
-# limit. The CI gate only checks files a pull request actually touches, so this
+# limit.
+#
+# The brace choice is measured, not assumed. Across main/ and include/ the
+# tree carries ~1020 attached control-statement braces against ~555 Allman
+# ones, and the split is per-file rather than random: the files inherited from
+# the original firmware (validation.cpp, webui_storage.cpp, radiomoduledetector
+# .cpp) are Allman, while the files this fork added or rewrote (monitoring.cpp
+# 178:4, mqtt_handler.cpp 95:0, events.cpp 54:0, syslog.cpp 47:0) are attached.
+# New code lands in the second group, so attached is the setting that produces
+# the least churn where changes actually happen.
+#
+# The CI gate only checks the lines a pull request actually touches, so this
 # file is a contract for new and modified code — it is deliberately not applied
 # as a one-shot reformat of the whole tree.
 ---
@@ -34,6 +45,16 @@ BraceWrapping:
 PointerAlignment: Right
 ReferenceAlignment: Right
 DerivePointerAlignment: false
+
+# The sources align enum initializers, table-like assignments and trailing
+# comments into columns on purpose — the event tables in events.cpp and the
+# pin map are far easier to read that way. Preserve that instead of collapsing
+# it to single spaces.
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveMacros: Consecutive
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
 
 AccessModifierOffset: -4
 AllowShortFunctionsOnASingleLine: Inline

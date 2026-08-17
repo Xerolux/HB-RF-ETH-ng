@@ -82,10 +82,52 @@ static void test_invalid_scalar_values_are_repaired_without_erasing_secrets()
     assert(std::strcmp(config.mqtt.command_token, "KeepMe123") == 0);
 }
 
+static void test_event_mask_defaults_to_every_supported_event()
+{
+    monitoring_config_t config = {};
+    monitoring_config_set_defaults(&config);
+
+    // A fresh device must notify about everything it can. Anything less would
+    // make a newly configured installation look broken: the user enables
+    // notifications, gets the test mail, and then never hears from it again.
+    assert(config.notify.event_mask == NOTIFY_EVENT_ALL);
+    assert((config.notify.event_mask & NOTIFY_EVENT_ETH_LINK_DOWN) != 0);
+    assert((config.notify.event_mask & NOTIFY_EVENT_CCU_DISCONNECTED) != 0);
+    assert((config.notify.event_mask & NOTIFY_EVENT_LOW_HEAP) != 0);
+}
+
+static void test_event_mask_normalization_drops_unknown_bits_but_keeps_none()
+{
+    monitoring_config_t config = {};
+    monitoring_config_set_defaults(&config);
+
+    // Bits above the defined events can only come from a newer build's
+    // backup or a hand-written API call. Drop them rather than persisting
+    // state this firmware cannot render.
+    config.notify.event_mask = 0xFFFFu;
+    monitoring_config_normalize(&config);
+    assert(config.notify.event_mask == NOTIFY_EVENT_ALL);
+
+    // A single selected event must survive untouched.
+    config.notify.event_mask = NOTIFY_EVENT_CCU_DISCONNECTED;
+    monitoring_config_normalize(&config);
+    assert(config.notify.event_mask == NOTIFY_EVENT_CCU_DISCONNECTED);
+
+    // "Notify nothing" is a legitimate choice and must not be silently
+    // rewritten into "notify everything" — the migration case for an older
+    // installation is handled by the NVS loader leaving the default in place,
+    // not by normalization second-guessing a stored zero.
+    config.notify.event_mask = 0;
+    monitoring_config_normalize(&config);
+    assert(config.notify.event_mask == 0);
+}
+
 int main()
 {
     test_empty_namespace_uses_complete_defaults();
     test_partial_namespace_preserves_mqtt_and_repairs_missing_checkmk();
     test_invalid_scalar_values_are_repaired_without_erasing_secrets();
+    test_event_mask_defaults_to_every_supported_event();
+    test_event_mask_normalization_drops_unknown_bits_but_keeps_none();
     return 0;
 }
