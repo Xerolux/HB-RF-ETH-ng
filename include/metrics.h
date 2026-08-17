@@ -61,9 +61,34 @@ void metrics_inc_one(metrics_counter_t counter);
 // scheduler tick only while an update is in flight or its snapshot changed.
 uint64_t metrics_get(metrics_counter_t counter);
 
-// Render every registered counter in Prometheus text exposition format and
-// append it to `out` (always NUL-terminated). `offset` is the current write
-// position, `cap` the total buffer capacity. Returns the new length.
+// --- High-water gauges -----------------------------------------------------
+//
+// A counter cannot express "the worst latency seen so far", which is the one
+// number that matters when a user reports that switching commands arrived
+// 20-30 seconds late: an average hides it and a rate says nothing at all.
+// A gauge holds a single 32-bit high-water value, updated with a lock-free
+// compare-exchange so the receive path can record into it without a mutex.
+
+typedef struct metrics_gauge *metrics_gauge_t;
+
+// Register (or look up) a named high-water gauge. Same boot-time
+// registration rules as metrics_register_counter.
+metrics_gauge_t metrics_register_gauge(const char *name, const char *help);
+
+// Raise the gauge to `value` if it is currently lower. Safe from any task.
+void metrics_gauge_record_max(metrics_gauge_t gauge, uint32_t value);
+
+// Read the current high-water value.
+uint32_t metrics_gauge_get(metrics_gauge_t gauge);
+
+// Clear the high-water mark back to 0, so an operator can watch a fresh
+// window after changing something rather than staring at a mark set days ago.
+void metrics_gauge_reset(metrics_gauge_t gauge);
+
+// Render every registered counter and gauge in Prometheus text exposition
+// format and append it to `out` (always NUL-terminated). `offset` is the
+// current write position, `cap` the total buffer capacity. Returns the new
+// length.
 size_t metrics_render_prometheus(char *out, size_t cap, size_t offset);
 
 #ifdef __cplusplus
