@@ -69,6 +69,10 @@ jobs:
         run: |
           cd webui
           npm install
+      - name: Lint WebUI sources
+        run: |
+          cd webui
+          npm run lint
       - name: Check WebUI build
         run: |
           cd webui
@@ -88,6 +92,72 @@ jobs:
             echo "Validating $file"
             python3 -m json.tool "$file" > /dev/null || exit 1
           done
+
+  cpp-format:
+    name: C++ Format (changed lines)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+      - name: Check formatting of lines this PR touches
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          BASE=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          echo "Comparing against merge base $BASE"
+          # git-clang-format reformats only the lines the diff actually
+          # touches. The firmware sources predate any formatter and are
+          # stylistically mixed, so a whole-file check would fail on files a
+          # PR merely brushes against. This is a ratchet, not a sweep.
+          DIFF=$(git clang-format --diff --extensions c,cpp,h,hpp "$BASE" -- main include)
+          if [ -z "$DIFF" ] || \
+             [ "$DIFF" = "no modified files to format" ] || \
+             [ "$DIFF" = "clang-format did not modify any files" ]; then
+            echo "✅ Changed C++ lines are correctly formatted."
+            exit 0
+          fi
+          echo "❌ Changed C++ lines do not match .clang-format:"
+          echo "$DIFF"
+          echo ""
+          echo "Fix locally with: git clang-format $BASE -- main include"
+          exit 1
+
+  webui-e2e:
+    name: WebUI End-to-End Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: webui/package-lock.json
+      - name: Install WebUI dependencies
+        run: |
+          cd webui
+          npm install
+      - name: Install Playwright browser
+        run: |
+          cd webui
+          npx playwright install --with-deps chromium
+      - name: Run Playwright regression suite
+        run: |
+          cd webui
+          npm run test:e2e -- tests/regressions.spec.js
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: webui/playwright-report/
+          retention-days: 7
 
   size-check:
     name: Firmware Size Check

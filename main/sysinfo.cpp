@@ -52,7 +52,14 @@ static const char *_currentVersion;
 static board_type_t _board;
 static uint64_t _bootTime;
 
-static const UBaseType_t MAX_TASKS = 32;
+// Upper bound for the CPU-usage snapshot. uxTaskGetSystemState() returns 0
+// rather than a partial list when the array is too small, and a zero count
+// here does not read as an error: idleRunTime stays 0, so the calculation
+// below reports a steady, entirely fictional 100% CPU. The firmware creates
+// around 25 tasks of its own before ESP-IDF's internals are counted, so the
+// old bound of 32 was uncomfortably close. The array is static, so the extra
+// headroom costs bytes rather than stack.
+static const UBaseType_t MAX_TASKS = 48;
 
 void updateCPUUsageTask(void *arg)
 {
@@ -68,6 +75,14 @@ void updateCPUUsageTask(void *arg)
         vTaskDelay(pdMS_TO_TICKS(1000));
 
         UBaseType_t taskCount = uxTaskGetSystemState(taskStatus, MAX_TASKS, &totalRunTime);
+        if (taskCount == 0) {
+            // Snapshot failed. Keep the previous reading rather than
+            // publishing a fabricated one, and leave the run-time baselines
+            // untouched so the next successful sample still spans a known
+            // interval.
+            ESP_LOGW(TAG, "CPU usage snapshot failed (more than %u tasks?)", (unsigned)MAX_TASKS);
+            continue;
+        }
 
         idleRunTime = 0;
 
@@ -328,23 +343,47 @@ std::string SysInfo::getTaskStackInfo()
     // The high-water mark (uxTaskGetStackHighWaterMark) is the minimum free
     // stack ever observed for a task — small values flag tasks close to
     // overflow, large values flag over-provisioned stacks that waste heap.
-    char out[512];
-
+    //
+    // Both halves of that sentence have to survive into the output. The list
+    // is sorted danger-first, so a buffer that overflows drops precisely the
+    // over-provisioned tasks — the ones worth reclaiming stack from. With
+    // ~86 KB of the ESP32's RAM sitting in task stacks that is the single
+    // largest reclaimable block on the device, so the buffer is sized from
+    // the actual task count instead of a fixed guess.
+    //
     // uxTaskGetSystemState needs CONFIG_FREERTOS_USE_TRACE_FACILITY (set in
-    // sdkconfig.defaults). Estimate an upper bound on the task count so the
-    // transient scratch allocation is right-sized without a second pass.
-    const size_t MAX_TASKS = 32;
-    TaskStatus_t *tasks = (TaskStatus_t *)malloc(sizeof(TaskStatus_t) * MAX_TASKS);
-    if (!tasks) {
-        snprintf(out, sizeof(out), "alloc-failed");
-        return out;
+    // sdkconfig.defaults). It returns 0 — not a partial list — when the array
+    // is too small, so the count comes from FreeRTOS rather than an estimate:
+    // a fixed 32-entry bound turned every reading into "no-tasks" as soon as
+    // enough services were enabled to cross it.
+    const size_t task_count = (size_t)uxTaskGetNumberOfTasks();
+    if (task_count == 0) {
+        return "no-tasks";
+    }
+    // Headroom for tasks created between the count and the snapshot.
+    const size_t max_tasks = task_count + 8;
+
+    // "name=12345 " — CONFIG_FREERTOS_MAX_TASK_NAME_LEN is 16, the mark is at
+    // most five digits, plus '=' and the separator.
+    const size_t per_task = CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 8;
+    const size_t out_size = max_tasks * per_task + 8;
+
+    char *out = (char *)malloc(out_size);
+    if (!out) {
+        return "alloc-failed";
     }
 
-    UBaseType_t n = uxTaskGetSystemState(tasks, MAX_TASKS, NULL);
+    TaskStatus_t *tasks = (TaskStatus_t *)malloc(sizeof(TaskStatus_t) * max_tasks);
+    if (!tasks) {
+        free(out);
+        return "alloc-failed";
+    }
+
+    UBaseType_t n = uxTaskGetSystemState(tasks, max_tasks, NULL);
     if (n == 0) {
         free(tasks);
-        snprintf(out, sizeof(out), "no-tasks");
-        return out;
+        free(out);
+        return "no-tasks";
     }
 
     // Sort ascending by usStackHighWaterMark. The smaller this value, the
@@ -374,19 +413,20 @@ std::string SysInfo::getTaskStackInfo()
         // words). Multiplying again would make every diagnostic four times too
         // large on ESP32 and could hide a genuinely tight task stack.
         unsigned hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;
-        int written = snprintf(out + pos, sizeof(out) - pos,
-                               "%s%s=%u",
-                               pos > 0 ? " " : "",
-                               tasks[i].pcTaskName,
-                               hwm_bytes);
-        if (written <= 0 || (size_t)written >= sizeof(out) - pos) {
-            // Truncated — append a marker and stop so the JSON is well-formed.
-            snprintf(out + pos, sizeof(out) - pos, "...");
+        int written        = snprintf(out + pos, out_size - pos, "%s%s=%u", pos > 0 ? " " : "",
+                                      tasks[i].pcTaskName, hwm_bytes);
+        if (written <= 0 || (size_t)written >= out_size - pos) {
+            // Should not happen now that the buffer is sized from the task
+            // count, but keep the marker so a miscalculation is visible in
+            // the output rather than silently cutting the list short.
+            snprintf(out + pos, out_size - pos, "...");
             break;
         }
         pos += (size_t)written;
     }
 
     free(tasks);
-    return out;
+    std::string result(out);
+    free(out);
+    return result;
 }

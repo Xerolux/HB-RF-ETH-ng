@@ -525,25 +525,25 @@ test('recovery mirrors the current New Design shell and links back to the normal
   const source = await readFile('../main/system_overview_api.cpp', 'utf8')
   const recoveryPage = source.slice(
     source.indexOf('constexpr char RECOVERY_PAGE[]'),
-    source.indexOf(')HTML\";')
+    source.indexOf(')HTML";')
   )
-  const backLink = '<a class=\"back-link\" href=\"/\">← Zur normalen WebUI</a>'
+  const backLink = '<a class="back-link" href="/">← Zur normalen WebUI</a>'
 
   expect(recoveryPage).toContain(backLink)
-  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"loginCard\"'))
-  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"tools\"'))
-  expect(recoveryPage).toContain('class=\"recovery-shell\"')
-  expect(recoveryPage).toContain('class=\"desktop-sidebar\"')
-  expect(recoveryPage).toContain('class=\"header-nav\"')
-  expect(recoveryPage).toContain('class=\"brand-logo\"')
-  expect(recoveryPage).toContain('class=\"hero-eyebrow\"')
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id="loginCard"'))
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id="tools"'))
+  expect(recoveryPage).toContain('class="recovery-shell"')
+  expect(recoveryPage).toContain('class="desktop-sidebar"')
+  expect(recoveryPage).toContain('class="header-nav"')
+  expect(recoveryPage).toContain('class="brand-logo"')
+  expect(recoveryPage).toContain('class="hero-eyebrow"')
   expect(recoveryPage).toContain('--newdesign-sidebar-width:360px')
   expect(recoveryPage).toContain('--newdesign-header-height:88px')
   expect(recoveryPage).toContain('--newdesign-radius-card:4px')
   expect(recoveryPage).toContain('@media(prefers-color-scheme:dark)')
   expect(recoveryPage).toContain('--newdesign-panel:#fff')
-  expect(recoveryPage).not.toContain('class=\"brand-mark\">RF')
-  expect(recoveryPage).not.toContain('class=\"recovery-header\"')
+  expect(recoveryPage).not.toContain('class="brand-mark">RF')
+  expect(recoveryPage).not.toContain('class="recovery-header"')
   expect(recoveryPage).not.toContain('ohne New-Design-Bundle')
 })
 
@@ -641,13 +641,38 @@ test('MQTT defers every publish until the broker connection is established', asy
     mqttSource.indexOf('case MQTT_EVENT_DISCONNECTED:')
   )
 
-  expect(mqttSource).toContain('static bool mqtt_can_publish()')
-  expect(mqttSource).toMatch(
-    /mqtt_running\.load\(\)\s*&&\s*mqtt_connected\.load\(\)\s*&&\s*client\s*!=\s*NULL/
+  const canPublish = mqttSource.slice(
+    mqttSource.indexOf('static bool mqtt_can_publish()'),
+    mqttSource.indexOf('static int mqtt_publish_connected(')
   )
+  const publishWrapper = mqttSource.slice(
+    mqttSource.indexOf('static int mqtt_publish_connected('),
+    mqttSource.indexOf('// Serializes mqtt_handler_start / mqtt_handler_stop')
+  )
+
+  // The guard itself must consider both lifecycle bits. The NULL-client check
+  // lives in the wrapper below rather than in this predicate, so assert each
+  // where it actually is instead of pinning one combined expression.
+  expect(canPublish).toContain('mqtt_running.load(std::memory_order_acquire)')
+  expect(canPublish).toContain('mqtt_connected.load(std::memory_order_acquire)')
+
+  // Exactly one raw publish call, and it sits inside the wrapper behind both
+  // lifecycle bits and a non-NULL client. The wrapper repeats the checks with
+  // seq_cst ordering instead of calling mqtt_can_publish(), so that the
+  // publisher count pairs with cleanup's mqtt_running=false store.
   expect(mqttSource.match(/esp_mqtt_client_publish\(/g)).toHaveLength(1)
+  expect(publishWrapper).toContain('esp_mqtt_client_publish(')
+  expect(publishWrapper).toContain('mqtt_running.load(std::memory_order_seq_cst)')
+  expect(publishWrapper).toContain('mqtt_connected.load(std::memory_order_acquire)')
+  expect(publishWrapper).toContain('if (publish_client != NULL)')
+  expect(publishWrapper).toContain('mqtt_active_publishers.fetch_add(1, std::memory_order_seq_cst)')
+  expect(publishWrapper).toContain('mqtt_active_publishers.fetch_sub(1, std::memory_order_seq_cst)')
+
+  // While disconnected the task must wait instead of formatting and
+  // submitting a batch. The wait is a bounded, notifiable take rather than a
+  // plain vTaskDelay so a reconnect wakes it immediately.
   expect(publishTask).toContain('if (!mqtt_can_publish())')
-  expect(publishTask).toContain('vTaskDelay(')
+  expect(publishTask).toMatch(/if \(!mqtt_can_publish\(\)\) \{\s*\(void\)ulTaskNotifyTake\(pdTRUE, pdMS_TO_TICKS\(\d+\)\);\s*continue;/)
   expect(connectedEvent.indexOf('mqtt_connected.store(true)')).toBeLessThan(
     connectedEvent.indexOf('mqtt_handler_publish_status()')
   )
@@ -663,20 +688,200 @@ test('MQTT startup waits for Ethernet IPv4 readiness without losing the GOT_IP r
     monitoringSource.indexOf('static void mqtt_network_ready_handler'),
     monitoringSource.indexOf('// Initialize monitoring subsystem')
   )
+  const retryTask = monitoringSource.slice(
+    monitoringSource.indexOf('static void mqtt_retry_task('),
+    // Anchor on the definition, not the forward declaration above it.
+    monitoringSource.indexOf('static void schedule_mqtt_retry()\n{')
+  )
 
   expect(monitoringSource).toContain('static std::atomic<bool> mqtt_start_deferred{false}')
   expect(monitoringSource).toContain('static void start_mqtt_when_network_ready')
   expect(monitoringSource).toContain('IP_EVENT_ETH_GOT_IP')
   expect(monitoringSource).toContain('MQTT start deferred until IPv4 is ready')
   expect(monitoringSource).toContain('starting MQTT with reconnect fallback')
-  expect(networkReadyHandler).toContain('mqtt_start_deferred.exchange(false)')
-  expect(networkReadyHandler).toContain('malloc(sizeof(mqtt_config_t))')
-  expect(networkReadyHandler).not.toContain('mqtt_config_t mqtt_config;')
-  expect(networkReadyHandler).toContain('mqtt_handler_start(mqtt_config)')
-  expect(networkReadyHandler).toContain('free(mqtt_config)')
+
+  // The GOT_IP handler runs on the default event loop, so it must only arm the
+  // retry worker. Starting MQTT inline would hold mqtt_lifecycle_mutex for up
+  // to 15 s and starve every other event subscriber (Ethernet link, NTP, ...).
+  expect(networkReadyHandler).toContain('IP_EVENT_ETH_GOT_IP')
+  expect(networkReadyHandler).toContain('mqtt_start_deferred.load(std::memory_order_acquire)')
+  expect(networkReadyHandler).toContain('schedule_mqtt_retry()')
+  expect(networkReadyHandler).not.toContain('mqtt_handler_start(')
+  expect(networkReadyHandler).not.toContain('malloc(')
+
+  // The worker owns the config snapshot. It must be heap-allocated rather than
+  // a stack copy, because mqtt_config_t is far too large for the worker stack.
+  expect(retryTask).toContain('malloc(sizeof(mqtt_config_t))')
+  expect(retryTask).not.toContain('mqtt_config_t snapshot;')
+  expect(retryTask).toContain('mqtt_handler_start(snapshot)')
+  expect(retryTask).toContain('free(snapshot)')
+
   expect(init).toContain('esp_event_handler_instance_register(')
   expect(init).toContain('start_mqtt_when_network_ready(&current_config.mqtt)')
   expect(init).not.toContain('mqtt_handler_start(&current_config.mqtt)')
+})
+
+test('notification event selection stays consistent across firmware, API and WebUI', async () => {
+  const monitoringHeader = await readFile('../include/monitoring.h', 'utf8')
+  const eventsHeader = await readFile('../include/events.h', 'utf8')
+  const eventsSource = await readFile('../main/events.cpp', 'utf8')
+  const configSource = await readFile('../main/monitoring_config.cpp', 'utf8')
+  const apiSource = await readFile('../main/monitoring_api.cpp', 'utf8')
+  const componentSource = await readFile('src/monitoring.vue', 'utf8')
+
+  // Every NOTIFY_EVENT_* bit the firmware defines must be mapped by
+  // events_mask_bit() and offered by the WebUI. A bit defined but unmapped
+  // would be permanently unfilterable; a bit mapped but not offered would be
+  // impossible to switch off.
+  const firmwareBits = [...monitoringHeader.matchAll(/#define (NOTIFY_EVENT_[A-Z0-9_]+)\s+\(1u << (\d+)\)/g)]
+    .map(match => ({ name: match[1], shift: Number(match[2]) }))
+  expect(firmwareBits.length).toBeGreaterThan(0)
+
+  for (const bit of firmwareBits) {
+    expect(eventsSource).toContain(`return ${bit.name};`)
+    expect(componentSource).toContain(`{ bit: 1 << ${bit.shift},`)
+  }
+
+  const uiBits = [...componentSource.matchAll(/\{ bit: 1 << (\d+),/g)].map(match => Number(match[1]))
+  expect(uiBits.sort((a, b) => a - b))
+    .toEqual(firmwareBits.map(bit => bit.shift).sort((a, b) => a - b))
+
+  // NOTIFY_EVENT_ALL must actually cover every defined bit, since it is both
+  // the factory default and the value an upgrading device keeps.
+  const allMatch = monitoringHeader.match(/#define NOTIFY_EVENT_ALL\s+\(\(uint16_t\)0x([0-9A-Fa-f]+)u\)/)
+  expect(allMatch).not.toBeNull()
+  const expectedAll = firmwareBits.reduce((mask, bit) => mask | (1 << bit.shift), 0)
+  expect(parseInt(allMatch[1], 16)).toBe(expectedAll)
+
+  // The test notification must stay unfilterable, otherwise the diagnostic
+  // button silently does nothing once a user deselects everything.
+  expect(eventsHeader).toContain('EVENT_TEST')
+  expect(eventsSource).toMatch(/default:\s*return 0;/)
+
+  // Defaults and migration: a fresh config selects everything, and the NVS
+  // loader must allow a stored zero so "notify nothing" survives a reboot.
+  expect(configSource).toContain('config->notify.event_mask = NOTIFY_EVENT_ALL')
+  expect(configSource).toContain('config->notify.event_mask &= NOTIFY_EVENT_ALL')
+
+  // The API both reports the selection and advertises what the firmware
+  // supports, so a newer WebUI does not offer events the device cannot emit.
+  expect(apiSource).toContain('cJSON_AddNumberToObject(notify, "eventMask"')
+  expect(apiSource).toContain('cJSON_AddNumberToObject(notify, "eventMaskSupported", NOTIFY_EVENT_ALL)')
+  expect(apiSource).toContain('Invalid notification event mask')
+})
+
+test('CCU connection changes and low heap are emitted as notifiable events', async () => {
+  const listenerSource = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+  const monitoringSource = await readFile('../main/monitoring.cpp', 'utf8')
+
+  // Both connect paths report the same event; both disconnect paths report
+  // the same event with distinguishing detail. An explicit CCU disconnect and
+  // a silent keep-alive timeout are very different failures and the
+  // notification has to say which one happened.
+  expect(listenerSource.match(/events_emit\(EVENT_CCU_CONNECTED/g)).toHaveLength(2)
+  expect(listenerSource.match(/events_emit\(EVENT_CCU_DISCONNECTED/g)).toHaveLength(2)
+  expect(listenerSource).toContain('CCU sent an explicit disconnect')
+  expect(listenerSource).toContain('no keep-alive from the CCU for 10 seconds')
+
+  // The low-heap warning has to leave the device before the watchdog reboots
+  // it, so it is emitted on the first hit of the streak and not next to
+  // esp_restart().
+  expect(monitoringSource).toContain('events_emit(EVENT_LOW_HEAP')
+  const watchdog = monitoringSource.slice(
+    monitoringSource.indexOf('static void heap_watchdog_task'),
+    monitoringSource.indexOf('static void schedule_mqtt_retry();')
+  )
+  expect(watchdog.indexOf('events_emit(EVENT_LOW_HEAP'))
+    .toBeLessThan(watchdog.indexOf('esp_restart()'))
+  expect(watchdog).toContain('if (low_heap_streak == 1)')
+})
+
+test('CCU relay latency is measured in the receive path and reported to MQTT', async () => {
+  const listenerSource = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+  const udpHelper = await readFile('../include/udphelper.h', 'utf8')
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+  const metricsSource = await readFile('../main/metrics.cpp', 'utf8')
+
+  // The timestamp has to be taken in the lwIP callback, not in the handler
+  // task — taking it after dequeue would measure nothing at all, since the
+  // whole point is the gap between those two moments.
+  expect(udpHelper).toContain('uint32_t enqueued_us')
+  const receiveCallback = listenerSource.slice(
+    listenerSource.indexOf('bool RawUartUdpListener::_udpReceivePacket'),
+    listenerSource.indexOf('Index 0 - Type:')
+  )
+  expect(receiveCallback).toContain('event.enqueued_us = (uint32_t)esp_timer_get_time()')
+
+  // Unsigned subtraction, so the 32-bit microsecond wraparound is not a
+  // special case. A signed or widened subtraction here would report absurd
+  // latencies roughly every 71 minutes.
+  expect(listenerSource).toContain('(uint32_t)esp_timer_get_time() - event.enqueued_us')
+  expect(listenerSource).toContain('g_queue_wait_max.record(waited_us)')
+  expect(listenerSource).toContain('g_queue_depth_max.record')
+
+  // Disjoint buckets: an else-if chain, so one slow datagram counts once.
+  expect(listenerSource).toMatch(
+    /if \(waited_us > 1000000u\) \{[\s\S]*?\} else if \(waited_us > 100000u\) \{[\s\S]*?\} else if \(waited_us > 10000u\) \{/
+  )
+
+  // The gauge must be a genuine high-water mark, not a last-value store.
+  expect(metricsSource).toContain('compare_exchange_weak')
+  expect(metricsSource).toContain('while (value > observed)')
+  expect(metricsSource).toContain('# TYPE %s gauge')
+
+  // Reported to MQTT as well as Prometheus: the users hitting this are
+  // watching Home Assistant, not scraping /metrics.
+  expect(mqttSource).toContain('status/ccu_queue_wait_max_ms')
+  expect(mqttSource).toContain('status/ccu_queue_depth_max')
+  expect(mqttSource).toContain('status/ccu_delayed_frames')
+  expect(mqttSource).toContain('status/ccu_dropped_frames')
+  expect(mqttSource).toContain('publish_config("sensor", "ccu_queue_wait_max_ms"')
+})
+
+test('stack and NVS diagnostics report the whole picture, not a truncated prefix', async () => {
+  const sysinfoSource = await readFile('../main/sysinfo.cpp', 'utf8')
+  const webuiSource = await readFile('../main/webui.cpp', 'utf8')
+  const prometheusSource = await readFile('../main/prometheus.cpp', 'utf8')
+  const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
+
+  const stackInfo = sysinfoSource.slice(
+    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()'),
+    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()') + 3000
+  )
+
+  // uxTaskGetSystemState returns 0 rather than a partial list when the array
+  // is too small, so a fixed bound turns the whole diagnostic into
+  // "no-tasks" once enough services are enabled to exceed it.
+  expect(stackInfo).toContain('uxTaskGetNumberOfTasks()')
+  expect(stackInfo).not.toContain('const size_t MAX_TASKS = 32')
+
+  // Same API, same trap in the CPU-usage sampler: a zero count there does not
+  // read as an error, it silently reports a fabricated 100% CPU forever.
+  expect(sysinfoSource).not.toContain('static const UBaseType_t MAX_TASKS = 32')
+  const cpuTask = sysinfoSource.slice(
+    sysinfoSource.indexOf('void updateCPUUsageTask'),
+    sysinfoSource.indexOf('uint32_t get_voltage(')
+  )
+  expect(cpuTask).toContain('if (taskCount == 0)')
+  expect(cpuTask).toContain('continue;')
+
+  // The list is sorted danger-first, so a fixed output buffer drops exactly
+  // the over-provisioned tasks — the ones worth reclaiming stack from.
+  expect(stackInfo).toContain('CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 8')
+  expect(stackInfo).not.toContain('char out[512]')
+
+  // Same defect one layer up: /sysinfo.json escaped the string into a fixed
+  // 640-byte buffer.
+  expect(webuiSource).not.toContain('char stack_buf[640]')
+  expect(webuiSource).toContain('stacks.size() * 2')
+  expect(webuiSource).toContain('taskStacks\\":\\"alloc-failed')
+
+  // NVS occupancy is exported: exhausting the 16 KiB partition presents as
+  // settings that will not save, with no obvious error.
+  expect(prometheusSource).toContain('hbrfeth_nvs_entries')
+  expect(prometheusSource).toContain('nvs_get_stats(NULL, &nvs)')
+  expect(mqttSource).toContain('status/nvs_usage')
+  expect(mqttSource).toContain('publish_config("sensor", "nvs_usage"')
 })
 
 test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', async () => {
@@ -684,7 +889,10 @@ test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', a
 
   expect(source).not.toContain('#include <vector>')
   expect(source).not.toContain('malloc(sizeof(udp_event_t))')
-  expect(source).toContain('xQueueCreate(64, sizeof(udp_event_t))')
+  // 32 slots, not 64: the descriptor lives in the queue itself, and the
+  // deeper reserve cost ~1 KB of heap for no observed benefit on a single
+  // CCU-3 session (see "harden firmware for 2.2.6-Beta.4").
+  expect(source).toContain('xQueueCreate(32, sizeof(udp_event_t))')
   expect(source).toContain('unsigned char small_data[256]')
   expect(source).toContain('if (length > sizeof(small_data))')
   expect(source).toContain('if (!heap_data.value)')

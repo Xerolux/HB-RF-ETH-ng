@@ -571,7 +571,13 @@ export const useMonitoringStore = defineStore('monitoring', {
       smtpPasswordSet: false,
       smtpFrom: '',
       smtpTo: '',
-      cooldownSeconds: 300
+      cooldownSeconds: 300,
+      // Bitmask of NOTIFY_EVENT_* (see include/monitoring.h). Default to
+      // everything so a firmware that predates the field keeps behaving as
+      // it did. `eventMaskSupported` tells the UI which bits this firmware
+      // actually knows, so the checkbox list follows the device.
+      eventMask: 0x07FF,
+      eventMaskSupported: 0x07FF
     },
     diagnostics: {
       checkmk: null,
@@ -616,6 +622,19 @@ export const useMonitoringStore = defineStore('monitoring', {
           this.syslog.minSeverity = 6
         }
         if (![0, 1, 2].includes(Number(this.notify.smtpTls))) this.notify.smtpTls = 1
+
+        // Firmware without the event selection reports neither field. Treat
+        // that as "everything supported and selected" rather than rendering
+        // an empty list or, worse, saving a zero mask back and silencing all
+        // notifications on a device that never had the feature.
+        const mask = Number(this.notify.eventMask)
+        const supported = Number(this.notify.eventMaskSupported)
+        this.notify.eventMaskSupported =
+          Number.isInteger(supported) && supported > 0 ? supported : 0x07FF
+        this.notify.eventMask =
+          Number.isInteger(mask) && mask >= 0
+            ? mask & this.notify.eventMaskSupported
+            : this.notify.eventMaskSupported
       } catch (error) {
         console.error('Failed to load monitoring config:', error.response?.status || error.message)
         throw error

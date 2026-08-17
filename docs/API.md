@@ -385,6 +385,8 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
     "enabled": false,
     "channels": 0,
     "cooldownSeconds": 300,
+    "eventMask": 2047,
+    "eventMaskSupported": 2047,
     "webhookUrl": "",
     "webhookSecretSet": false,
     "telegramTokenSet": false,
@@ -441,6 +443,24 @@ Retrieve monitoring configuration for MQTT, CheckMK, Prometheus, Syslog forwardi
 - `enabled`: Master switch for the notification subsystem
 - `channels`: Bitmask of active channels (`1` = webhook, `2` = Telegram, `4` = email)
 - `cooldownSeconds`: Per-event-type dedupe window; only one notification per event type is sent within this window
+- `eventMask`: Bitmask selecting which events trigger a notification. Writable. A value of `0` means "notify about nothing"; the test notification is delivered regardless of this mask. Values with bits outside `eventMaskSupported` are rejected with `400`.
+- `eventMaskSupported`: Read-only. Bitmask of every event this firmware can emit — use it to render the selection instead of hardcoding the list. Sending it back is rejected.
+
+  | Bit | Value | Event |
+  |-----|-------|-------|
+  | 0 | 1 | Ethernet link lost |
+  | 1 | 2 | Ethernet link restored |
+  | 2 | 4 | Radio module stopped responding |
+  | 3 | 8 | Radio module detected |
+  | 4 | 16 | MQTT connection lost |
+  | 5 | 32 | MQTT connection restored |
+  | 6 | 64 | Factory reset triggered |
+  | 7 | 128 | Restart triggered |
+  | 8 | 256 | CCU connected |
+  | 9 | 512 | CCU disconnected (explicit disconnect or keep-alive timeout — the detail text distinguishes them) |
+  | 10 | 1024 | Free heap dropped below the watchdog threshold |
+
+  A device upgrading from a firmware without this field keeps receiving every event: the stored configuration has no `eventMask` key, so the factory default (all bits set) stays in effect.
 - `webhookUrl` / `webhookSecret` (`webhookSecretSet`): HTTP POST target and shared secret (sent as `X-HB-RF-ETH-Secret` header). Secret write-only.
 - `telegramToken` (`telegramTokenSet`) / `telegramChatId`: Telegram bot token and target chat ID. Token write-only.
 - `smtpServer` / `smtpPort` / `smtpTls` (`0` = none, `1` = STARTTLS, `2` = implicit TLS) / `smtpUser` / `smtpPassword` (`smtpPasswordSet`) / `smtpFrom` / `smtpTo`: SMTP relay configuration. Password write-only. Note: an SMTP send holds the net-fetch mutex for the duration of the SMTP session; an active manual firmware upload defers event delivery until the upload completes.
@@ -800,6 +820,39 @@ Exposed metrics (non-exhaustive):
   `hbrfeth_udp_keepalive_total`, `hbrfeth_udp_drop_total` (counter)
 - `hbrfeth_notify_sent_total`, `hbrfeth_notify_failed_total`,
   `hbrfeth_notify_suppressed_total` (counter)
+- `hbrfeth_udp_queue_wait_max_us` (gauge) — longest time a received CCU
+  datagram waited between the lwIP receive callback and the handler task
+  being scheduled. High-water mark since boot.
+- `hbrfeth_udp_queue_depth_max` (gauge) — highest observed occupancy of the
+  32-slot receive queue.
+- `hbrfeth_udp_queue_wait_over_10ms_total`,
+  `hbrfeth_udp_queue_wait_over_100ms_total`,
+  `hbrfeth_udp_queue_wait_over_1s_total` (counter) — disjoint buckets, so one
+  slow datagram is counted exactly once. Use these to tell a single outlier
+  apart from sustained stalling.
+- `hbrfeth_nvs_entries{state="used|free|available|total"}` (gauge) and
+  `hbrfeth_nvs_namespaces` (gauge) — occupancy of the 16 KiB NVS partition,
+  which holds the device settings together with MQTT credentials, TLS key
+  material, theme state and the WebUI record. Exhausting it does not announce
+  itself; writes simply start failing, which users experience as settings
+  that will not save or that vanish after an update. Also published to MQTT
+  as `status/nvs_used_entries`, `status/nvs_free_entries` and
+  `status/nvs_usage` (percent, announced as a Home Assistant diagnostic
+  entity).
+
+### Diagnosing delayed switching commands
+
+If commands to the CCU execute late, these metrics separate the two possible
+causes. A rising `hbrfeth_udp_queue_wait_max_us` together with a non-zero
+`hbrfeth_udp_queue_wait_over_1s_total` means the datagram reached the device
+promptly but waited for the handler task — the delay is on the device. If
+both stay near zero while the delay is still observed, the device forwarded
+everything without hesitation and the delay is upstream of it.
+
+The same four figures are published to MQTT as
+`status/ccu_queue_wait_max_ms`, `status/ccu_queue_depth_max`,
+`status/ccu_delayed_frames` and `status/ccu_dropped_frames`, and announced as
+Home Assistant diagnostic entities, so no Prometheus scrape is required.
 
 ## Rate Limiting
 

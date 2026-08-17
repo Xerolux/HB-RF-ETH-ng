@@ -102,9 +102,6 @@ jobs:
       - name: Prepare standalone WebUI assets
         run: python3 rename_webui_files.py
 
-      - name: Regenerate embedded archive for build verification
-        run: python3 scripts/update_archive.py
-
       - name: Setup ESP-IDF v6.1-beta1
         run: |
           python -m pip install --upgrade pip

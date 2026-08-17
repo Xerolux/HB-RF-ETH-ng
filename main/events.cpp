@@ -274,6 +274,10 @@ static const EventMeta &meta_for(Event e)
     static const EventMeta m_mqtt_recon   = { "mqtt_reconnected",   "MQTT broker connection re-established" };
     static const EventMeta m_factory      = { "factory_reset",      "Factory reset initiated" };
     static const EventMeta m_restart      = { "restart",            "Device restart initiated" };
+    static const EventMeta m_ccu_conn = {"ccu_connected", "CCU connected to the radio interface"};
+    static const EventMeta m_ccu_disc = {"ccu_disconnected",
+                                         "CCU disconnected from the radio interface"};
+    static const EventMeta m_low_heap = {"low_heap", "Free heap dropped below the safe threshold"};
     static const EventMeta m_test         = { "test",               "Test notification from HB-RF-ETH-ng" };
     static const EventMeta m_unknown      = { "unknown",            "Unknown event" };
 
@@ -286,8 +290,47 @@ static const EventMeta &meta_for(Event e)
         case EVENT_MQTT_RECONNECTED:   return m_mqtt_recon;
         case EVENT_FACTORY_RESET:      return m_factory;
         case EVENT_RESTART:            return m_restart;
+        case EVENT_CCU_CONNECTED:
+            return m_ccu_conn;
+        case EVENT_CCU_DISCONNECTED:
+            return m_ccu_disc;
+        case EVENT_LOW_HEAP:
+            return m_low_heap;
         case EVENT_TEST:               return m_test;
         default:                       return m_unknown;
+    }
+}
+
+uint16_t events_mask_bit(Event e)
+{
+    switch (e) {
+        case EVENT_ETH_LINK_DOWN:
+            return NOTIFY_EVENT_ETH_LINK_DOWN;
+        case EVENT_ETH_LINK_UP:
+            return NOTIFY_EVENT_ETH_LINK_UP;
+        case EVENT_RF_MODULE_LOST:
+            return NOTIFY_EVENT_RF_MODULE_LOST;
+        case EVENT_RF_MODULE_DETECTED:
+            return NOTIFY_EVENT_RF_MODULE_DETECT;
+        case EVENT_MQTT_DISCONNECTED:
+            return NOTIFY_EVENT_MQTT_DISCONNECTED;
+        case EVENT_MQTT_RECONNECTED:
+            return NOTIFY_EVENT_MQTT_RECONNECTED;
+        case EVENT_FACTORY_RESET:
+            return NOTIFY_EVENT_FACTORY_RESET;
+        case EVENT_RESTART:
+            return NOTIFY_EVENT_RESTART;
+        case EVENT_CCU_CONNECTED:
+            return NOTIFY_EVENT_CCU_CONNECTED;
+        case EVENT_CCU_DISCONNECTED:
+            return NOTIFY_EVENT_CCU_DISCONNECTED;
+        case EVENT_LOW_HEAP:
+            return NOTIFY_EVENT_LOW_HEAP;
+        // EVENT_TEST and anything unknown are not filterable. Returning 0
+        // makes the worker deliver them unconditionally, which is what the
+        // diagnostic button depends on.
+        default:
+            return 0;
     }
 }
 
@@ -777,6 +820,15 @@ static void events_task(void *)
             xSemaphoreTake(lifecycle, portMAX_DELAY);
             memcpy(&config, &s_cfg, sizeof(config));
             xSemaphoreGive(lifecycle);
+
+            // Honour the user's event selection before the cooldown check, so
+            // a deselected event never consumes the debounce slot of an event
+            // the user does want to see.
+            const uint16_t mask_bit = events_mask_bit(e.id);
+            if (mask_bit != 0 && (config.event_mask & mask_bit) == 0) {
+                g_suppressed_total.inc();
+                continue;
+            }
 
             if ((int)e.id < MAX_EVENT_ID) {
                 int64_t now = esp_timer_get_time();

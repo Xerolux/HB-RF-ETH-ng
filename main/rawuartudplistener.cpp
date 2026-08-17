@@ -28,6 +28,8 @@
 #include <string.h>
 #include "udphelper.h"
 #include "metrics.h"
+#include "events.h"
+#include "esp_timer.h"
 
 static const char *TAG = "RawUartUdpListener";
 
@@ -46,8 +48,51 @@ static MetricsCounter g_keepalives("hbrfeth_udp_keepalive_total",
 static MetricsCounter g_rx_drops("hbrfeth_udp_drop_total",
                                  "Received UDP frames dropped (queue full / parse error)");
 
+// Latency instrumentation for the CCU relay path.
+//
+// Users report switching commands executing 20-30 seconds late after hours of
+// normal operation (issue #411), and the long-uptime reports in #362 look
+// related. Nothing in the firmware could previously distinguish "the CCU sent
+// it late" from "the datagram sat in our queue because the handler task was
+// not scheduled", so the first step is to make that measurable rather than
+// argued about. All of these are cheap: two timer reads and a compare-exchange
+// per datagram, on a path that already does a CRC over the payload.
+static MetricsHighWater g_queue_wait_max(
+    "hbrfeth_udp_queue_wait_max_us",
+    "Longest time a received UDP datagram waited for the handler task, microseconds");
+static MetricsHighWater g_queue_depth_max("hbrfeth_udp_queue_depth_max",
+                                          "Highest observed UDP receive queue occupancy");
+// Bucketed so a single outlier can be told apart from sustained stalling.
+// Cumulative in the Prometheus sense would need label support the registry
+// does not have, so these are plain disjoint-threshold counters.
+static MetricsCounter
+    g_wait_over_10ms("hbrfeth_udp_queue_wait_over_10ms_total",
+                     "Datagrams that waited more than 10 ms for the handler task");
+static MetricsCounter
+    g_wait_over_100ms("hbrfeth_udp_queue_wait_over_100ms_total",
+                      "Datagrams that waited more than 100 ms for the handler task");
+static MetricsCounter g_wait_over_1s("hbrfeth_udp_queue_wait_over_1s_total",
+                                     "Datagrams that waited more than 1 s for the handler task");
+
 static_assert(std::atomic<uint32_t>::is_always_lock_free,
               "Raw-UART sender lifetime guard must be native 32-bit");
+
+void raw_uart_get_latency(raw_uart_latency_t *out)
+{
+    if (!out) return;
+    out->queue_wait_max_us = g_queue_wait_max.get();
+    out->queue_depth_max   = g_queue_depth_max.get();
+    out->wait_over_10ms    = g_wait_over_10ms.get();
+    out->wait_over_100ms   = g_wait_over_100ms.get();
+    out->wait_over_1s      = g_wait_over_1s.get();
+    out->drops             = g_rx_drops.get();
+}
+
+void raw_uart_reset_latency_high_water(void)
+{
+    g_queue_wait_max.reset();
+    g_queue_depth_max.reset();
+}
 
 void _raw_uart_udpQueueHandlerTask(void *parameter)
 {
@@ -163,6 +208,12 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             _radioModuleConnector->setLED(true, true, false);
 
             ESP_LOGI(TAG, "CCU 3 connected from %s:%u", ip4addr_ntoa(&addr), port);
+            {
+                char detail[64];
+                snprintf(detail, sizeof(detail), "CCU connected from %s:%u", ip4addr_ntoa(&addr),
+                         port);
+                events_emit(EVENT_CCU_CONNECTED, detail);
+            }
 
             response_buffer[0] = 1;
             response_buffer[1] = data[1];
@@ -194,6 +245,12 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             _radioModuleConnector->setLED(true, true, false);
 
             ESP_LOGI(TAG, "CCU 3 reconnected from %s:%u", ip4addr_ntoa(&addr), port);
+            {
+                char detail[64];
+                snprintf(detail, sizeof(detail), "CCU reconnected from %s:%u", ip4addr_ntoa(&addr),
+                         port);
+                events_emit(EVENT_CCU_CONNECTED, detail);
+            }
 
             response_buffer[0] = 2;
             response_buffer[1] = data[1];
@@ -208,6 +265,7 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
 
     case 1: // disconnect
         ESP_LOGI(TAG, "CCU 3 disconnected");
+        events_emit(EVENT_CCU_DISCONNECTED, "CCU sent an explicit disconnect");
         atomic_store(&_connectionStarted, false);
         atomic_store(&_remotePort, (ushort)0);
         atomic_store(&_remoteAddress, 0u);
@@ -516,6 +574,23 @@ void RawUartUdpListener::_udpQueueHandler()
         {
             if (event.pb) {
                 const TickType_t received_at = xTaskGetTickCount();
+
+                // How long this datagram sat between the lwIP callback and
+                // this task getting scheduled. Unsigned subtraction, so the
+                // 32-bit microsecond wraparound needs no special case.
+                const uint32_t waited_us = (uint32_t)esp_timer_get_time() - event.enqueued_us;
+                g_queue_wait_max.record(waited_us);
+                if (waited_us > 1000000u) {
+                    g_wait_over_1s.inc();
+                } else if (waited_us > 100000u) {
+                    g_wait_over_100ms.inc();
+                } else if (waited_us > 10000u) {
+                    g_wait_over_10ms.inc();
+                }
+                // Recorded after the receive, so it is the backlog left
+                // behind rather than the depth this datagram saw.
+                g_queue_depth_max.record((uint32_t)uxQueueMessagesWaiting(queue));
+
                 if (!_stopRequested.load(std::memory_order_acquire) &&
                     handlePacket(event.pb, event.addr, event.port)) {
                     last_received_keep_alive = received_at;
@@ -534,6 +609,11 @@ void RawUartUdpListener::_udpQueueHandler()
                 connection_timeout)
             { // 10 sec
                 ESP_LOGW(TAG, "CCU 3 connection timed out (no keep-alive for 10 seconds)");
+                // Deliberately distinct from the explicit disconnect above:
+                // a silent timeout is the symptom users report as "switching
+                // commands stopped working", and the two are not the same
+                // failure at all.
+                events_emit(EVENT_CCU_DISCONNECTED, "no keep-alive from the CCU for 10 seconds");
                 atomic_store(&_connectionStarted, false);
                 atomic_store(&_remotePort, (ushort)0);
                 atomic_store(&_remoteAddress, 0u);
@@ -604,6 +684,7 @@ bool RawUartUdpListener::_udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint
     // instead of reading raw pbuf header memory (which is unsafe and fragile).
     event.addr.addr = addr->u_addr.ip4.addr;
     event.port = port;
+    event.enqueued_us = (uint32_t)esp_timer_get_time();
 
     if (xQueueSend(queue, &event, 0) != pdPASS)
     {

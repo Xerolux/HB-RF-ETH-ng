@@ -27,7 +27,7 @@ export async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text)
       return true
-    } catch (e) {
+    } catch {
       // Permission denied, clipboard busy, or transient failure — fall through.
     }
   }
@@ -57,7 +57,10 @@ export async function copyToClipboard(text) {
     selection.addRange(range)
     ok = document.execCommand('copy')
   } catch {
-    ok = false
+    // `ok` is still false here: nothing runs after the execCommand result is
+    // assigned, so a throw can only have happened while it was still false.
+    // The finally block below still restores the selection and removes the
+    // scratch node.
   } finally {
     if (selection) {
       selection.removeAllRanges()

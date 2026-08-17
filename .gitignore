@@ -35,6 +35,8 @@ __pycache__/
 
 # Logs
 *.log
+# CI job transcripts occasionally get saved into the repo root by accident.
+action_log.txt
 
 # OS specific
 .DS_Store

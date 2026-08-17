@@ -232,6 +232,11 @@ esp_err_t get_monitoring_handler_func(httpd_req_t *req)
     cJSON_AddStringToObject(notify, "smtpTo", config.notify.smtp_to);
     cJSON_AddBoolToObject(notify, "smtpPasswordSet", strlen(config.notify.smtp_password) > 0);
     cJSON_AddNumberToObject(notify, "cooldownSeconds", config.notify.cooldown_seconds);
+    cJSON_AddNumberToObject(notify, "eventMask", config.notify.event_mask);
+    // Advertise what this firmware can actually notify about, so the WebUI
+    // renders exactly the supported checkboxes instead of hardcoding a list
+    // that drifts out of sync with the firmware it is talking to.
+    cJSON_AddNumberToObject(notify, "eventMaskSupported", NOTIFY_EVENT_ALL);
     cJSON_AddItemToObject(root, "notify", notify);
 
     char *json_string = cJSON_Print(root);
@@ -735,6 +740,18 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         }
         cJSON *ncd = cJSON_GetObjectItem(notify, "cooldownSeconds");
         if (ncd && cJSON_IsNumber(ncd)) config.notify.cooldown_seconds = ncd->valueint;
+        cJSON *nev = cJSON_GetObjectItem(notify, "eventMask");
+        if (nev && cJSON_IsNumber(nev)) {
+            // Reject out-of-range values outright rather than silently
+            // truncating: a client sending an unknown bit is working from a
+            // different contract, and quietly dropping half its request would
+            // leave it convinced a setting was applied.
+            if (nev->valuedouble < 0 || nev->valuedouble > NOTIFY_EVENT_ALL) {
+                cJSON_Delete(root);
+                return send_json_error(req, "Invalid notification event mask");
+            }
+            config.notify.event_mask = (uint16_t)nev->valueint;
+        }
     }
 
     cJSON_Delete(root);

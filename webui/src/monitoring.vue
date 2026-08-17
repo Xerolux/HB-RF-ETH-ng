@@ -438,6 +438,36 @@
               <div class="form-text">{{ t('monitoring.notify.cooldownHelp') }}</div>
             </div>
 
+            <div class="col-12 mt-3">
+              <h4>{{ t('monitoring.notify.eventsSection') }}</h4>
+              <div class="form-text mb-2">{{ t('monitoring.notify.eventsHelp') }}</div>
+              <div class="d-flex gap-2 mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        @click="setAllNotifyEvents(true)">
+                  {{ t('monitoring.notify.eventsSelectAll') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        @click="setAllNotifyEvents(false)">
+                  {{ t('monitoring.notify.eventsSelectNone') }}
+                </button>
+              </div>
+              <div class="row">
+                <div v-for="event in availableNotifyEvents" :key="event.bit" class="col-md-6">
+                  <div class="form-check">
+                    <input :id="'notify-event-' + event.bit" class="form-check-input" type="checkbox"
+                           :checked="!!(notifyConfig.eventMask & event.bit)"
+                           @change="toggleNotifyEvent(event.bit, $event.target.checked)">
+                    <label class="form-check-label" :for="'notify-event-' + event.bit">
+                      {{ t(event.label) }}
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div v-if="notifyConfig.eventMask === 0" class="form-text text-warning mt-1">
+                {{ t('monitoring.notify.eventsNoneWarning') }}
+              </div>
+            </div>
+
             <div v-if="notifyConfig.channels & 1" class="col-12 mt-3">
               <h4>{{ t('monitoring.notify.webhookSection') }}</h4>
               <label class="form-label">{{ t('monitoring.notify.webhookUrl') }}</label>
@@ -561,6 +591,38 @@ let mounted = true
 
 const tlsClearFlags = ref({ tlsCaCertsClear: false, tlsCertfileClear: false, tlsKeyfileClear: false, commandTokenClear: false,
                             webhookSecretClear: false, telegramTokenClear: false, smtpPasswordClear: false })
+
+// Mirrors the NOTIFY_EVENT_* bits in include/monitoring.h. The firmware
+// reports which of them it supports via notify.eventMaskSupported, so a WebUI
+// newer than the device it is talking to hides events that device cannot
+// emit instead of offering a checkbox that would never fire.
+const NOTIFY_EVENTS = [
+  { bit: 1 << 0,  label: 'monitoring.notify.eventEthLinkDown' },
+  { bit: 1 << 1,  label: 'monitoring.notify.eventEthLinkUp' },
+  { bit: 1 << 2,  label: 'monitoring.notify.eventRfModuleLost' },
+  { bit: 1 << 3,  label: 'monitoring.notify.eventRfModuleDetected' },
+  { bit: 1 << 4,  label: 'monitoring.notify.eventMqttDisconnected' },
+  { bit: 1 << 5,  label: 'monitoring.notify.eventMqttReconnected' },
+  { bit: 1 << 6,  label: 'monitoring.notify.eventFactoryReset' },
+  { bit: 1 << 7,  label: 'monitoring.notify.eventRestart' },
+  { bit: 1 << 8,  label: 'monitoring.notify.eventCcuConnected' },
+  { bit: 1 << 9,  label: 'monitoring.notify.eventCcuDisconnected' },
+  { bit: 1 << 10, label: 'monitoring.notify.eventLowHeap' }
+]
+
+const availableNotifyEvents = computed(() =>
+  NOTIFY_EVENTS.filter(event => (notifyConfig.value.eventMaskSupported & event.bit) !== 0)
+)
+
+function toggleNotifyEvent(bit, checked) {
+  notifyConfig.value.eventMask = checked
+    ? (notifyConfig.value.eventMask | bit)
+    : (notifyConfig.value.eventMask & ~bit)
+}
+
+function setAllNotifyEvents(selected) {
+  notifyConfig.value.eventMask = selected ? notifyConfig.value.eventMaskSupported : 0
+}
 const pemFeedback = ref({ tlsCaCerts: null, tlsCertfile: null, tlsKeyfile: null })
 
 const MAX_PEM_BYTES = 8 * 1024
@@ -573,7 +635,7 @@ const ALLOWED_LABELS = {
 
 function normalizePem(raw) {
   let s = String(raw)
-  s = s.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  s = s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   s = s.split('\n').map(l => l.replace(/[\t ]+$/g, '')).join('\n').trim()
   return s.length > 0 ? s + '\n' : s
 }
@@ -807,7 +869,13 @@ const saveConfig = async () => {
 
     // Strip the read-only *Set sentinels from the notify payload — the
     // backend reports them as booleans but does not accept them on write.
-    const { webhookSecretSet, telegramTokenSet, smtpPasswordSet, ...notifyPayload } = notifyConfig.value
+    const {
+      webhookSecretSet, telegramTokenSet, smtpPasswordSet,
+      // Read-only capability advertisement from the firmware — sending it
+      // back would be meaningless and the backend does not accept it.
+      eventMaskSupported,
+      ...notifyPayload
+    } = notifyConfig.value
     notifyPayload.webhookSecretClear  = tlsClearFlags.value.webhookSecretClear
     notifyPayload.telegramTokenClear  = tlsClearFlags.value.telegramTokenClear
     notifyPayload.smtpPasswordClear   = tlsClearFlags.value.smtpPasswordClear

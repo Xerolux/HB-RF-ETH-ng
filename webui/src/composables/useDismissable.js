@@ -14,7 +14,7 @@
  *
  * The ref must wrap the toggle + its dropdown so clicks inside don't dismiss.
  */
-import { watch, onUnmounted } from 'vue'
+import { onUnmounted } from 'vue'
 
 export function useDismissable(targetRef, dismiss) {
   let active = false

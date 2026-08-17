@@ -184,6 +184,7 @@ enum OtaPausedService : uint32_t {
 #define NVS_NOTIFY_SMTPFROM "notify_smtp_f"
 #define NVS_NOTIFY_SMTPTO   "notify_smtp_to"
 #define NVS_NOTIFY_COOLDOWN "notify_cd"
+#define NVS_NOTIFY_EVENTS   "notify_ev"
 
 // Global pointers
 static SysInfo* g_sysInfo = NULL;
@@ -670,6 +671,7 @@ static const ConfigFieldDesc CONFIG_FIELDS[] = {
     CFG_STR(notify.smtp_from, NVS_NOTIFY_SMTPFROM),
     CFG_STR(notify.smtp_to, NVS_NOTIFY_SMTPTO),
     CFG_U16(notify.cooldown_seconds, NVS_NOTIFY_COOLDOWN),
+    CFG_U16(notify.event_mask, NVS_NOTIFY_EVENTS),
 };
 
 #undef CFG_OFF
@@ -1205,6 +1207,12 @@ static esp_err_t load_integrity_sensitive_config(
                    load_optional_integrity_u16(
                        handle, NVS_NOTIFY_COOLDOWN,
                        &config->notify.cooldown_seconds, true));
+    // zero_allowed: an explicit "notify nothing" selection is legitimate.
+    // A missing key leaves the caller's default (NOTIFY_EVENT_ALL) in place,
+    // which is how an upgrade from a build without the mask keeps working.
+    LOAD_INTEGRITY(
+        NVS_NOTIFY_EVENTS,
+        load_optional_integrity_u16(handle, NVS_NOTIFY_EVENTS, &config->notify.event_mask, true));
 
 #undef LOAD_INTEGRITY
     return ESP_OK;
@@ -1306,6 +1314,20 @@ static void heap_watchdog_task(void *pvParameters)
             low_heap_streak++;
             ESP_LOGW(TAG, "Low heap: %u bytes free (streak %d/%d)",
                      (unsigned)free_heap, low_heap_streak, HEAP_WATCHDOG_CONSECUTIVE_HITS);
+
+            // Notify on the first hit of a streak, not on the restart itself:
+            // once the streak completes the device reboots and any in-flight
+            // TLS send dies with it. Emitting early gives the notification a
+            // chance to leave the device while it still can. Repeats are
+            // debounced by the per-event cooldown.
+            if (low_heap_streak == 1) {
+                char detail[96];
+                snprintf(detail, sizeof(detail), "free=%u largest=%u threshold=%u",
+                         (unsigned)free_heap,
+                         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT),
+                         (unsigned)HEAP_WATCHDOG_CRITICAL_BYTES);
+                events_emit(EVENT_LOW_HEAP, detail);
+            }
 
             if (low_heap_streak >= HEAP_WATCHDOG_CONSECUTIVE_HITS)
             {

@@ -32,6 +32,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -143,6 +145,27 @@ static size_t render_static(char *out, size_t cap)
     EMIT("# TYPE hbrfeth_heap_largest_free_block gauge\n");
     EMIT("hbrfeth_heap_largest_free_block %u\n",
          (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+
+    // NVS occupancy. The partition is 16 KiB and now holds MQTT credentials,
+    // TLS key material, theme state and the WebUI record alongside the device
+    // settings. Running it out does not announce itself — writes simply start
+    // failing — and "settings lost after an update" is a recurring report, so
+    // the fill level belongs in monitoring rather than only in the error path
+    // that already checks it before a config transaction.
+    {
+        nvs_stats_t nvs = {};
+        if (nvs_get_stats(NULL, &nvs) == ESP_OK) {
+            EMIT("# HELP hbrfeth_nvs_entries NVS entry accounting for the default partition\n");
+            EMIT("# TYPE hbrfeth_nvs_entries gauge\n");
+            EMIT("hbrfeth_nvs_entries{state=\"used\"} %u\n", (unsigned)nvs.used_entries);
+            EMIT("hbrfeth_nvs_entries{state=\"free\"} %u\n", (unsigned)nvs.free_entries);
+            EMIT("hbrfeth_nvs_entries{state=\"available\"} %u\n", (unsigned)nvs.available_entries);
+            EMIT("hbrfeth_nvs_entries{state=\"total\"} %u\n", (unsigned)nvs.total_entries);
+            EMIT("# HELP hbrfeth_nvs_namespaces Namespaces in the default NVS partition\n");
+            EMIT("# TYPE hbrfeth_nvs_namespaces gauge\n");
+            EMIT("hbrfeth_nvs_namespaces %u\n", (unsigned)nvs.namespace_count);
+        }
+    }
 
     SysInfo *si = monitoring_get_sysinfo();
     if (si) {

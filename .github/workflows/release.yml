@@ -179,9 +179,6 @@ jobs:
               output.write(f'MIN_FIRMWARE={minimum}\n')
           PY
 
-      - name: Regenerate embedded firmware archive
-        run: python3 scripts/update_archive.py
-
       - name: Setup ESP-IDF v6.1-beta1
         run: |
           python -m pip install --upgrade pip

@@ -240,7 +240,7 @@ const pollPasswordReset = async () => {
       resetError.value = t('login.passwordResetExpired')
       resetStep.value = 'idle'
     }
-  } catch (error) {
+  } catch {
     stopResetPolling()
     resetError.value = t('login.passwordResetError')
     resetStep.value = 'idle'
@@ -261,7 +261,7 @@ const startPasswordReset = async () => {
     resetToken.value = response.data?.token || ''
     resetCountdown.value = response.data?.expiresIn || 90
     resetPollTimer.value = setInterval(pollPasswordReset, 1000)
-  } catch (error) {
+  } catch {
     resetStep.value = 'idle'
     resetError.value = t('login.passwordResetError')
   } finally {
@@ -299,7 +299,7 @@ const completePasswordReset = async () => {
     } else {
       resetError.value = t('login.passwordResetError')
     }
-  } catch (error) {
+  } catch {
     resetError.value = t('login.passwordResetError')
   } finally {
     resetCompleteLoading.value = false

@@ -17,7 +17,7 @@ export function safeSetItem(storage, key, value) {
   try {
     storage.setItem(key, value)
     return true
-  } catch (e) {
+  } catch {
     // QuotaExceededError (Safari private mode), SecurityError (sandboxed),
     // or a genuine quota exhaustion — none of them should abort the caller.
     return false
@@ -28,7 +28,7 @@ export function safeRemoveItem(storage, key) {
   try {
     storage.removeItem(key)
     return true
-  } catch (e) {
+  } catch {
     return false
   }
 }
@@ -36,7 +36,7 @@ export function safeRemoveItem(storage, key) {
 export function safeGetItem(storage, key) {
   try {
     return storage.getItem(key)
-  } catch (e) {
+  } catch {
     return null
   }
 }
@@ -45,7 +45,7 @@ export function safeClear(storage) {
   try {
     storage.clear()
     return true
-  } catch (e) {
+  } catch {
     return false
   }
 }

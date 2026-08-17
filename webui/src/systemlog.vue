@@ -381,7 +381,7 @@ const closeLogStream = () => {
   wsSnapshotOffset = null
   wsBacklogBytes = null
   if (socket) {
-    try { socket.close() } catch (e) {}
+    try { socket.close() } catch { /* already closing or closed */ }
   }
 }
 
@@ -411,7 +411,7 @@ watch(logEnabled, async (enabled) => {
       if (response.data?.enabled !== true) {
         throw new Error('Device could not allocate the log buffer')
       }
-    } catch (e) {
+    } catch {
       // Backend could not allocate the buffer - revert the toggle.
       logEnabled.value = false
       uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.enableFailed') })
@@ -427,7 +427,7 @@ watch(logEnabled, async (enabled) => {
     stopPolling()
     try {
       await axios.post('/api/log/disable', {}, { timeout: 5000, silent: true })
-    } catch (e) {
+    } catch {
       // Non-fatal: polling already stopped; backend keeps its current state.
     }
   }
@@ -499,7 +499,7 @@ const copyVisibleLog = async () => {
   try {
     await copyToClipboard(content)
     uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('systemlog.copiedVisible'), duration: 1800 })
-  } catch (error) {
+  } catch {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.copyVisibleFailed') })
   }
 }
@@ -508,7 +508,7 @@ const copyLine = async (line) => {
   try {
     await copyToClipboard(line)
     uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('systemlog.copiedLine'), duration: 1400 })
-  } catch (error) {
+  } catch {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('systemlog.copyLineFailed') })
   }
 }
@@ -564,7 +564,7 @@ onMounted(async () => {
     await nextTick()
     if (!mounted) return
     syncingFromBackend = false
-  } catch (e) {
+  } catch {
     if (!mounted) return
     syncingFromBackend = false
     logEnabled.value = false
@@ -585,7 +585,7 @@ onMounted(async () => {
       crashTail.value = r.data.tail
       showCrashModal.value = true
     }
-  } catch (e) {
+  } catch {
     // ignore — older firmware versions do not expose this endpoint
   }
 })

@@ -45,6 +45,11 @@ void monitoring_config_set_defaults(monitoring_config_t *config)
     config->notify.smtp_port = 587;
     config->notify.smtp_tls = 1;
     config->notify.cooldown_seconds = 300;
+    // Everything selected by default. This value also survives an upgrade
+    // from a firmware without the mask: the NVS loader leaves the field alone
+    // when its key is missing, so an existing installation keeps receiving
+    // exactly what it received before.
+    config->notify.event_mask = NOTIFY_EVENT_ALL;
 }
 
 void monitoring_config_normalize(monitoring_config_t *config)
@@ -80,4 +85,11 @@ void monitoring_config_normalize(monitoring_config_t *config)
     if (config->notify.smtp_tls > 2) {
         config->notify.smtp_tls = 1;
     }
+
+    // Bits above the defined events cannot come from this firmware's WebUI,
+    // but a hand-crafted API call or a restored backup from a newer build
+    // could carry them. Drop them rather than storing state we cannot show.
+    // A mask of 0 is left as-is: "notify nothing" is a valid choice, and the
+    // migration case is handled by the loader leaving the default in place.
+    config->notify.event_mask &= NOTIFY_EVENT_ALL;
 }
