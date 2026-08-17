@@ -295,7 +295,7 @@ const copyValue = async (value, label) => {
       message: t('sysinfo.copied', { label }),
       duration: 2200
     })
-  } catch (e) {
+  } catch {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('common.copyFailed') })
   }
 }

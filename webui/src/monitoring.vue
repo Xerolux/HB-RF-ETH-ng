@@ -573,7 +573,7 @@ const ALLOWED_LABELS = {
 
 function normalizePem(raw) {
   let s = String(raw)
-  s = s.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  s = s.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   s = s.split('\n').map(l => l.replace(/[\t ]+$/g, '')).join('\n').trim()
   return s.length > 0 ? s + '\n' : s
 }

@@ -189,7 +189,7 @@ const confirmFactoryReset = async () => {
       restartSeconds: 30
     })
     emit('completed')
-  } catch (error) {
+  } catch {
     uiStore.pushToast({
       type: 'error',
       title: t('common.error'),

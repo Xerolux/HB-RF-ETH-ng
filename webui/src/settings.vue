@@ -142,8 +142,8 @@
                   <div class="led-program-item" v-for="program in ledPrograms" :key="program.id">
                     <label class="form-label small">{{ program.label }}</label>
                     <BFormSelect
-                      :modelValue="getLedProgramValue(program.id)"
-                      @update:modelValue="setLedProgramValue(program.id, $event)"
+                      :model-value="getLedProgramValue(program.id)"
+                      @update:model-value="setLedProgramValue(program.id, $event)"
                       :options="ledPatterns"
                       size="sm"
                     />
@@ -282,11 +282,15 @@
                     <button
                       :class="['mode-btn', { active: ipv6Mode === 'auto' }]"
                       @click="ipv6Mode = 'auto'"
-                    >{{ t('settings.ipv6Auto') }}</button>
+                    >
+{{ t('settings.ipv6Auto') }}
+</button>
                     <button
                       :class="['mode-btn', { active: ipv6Mode === 'static' }]"
                       @click="ipv6Mode = 'static'"
-                    >{{ t('settings.ipv6Static') }}</button>
+                    >
+{{ t('settings.ipv6Static') }}
+</button>
                   </div>
                 </div>
 
@@ -592,7 +596,9 @@
             fade
             @update:model-value="showError = null"
             class="footer-alert"
-          >{{ showError || t("settings.saveError") }}</BAlert>
+          >
+{{ showError || t("settings.saveError") }}
+</BAlert>
 
           <BButton
             variant="outline-secondary"
@@ -658,7 +664,6 @@ import { useI18n } from 'vue-i18n'
 import { useVuelidate } from '@vuelidate/core'
 import {
   required,
-  minLength,
   maxLength,
   numeric,
   ipAddress,
@@ -666,7 +671,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore, useLoginStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore } from './stores.js'
+import { useSettingsStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 import FactoryResetModal from './components/FactoryResetModal.vue'
 import ThemeSettings from './theme.vue'
@@ -676,7 +681,6 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
-const loginStore = useLoginStore()
 const uiStore = useUiStore()
 const sysInfoStore = useSysInfoStore()
 const restartUiStore = useRestartUiStore()
@@ -1369,7 +1373,7 @@ const restoreSettings = async () => {
       isRestoring.value = false
     }
     reader.readAsText(restoreFile.value)
-  } catch (e) {
+  } catch {
     uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('settings.restoreError') })
     isRestoring.value = false
   }

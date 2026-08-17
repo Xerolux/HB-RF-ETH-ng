@@ -525,25 +525,25 @@ test('recovery mirrors the current New Design shell and links back to the normal
   const source = await readFile('../main/system_overview_api.cpp', 'utf8')
   const recoveryPage = source.slice(
     source.indexOf('constexpr char RECOVERY_PAGE[]'),
-    source.indexOf(')HTML\";')
+    source.indexOf(')HTML";')
   )
-  const backLink = '<a class=\"back-link\" href=\"/\">← Zur normalen WebUI</a>'
+  const backLink = '<a class="back-link" href="/">← Zur normalen WebUI</a>'
 
   expect(recoveryPage).toContain(backLink)
-  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"loginCard\"'))
-  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id=\"tools\"'))
-  expect(recoveryPage).toContain('class=\"recovery-shell\"')
-  expect(recoveryPage).toContain('class=\"desktop-sidebar\"')
-  expect(recoveryPage).toContain('class=\"header-nav\"')
-  expect(recoveryPage).toContain('class=\"brand-logo\"')
-  expect(recoveryPage).toContain('class=\"hero-eyebrow\"')
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id="loginCard"'))
+  expect(recoveryPage.indexOf(backLink)).toBeLessThan(recoveryPage.indexOf('id="tools"'))
+  expect(recoveryPage).toContain('class="recovery-shell"')
+  expect(recoveryPage).toContain('class="desktop-sidebar"')
+  expect(recoveryPage).toContain('class="header-nav"')
+  expect(recoveryPage).toContain('class="brand-logo"')
+  expect(recoveryPage).toContain('class="hero-eyebrow"')
   expect(recoveryPage).toContain('--newdesign-sidebar-width:360px')
   expect(recoveryPage).toContain('--newdesign-header-height:88px')
   expect(recoveryPage).toContain('--newdesign-radius-card:4px')
   expect(recoveryPage).toContain('@media(prefers-color-scheme:dark)')
   expect(recoveryPage).toContain('--newdesign-panel:#fff')
-  expect(recoveryPage).not.toContain('class=\"brand-mark\">RF')
-  expect(recoveryPage).not.toContain('class=\"recovery-header\"')
+  expect(recoveryPage).not.toContain('class="brand-mark">RF')
+  expect(recoveryPage).not.toContain('class="recovery-header"')
   expect(recoveryPage).not.toContain('ohne New-Design-Bundle')
 })
 
@@ -641,13 +641,38 @@ test('MQTT defers every publish until the broker connection is established', asy
     mqttSource.indexOf('case MQTT_EVENT_DISCONNECTED:')
   )
 
-  expect(mqttSource).toContain('static bool mqtt_can_publish()')
-  expect(mqttSource).toMatch(
-    /mqtt_running\.load\(\)\s*&&\s*mqtt_connected\.load\(\)\s*&&\s*client\s*!=\s*NULL/
+  const canPublish = mqttSource.slice(
+    mqttSource.indexOf('static bool mqtt_can_publish()'),
+    mqttSource.indexOf('static int mqtt_publish_connected(')
   )
+  const publishWrapper = mqttSource.slice(
+    mqttSource.indexOf('static int mqtt_publish_connected('),
+    mqttSource.indexOf('// Serializes mqtt_handler_start / mqtt_handler_stop')
+  )
+
+  // The guard itself must consider both lifecycle bits. The NULL-client check
+  // lives in the wrapper below rather than in this predicate, so assert each
+  // where it actually is instead of pinning one combined expression.
+  expect(canPublish).toContain('mqtt_running.load(std::memory_order_acquire)')
+  expect(canPublish).toContain('mqtt_connected.load(std::memory_order_acquire)')
+
+  // Exactly one raw publish call, and it sits inside the wrapper behind both
+  // lifecycle bits and a non-NULL client. The wrapper repeats the checks with
+  // seq_cst ordering instead of calling mqtt_can_publish(), so that the
+  // publisher count pairs with cleanup's mqtt_running=false store.
   expect(mqttSource.match(/esp_mqtt_client_publish\(/g)).toHaveLength(1)
+  expect(publishWrapper).toContain('esp_mqtt_client_publish(')
+  expect(publishWrapper).toContain('mqtt_running.load(std::memory_order_seq_cst)')
+  expect(publishWrapper).toContain('mqtt_connected.load(std::memory_order_acquire)')
+  expect(publishWrapper).toContain('if (publish_client != NULL)')
+  expect(publishWrapper).toContain('mqtt_active_publishers.fetch_add(1, std::memory_order_seq_cst)')
+  expect(publishWrapper).toContain('mqtt_active_publishers.fetch_sub(1, std::memory_order_seq_cst)')
+
+  // While disconnected the task must wait instead of formatting and
+  // submitting a batch. The wait is a bounded, notifiable take rather than a
+  // plain vTaskDelay so a reconnect wakes it immediately.
   expect(publishTask).toContain('if (!mqtt_can_publish())')
-  expect(publishTask).toContain('vTaskDelay(')
+  expect(publishTask).toMatch(/if \(!mqtt_can_publish\(\)\) \{\s*\(void\)ulTaskNotifyTake\(pdTRUE, pdMS_TO_TICKS\(\d+\)\);\s*continue;/)
   expect(connectedEvent.indexOf('mqtt_connected.store(true)')).toBeLessThan(
     connectedEvent.indexOf('mqtt_handler_publish_status()')
   )
@@ -663,17 +688,34 @@ test('MQTT startup waits for Ethernet IPv4 readiness without losing the GOT_IP r
     monitoringSource.indexOf('static void mqtt_network_ready_handler'),
     monitoringSource.indexOf('// Initialize monitoring subsystem')
   )
+  const retryTask = monitoringSource.slice(
+    monitoringSource.indexOf('static void mqtt_retry_task('),
+    // Anchor on the definition, not the forward declaration above it.
+    monitoringSource.indexOf('static void schedule_mqtt_retry()\n{')
+  )
 
   expect(monitoringSource).toContain('static std::atomic<bool> mqtt_start_deferred{false}')
   expect(monitoringSource).toContain('static void start_mqtt_when_network_ready')
   expect(monitoringSource).toContain('IP_EVENT_ETH_GOT_IP')
   expect(monitoringSource).toContain('MQTT start deferred until IPv4 is ready')
   expect(monitoringSource).toContain('starting MQTT with reconnect fallback')
-  expect(networkReadyHandler).toContain('mqtt_start_deferred.exchange(false)')
-  expect(networkReadyHandler).toContain('malloc(sizeof(mqtt_config_t))')
-  expect(networkReadyHandler).not.toContain('mqtt_config_t mqtt_config;')
-  expect(networkReadyHandler).toContain('mqtt_handler_start(mqtt_config)')
-  expect(networkReadyHandler).toContain('free(mqtt_config)')
+
+  // The GOT_IP handler runs on the default event loop, so it must only arm the
+  // retry worker. Starting MQTT inline would hold mqtt_lifecycle_mutex for up
+  // to 15 s and starve every other event subscriber (Ethernet link, NTP, ...).
+  expect(networkReadyHandler).toContain('IP_EVENT_ETH_GOT_IP')
+  expect(networkReadyHandler).toContain('mqtt_start_deferred.load(std::memory_order_acquire)')
+  expect(networkReadyHandler).toContain('schedule_mqtt_retry()')
+  expect(networkReadyHandler).not.toContain('mqtt_handler_start(')
+  expect(networkReadyHandler).not.toContain('malloc(')
+
+  // The worker owns the config snapshot. It must be heap-allocated rather than
+  // a stack copy, because mqtt_config_t is far too large for the worker stack.
+  expect(retryTask).toContain('malloc(sizeof(mqtt_config_t))')
+  expect(retryTask).not.toContain('mqtt_config_t snapshot;')
+  expect(retryTask).toContain('mqtt_handler_start(snapshot)')
+  expect(retryTask).toContain('free(snapshot)')
+
   expect(init).toContain('esp_event_handler_instance_register(')
   expect(init).toContain('start_mqtt_when_network_ready(&current_config.mqtt)')
   expect(init).not.toContain('mqtt_handler_start(&current_config.mqtt)')
@@ -684,7 +726,10 @@ test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', a
 
   expect(source).not.toContain('#include <vector>')
   expect(source).not.toContain('malloc(sizeof(udp_event_t))')
-  expect(source).toContain('xQueueCreate(64, sizeof(udp_event_t))')
+  // 32 slots, not 64: the descriptor lives in the queue itself, and the
+  // deeper reserve cost ~1 KB of heap for no observed benefit on a single
+  // CCU-3 session (see "harden firmware for 2.2.6-Beta.4").
+  expect(source).toContain('xQueueCreate(32, sizeof(udp_event_t))')
   expect(source).toContain('unsigned char small_data[256]')
   expect(source).toContain('if (length > sizeof(small_data))')
   expect(source).toContain('if (!heap_data.value)')

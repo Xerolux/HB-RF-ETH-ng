@@ -1,5 +1,5 @@
 
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
@@ -18,7 +18,7 @@ test.use({
 
 test.describe('Generate Assets', () => {
 
-  test('capture screenshots and video', async ({ page }, testInfo) => {
+  test('capture screenshots and video', async ({ page }) => {
     test.setTimeout(90000);
     // --- Mocks ---
 
@@ -150,7 +150,7 @@ test.describe('Generate Assets', () => {
     // Wait for either sysinfo page or grid
     try {
         await page.waitForSelector('.page-shell.dashboard, .dashboard-grid', { state: 'visible', timeout: 5000 });
-    } catch (e) {
+    } catch {
         console.log("Dashboard selector not found, taking screenshot anyway");
     }
     await page.waitForTimeout(2000); // Allow animations and data population

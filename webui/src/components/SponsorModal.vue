@@ -10,8 +10,7 @@
     ok-only
   >
     <div class="sponsor-modal-body">
-
-      <div class="header-section">
+<div class="header-section">
         <div class="support-icon"><AppIcon name="support" /></div>
         <h2 class="title">{{ t('sponsor.title') }}</h2>
         <p class="description">

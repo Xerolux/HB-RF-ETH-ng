@@ -27,7 +27,7 @@ export async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text)
       return true
-    } catch (e) {
+    } catch {
       // Permission denied, clipboard busy, or transient failure — fall through.
     }
   }
