@@ -20,6 +20,17 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
     def read(self, relative_path: str) -> str:
         return (ROOT / relative_path).read_text(encoding="utf-8")
 
+    def read_webui(self) -> str:
+        """Every WebUI handler unit as one string.
+
+        backup/restore and OTA were split out of webui.cpp; these policies
+        are about the handlers, not about which file holds them.
+        """
+        return "\n".join(
+            self.read(f"main/{name}")
+            for name in ("webui.cpp", "webui_backup.cpp", "webui_ota.cpp")
+        )
+
     def test_emac_interrupt_is_suspended_while_flash_cache_is_disabled(self) -> None:
         ethernet_source = self.read("main/ethernet.cpp")
         self.assertNotIn("ETH_MAC_FLAG_WORK_WITH_CACHE_DISABLE", ethernet_source)
@@ -184,7 +195,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn("rollback_ota_pause(paused, \"Syslog\"", monitoring)
         self.assertIn("rollback_ota_pause(paused, \"Prometheus\"", monitoring)
 
-        webui = self.read("main/webui.cpp")
+        webui = self.read_webui()
         self.assertIn("prepare_result = prepare_ota_heap", webui)
         self.assertIn("if (prepare_result != ESP_OK)", webui)
         self.assertIn("esp_ota_set_boot_partition(ctx->running)", webui)
@@ -445,14 +456,14 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn("SAVE_STEP(nvs_commit(handle))", settings_save)
         self.assertIn("return err", settings_save)
 
-        webui = self.read("main/webui.cpp")
+        webui = self.read_webui()
         restore = webui[
             webui.index("esp_err_t post_restore_handler_func") :
             webui.index("httpd_uri_t post_restore_handler")
         ]
         self.assertIn("NvsStorageLock restore_storage", restore)
         self.assertIn("const esp_err_t settings_save_result", restore)
-        self.assertIn("_settings->restoreSnapshot", restore)
+        self.assertIn("webui_settings()->restoreSnapshot", restore)
         settings_capacity = restore.index(
             "const esp_err_t settings_capacity_result"
         )
@@ -472,7 +483,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         )
         final_preflight = restore[final_capacity:monitoring_save]
         self.assertIn("monitoring_validate_config_storage", final_preflight)
-        self.assertIn("_settings->restoreSnapshot", final_preflight)
+        self.assertIn("webui_settings()->restoreSnapshot", final_preflight)
         self.assertIn("theme_api_set_config", final_preflight)
         self.assertIn("ESP_ERR_NVS_NOT_ENOUGH_SPACE", final_preflight)
         self.assertIn('"507 Insufficient Storage"', final_preflight)
@@ -505,7 +516,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
             webui.index("httpd_uri_t post_factory_reset_handler")
         ]
         clear_call = factory_reset.index(
-            "const esp_err_t clear_result = _settings->clear()"
+            "const esp_err_t clear_result = webui_settings()->clear()"
         )
         clear_failure = factory_reset.index("if (clear_result != ESP_OK)")
         reset_reason = factory_reset.index(
@@ -535,7 +546,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn("vTaskDelay(pdMS_TO_TICKS(100))", restart_entry)
         self.assertNotIn("g_restart_in_progress.exchange", restart_entry)
 
-        webui = self.read("main/webui.cpp")
+        webui = self.read_webui()
         upload = webui[
             webui.index("esp_err_t post_ota_update_handler_func") :
             webui.index("httpd_uri_t post_ota_update_handler")
@@ -545,10 +556,11 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
 
         # The finalize logic (prepare → boot-select → restart) runs on a
         # background task so httpd stays responsive during worker shutdown.
-        finalize = webui[
-            webui.index("static void ota_finalize_task") :
-            webui.index("esp_err_t post_change_password_handler_func")
-        ]
+        # ota_finalize_task is the last function in webui_ota.cpp, so the
+        # slice runs to the end of that unit rather than to whatever
+        # happens to follow it in the concatenation.
+        ota_unit = self.read("main/webui_ota.cpp")
+        finalize = ota_unit[ota_unit.index("static void ota_finalize_task") :]
         self.assertIn("full_system_restart_with_reserved_operation()", finalize)
         uncertain = finalize[
             finalize.index("Boot selection uncertain") :

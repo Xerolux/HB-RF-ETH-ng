@@ -9,7 +9,15 @@ ROOT = Path(__file__).resolve().parents[2]
 SETTINGS = (ROOT / "main" / "settings.cpp").read_text(encoding="utf-8")
 HEADER = (ROOT / "include" / "settings.h").read_text(encoding="utf-8")
 BUTTON = (ROOT / "main" / "pushbuttonhandler.cpp").read_text(encoding="utf-8")
-WEBUI = (ROOT / "main" / "webui.cpp").read_text(encoding="utf-8")
+# The WebUI handlers live in three translation units since backup/restore
+# and OTA were split out of webui.cpp. Concatenating them keeps these
+# source-level policies covering every handler; each slice below is
+# anchored between a handler function and its own httpd_uri_t, so it
+# still resolves inside a single unit.
+WEBUI = "\n".join(
+    (ROOT / "main" / name).read_text(encoding="utf-8")
+    for name in ("webui.cpp", "webui_backup.cpp", "webui_ota.cpp")
+)
 MQTT = (ROOT / "main" / "mqtt_handler.cpp").read_text(encoding="utf-8")
 
 
@@ -237,7 +245,7 @@ class SettingsTransactionPolicyTest(unittest.TestCase):
 
     def test_every_password_replacement_rotates_token_before_password(self) -> None:
         rotate = function_body(
-            WEBUI, "static esp_err_t rotate_admin_token()", "void generateToken()"
+            WEBUI, "esp_err_t rotate_admin_token()", "void generateToken()"
         )
         self.assertLess(
             rotate.index("generate_fresh_admin_token"),
