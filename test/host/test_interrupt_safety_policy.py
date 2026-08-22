@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-STABLE_IDF = "v6.1-beta1"
+STABLE_IDF = "v6.1-rc1"
 LOCKFILE_IDF_VERSION = "6.1.0"
 SDKCONFIG_IDF_INIT_VERSION = "6.1.0"
 FIRMWARE_WORKFLOWS = (
@@ -58,7 +58,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn(f'ESP_IDF_VERSION="${{ESP_IDF_VERSION:-{STABLE_IDF}}}"', setup_script)
 
         readme = self.read("README.md")
-        self.assertIn("ESP-IDF 6.1-beta1", readme)
+        self.assertIn("ESP-IDF 6.1-rc1", readme)
 
     def test_watchdog_remains_a_fault_detector(self) -> None:
         sdkconfig = self.read("sdkconfig.hb-rf-eth-ng")

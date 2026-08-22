@@ -115,7 +115,7 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * **Event-basierte Benachrichtigungen** - Nicht-retained Events für Automatisierungen
 
 ### Technische Basis
-* **ESP-IDF 6.1-beta1** mit nativer `idf.py` Toolchain
+* **ESP-IDF 6.1-rc1** mit nativer `idf.py` Toolchain
 * **Xtensa GCC 14.2.0+20251107** Toolchain (xtensa-esp-elf)
 * **CMake** Build-System für Firmware (nicht PlatformIO)
 * **Vue.js 3** mit Composition API, Vue Router, Pinia, Vue i18n
