@@ -216,9 +216,20 @@ static void handlePinChange(int64_t flankTime, int state)
                 {
                     struct timeval tv;
                     tv.tv_sec = dcf2epoch(&dcf_tm, timezone);
-                    tv.tv_usec = esp_timer_get_time() - _secondMark + _settings->getDcfOffset();
+                    int64_t usec = esp_timer_get_time() - _secondMark + _settings->getDcfOffset();
+                    while (usec >= 1000000)
+                    {
+                        tv.tv_sec++;
+                        usec -= 1000000;
+                    }
+                    while (usec < 0)
+                    {
+                        tv.tv_sec--;
+                        usec += 1000000;
+                    }
+                    tv.tv_usec = (suseconds_t)usec;
 
-                    ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900, dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, tv.tv_usec, timezone == 2 ? "CET" : "CEST");
+                    ESP_LOGI(TAG, "Updated time to %02d-%02d-%02d %02d:%02d:%02d.%06ld %s", dcf_tm.tm_year + 1900, dcf_tm.tm_mon + 1, dcf_tm.tm_mday, dcf_tm.tm_hour, dcf_tm.tm_min, dcf_tm.tm_sec, (long)tv.tv_usec, timezone == 2 ? "CET" : "CEST");
                     _clk->setTime(&tv);
                 }
             }

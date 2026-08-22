@@ -152,6 +152,7 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
 
     struct tm time = {};
     time.tm_isdst = 0;
+    bool statusValid = false;
 
     for (int i = 0; i < len; i++)
     {
@@ -161,23 +162,50 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
 
             if (fieldIndex == 1)
             {
-                if (fieldLength != 9)
+                if (fieldLength < 6)
                     return false;
 
-                time.tm_sec = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0');
-                time.tm_min = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0');
-                time.tm_hour = ((buffer[fieldStart + 0] - '0') * 10) + (buffer[fieldStart + 1] - '0');
+                for (int d = 0; d < 6; d++) {
+                    if (buffer[fieldStart + d] < '0' || buffer[fieldStart + d] > '9') return false;
+                }
 
-                tv->tv_usec = ((buffer[fieldStart + 7] - '0') * 100000) + ((buffer[fieldStart + 8] - '0') * 10000);
+                time.tm_hour = ((buffer[fieldStart + 0] - '0') * 10) + (buffer[fieldStart + 1] - '0');
+                time.tm_min = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0');
+                time.tm_sec = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0');
+
+                if (time.tm_hour > 23 || time.tm_min > 59 || time.tm_sec > 60) return false;
+
+                tv->tv_usec = 0;
+                if (fieldLength >= 9 && buffer[fieldStart + 6] == '.') {
+                    if (buffer[fieldStart + 7] >= '0' && buffer[fieldStart + 7] <= '9')
+                        tv->tv_usec += (buffer[fieldStart + 7] - '0') * 100000;
+                    if (buffer[fieldStart + 8] >= '0' && buffer[fieldStart + 8] <= '9')
+                        tv->tv_usec += (buffer[fieldStart + 8] - '0') * 10000;
+                }
+            }
+            else if (fieldIndex == 2)
+            {
+                // Field 2: Status 'A' = valid fix, 'V' = warning / invalid fix
+                if (fieldLength == 1 && buffer[fieldStart] == 'A') {
+                    statusValid = true;
+                } else {
+                    return false;
+                }
             }
             else if (fieldIndex == 9)
             {
                 if (fieldLength != 6)
                     return false;
 
-                time.tm_year = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0') + 100;
-                time.tm_mon = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0') - 1;
+                for (int d = 0; d < 6; d++) {
+                    if (buffer[fieldStart + d] < '0' || buffer[fieldStart + d] > '9') return false;
+                }
+
                 time.tm_mday = ((buffer[fieldStart + 0] - '0') * 10) + (buffer[fieldStart + 1] - '0');
+                time.tm_mon = ((buffer[fieldStart + 2] - '0') * 10) + (buffer[fieldStart + 3] - '0') - 1;
+                time.tm_year = ((buffer[fieldStart + 4] - '0') * 10) + (buffer[fieldStart + 5] - '0') + 100;
+
+                if (time.tm_mon < 0 || time.tm_mon > 11 || time.tm_mday < 1 || time.tm_mday > 31) return false;
             }
 
             fieldIndex++;
@@ -185,10 +213,12 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
         }
     }
 
-    if (fieldIndex != 12)
+    if (fieldIndex < 10 || !statusValid)
         return false;
 
     tv->tv_sec = mktime(&time);
+    if (tv->tv_sec == (time_t)-1)
+        return false;
 
     return true;
 }
@@ -196,7 +226,7 @@ bool parseRMCTime(unsigned char *buffer, uint16_t len, timeval *tv)
 void GPS::_handleLine(unsigned char *buffer, uint16_t len)
 {
     uint64_t startTime = esp_timer_get_time();
-    if ((len > 6) && (strncmp((char *)buffer, "$GPRMC", 6) == 0))
+    if (len > 6 && buffer[0] == '$' && memcmp(buffer + 3, "RMC", 3) == 0)
     {
         timeval tv;
         if (parseRMCTime(buffer, len, &tv))
@@ -205,7 +235,12 @@ void GPS::_handleLine(unsigned char *buffer, uint16_t len)
             {
                 _nextSync = startTime + 300 * 1000 * 1000; // every 5 minutes
 
-                tv.tv_usec += esp_timer_get_time() - startTime;
+                int64_t elapsed_us = esp_timer_get_time() - startTime;
+                tv.tv_usec += elapsed_us;
+                while (tv.tv_usec >= 1000000) {
+                    tv.tv_sec++;
+                    tv.tv_usec -= 1000000;
+                }
                 _clk->setTime(&tv);
             }
         }

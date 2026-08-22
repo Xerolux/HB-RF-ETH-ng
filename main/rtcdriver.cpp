@@ -126,6 +126,9 @@ bool Rtc::begin()
 struct timeval Rtc::GetTime()
 {
     struct timeval res = {};
+    if (!i2c_bus) {
+        return res;
+    }
 
     uint8_t rawData[7] = {0};
 
@@ -186,6 +189,10 @@ struct timeval Rtc::GetTime()
 
 void Rtc::SetTime(struct timeval now)
 {
+    if (!i2c_bus) {
+        return;
+    }
+
     now.tv_sec -= 10957 * 86400; // epoch diff 1970 vs. 2000
 
     uint8_t seconds = now.tv_sec % 60;

@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.2.6-Beta.12] - 2026-08-17
+## [2.2.7-Beta.2] - 2026-08-22
+
+### Changes
+- fix(gps): validate NMEA RMC fix status, check digit ranges and normalize timeval
+- fix(dcf): normalize timeval microsecond calculation and prevent out-of-range values
+- fix(rtc): add null I2C bus handle guards in GetTime and SetTime
+- fix(radiomodule): free detection semaphore after scan to prevent memory leak
+
+## [2.2.7-Beta.1] - 2026-08-22
+
+### Changes
+- chore(idf): upgrade ESP-IDF from v6.1-beta1 to v6.1-rc1 (#422)
 
 ### Changes
 - feat: notification event selection, CCU latency diagnostics, CI gates and webui.cpp split (#420)

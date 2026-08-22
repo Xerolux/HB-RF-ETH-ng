@@ -126,6 +126,11 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
     }
 
     _radioModuleConnector->setFrameHandler(NULL, false);
+    if (_detectWaitFrameDataSemaphore)
+    {
+        vSemaphoreDelete(_detectWaitFrameDataSemaphore);
+        _detectWaitFrameDataSemaphore = NULL;
+    }
 }
 
 void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)
