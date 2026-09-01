@@ -78,6 +78,18 @@ jobs:
           python update_version.py "$VERSION"
           git status --short
 
+      - name: Validate release version against source
+        env:
+          RELEASE_VERSION: ${{ steps.firmware.outputs.VERSION }}
+        run: |
+          SOURCE_VERSION="$(tr -d '\r\n' < version.txt)"
+          if [ "$SOURCE_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Release $RELEASE_VERSION does not match version.txt ($SOURCE_VERSION)."
+            echo "Use the manual release workflow to create a new version, or move the tag to a commit whose version.txt matches." >&2
+            exit 1
+          fi
+          echo "Release version validated: $SOURCE_VERSION"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
