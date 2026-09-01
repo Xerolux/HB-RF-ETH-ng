@@ -26,19 +26,19 @@ At this point, you're ready to make your changes. Feel free to ask for help; eve
 
 ## Make a Pull Request
 
-At this point, you should switch back to your master branch and make sure it's up to date with HB-RF-ETH-ng's master branch:
+At this point, you should switch back to your main branch and make sure it's up to date with HB-RF-ETH-ng's main branch:
 
 ```sh
 git remote add upstream https://github.com/Xerolux/HB-RF-ETH-ng.git
-git checkout master
-git pull upstream master
+git checkout main
+git pull upstream main
 ```
 
-Then update your feature branch from your local copy of master, and push it!
+Then update your feature branch from your local copy of main, and push it!
 
 ```sh
 git checkout 325-add-new-feature
-git rebase master
+git rebase main
 git push --set-upstream origin 325-add-new-feature
 ```
 
@@ -50,11 +50,13 @@ If a maintainer asks you to "rebase" your PR, they're saying that a lot of code 
 
 ## Merging a PR (maintainers only)
 
-A PR can only be merged into master by a maintainer if:
+A PR can only be merged into main by a maintainer if:
 
 * It is passing CI.
-* It has been approved by at least two maintainers. If it was a maintainer who opened the PR, only one extra approval is needed.
+* Its diff has been reviewed by a maintainer. Trusted automated dependency
+  updates may be merged by a maintainer after the diff and all required checks
+  have been reviewed.
 * It has no requested changes.
-* It is up to date with current master.
+* It is up to date with current main.
 
 Any maintainer is allowed to merge a PR if all of these conditions are met.

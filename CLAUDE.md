@@ -351,7 +351,7 @@ python3 test_ota_function.py <device-ip> build/HB-RF-ETH-ng-<version>.bin
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `build.yml` | Push/PR to `main`, manual | Build WebUI, `idf.py build`, report firmware size, upload artifacts |
-| `release.yml` | Tag push (`v*`), manual | Version bump, changelog, `idf.py build`, GitHub release |
+| `release.yml` | Tag push (`v*`), manual | Version validation/bump, changelog, `idf.py build`, GitHub release |
 | `pr-check.yml` | PR opened/synced/reopened | Semantic PR title check, version-bump check, `idf.py build` |
 | `security.yml` | Push/PR, weekly schedule | Security scanning, `idf.py build` |
 | `pages.yml` | Push to `main`, manual | Deploy docs to GitHub Pages |
@@ -365,15 +365,21 @@ python3 test_ota_function.py <device-ip> build/HB-RF-ETH-ng-<version>.bin
 
 ## Release Process
 
-Releases are fully automated via `release.yml`, triggered by a `v*` tag push or manual dispatch:
+Releases are fully automated via `release.yml`. Prefer a manual dispatch with a
+new `tag` input; that path updates the version and changelog, commits the release
+metadata to `main`, creates the tag, and publishes the release.
 
-1. Tag the commit: `git tag v2.x.x && git push --tags` (or trigger manually with a `tag` input)
-2. The workflow runs:
-   - `update_version.py` — updates `version.txt` and all references
-   - `update_changelog.py` — generates `CHANGELOG.md` from git history
-   - `generate_release_notes.py` — creates GitHub release notes
-   - `idf.py build` for a versioned firmware binary
-   - Creates a GitHub Release with firmware `.bin` attached
+A pushed `v*` tag is also supported, but it is immutable input: the tagged
+commit's `version.txt` must already match the tag exactly. The workflow fails
+before building assets when they differ.
+
+The workflow runs:
+
+- `update_version.py` — updates `version.txt` and all references for manual dispatches
+- `update_changelog.py` — generates `CHANGELOG.md` for manual dispatches
+- `generate_release_notes.py` — creates GitHub release notes
+- `idf.py build` for a versioned firmware binary
+- Creates a GitHub Release with firmware `.bin` attached
 
 Manual version/changelog tools:
 ```bash

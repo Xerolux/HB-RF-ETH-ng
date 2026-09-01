@@ -15,6 +15,13 @@ change must not modify `version.txt` or advertise a new firmware update.
 Use `.github/workflows/release.yml` when firmware changed or when publishing the
 first migration-capable release.
 
+Prefer a manual workflow dispatch with the new firmware tag. The workflow then
+updates `version.txt` and the changelog, commits those changes to `main`, creates
+the tag, builds the artifacts and publishes the release. A release triggered by
+pushing an existing `v*` tag never rewrites source metadata: the tagged commit's
+`version.txt` must already match the tag exactly, or the workflow stops before
+building any assets.
+
 The release contains:
 
 - firmware image
