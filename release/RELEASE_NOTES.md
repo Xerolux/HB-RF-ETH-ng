@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.6-Beta.12
+# 🚀 HB-RF-ETH-ng v2.2.7-Beta.3
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,20 +11,19 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.6-Beta.12?
+## 🆕 Was ist neu in v2.2.7-Beta.3?
 
 ### Changes
-- feat: notification event selection, CCU latency diagnostics, CI gates and webui.cpp split (#420)
-- fix(ota): drop the unused varargs from the OTA error setter
-- test: follow the WebUI handlers into their new translation units
-- style(webui): apply clang-format to the extracted WebUI units
-- refactor(webui): split backup/restore and OTA out of webui.cpp
-- fix(diag): repair the stack, CPU and NVS diagnostics used to size the device
-- feat(diag): measure CCU relay latency so delayed switching can be diagnosed
-- fix(ci): move ESLint to 10.x and drop a redundant assignment it caught
-- feat(notify): let users choose which events trigger a notification
-- ci: add ESLint, C++ format ratchet and Playwright gate; drop dead artifacts
-- chore: update manifests for v2.2.6-Beta.11
+- fix(release): resolve F-01, F-02 and F-04 safety gaps (#430)
+- chore(deps)(deps-dev): bump esbuild from 0.28.1 to 0.28.2 in /webui (#424)
+- chore(deps)(deps): bump vue-i18n from 11.4.8 to 11.4.10 in /webui (#428)
+- chore(deps)(deps): bump vue from 3.5.41 to 3.5.42 in /webui (#427)
+- chore(deps)(deps-dev): bump sass from 1.102.0 to 1.103.1 in /webui (#425)
+- chore(deps)(deps-dev): bump vite from 8.2.1 to 8.2.2 in /webui (#423)
+- chore(ci)(deps): bump crate-ci/typos from 1.49.0 to 1.50.0 (#429)
+- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action (#426)
+- chore: ignore build-*/ output directories
+- chore: update manifests for v2.2.7-Beta.2
 
 ## ✨ Hauptfunktionen
 
@@ -61,7 +60,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.6-Beta.12.bin`)
+- **Firmware-Binary** (`firmware_2.2.7-Beta.3.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)

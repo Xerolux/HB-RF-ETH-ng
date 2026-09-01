@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.3] - 2026-09-01
+
+### Changes
+- fix(release): resolve F-01, F-02 and F-04 safety gaps (#430)
+- chore(deps)(deps-dev): bump esbuild from 0.28.1 to 0.28.2 in /webui (#424)
+- chore(deps)(deps): bump vue-i18n from 11.4.8 to 11.4.10 in /webui (#428)
+- chore(deps)(deps): bump vue from 3.5.41 to 3.5.42 in /webui (#427)
+- chore(deps)(deps-dev): bump sass from 1.102.0 to 1.103.1 in /webui (#425)
+- chore(deps)(deps-dev): bump vite from 8.2.1 to 8.2.2 in /webui (#423)
+- chore(ci)(deps): bump crate-ci/typos from 1.49.0 to 1.50.0 (#429)
+- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action (#426)
+- chore: ignore build-*/ output directories
+- chore: update manifests for v2.2.7-Beta.2
+
 ## [2.2.7-Beta.2] - 2026-08-22
 
 ### Changes
