@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.4] - 2026-09-03
+
+### Changes
+- fix(stability): enable ESP32 ECO3 cache-livelock workaround for #362
+- chore: update manifests for v2.2.7-Beta.3
+
 ## [2.2.7-Beta.3] - 2026-09-01
 
 ### Changes
