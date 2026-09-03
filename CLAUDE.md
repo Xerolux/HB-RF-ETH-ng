@@ -61,9 +61,16 @@ HB-RF-ETH-ng/
 
 | Tool | Version |
 |------|---------|
-| ESP-IDF | v6.1-rc1 (pre-release, cloned fresh in CI from `espressif/esp-idf`) |
+| ESP-IDF | v6.1 (cloned fresh in CI from `espressif/esp-idf`) |
 | IDF target | `esp32` |
 | SDK config | `sdkconfig.defaults;sdkconfig.hb-rf-eth-ng` |
+
+> **Required IDF patch (errata WDT-3.15 / issue #362):** after cloning
+> ESP-IDF, run `scripts/patch_idf_eco3_fix.sh $IDF_PATH`. It removes the
+> `SPIRAM` gate from `CONFIG_ESP32_ECO3_CACHE_LOCK_FIX` so the ESP32
+> v3.x cache-livelock watchdog workaround is active on our PSRAM-less
+> boards (no-op on silicon ≤ v2). CI applies it automatically in all
+> firmware workflows; local setups must run it once per IDF checkout.
 
 ### Building the Firmware
 

@@ -1,5 +1,5 @@
 # HB-RF-ETH Default Configuration
-# Compatible with ESP-IDF v6.1-rc1
+# Compatible with ESP-IDF v6.1
 
 # Partition Table
 CONFIG_PARTITION_TABLE_CUSTOM=y
@@ -55,7 +55,7 @@ CONFIG_FREERTOS_USE_TRACE_FACILITY=y
 CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
 
 # The HB-RF-ETH board uses Ethernet (LAN8720A) only. These legacy symbols are
-# retained as documentation; ESP-IDF v6.1-rc1 may still resolve its promptless
+# retained as documentation; ESP-IDF v6.1 may still resolve its promptless
 # Wi-Fi component symbol internally, but the application never initializes it.
 # CONFIG_ESP_WIFI_ENABLED is not set
 # CONFIG_ESP32_WIFI_ENABLED is not set

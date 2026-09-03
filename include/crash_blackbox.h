@@ -46,6 +46,7 @@
 // shrinking another partition.
 
 #define CRASH_BLACKBOX_MAGIC 0xB0BE1EAFu
+#define CRASH_BLACKBOX_TICK_MAGIC 0x71C711C7u
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,6 +85,17 @@ typedef struct {
 
     uint32_t net_op_magic;  // set while g_net_fetch_mutex is held with a tag
     char     net_op_tag[CRASH_BLACKBOX_TAG_LEN];
+
+    // Tick sentinel: per-CPU uptime (ms) of the most recent FreeRTOS tick,
+    // written from an IRAM tick hook at every tick (100 Hz). The interrupt
+    // watchdog can only trip when a CPU stops ticking for >300 ms (interrupts
+    // masked or a higher-level ISR monopolizing the core), so after a
+    // watchdog reset these two timestamps answer the one question no other
+    // field can: WHICH core starved first, and how far behind the last heap
+    // sample the stall began. Independent of `magic` above — the sentinel
+    // must keep running through crash_blackbox_clear().
+    uint32_t tick_magic;      // CRASH_BLACKBOX_TICK_MAGIC once armed this RTC cycle
+    uint32_t last_tick_ms[2]; // [cpu] uptime ms of that CPU's most recent tick
 } crash_blackbox_t;
 
 // Record a fresh sample. Called periodically (e.g. every 60 s) from the
@@ -123,6 +135,12 @@ void crash_blackbox_net_op_end(void);
 // NULL if nothing was stuck. Does not clear any state — callers still own
 // crash_blackbox_clear().
 const char *crash_blackbox_describe_stuck_op(void);
+
+// Arm the per-CPU tick sentinel (see crash_blackbox_t above). Registers an
+// IRAM tick hook on both cores and seeds the timestamps. Call once, as early
+// as possible in app_main — before any subsystem that could crash. Safe to
+// call again (registers nothing new on failure only).
+void crash_blackbox_tick_sentinel_init(void);
 
 #ifdef __cplusplus
 }

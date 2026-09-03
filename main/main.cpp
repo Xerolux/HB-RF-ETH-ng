@@ -53,6 +53,7 @@
 #include "metrics.h"
 #include "events.h"
 #include "reset_info.h"
+#include "crash_blackbox.h"
 #include "system_reset.h"
 
 static const char *TAG = "HB-RF-ETH";
@@ -130,6 +131,12 @@ void app_main()
     };
     uart_param_config(UART_NUM_0, &uart_config);
     uart_set_pin(UART_NUM_0, GPIO_NUM_1, GPIO_NUM_3, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    // Arm the per-CPU tick sentinel before anything else can crash: field
+    // units hit by the interrupt-watchdog resets (#362) have no serial
+    // console attached, and the sentinel is the only witness that survives
+    // the reset and can name the core that stopped ticking first.
+    crash_blackbox_tick_sentinel_init();
 
     // All long-lived service objects are function-local statics instead of
     // stack locals: they must outlive app_main's active phase (the task is

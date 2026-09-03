@@ -286,6 +286,28 @@ const char* ResetInfo::getResetDetails() {
                                  (unsigned)bb->sample_count);
                     }
                     if (bb) {
+                        // Tick sentinel readout — the discriminating fact for
+                        // issue #362: the interrupt watchdog can only trip
+                        // when a core stops ticking for >300 ms, so WHICH
+                        // core went silent (and how it relates to the last
+                        // heap sample) narrows the fault class decisively.
+                        // Deltas are against the last heap sample (sampled
+                        // every 60 s); both clocks are uptime-based ms, so
+                        // expect a few ms of benign offset.
+                        if (bb->tick_magic == CRASH_BLACKBOX_TICK_MAGIC) {
+                            const int32_t sample_ms =
+                                (int32_t)(bb->uptime_s * 1000u);
+                            const int32_t d0 =
+                                (int32_t)bb->last_tick_ms[0] - sample_ms;
+                            const int32_t d1 =
+                                (int32_t)bb->last_tick_ms[1] - sample_ms;
+                            ESP_LOGI(TAG,
+                                     "Tick sentinel: cpu0 last tick at %u ms "
+                                     "(%+d ms vs sample), cpu1 at %u ms "
+                                     "(%+d ms vs sample)",
+                                     (unsigned)bb->last_tick_ms[0], (int)d0,
+                                     (unsigned)bb->last_tick_ms[1], (int)d1);
+                        }
                         crash_blackbox_clear();
                     }
                 }

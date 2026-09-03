@@ -182,12 +182,15 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: '3.13'
-      - name: Setup ESP-IDF v6.1-rc1
+      - name: Setup ESP-IDF v6.1
         run: |
           python -m pip install --upgrade pip
-          git clone --depth 1 --branch v6.1-rc1 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
+          git clone --depth 1 --branch v6.1 https://github.com/espressif/esp-idf.git "$HOME/esp-idf"
           git -C "$HOME/esp-idf" submodule update --init --recursive --depth 1
           "$HOME/esp-idf/install.sh" esp32
+
+      - name: Enable ESP32 ECO3 cache-lock livelock workaround (errata WDT-3.15, issue #362)
+        run: bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"
       - name: Build and check firmware size
         run: |
           . "$HOME/esp-idf/export.sh"

@@ -2,7 +2,7 @@
 
 # HB-RF-ETH-ng
 
-**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 6.1-rc1**
+**Modernisierte HomeMatic Netzwerk-Firmware | ESP-IDF 6.1**
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -17,7 +17,7 @@
 
 ## Modernisierte Fork von Xerolux (2025)
 
-Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware basiert auf ESP-IDF 6.1-rc1 und ist für moderne Toolchains optimiert.
+Diese Version ist eine modernisierte und aktualisierte Fork der originalen HB-RF-ETH Firmware von Alexander Reinert. Die Firmware basiert auf ESP-IDF 6.1 und ist für moderne Toolchains optimiert.
 
 > Alle detaillierten Änderungen pro Version finden Sie im [CHANGELOG.md](CHANGELOG.md).
 
@@ -41,7 +41,7 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 - **Monitoring via MQTT** (mit Home Assistant Auto-Discovery, TLS/mTLS, Kommando-Token) und CheckMK
 - Manuelle Firmware-Updates per `.bin`-Datei-Upload in der WebUI (automatische
   Update-Suche, URL-OTA und MQTT/Home-Assistant-OTA wurden entfernt)
-- ESP-IDF 6.1-rc1 Toolchain (native `idf.py` Builds), GCC 15.2 (xtensa-esp-elf)
+- ESP-IDF 6.1 Toolchain (native `idf.py` Builds), GCC 15.2 (xtensa-esp-elf)
 
 ### Login nach Update
 Nach dem Update auf eine Version mit Benutzername-Pflicht muss die Anmeldung einmalig mit dem Standard-Benutzernamen `admin` und dem bisherigen Administrator-Passwort erfolgen. Alte gespeicherte Browser-Sessions werden dabei aus Sicherheitsgründen ungültig. Der Benutzername kann anschließend unter **Einstellungen > Allgemein > Sicherheit** geändert werden, z.B. für Passwortmanager oder Installationen mit mehreren Geräten.
@@ -57,7 +57,7 @@ Backups enthalten vollständig alle wiederherstellbaren Benutzereinstellungen: A
 > HA-Entitäten, TLS-Konfiguration, Sicherheitsmodell) findet sich im
 > [Wiki – MQTT-Sektion](docs/WIKI.md#home-assistant-mqtt-integration).
 
-### Entwickler-Build (ESP-IDF 6.1-rc1)
+### Entwickler-Build (ESP-IDF 6.1)
 ```bash
 ./scripts/setup_esp_idf.sh
 . ~/esp-idf/export.sh
@@ -70,6 +70,13 @@ python3 rename_webui_files.py
 
 ./idf.py build
 ```
+
+> **Wichtig — IDF-Patch (Errata WDT-3.15, Issue #362):** Vor dem ersten Build
+> einmalig `bash scripts/patch_idf_eco3_fix.sh ~/esp-idf` ausführen. Das Skript
+> aktiviert den ESP32-v3.x-Cache-Livelock-Watchdog-Workaround
+> (`CONFIG_ESP32_ECO3_CACHE_LOCK_FIX`) auch auf Boards ohne PSRAM — ohne ihn
+> können Rev-3-Chips spurlos per Interrupt-Watchdog resettet werden. Die CI wendet
+> den Patch automatisch an; auf Silicon ≤ v2 ist er ein No-Op.
 
 > Vor jeder Styling-Änderung an der WebUI bitte [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) lesen — die verbindliche Design-Spezifikation (Zwei-Theme-System, Farbpaletten, Tokens).
 

@@ -85,8 +85,16 @@ void RadioModuleConnector::start()
     }
     setLED(false, false, false);
 
+    // A TX ring buffer keeps uart_write_bytes() from busy-waiting on the
+    // TX-FIFO-empty handshake at 115200 baud (the zero-size-TX-buffer mode
+    // blocks the caller for the full wire time of every frame). The raw-uart
+    // relay worker is one of the hottest tasks during a CCU reconnect burst,
+    // and draining that burst serially into the module is exactly when the
+    // relay must not stall. 2 KiB absorbs a worst-case HmIP frame burst.
+    static const int HM_UART_TX_RING_BUF_SIZE = 2048;
+
     esp_err_t err = uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2,
-                                        0, 20, &_uart_queue, 0);
+                                        HM_UART_TX_RING_BUF_SIZE, 20, &_uart_queue, 0);
     if (err != ESP_OK) {
         ESP_LOGE("RadioModuleConnector", "Failed to install UART driver: %s",
                  esp_err_to_name(err));
@@ -130,6 +138,12 @@ void RadioModuleConnector::setLED(bool red, bool green, bool blue)
 
 void RadioModuleConnector::resetModule()
 {
+    // With the TX ring buffer, queued bytes may not have hit the wire yet;
+    // the module reset would cut them off mid-frame. Drain first (bounded —
+    // the full 2 KiB ring needs ~180 ms at 115200). Harmless no-op when the
+    // driver is not installed (returns an error, checked by the driver).
+    uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(250));
+
     gpio_set_level(HM_RST_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
     gpio_set_level(HM_RST_PIN, 0);

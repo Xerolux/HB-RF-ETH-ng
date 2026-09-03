@@ -23,6 +23,14 @@
 
 #include "crash_blackbox.h"
 #include "esp_attr.h" // RTC_NOINIT_ATTR
+// freertos/FreeRTOS.h must be included before anything that pulls in
+// portmacro.h (esp_freertos_hooks.h does) — it defines the config* macros
+// portmacro depends on.
+#include "freertos/FreeRTOS.h"
+#include "esp_cpu.h"
+#include "esp_freertos_hooks.h"
+#include "esp_timer.h"
+#include "freertos/portmacro.h"
 #include <cstdio>
 #include <cstring>
 
@@ -139,4 +147,35 @@ const char *crash_blackbox_describe_stuck_op(void)
         snprintf(buf, sizeof(buf), "net:%s", s_blackbox.net_op_tag);
     }
     return buf;
+}
+
+// --- Tick sentinel ---------------------------------------------------------
+//
+// Everything in this hook must stay in IRAM with no flash-resident callees:
+// the tick also fires while a flash operation has the cache disabled, and
+// that is precisely a window where an interrupt-watchdog hang could start.
+// This mirrors the constraint on the interrupt watchdog's own tick hook:
+// esp_cpu_get_core_id() is a forced inline reading the PRID register and
+// esp_timer_get_time() is an alias of an ESP_TIMER_IRAM_ATTR function —
+// the same pair int_wdt.c itself calls from this exact context. The store
+// is one aligned 32-bit write to RTC slow memory per core per 10 ms tick.
+static void IRAM_ATTR crash_blackbox_tick_hook(void)
+{
+    s_blackbox.last_tick_ms[(unsigned)esp_cpu_get_core_id() & 1] =
+        (uint32_t)(esp_timer_get_time() / 1000);
+}
+
+void crash_blackbox_tick_sentinel_init(void)
+{
+    s_blackbox.tick_magic = CRASH_BLACKBOX_TICK_MAGIC;
+    const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    s_blackbox.last_tick_ms[0] = now_ms;
+    s_blackbox.last_tick_ms[1] = now_ms;
+
+    // Same registration mechanism the interrupt watchdog itself uses. A
+    // failed registration leaves stale-but-armed timestamps; the boot-side
+    // reader treats identical frozen values with equal deltas as "sentinel
+    // data", which is still strictly better than nothing.
+    esp_register_freertos_tick_hook_for_cpu(&crash_blackbox_tick_hook, 0);
+    esp_register_freertos_tick_hook_for_cpu(&crash_blackbox_tick_hook, 1);
 }
