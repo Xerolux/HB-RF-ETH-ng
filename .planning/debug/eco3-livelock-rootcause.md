@@ -62,3 +62,21 @@ root_cause: "ESP32 ECO3-Silicon-Livelock (Errata WDT-3.15) auf Feldgeräten mit 
 fix: "scripts/patch_idf_eco3_fix.sh entfernt die SPIRAM-Gate aus der frisch geklonten IDF-Kconfig in allen 5 Build-Workflows → CONFIG_ESP32_ECO3_CACHE_LOCK_FIX=y (default y, promptless). Zusätzlich: Tick-Sentinel in der Crash-Blackbox (core-lokale letzte-Tick-Zeitstempel, IRAM-Hook) als Verifikations-Instrumentierung und UART1-TX-Ringbuffer (2 KiB) als Relay-Härtung."
 verification: "Build läuft (WSL, CI-äquivalent); sdkconfig muss CONFIG_ESP32_ECO3_CACHE_LOCK_FIX=y zeigen. Feldtest auf Rev-3-Gerät ausstehend; chipRevision-Abfrage im Issue ausstehend."
 files_changed: "scripts/patch_idf_eco3_fix.sh (neu), .github/workflows/{build,pr-check,release,release-webui,security}.yml, include/crash_blackbox.h, main/crash_blackbox.cpp, main/reset_info.cpp, main/main.cpp, main/radiomoduleconnector.cpp, docs (CLAUDE.md/README), sowie IDF-Pinning v6.1-rc1→v6.1 (separater Change)."
+
+## Update 2026-09-04 (nach Beta.4-Feldfalsifikation + IDF55EXP-Experiment)
+
+- ECO3-Hypothese FALSIFIZIERT (als Alleinursache): Walki2000 (chipRevision 100!) und zoephelweb (301) crashen mit aktivem Workaround (Beta.4, up=3786s/5286s). Sentinel-Latch-Bug in Beta.4 gefunden und in Beta.5 behoben (Vorher-Werte werden jetzt beim Boot eingefroren, Ausgabe "Tick sentinel (pre-reset)").
+- Live-Test .56 (rev100, Beta.4): 67 Mbit/s Unicast-Flood 25 s → 10 s völlige Unantwortigkeit OHNE Reset; 10 Mbit/s Broadcast → nichts. LAN-Flut allein reicht nicht.
+- Isolierung des Deltas 5.5.3 (stabile Basis) vs 6.1 (crashend) bei IDENTISCHEM App-Code (Experiment-Build):
+  * lwIP: BEIDE 2.2.0 → kein Delta.
+  * Config (vollständiger sdkconfig-Diff): kein app-relevanter Unterschied (nur Renames/Defaults abgeschalteter Subsysteme; PM in beiden AUS; Feed-Mechanik des IWDT generationen-identisch).
+  * App-Code: identisch (kompiliert auf beiden).
+  * **Verbleibendes Delta: FreeRTOS-Kernel — klassischer IDF-Port (5.5.x) vs FreeRTOS-Kernel-SMP (6.x) + Treiber-Glue.**
+  * Zeitleiste passt exakt: Crash-Serie begann mit der 2.2.0-Linie (IDF 6.0 = SMP-Default); 2.1.10 (5.5.3, klassisch) stabil auf derselben Hardware.
+- Experiment ausgerollt: Release "experiment-idf55exp-b5" (Branch experiment/idf-v5.5.3, Version 2.2.7-Beta.5-IDF55EXP, klassischer Kernel verifiziert, ECO3 an, Sentinel drin). Nur für #362-Tester; Issue kommentiert.
+
+## Entscheidungsbaum für die Feld-Ergebnisse
+
+1. IDF55EXP stabil über Tage → Ursache in IDF-6.x-Schicht (SMP-Kernel-Xtensa-Port oder Treiber-Glue). Nächste Schritte: (a) ggf. Produktion interim auf 5.5.3-Basis; (b) gezielter Diff SMP-Port vs klassischem Port in critical-section/tick/int-level-Pfaden; (c) ggf. Issue bei espressif mit unseren Sentinel-Daten.
+2. IDF55EXP crasht auch → Tick-Sentinel-Zeile auswerten: Kern-Differenz (cpu0 vs cpu1) + Abstand zum letzten Heap-Sample nenmt die Verdachtslinie (gleiche Zeit = simultanes Einfrieren; ein Kern früher = der Kern ist der Täter-Umfeld).
+3. Beta.5 (6.1) stabil → Prio-15-Rücknahme hat es gegeben (dann: trotzdem Wurzel klären).
