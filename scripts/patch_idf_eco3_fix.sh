@@ -40,9 +40,11 @@ if [ ! -f "$KFILE" ]; then
 fi
 
 if grep -q "config ESP32_ECO3_CACHE_LOCK_FIX" "$KFILE" &&
-   grep -A3 "config ESP32_ECO3_CACHE_LOCK_FIX" "$KFILE" | grep -q "depends on !ESP_SYSTEM_SINGLE_CORE_MODE && SPIRAM"; then
+   grep -A3 "config ESP32_ECO3_CACHE_LOCK_FIX" "$KFILE" | grep -qE "depends on !ESP_SYSTEM_SINGLE_CORE_MODE && SPIRAM|depends on !FREERTOS_UNICORE && SPIRAM"; then
     # Keep the option's own line untouched; only drop the SPIRAM term.
-    sed -i '/config ESP32_ECO3_CACHE_LOCK_FIX/,+3 s/depends on !ESP_SYSTEM_SINGLE_CORE_MODE && SPIRAM/depends on !ESP_SYSTEM_SINGLE_CORE_MODE/' "$KFILE"
+    # ESP-IDF <= 5.x spells the first dependency !FREERTOS_UNICORE, 6.x
+    # uses !ESP_SYSTEM_SINGLE_CORE_MODE — handle both.
+    sed -i '/config ESP32_ECO3_CACHE_LOCK_FIX/,+3 s/depends on !\(ESP_SYSTEM_SINGLE_CORE_MODE\|FREERTOS_UNICORE\) && SPIRAM/depends on !\1/' "$KFILE"
     echo "patch_idf_eco3_fix.sh: removed SPIRAM gate from ESP32_ECO3_CACHE_LOCK_FIX in $KFILE"
 elif grep -q "config ESP32_ECO3_CACHE_LOCK_FIX" "$KFILE"; then
     echo "patch_idf_eco3_fix.sh: gate already absent or already patched — nothing to do"

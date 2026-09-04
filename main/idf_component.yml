@@ -3,5 +3,3 @@ dependencies:
     version: "^1.0.0"
   espressif/cjson:
     version: "^1.7.19"
-  espressif/lan87xx:
-    version: "^1.0.0"

@@ -23,7 +23,12 @@
 
 #include "ethernet.h"
 #include "pins.h"
-#include "esp_eth_phy_lan87xx.h"
+#include "esp_idf_version.h"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include "esp_eth_phy_lan87xx.h" // moved out of esp_eth core in IDF 6.0
+#else
+#include "esp_eth_phy.h" // declares esp_eth_phy_new_lan87xx() in IDF 5.x
+#endif
 #include "lwip/ip6_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -240,7 +245,12 @@ Ethernet::Ethernet(Settings *settings) : _eth_netif(NULL), _eth_handle(NULL), _m
     esp32_emac_config.smi_gpio.mdio_num = ETH_MDIO_PIN;
     esp32_emac_config.smi_gpio.mdc_num = ETH_MDC_PIN;
     esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_OUT;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
     esp32_emac_config.clock_config.rmii.clock_gpio = GPIO_NUM_17;
+#else
+    // IDF 5.x types the field as emac_rmii_clock_gpio_t (enum on ESP32)
+    esp32_emac_config.clock_config.rmii.clock_gpio = EMAC_CLK_OUT_180_GPIO;
+#endif
     _mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
     ESP_LOGI(TAG, "MAC created: %s", _mac ? "OK" : "FAILED");
 

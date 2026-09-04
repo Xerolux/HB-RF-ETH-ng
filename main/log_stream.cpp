@@ -25,6 +25,7 @@
 #include "log_manager.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_idf_version.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -38,9 +39,18 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
 #if !defined(CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT) || !CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT || \
     !defined(CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT) || !CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT
 #error "The log WebSocket requires ESP-IDF pre- and post-handshake callbacks"
+#endif
+#define LOG_STREAM_WS_ENDPOINT_SUPPORTED 1
+#else
+// IDF 5.x has no ws_post_handshake_cb in httpd_uri_t. The live-log WebSocket
+// endpoint is compiled out on the IDF-5.5 experiment build; the WebUI falls
+// back to polling GET /api/log (its documented fallback path). Everything
+// else - ring buffer, snapshot API, crash tail - is unaffected.
+#define LOG_STREAM_WS_ENDPOINT_SUPPORTED 0
 #endif
 
 extern esp_err_t validate_auth(httpd_req_t *req);
@@ -615,6 +625,7 @@ static esp_err_t send_text_frame(httpd_req_t *req, const char *payload, size_t l
     return httpd_ws_send_frame(req, &frame);
 }
 
+#if LOG_STREAM_WS_ENDPOINT_SUPPORTED
 static esp_err_t log_stream_pre_handshake(httpd_req_t *req)
 {
     if (authenticate_websocket(req)) return ESP_OK;
@@ -696,6 +707,7 @@ esp_err_t log_stream_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+#endif // LOG_STREAM_WS_ENDPOINT_SUPPORTED
 void log_stream_close_socket(httpd_handle_t handle, int fd)
 {
     (void)handle;
@@ -705,6 +717,7 @@ void log_stream_close_socket(httpd_handle_t handle, int fd)
     close(fd);
 }
 
+#if LOG_STREAM_WS_ENDPOINT_SUPPORTED
 httpd_uri_t log_stream_ws_uri = {
     .uri       = "/api/log/stream",
     .method    = HTTP_GET,
@@ -716,3 +729,4 @@ httpd_uri_t log_stream_ws_uri = {
     .ws_pre_handshake_cb = log_stream_pre_handshake,
     .ws_post_handshake_cb = log_stream_post_handshake,
 };
+#endif // LOG_STREAM_WS_ENDPOINT_SUPPORTED

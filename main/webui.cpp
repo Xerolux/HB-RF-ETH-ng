@@ -35,6 +35,7 @@
 #include "webui_internal.h"
 #include "ping_service.h"
 #include "esp_log.h"
+#include "esp_idf_version.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "driver/gpio.h"
@@ -1934,7 +1935,9 @@ void WebUI::start()
         // Make the WebSocket log stream available as soon as the server starts
         // so subscribers can connect before any monitoring backend is enabled.
         log_stream_init();
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
         httpd_register_uri_handler(_httpd_handle, &log_stream_ws_uri);
+#endif
         system_overview_api_register(_httpd_handle);
         theme_api_register(_httpd_handle);
 
