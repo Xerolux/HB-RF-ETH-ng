@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.7-Beta.4
+# 🚀 HB-RF-ETH-ng v2.2.7-Beta.5
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,11 +11,11 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.7-Beta.4?
+## 🆕 Was ist neu in v2.2.7-Beta.5?
 
 ### Changes
-- fix(stability): enable ESP32 ECO3 cache-livelock workaround for #362
-- chore: update manifests for v2.2.7-Beta.3
+- fix(stability): latch pre-reset tick sentinel; restore relay priority 15 (#362)
+- chore: update manifests for v2.2.7-Beta.4
 
 ## ✨ Hauptfunktionen
 
@@ -52,7 +52,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.7-Beta.4.bin`)
+- **Firmware-Binary** (`firmware_2.2.7-Beta.5.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.0.0-Beta.17.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)

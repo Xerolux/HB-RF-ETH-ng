@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.5] - 2026-09-04
+
+### Changes
+- fix(stability): latch pre-reset tick sentinel; restore relay priority 15 (#362)
+- chore: update manifests for v2.2.7-Beta.4
+
 ## [2.2.7-Beta.4] - 2026-09-03
 
 ### Changes
