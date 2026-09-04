@@ -167,6 +167,17 @@ static void IRAM_ATTR crash_blackbox_tick_hook(void)
 
 void crash_blackbox_tick_sentinel_init(void)
 {
+    // Latch the pre-reset values FIRST — the very first tick after this
+    // call would already overwrite the live slots and destroy the evidence
+    // (that is exactly what the first Beta.4 revision got wrong).
+    if (s_blackbox.tick_magic == CRASH_BLACKBOX_TICK_MAGIC) {
+        s_blackbox.prev_tick_magic = CRASH_BLACKBOX_TICK_MAGIC;
+        s_blackbox.prev_tick_ms[0] = s_blackbox.last_tick_ms[0];
+        s_blackbox.prev_tick_ms[1] = s_blackbox.last_tick_ms[1];
+    } else {
+        s_blackbox.prev_tick_magic = 0;
+    }
+
     s_blackbox.tick_magic = CRASH_BLACKBOX_TICK_MAGIC;
     const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
     s_blackbox.last_tick_ms[0] = now_ms;

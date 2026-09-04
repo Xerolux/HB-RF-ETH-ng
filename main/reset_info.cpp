@@ -308,6 +308,28 @@ const char* ResetInfo::getResetDetails() {
                                      (unsigned)bb->last_tick_ms[0], (int)d0,
                                      (unsigned)bb->last_tick_ms[1], (int)d1);
                         }
+                        // Pre-reset values (Beta.5+): these are the ones that
+                        // matter. The line above shows the CURRENT session's
+                        // ticks and is kept only for sanity checks.
+                        if (bb->prev_tick_magic == CRASH_BLACKBOX_TICK_MAGIC) {
+                            const int32_t sample_ms =
+                                (int32_t)(bb->uptime_s * 1000u);
+                            const int32_t d0 =
+                                (int32_t)bb->prev_tick_ms[0] - sample_ms;
+                            const int32_t d1 =
+                                (int32_t)bb->prev_tick_ms[1] - sample_ms;
+                            const int32_t core_gap =
+                                (int32_t)bb->prev_tick_ms[0] -
+                                (int32_t)bb->prev_tick_ms[1];
+                            ESP_LOGI(TAG,
+                                     "Tick sentinel (pre-reset): cpu0 last "
+                                     "tick at %u ms (%+d ms vs sample), cpu1 "
+                                     "at %u ms (%+d ms vs sample), core gap "
+                                     "%+d ms",
+                                     (unsigned)bb->prev_tick_ms[0], (int)d0,
+                                     (unsigned)bb->prev_tick_ms[1], (int)d1,
+                                     (int)core_gap);
+                        }
                         crash_blackbox_clear();
                     }
                 }

@@ -463,16 +463,17 @@ void RawUartUdpListener::start()
     }
     _udp_recv(pcb, &_raw_uart_udpReceivePaket, (void *)this);
 
-    // Priority 12 (was 15): the listener still runs well above user tasks
-    // (events: 3, log_stream: 4, mqtt_publish: 4) so the CCU-3 session stays
-    // latency-bound to the radio module, but yields a few levels of headroom
-    // below the ESP-IDF system / Wi-Fi / timer tasks. Under a burst of UDP
-    // frames this gives high-priority system tasks more room to interleave and
-    // avoids unnecessary pressure around the per-CPU tick ISR that feeds the
-    // interrupt watchdog.
+    // Priority 15 (matches the stable v2.1.10 scheduling and the UART handler
+    // task): the 2.2.x drop to 12 left the relay worker below the UART task,
+    // so under a CCU reconnect burst the parser could feed the worker faster
+    // than it was allowed to drain. Field units on both silicon revisions
+    // still hit interrupt-watchdog resets with priority 12 (#362), so the
+    // conservative move is the known-good 2.1.10 value rather than a novel
+    // one; it also keeps the relay chain (UART 15 -> worker 15) at one level,
+    // like 2.1.10 had.
     TaskHandle_t task = NULL;
     if (xTaskCreate(_raw_uart_udpQueueHandlerTask, "RawUartUdpListener_UDP_QueueHandler",
-                    4096, this, 12, &task) != pdPASS) {
+                    4096, this, 15, &task) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UDP listener task");
         // Reception was enabled before task creation so the tcpip thread may
         // already have transferred pbuf ownership into the queue. Close

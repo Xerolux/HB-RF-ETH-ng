@@ -96,6 +96,14 @@ typedef struct {
     // must keep running through crash_blackbox_clear().
     uint32_t tick_magic;      // CRASH_BLACKBOX_TICK_MAGIC once armed this RTC cycle
     uint32_t last_tick_ms[2]; // [cpu] uptime ms of that CPU's most recent tick
+
+    // Latched copy of last_tick_ms[] taken at the very start of the boot
+    // AFTER a reset, before the sentinel re-arms and starts overwriting the
+    // live slots (the first Beta.4 revision read the live slots ~7 s after
+    // boot and therefore only ever saw the new session's ticks — the
+    // pre-crash values were already gone). prev_tick_magic guards the copy.
+    uint32_t prev_tick_magic;  // CRASH_BLACKBOX_TICK_MAGIC when prev_tick_ms holds pre-reset values
+    uint32_t prev_tick_ms[2];  // [cpu] uptime ms of that CPU's last tick BEFORE the reset
 } crash_blackbox_t;
 
 // Record a fresh sample. Called periodically (e.g. every 60 s) from the
