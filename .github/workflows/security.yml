@@ -73,6 +73,7 @@ jobs:
           "$HOME/esp-idf/install.sh" esp32
 
       - name: Enable ESP32 ECO3 cache-lock livelock workaround (errata WDT-3.15, issue #362)
+        if: matrix.language == 'cpp'
         run: bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"
 
       - name: Build with ESP-IDF
