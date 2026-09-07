@@ -8,18 +8,17 @@ const BASE_URL = 'http://127.0.0.1:1234';
 const gotoApp = (page, pathName) => page.goto(`${BASE_URL}${pathName}`, { waitUntil: 'domcontentloaded' });
 
 test.use({
-  viewport: { width: 1280, height: 800 },
-  video: {
-    mode: 'on',
-    size: { width: 1280, height: 800 },
-    dir: screenshotsDir
-  }
+  viewport: { width: 1600, height: 1000 },
+  // The WebUI picks its language from the browser, and the README these
+  // screenshots feed is German - pin both so captures stay reproducible.
+  locale: 'de-DE',
+  timezoneId: 'Europe/Berlin'
 });
 
 test.describe('Generate Assets', () => {
 
-  test('capture screenshots and video', async ({ page }) => {
-    test.setTimeout(90000);
+  test('capture README screenshots', async ({ page }) => {
+    test.setTimeout(180000);
     // --- Mocks ---
 
     // SysInfo (Dashboard data)
@@ -29,7 +28,8 @@ test.describe('Generate Assets', () => {
         body: JSON.stringify({
           sysInfo: {
             serial: "MEQ1234567",
-            currentVersion: "2.1.11",
+            hostname: "hb-rf-eth",
+            currentVersion: "2.2.7",
             latestVersion: "n/a",
             rawUartRemoteAddress: "192.168.1.10",
             memoryUsage: 45.2,
@@ -124,6 +124,16 @@ test.describe('Generate Assets', () => {
         });
     });
 
+    // /api/log/status decides whether the viewer renders the live buffer or the
+    // "capture disabled" placeholder. Registered after the generic
+    // '**/api/log*' route so this more specific handler wins.
+    await page.route('**/api/log/status*', async route => {
+        await route.fulfill({
+            contentType: 'application/json',
+            body: JSON.stringify({ enabled: true })
+        });
+    });
+
     // --- Execution ---
 
     // Ensure dir exists
@@ -185,7 +195,5 @@ test.describe('Generate Assets', () => {
     await page.waitForSelector('.about-page', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1000);
     await page.screenshot({ path: path.join(screenshotsDir, '08_About.png') });
-
-    // Video will be saved automatically to screenshotsDir with a random name.
   });
 });

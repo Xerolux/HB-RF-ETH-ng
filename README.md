@@ -89,21 +89,29 @@ python3 rename_webui_files.py
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
 ### Screenshots
-| Login | Dashboard |
-| :---: | :---: |
-| ![Login](screenshots/01_Login.png) | ![Dashboard](screenshots/02_Dashboard.png) |
+Die Aufnahmen zeigen die aktuelle WebUI im Auslieferungszustand (helles Theme,
+Akzentfarbe `#f26a3d`). Theme und Akzentfarbe lassen sich unter
+*Einstellungen → Design* umstellen.
 
-| Settings | Monitoring |
+| Anmeldung | Status (Dashboard) |
 | :---: | :---: |
-| ![Settings](screenshots/04_Settings.png) | ![Monitoring](screenshots/05_Monitoring.png) |
+| ![Anmeldung](screenshots/01_Login.png) | ![Status](screenshots/02_Dashboard.png) |
 
-| Firmware Update | System Log |
+| Einstellungen | Monitoring |
 | :---: | :---: |
-| ![Firmware Update](screenshots/06_FirmwareUpdate.png) | ![System Log](screenshots/07_SystemLog.png) |
+| ![Einstellungen](screenshots/04_Settings.png) | ![Monitoring](screenshots/05_Monitoring.png) |
 
-| About |
+| Updates (Geräte-Firmware) | System-Log |
+| :---: | :---: |
+| ![Updates](screenshots/06_FirmwareUpdate.png) | ![System-Log](screenshots/07_SystemLog.png) |
+
+| Über |
 | :---: |
-| ![About](screenshots/08_About.png) |
+| ![Über](screenshots/08_About.png) |
+
+> Die Screenshots werden aus der laufenden WebUI erzeugt und nicht von Hand
+> nachbearbeitet. Neu aufnehmen mit:
+> `cd webui && npm install && npx playwright test tests/generate_assets.spec.js`
 
 ### Danksagung
 Ein großer Dank geht an **Alexander Reinert** für die Entwicklung der originalen HB-RF-ETH Firmware und Hardware. Seine Arbeit bildet die Grundlage für diese modernisierte Version.

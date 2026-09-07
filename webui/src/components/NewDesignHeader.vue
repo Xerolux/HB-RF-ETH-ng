@@ -428,7 +428,10 @@ onUnmounted(() => {
 }
 
 .brand-copy strong {
-  font-size: var(--fs-3xl);
+  /* --fs-3xl (38px) makes the wordmark wider than the fixed 360px sidebar, so
+     the trailing characters were clipped by the sidebar's overflow-x: hidden.
+     --fs-2xl keeps the display weight while fitting the column. */
+  font-size: var(--fs-2xl);
   line-height: var(--line-height-tight);
   letter-spacing: 0;
   font-weight: var(--font-weight-heavy);
