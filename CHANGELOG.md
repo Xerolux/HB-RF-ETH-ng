@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.7] - 2026-09-07
+
+### Changes
+- fix(stability): UART RX-FIFO overflow hardening + panic transcript capture (#362)
+- docs: green NewDesign screenshots, real version, wiki set refreshed (#439)
+- ci: skip the ESP-IDF ECO3 patch on the JavaScript CodeQL leg (#438)
+- docs: refresh README screenshots from the current WebUI (#437)
+- chore: update WebUI manifest for webui-v1.0.0
+
 ## [2.2.7-Beta.6] - 2026-09-06
 
 ### Changes
