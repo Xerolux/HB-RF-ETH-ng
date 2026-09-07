@@ -89,9 +89,10 @@ python3 rename_webui_files.py
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
 ### Screenshots
-Die Aufnahmen zeigen die aktuelle WebUI im Auslieferungszustand (helles Theme,
-Akzentfarbe `#f26a3d`). Theme und Akzentfarbe lassen sich unter
-*Einstellungen → Design* umstellen.
+Die Aufnahmen zeigen die aktuelle WebUI im NewDesign mit der smaragdgrünen
+Akzentfarbe `#2F8B57` (helles Theme). Farbschema und Akzentfarbe lassen sich
+unter *Einstellungen → Design* frei wählen — ein frisch geflashtes Gerät
+startet mit dem orangen Markton `#f26a3d`.
 
 | Anmeldung | Status (Dashboard) |
 | :---: | :---: |
