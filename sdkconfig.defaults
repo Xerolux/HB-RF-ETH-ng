@@ -71,3 +71,20 @@ CONFIG_LWIP_MAX_SOCKETS=16
 # the socket FD was unavailable for a full minute,
 # compounding the socket-exhaustion problem above.
 CONFIG_LWIP_TCP_MSL=15000
+
+# Heap poisoning (light): field data from the tick sentinel (issue #362)
+# shows single-core freezes with no preceding fault - consistent with a
+# silent memory corruption hitting lock/heap structures. Light poisoning
+# puts canaries around every allocation and verifies them on free, turning
+# a silent wild write into an abort with a distinguishable reset reason
+# ("Software Reset (panic)" instead of "Interrupt Watchdog") so field
+# devices can report the culprit class without a serial console.
+CONFIG_HEAP_POISONING_LIGHT=y
+
+# UART ISR in IRAM (issue #362): the radio-module UART (UART1, 115200 baud)
+# must keep being serviced while a flash write/erase has the cache disabled.
+# With the ISR in flash it is masked for the whole flash window, the 128-byte
+# hardware FIFO overflows within ~10 ms, and the driver's overflow recovery
+# spins in an ISR critical section on a FIFO counter the ESP32 errata
+# (UART-3.17) documents as unreliable. Costs ~4 KB of IRAM, no DRAM.
+CONFIG_UART_ISR_IN_IRAM=y

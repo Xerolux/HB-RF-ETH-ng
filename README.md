@@ -71,12 +71,16 @@ python3 rename_webui_files.py
 ./idf.py build
 ```
 
-> **Wichtig — IDF-Patch (Errata WDT-3.15, Issue #362):** Vor dem ersten Build
-> einmalig `bash scripts/patch_idf_eco3_fix.sh ~/esp-idf` ausführen. Das Skript
-> aktiviert den ESP32-v3.x-Cache-Livelock-Watchdog-Workaround
-> (`CONFIG_ESP32_ECO3_CACHE_LOCK_FIX`) auch auf Boards ohne PSRAM — ohne ihn
-> können Rev-3-Chips spurlos per Interrupt-Watchdog resettet werden. Die CI wendet
-> den Patch automatisch an; auf Silicon ≤ v2 ist er ein No-Op.
+> **Wichtig — IDF-Patches (Issue #362):** Vor dem ersten Build einmalig
+> `bash scripts/patch_idf_eco3_fix.sh ~/esp-idf` und
+> `bash scripts/patch_idf_uart_rxfifo_rst.sh ~/esp-idf` ausführen. Das erste
+> Skript aktiviert den ESP32-v3.x-Cache-Livelock-Watchdog-Workaround
+> (`CONFIG_ESP32_ECO3_CACHE_LOCK_FIX`, Errata WDT-3.15) auch auf Boards ohne
+> PSRAM (auf Silicon ≤ v2 ein No-Op). Das zweite begrenzt die unendliche
+> RX-FIFO-Leerlaufschleife in `uart_ll_rxfifo_rst()` des ESP32-UART-Treibers
+> (Errata UART-3.17: `rxfifo_cnt` ist unzuverlässig), die der Treiber bei jedem
+> RX-FIFO-Überlauf innerhalb einer ISR-Critical-Section ausführt. Die CI wendet
+> beide Patches automatisch an; beide sind idempotent.
 
 > Vor jeder Styling-Änderung an der WebUI bitte [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) lesen — die verbindliche Design-Spezifikation (Zwei-Theme-System, Farbpaletten, Tokens).
 

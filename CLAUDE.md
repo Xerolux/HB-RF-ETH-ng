@@ -65,12 +65,17 @@ HB-RF-ETH-ng/
 | IDF target | `esp32` |
 | SDK config | `sdkconfig.defaults;sdkconfig.hb-rf-eth-ng` |
 
-> **Required IDF patch (errata WDT-3.15 / issue #362):** after cloning
-> ESP-IDF, run `scripts/patch_idf_eco3_fix.sh $IDF_PATH`. It removes the
+> **Required IDF patches (issue #362):** after cloning ESP-IDF, run both
+> `scripts/patch_idf_eco3_fix.sh $IDF_PATH` and
+> `scripts/patch_idf_uart_rxfifo_rst.sh $IDF_PATH`. The first removes the
 > `SPIRAM` gate from `CONFIG_ESP32_ECO3_CACHE_LOCK_FIX` so the ESP32
-> v3.x cache-livelock watchdog workaround is active on our PSRAM-less
-> boards (no-op on silicon ≤ v2). CI applies it automatically in all
-> firmware workflows; local setups must run it once per IDF checkout.
+> v3.x cache-livelock watchdog workaround (errata WDT-3.15) is active on
+> our PSRAM-less boards (no-op on silicon ≤ v2). The second bounds the
+> unbounded RX-FIFO drain loop in the ESP32 `uart_ll_rxfifo_rst()` (errata
+> UART-3.17: `rxfifo_cnt` is unreliable), which the UART driver runs inside
+> an ISR critical section on every RX-FIFO overflow. CI applies both
+> automatically in all firmware workflows; local setups must run them once
+> per IDF checkout. Both are idempotent.
 
 ### Building the Firmware
 

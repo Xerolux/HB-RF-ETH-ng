@@ -54,6 +54,7 @@
 #include "events.h"
 #include "reset_info.h"
 #include "crash_blackbox.h"
+#include "panic_transcript.h"
 #include "system_reset.h"
 
 static const char *TAG = "HB-RF-ETH";
@@ -137,6 +138,12 @@ void app_main()
     // console attached, and the sentinel is the only witness that survives
     // the reset and can name the core that stopped ticking first.
     crash_blackbox_tick_sentinel_init();
+
+    // Latch the panic transcript (register dump + backtraces of the last
+    // panic/interrupt-watchdog reset, mirrored into RTC memory by the
+    // uart_hal_write_txfifo wrapper) into RAM before anything else runs.
+    // It is reported once NVS is up, see below.
+    panic_transcript_boot_latch();
 
     // All long-lived service objects are function-local statics instead of
     // stack locals: they must outlive app_main's active phase (the task is
@@ -314,13 +321,20 @@ void app_main()
         const char *diag = ResetInfo::getLastDiag();
         size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
-        ESP_LOGI(TAG, "Boot reset reason: %s (esp: %s)%s%s",
+        ESP_LOGI(TAG, "Boot reset reason: %s (esp: %s, rtc: %s)%s%s",
                  details ? details : "(unknown)",
                  esp_reason ? esp_reason : "(unknown)",
+                 ResetInfo::getRtcResetCause(),
                  (diag && diag[0]) ? " - " : "",
                  (diag && diag[0]) ? diag : "");
         ESP_LOGI(TAG, "Boot heap: %u bytes free, %u bytes largest block",
                  (unsigned)free_heap, (unsigned)largest);
+
+        // Panic transcript from before the reset (if the panic handler ran):
+        // essential lines into the system log, full text into the crash-tail
+        // slot for the WebUI. This is the backtrace field devices could never
+        // deliver before (#362).
+        panic_transcript_report();
     }
 
     // Register data providers for MQTT status topics (Ethernet link/IP,

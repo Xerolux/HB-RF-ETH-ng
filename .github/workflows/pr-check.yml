@@ -191,6 +191,9 @@ jobs:
 
       - name: Enable ESP32 ECO3 cache-lock livelock workaround (errata WDT-3.15, issue #362)
         run: bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"
+
+      - name: Bound the ESP32 UART RX-FIFO drain loop (errata UART-3.17, issue #362)
+        run: bash scripts/patch_idf_uart_rxfifo_rst.sh "$HOME/esp-idf"
       - name: Build and check firmware size
         run: |
           . "$HOME/esp-idf/export.sh"

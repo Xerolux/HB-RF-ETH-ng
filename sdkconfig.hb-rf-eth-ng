@@ -785,7 +785,11 @@ CONFIG_SPI_SLAVE_ISR_IN_IRAM=y
 #
 # ESP-Driver:UART Configurations
 #
-# CONFIG_UART_ISR_IN_IRAM is not set
+# Issue #362: keep UART1 RX serviced while a flash operation has the cache
+# disabled. Without this the UART ISR is masked for the whole flash window
+# (up to tens of ms), the 128-byte RX FIFO overflows at 115200 baud, and the
+# driver runs its FIFO-overflow recovery inside an ISR critical section.
+CONFIG_UART_ISR_IN_IRAM=y
 # end of ESP-Driver:UART Configurations
 
 #
@@ -1394,8 +1398,13 @@ CONFIG_HAL_DEFAULT_ASSERTION_LEVEL=2
 #
 # Heap memory debugging
 #
-CONFIG_HEAP_POISONING_DISABLED=y
-# CONFIG_HEAP_POISONING_LIGHT is not set
+# Corruption trap for issue #362: canaries around every allocation,
+# verified on free. A silent wild write aborts with a distinguishable
+# reset reason ("Software Reset (panic)") instead of freezing a core.
+# ~4-8 bytes overhead per allocation; measured headroom on this build
+# is sufficient (see sdkconfig.defaults note).
+# CONFIG_HEAP_POISONING_DISABLED is not set
+CONFIG_HEAP_POISONING_LIGHT=y
 # CONFIG_HEAP_POISONING_COMPREHENSIVE is not set
 CONFIG_HEAP_TRACING_OFF=y
 # CONFIG_HEAP_TRACING_STANDALONE is not set

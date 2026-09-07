@@ -28,6 +28,8 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "crash_blackbox.h"
+#include "esp_rom_sys.h"
+#include "soc/reset_reasons.h"
 #include <cstring>
 
 static const char *TAG = "ResetInfo";
@@ -193,6 +195,24 @@ const char* ResetInfo::getEspResetReason() {
     }
 }
 
+const char* ResetInfo::getRtcResetCause() {
+    switch ((int)esp_rom_get_reset_reason(0)) {
+        case RESET_REASON_CHIP_POWER_ON:   return "POWERON";
+        case RESET_REASON_CORE_SW:         return "SW_SYS";
+        case RESET_REASON_CORE_DEEP_SLEEP: return "DEEPSLEEP";
+        case RESET_REASON_CORE_SDIO:       return "SDIO";
+        case RESET_REASON_CORE_MWDT0:      return "TG0WDT_SYS";
+        case RESET_REASON_CORE_MWDT1:      return "TG1WDT_SYS";
+        case RESET_REASON_CORE_RTC_WDT:    return "RTCWDT_SYS";
+        case RESET_REASON_CPU0_MWDT0:      return "TG0WDT_CPU";
+        case RESET_REASON_CPU0_SW:         return "SW_CPU";
+        case RESET_REASON_CPU0_RTC_WDT:    return "RTCWDT_CPU";
+        case RESET_REASON_SYS_BROWN_OUT:   return "BROWNOUT";
+        case RESET_REASON_SYS_RTC_WDT:     return "RTCWDT_RTC";
+        default:                           return "?";
+    }
+}
+
 const char* ResetInfo::getResetDetails() {
     static bool initialized = false;
 
@@ -244,6 +264,26 @@ const char* ResetInfo::getResetDetails() {
                 if (hw == ESP_RST_INT_WDT || hw == ESP_RST_TASK_WDT ||
                     hw == ESP_RST_WDT || hw == ESP_RST_PANIC ||
                     hw == ESP_RST_BROWNOUT) {
+                    // Which of the two watchdog paths fired? After a
+                    // stage-0 interrupt-watchdog panic the chip reboots via
+                    // a software CPU reset (the panic handler ran and its
+                    // transcript was captured); a raw TG1WDT_SYS reset means
+                    // stage 1 fired because the stalled core never serviced
+                    // the level-4 interrupt - a hardware-level stall, not a
+                    // software spin. Decisive for issue #362.
+                    if (hw == ESP_RST_INT_WDT) {
+                        const int rtc = (int)esp_rom_get_reset_reason(0);
+                        const char *path;
+                        if (rtc == RESET_REASON_CPU0_SW || rtc == RESET_REASON_CORE_SW) {
+                            path = "stage-0 interrupt serviced, panic handler ran (transcript expected)";
+                        } else if (rtc == RESET_REASON_CORE_MWDT1) {
+                            path = "stage-1 hard reset, panic handler never ran (core could not take a level-4 interrupt)";
+                        } else {
+                            path = "unexpected raw cause";
+                        }
+                        ESP_LOGI(TAG, "Interrupt watchdog path: rtc cause %s - %s",
+                                 getRtcResetCause(), path);
+                    }
                     // The op-tag flight recorder answers "what was the
                     // firmware doing", which is strictly more actionable than
                     // the heap snapshot below (that only rules heap exhaustion

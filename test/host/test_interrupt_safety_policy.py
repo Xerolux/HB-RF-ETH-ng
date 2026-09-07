@@ -60,6 +60,53 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         readme = self.read("README.md")
         self.assertIn("ESP-IDF 6.1", readme)
 
+    def test_idf_patches_are_applied_in_every_firmware_workflow(self) -> None:
+        # Both IDF patches are part of the firmware, not of the CI recipe: a
+        # build without them is a different (less safe) firmware. Every
+        # workflow that clones a fresh IDF must apply both (issue #362).
+        for script in ("scripts/patch_idf_eco3_fix.sh", "scripts/patch_idf_uart_rxfifo_rst.sh"):
+            with self.subTest(script=script):
+                self.assertTrue((ROOT / script).is_file())
+        for workflow in FIRMWARE_WORKFLOWS:
+            with self.subTest(workflow=workflow):
+                content = self.read(workflow)
+                self.assertIn('bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"', content)
+                self.assertIn('bash scripts/patch_idf_uart_rxfifo_rst.sh "$HOME/esp-idf"', content)
+                # The patch must run before the build step of the same job.
+                self.assertLess(
+                    content.index('bash scripts/patch_idf_uart_rxfifo_rst.sh "$HOME/esp-idf"'),
+                    content.index("idf.py build"),
+                )
+
+    def test_uart_relay_keeps_the_fifo_overflow_path_out_of_reach(self) -> None:
+        # Issue #362: the ESP32 UART driver's RX-FIFO overflow recovery spins
+        # inside an ISR critical section on a counter the errata (UART-3.17)
+        # declares unreliable. These three settings keep that path from being
+        # exercised: ISR serviced during flash windows, a ring buffer that
+        # absorbs the relay task's blocking sends, and an RX threshold with
+        # real latency margin.
+        for config_path in ("sdkconfig.defaults", "sdkconfig.hb-rf-eth-ng"):
+            with self.subTest(config_path=config_path):
+                self.assertIn("CONFIG_UART_ISR_IN_IRAM=y", self.read(config_path))
+        connector = self.read("main/radiomoduleconnector.cpp")
+        self.assertIn("HM_UART_RX_RING_BUF_SIZE = 2048", connector)
+        self.assertIn("uart_set_rx_full_threshold(UART_NUM_1, HM_UART_RX_FULL_THRESHOLD)", connector)
+
+        # The panic transcript is the post-mortem channel; the wrap must stay
+        # in the link options and the latch must be the first thing after
+        # the tick sentinel so no early crash can overwrite the evidence.
+        cmake = self.read("main/CMakeLists.txt")
+        self.assertIn("-Wl,--wrap=uart_hal_write_txfifo", cmake)
+        main_source = self.read("main/main.cpp")
+        self.assertLess(
+            main_source.index("crash_blackbox_tick_sentinel_init();"),
+            main_source.index("panic_transcript_boot_latch();"),
+        )
+        self.assertIn("panic_transcript_report();", main_source)
+        transcript = self.read("main/panic_transcript.cpp")
+        self.assertIn("IRAM_ATTR __wrap_uart_hal_write_txfifo", transcript)
+        self.assertIn("RTC_NOINIT_ATTR panic_transcript_rtc_t s_rtc", transcript)
+
     def test_watchdog_remains_a_fault_detector(self) -> None:
         sdkconfig = self.read("sdkconfig.hb-rf-eth-ng")
         self.assertIn("CONFIG_ESP_INT_WDT_TIMEOUT_MS=300", sdkconfig)

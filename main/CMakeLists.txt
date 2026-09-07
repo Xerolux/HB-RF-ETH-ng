@@ -50,6 +50,14 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     HB_WEBUI_VERSION=\"${HB_WEBUI_VERSION}\"
     HB_SUPPORTED_WEBUI_API_VERSION=${HB_SUPPORTED_WEBUI_API_VERSION})
 
+# Panic transcript capture (issue #362): ESP-IDF's panic handler prints the
+# register dump and backtrace through uart_hal_write_txfifo(&UART0, ...).
+# Wrapping that symbol lets main/panic_transcript.cpp mirror the output into
+# RTC memory so it survives the watchdog/panic reboot and can be read from
+# the WebUI — the only post-mortem channel on field devices without a serial
+# console and without room for a coredump partition.
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=uart_hal_write_txfifo")
+
 # Transition firmware: keep the New Design embedded as a guaranteed fallback
 # while the same New Design can also be served and updated independently from
 # the existing 0x50000-byte `spiffs` partition.

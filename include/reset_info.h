@@ -62,6 +62,14 @@ public:
     // Get the ESP reset reason (hardware level)
     static const char* getEspResetReason();
 
+    // Raw RTC reset cause of CPU0 (esp_rom_get_reset_reason), as a short
+    // name. For interrupt-watchdog resets this distinguishes the two paths
+    // that esp_reset_reason() folds into ESP_RST_INT_WDT: SW_CPU (the stage-0
+    // watchdog interrupt was serviced and the panic handler rebooted the
+    // chip - a transcript exists) versus TG1WDT_SYS (stage-1 hard reset: the
+    // stalled core never took the level-4 interrupt). Issue #362.
+    static const char* getRtcResetCause();
+
     // Get combined detailed message
     static const char* getResetDetails();
 

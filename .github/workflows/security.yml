@@ -76,6 +76,10 @@ jobs:
         if: matrix.language == 'cpp'
         run: bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"
 
+      - name: Bound the ESP32 UART RX-FIFO drain loop (errata UART-3.17, issue #362)
+        if: matrix.language == 'cpp'
+        run: bash scripts/patch_idf_uart_rxfifo_rst.sh "$HOME/esp-idf"
+
       - name: Build with ESP-IDF
         if: matrix.language == 'cpp'
         run: |
@@ -128,6 +132,9 @@ jobs:
 
       - name: Enable ESP32 ECO3 cache-lock livelock workaround (errata WDT-3.15, issue #362)
         run: bash scripts/patch_idf_eco3_fix.sh "$HOME/esp-idf"
+
+      - name: Bound the ESP32 UART RX-FIFO drain loop (errata UART-3.17, issue #362)
+        run: bash scripts/patch_idf_uart_rxfifo_rst.sh "$HOME/esp-idf"
 
       - name: Check ESP-IDF tool versions
         run: |

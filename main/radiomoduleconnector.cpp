@@ -93,13 +93,43 @@ void RadioModuleConnector::start()
     // relay must not stall. 2 KiB absorbs a worst-case HmIP frame burst.
     static const int HM_UART_TX_RING_BUF_SIZE = 2048;
 
-    esp_err_t err = uart_driver_install(UART_NUM_1, UART_HW_FIFO_LEN(UART_NUM_1) * 2,
+    // RX ring buffer 2 KiB (was 2 x FIFO = 256 bytes since the original
+    // firmware). 256 bytes is ~22 ms of wire time at 115200 baud, so every
+    // time this task sat in a blocking network send for longer than that
+    // (tcpip_api_call on every module->CCU frame) the driver hit
+    // UART_BUFFER_FULL, disabled the RX interrupt, and the hardware FIFO then
+    // overflowed. The overflow path is the one place in the UART driver that
+    // spins in an ISR critical section on the RX-FIFO counter the ESP32
+    // errata (UART-3.17) declares unreliable - the prime suspect for the
+    // interrupt-watchdog resets of issue #362, which only affect busy
+    // installations (lots of RF traffic) and never the idle bench unit.
+    // 2 KiB covers ~180 ms of continuous inbound traffic; the heap cost is
+    // 1.75 KiB. Keeping the overflow path out of reach is cheaper than
+    // surviving it.
+    static const int HM_UART_RX_RING_BUF_SIZE = 2048;
+
+    // RX-FIFO "full" threshold 64 of 128 bytes (driver default: 120). The
+    // default leaves the ISR only 8 bytes = 0.7 ms at 115200 baud between
+    // "interrupt raised" and "FIFO overflows"; any critical section, flash
+    // window or higher-priority ISR on that core longer than that overflows
+    // the FIFO. 64 gives 5.5 ms of latency margin at the cost of one
+    // interrupt per 64 instead of 120 bytes - irrelevant at this data rate.
+    static const int HM_UART_RX_FULL_THRESHOLD = 64;
+
+    esp_err_t err = uart_driver_install(UART_NUM_1, HM_UART_RX_RING_BUF_SIZE,
                                         HM_UART_TX_RING_BUF_SIZE, 20, &_uart_queue, 0);
     if (err != ESP_OK) {
         ESP_LOGE("RadioModuleConnector", "Failed to install UART driver: %s",
                  esp_err_to_name(err));
         _uart_queue = NULL;
         return;
+    }
+
+    err = uart_set_rx_full_threshold(UART_NUM_1, HM_UART_RX_FULL_THRESHOLD);
+    if (err != ESP_OK) {
+        // Not fatal: the driver default still works, just with less margin.
+        ESP_LOGW("RadioModuleConnector", "Could not set RX-FIFO threshold: %s",
+                 esp_err_to_name(err));
     }
 
     if (xTaskCreate(serialQueueHandlerTask, "RadioModuleConnector_UART_QueueHandler",
@@ -163,9 +193,12 @@ void RadioModuleConnector::sendFrame(unsigned char *buffer, uint16_t len)
 void RadioModuleConnector::_serialQueueHandler()
 {
     uart_event_t event;
-    /* Match the RX buffer size passed to uart_driver_install() (UART_HW_FIFO_LEN * 2).
-     * event.size can be as large as the full driver RX buffer, so a smaller
-     * allocation would be overflowed by uart_read_bytes() on long bursts. */
+    /* One UART_DATA event carries at most one ISR read, i.e. at most the
+     * hardware FIFO (128 bytes); the driver RX ring buffer is larger than
+     * this scratch buffer only so that many such events can queue up while
+     * this task is blocked. Twice the FIFO keeps a safety margin, and the
+     * size check below turns any larger event into a flush instead of an
+     * overflow of this stack buffer. */
     const size_t bufSize = UART_HW_FIFO_LEN(UART_NUM_1) * 2;
     uint8_t buffer[UART_HW_FIFO_LEN(UART_NUM_1) * 2];
 
