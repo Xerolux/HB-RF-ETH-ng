@@ -47,8 +47,7 @@ static SemaphoreHandle_t _ledMutex = NULL;
 
 static void _ensureLedMutex()
 {
-    if (_ledMutex == NULL)
-    {
+    if (_ledMutex == NULL) {
         _ledMutex = xSemaphoreCreateMutex();
     }
 }
@@ -85,12 +84,12 @@ void ledSwitcherTask(void *parameter)
 void LED::start(Settings *settings)
 {
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = LEDC_HIGH_SPEED_MODE,
+        .speed_mode      = LEDC_HIGH_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_11_BIT,
-        .timer_num = LEDC_TIMER_0,
-        .freq_hz = 5000,
-        .clk_cfg = LEDC_AUTO_CLK,
-        .deconfigure = false,
+        .timer_num       = LEDC_TIMER_0,
+        .freq_hz         = 5000,
+        .clk_cfg         = LEDC_AUTO_CLK,
+        .deconfigure     = false,
     };
 
     _ensureLedMutex();
@@ -133,13 +132,13 @@ LED::LED(gpio_num_t pin) : _state(LED_STATE_OFF), _channel_conf({})
 {
     _ensureLedMutex();
 
-    _channel_conf.gpio_num = pin;
-    _channel_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-    _channel_conf.channel = LEDC_CHANNEL_0;
-    _channel_conf.timer_sel = LEDC_TIMER_0;
-    _channel_conf.duty = 0;
-    _channel_conf.hpoint = 0;
-    _channel_conf.sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD;
+    _channel_conf.gpio_num            = pin;
+    _channel_conf.speed_mode          = LEDC_HIGH_SPEED_MODE;
+    _channel_conf.channel             = LEDC_CHANNEL_0;
+    _channel_conf.timer_sel           = LEDC_TIMER_0;
+    _channel_conf.duty                = 0;
+    _channel_conf.hpoint              = 0;
+    _channel_conf.sleep_mode          = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD;
     _channel_conf.flags.output_invert = 0;
 
     for (uint8_t i = 0; i < MAX_LED_COUNT; i++)
@@ -177,15 +176,13 @@ void LED::updatePinState()
     // is only ever held for a few microseconds, so a timeout means something
     // is wrong - skipping one refresh is harmless, blocking the packet path
     // is not.
-    if (_ledMutex != NULL && xSemaphoreTake(_ledMutex, pdMS_TO_TICKS(100)) != pdTRUE)
-    {
+    if (_ledMutex != NULL && xSemaphoreTake(_ledMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         return;
     }
 
     _applyState();
 
-    if (_ledMutex != NULL)
-    {
+    if (_ledMutex != NULL) {
         xSemaphoreGive(_ledMutex);
     }
 }
