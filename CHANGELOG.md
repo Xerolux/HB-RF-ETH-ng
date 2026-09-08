@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.8] - 2026-09-08
+
+### Changes
+- fix(stability): serialize LEDC duty writes, restore high-speed mode (#362)
+- chore: update manifests for v2.2.7-Beta.7
+
 ## [2.2.7-Beta.7] - 2026-09-07
 
 ### Changes
