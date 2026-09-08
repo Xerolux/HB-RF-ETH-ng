@@ -24,6 +24,7 @@
 #include "led.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "driver/gpio.h"
 #include "math.h"
 
@@ -31,6 +32,25 @@ static volatile uint8_t _blinkState = 0;
 static LED *_leds[MAX_LED_COUNT] = {0};
 static TaskHandle_t _switchTaskHandle = NULL;
 static int _highDuty;
+
+// Serializes every LEDC duty write below. ledc_set_duty() and
+// ledc_update_duty() are two separate driver critical sections, so the pair
+// is not atomic. ledSwitcherTask and the CCU packet path (setLED() out of
+// RawUartUdpListener::handlePacket) drive the same channel, and when the two
+// halves interleave the driver rewrites conf1 while an update is still
+// pending. On ESP32 that can leave the channel's duty_start bit set, and
+// ledc_ll_set_duty_start() then spins on it forever inside ledc_spinlock
+// with interrupts disabled - interrupt watchdog reset after 300 ms (#362).
+// The driver's own fade semaphore does not cover this: ledc_update_duty()
+// never takes it.
+static SemaphoreHandle_t _ledMutex = NULL;
+
+static void _ensureLedMutex()
+{
+    if (_ledMutex == NULL) {
+        _ledMutex = xSemaphoreCreateMutex();
+    }
+}
 
 // LED Programme Konfiguration (Default-Werte)
 led_state_t LED::_programs[7] = {
@@ -64,13 +84,15 @@ void ledSwitcherTask(void *parameter)
 void LED::start(Settings *settings)
 {
     ledc_timer_config_t ledc_timer = {
-        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .speed_mode      = LEDC_HIGH_SPEED_MODE,
         .duty_resolution = LEDC_TIMER_11_BIT,
-        .timer_num = LEDC_TIMER_0,
-        .freq_hz = 5000,
-        .clk_cfg = LEDC_AUTO_CLK,
-        .deconfigure = false,
+        .timer_num       = LEDC_TIMER_0,
+        .freq_hz         = 5000,
+        .clk_cfg         = LEDC_AUTO_CLK,
+        .deconfigure     = false,
     };
+
+    _ensureLedMutex();
 
     _highDuty = settings->getLEDBrightness() * (1 << ledc_timer.duty_resolution) / 100;
 
@@ -108,13 +130,15 @@ void LED::stop()
 
 LED::LED(gpio_num_t pin) : _state(LED_STATE_OFF), _channel_conf({})
 {
-    _channel_conf.gpio_num = pin;
-    _channel_conf.speed_mode = LEDC_LOW_SPEED_MODE;
-    _channel_conf.channel = LEDC_CHANNEL_0;
-    _channel_conf.timer_sel = LEDC_TIMER_0;
-    _channel_conf.duty = 0;
-    _channel_conf.hpoint = 0;
-    _channel_conf.sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD;
+    _ensureLedMutex();
+
+    _channel_conf.gpio_num            = pin;
+    _channel_conf.speed_mode          = LEDC_HIGH_SPEED_MODE;
+    _channel_conf.channel             = LEDC_CHANNEL_0;
+    _channel_conf.timer_sel           = LEDC_TIMER_0;
+    _channel_conf.duty                = 0;
+    _channel_conf.hpoint              = 0;
+    _channel_conf.sleep_mode          = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD;
     _channel_conf.flags.output_invert = 0;
 
     for (uint8_t i = 0; i < MAX_LED_COUNT; i++)
@@ -147,6 +171,23 @@ void LED::_setPinState(bool enabled) {
 }
 
 void LED::updatePinState()
+{
+    // Bounded wait: an LED refresh must never park the relay task. The lock
+    // is only ever held for a few microseconds, so a timeout means something
+    // is wrong - skipping one refresh is harmless, blocking the packet path
+    // is not.
+    if (_ledMutex != NULL && xSemaphoreTake(_ledMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        return;
+    }
+
+    _applyState();
+
+    if (_ledMutex != NULL) {
+        xSemaphoreGive(_ledMutex);
+    }
+}
+
+void LED::_applyState()
 {
     switch (_state)
     {

@@ -63,6 +63,7 @@ private:
     uint8_t _state;
     ledc_channel_config_t _channel_conf;
     void _setPinState(bool enabled);
+    void _applyState();
 
     // LED Programme Konfiguration
     static led_state_t _programs[7]; // Programme für verschiedene Zustände
