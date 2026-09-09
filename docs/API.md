@@ -608,9 +608,10 @@ started:
 worker task could not be created.
 
 A search is refused before any network activity when free memory is too low,
-when a firmware or WebUI installation is in progress, or when another outbound
-TLS operation holds the device-wide network gate. The reason then appears in
-`lastSkipReason`.
+when a firmware installation is in progress, or when another outbound TLS
+operation holds the device-wide network gate. (A WebUI upload does not gate
+the search; both were verified to run concurrently on hardware.) The reason
+then appears in `lastSkipReason`.
 
 ---
 

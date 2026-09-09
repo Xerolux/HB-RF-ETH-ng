@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Priorität 3 (Relay-Kette: 15) und kann dem Funkpfad keine CPU nehmen.
 - Eine übersprungene Suche wird als solche angezeigt und niemals als
   „kein Update gefunden“.
+- Hardware-Feldtest (2026-09-09, productive Gerät mit aktiver CCU über die
+  UART/UDP-Brücke): 30+ Suchen über API und WebUI, Heap-Drift nach 20 Suchen
+  172 Bytes, kein Watchdog-Reset, keine CCU-Trennung, keine Crash-Einträge.
+  Doku entsprechend korrigiert: Die Suche blockt nur bei laufender
+  **Firmware**-Installation (nicht WebUI-Upload), und die
+  Speicher-Akzeptanzschwelle des Testprotokolls unterscheidet jetzt Idle- und
+  CCU-Lastfall.
 
 ## [2.2.7-Beta.8] - 2026-09-08
 

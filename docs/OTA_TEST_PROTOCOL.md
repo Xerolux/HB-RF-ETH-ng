@@ -125,9 +125,21 @@ request itself.
 
 **Memory gate — the acceptance criterion.** Read
 `esp_get_minimum_free_heap_size()` (WebUI system overview, or
-`status/min_free_heap`) before and after. The manual search must not push the
-minimum free heap below **80 KB**, and after twenty consecutive searches the
-free heap must return to within 4 KB of its starting value.
+`status/min_free_heap`) before and after, and record the load state first,
+because the floor depends on the baseline:
+
+- On an **idle device** (no CCU session, optional services off; roughly
+  110 KB free after boot), the manual search must not push the minimum free
+  heap below **80 KB**.
+- On a device **with an active CCU session** (idle free heap around 60–65 KB,
+  where an 80 KB floor is unreachable by design), the transient minimum must
+  stay above **15 KB** during the search's TLS handshake.
+
+In both states, after twenty consecutive searches the free heap must return
+to within 4 KB of its starting value. Field reference (2026-09-09, active
+CCU on RPI-RF-MOD fw 4.4.22): idle free 63.6 KB / largest block 45.0 KB,
+transient minimum 17.4 KB, free heap after 20 searches within 172 bytes of
+the start; no relay impact, no watchdog reset.
 
 - [ ] Press "Search for updates now" with the device idle: a result appears and
       the displayed check time advances.
