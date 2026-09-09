@@ -722,6 +722,6 @@ export default {
   // Privacy
   privacy: {
     title: 'Confidentialité',
-    updateCheck: 'L’appareil ne recherche plus automatiquement les mises à jour et ne se connecte pas à GitHub à cette fin. Les nouvelles versions sont disponibles sur GitHub ; le micrologiciel local est téléversé directement du navigateur vers l’appareil. Les fonctions facultatives ne se connectent qu’aux serveurs configurés lorsqu’elles sont activées.',
+    updateCheck: 'L’appareil ne recherche jamais de mises à jour de lui-même. Ce n’est que si vous lancez « Rechercher des mises à jour » dans l’interface qu’il récupère un petit fichier de versions (moins de 1 Ko) depuis xerolux.github.io et le compare à la version installée. Aucune donnée de l’appareil n’est transmise ; la requête ne comporte que l’adresse IP publique de votre connexion. Rien n’est téléchargé ni installé — le micrologiciel est toujours téléversé directement du navigateur vers l’appareil. Les fonctions facultatives ne se connectent qu’aux serveurs configurés lorsqu’elles sont activées.',
   },
 }

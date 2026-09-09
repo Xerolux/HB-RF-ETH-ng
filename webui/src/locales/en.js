@@ -721,6 +721,6 @@ export default {
   // Privacy
   privacy: {
     title: 'Privacy',
-    updateCheck: 'The device no longer checks for updates automatically and does not connect to GitHub for that purpose. New versions can be found on GitHub; the firmware upload happens directly from your browser to the device. Optional features (MQTT, syslog) only connect to their configured servers when enabled.'
+    updateCheck: 'The device never searches for updates on its own. Only when you trigger “Search for updates now” in the interface does it fetch a small version file (under 1 KB) from xerolux.github.io and compare it with the installed version. No device data is transmitted; the request carries only your connection\u2019s public IP address. Nothing is downloaded or installed — the firmware upload still happens directly from your browser to the device. Optional features (MQTT, syslog) only connect to their configured servers when enabled.'
   },
 }

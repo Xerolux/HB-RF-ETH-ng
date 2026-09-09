@@ -722,6 +722,6 @@ webuiUpdate: {
   // Privacy
   privacy: {
     title: 'Privacy',
-    updateCheck: 'Il dispositivo non cerca più aggiornamenti automaticamente e non si connette a GitHub a tale scopo. Le nuove versioni sono disponibili su GitHub; il firmware locale viene caricato direttamente dal browser al dispositivo. Le funzioni opzionali si collegano solo ai server configurati quando sono abilitate.',
+    updateCheck: 'Il dispositivo non cerca mai aggiornamenti da solo. Solo se si avvia «Cerca aggiornamenti ora» nell’interfaccia, scarica un piccolo file di versioni (meno di 1 KB) da xerolux.github.io e lo confronta con la versione installata. Non viene trasmesso alcun dato del dispositivo; la richiesta contiene soltanto l’indirizzo IP pubblico della vostra connessione. Non viene scaricato né installato nulla: il firmware viene sempre caricato direttamente dal browser al dispositivo. Le funzioni opzionali si collegano solo ai server configurati quando sono abilitate.',
   },
 }
