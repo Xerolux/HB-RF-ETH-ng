@@ -45,6 +45,7 @@
 #include "radiomoduleconnector.h"
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
+#include "update_check.h"
 #include "webui.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
@@ -336,6 +337,12 @@ void app_main()
         // deliver before (#362).
         panic_transcript_report();
     }
+
+    // Prepare the manual update search before monitoring starts publishing, so
+    // the first MQTT status cycle reads a real (empty) snapshot rather than
+    // finding the module uninitialised. This allocates a mutex and nothing
+    // else - no task, no timer, no network activity until someone asks.
+    update_check_init();
 
     // Register data providers for MQTT status topics (Ethernet link/IP,
     // radio module info, system clock / NTP sync state). Must happen before

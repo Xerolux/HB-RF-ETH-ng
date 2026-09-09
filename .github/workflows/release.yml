@@ -144,6 +144,20 @@ jobs:
             -o build/host-tests/test_secure_utils
           build/host-tests/test_secure_utils
 
+      - name: Test update-search admission policy and version decision
+        run: |
+          mkdir -p build/host-tests
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror \
+            -Iinclude \
+            test/host/test_updatecheck_heap_policy.cpp \
+            -o build/host-tests/test_updatecheck_heap_policy
+          build/host-tests/test_updatecheck_heap_policy
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror \
+            -Iinclude \
+            test/host/test_update_decision.cpp \
+            -o build/host-tests/test_update_decision
+          build/host-tests/test_update_decision
+
       - name: Test stability and storage policies
         run: python3 -m unittest discover -s test/host -p 'test_*policy.py'
 

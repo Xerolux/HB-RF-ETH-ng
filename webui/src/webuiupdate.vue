@@ -39,21 +39,50 @@
           <div class="header-icon bg-success-light text-success"><AppIcon name="externalLink" /></div>
           <div class="header-text">
             <span class="kicker">{{ t('webuiUpdate.availableKicker') }}</span>
-            <h2>{{ t('firmware.updatesOnGithubHeading') }}</h2>
-            <p>{{ t('firmware.updatesOnGithubHelp') }}</p>
+            <h2>{{ t('firmware.onlineHeading') }}</h2>
+            <p>{{ t('webuiUpdate.onlineHelp') }}</p>
           </div>
         </div>
 
         <div class="card-body">
-          <p class="muted-text">{{ t('firmware.noAutoCheckNote') }}</p>
+          <p class="muted-text">{{ t('firmware.onlineManualNote') }}</p>
+
+          <div class="channel-row">
+            <label class="channel-label" for="webui-update-channel">{{ t('firmware.channelLabel') }}</label>
+            <select id="webui-update-channel" v-model="channel" class="form-select channel-select"
+                    :disabled="checking">
+              <option value="stable">{{ t('firmware.channelStable') }}</option>
+              <option value="beta">{{ t('firmware.channelBeta') }}</option>
+            </select>
+          </div>
+
+          <!-- Same rule as on the firmware page: the outcome is durable page
+               content, and a skip is never rendered as "up to date". -->
+          <BAlert v-if="triggerMessage.text" :variant="triggerMessage.variant" :model-value="true">
+            {{ triggerMessage.text }}
+          </BAlert>
+          <BAlert v-if="searchMessage.text" :variant="searchMessage.variant" :model-value="true">
+            {{ searchMessage.text }}
+          </BAlert>
+          <p v-if="!searchMessage.text" class="muted-text">{{ t('firmware.neverChecked') }}</p>
+
+          <p v-if="updateStatus.lastCheck" class="muted-text">
+            {{ t('firmware.lastCheck') }}: {{ formatTimestamp(updateStatus.lastCheck) }}
+          </p>
+
           <div class="actions">
+            <BButton variant="success" class="action-btn" :disabled="checking" @click="checkForUpdates">
+              <span v-if="checking" class="spinner-border spinner-border-sm me-2"></span>
+              <AppIcon v-else name="refresh" /> {{ checking ? t('firmware.checking') : t('firmware.checkNow') }}
+            </BButton>
             <a
-              class="btn btn-success action-btn"
-              href="https://github.com/Xerolux/HB-RF-ETH-ng/releases"
+              class="btn btn-outline-secondary action-btn"
+              :href="updateStatus.notesUrl || 'https://github.com/Xerolux/HB-RF-ETH-ng/releases'"
               target="_blank"
               rel="noopener noreferrer"
             >
-              <AppIcon name="externalLink" /> {{ t('webuiUpdate.releaseLink') }}
+              <AppIcon name="externalLink" />
+              {{ updateStatus.notesUrl ? t('firmware.releaseNotes') : t('webuiUpdate.releaseLink') }}
             </a>
             <BButton variant="outline-secondary" :disabled="loading" @click="refreshCachedStatus">
               <AppIcon name="refresh" /> {{ t('webuiUpdate.reloadStatusButton') }}
@@ -107,12 +136,38 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from './stores.js'
+import { useUpdateSearch } from './composables/useUpdateSearch'
 
 const { t } = useI18n()
+
+// Shared with the firmware update page - one device-side search answers both.
+const {
+  channel,
+  checking,
+  updateStatus,
+  triggerMessage,
+  resultMessage,
+  checkForUpdates,
+  loadUpdateStatus,
+  stopPolling,
+  formatTimestamp
+} = useUpdateSearch(t)
+
+const searchMessage = resultMessage(status => {
+  if (status.webuiUpdateAvailable) {
+    return {
+      variant: 'success',
+      text: `${t('firmware.webuiAvailable', { version: status.latestWebui })} ${t('webuiUpdate.installHint')}`
+    }
+  }
+  return { variant: 'success', text: t('webuiUpdate.upToDate', { version: status.latestWebui }) }
+})
+
+onBeforeUnmount(stopPolling)
 
 const WEBUI_API_VERSION = typeof __WEBUI_API_VERSION__ !== 'undefined' ? __WEBUI_API_VERSION__ : 1
 const EMBEDDED_WEBUI_VERSION = typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : ''
@@ -237,12 +292,19 @@ const installManual = async () => {
   }
 }
 
-onMounted(refreshCachedStatus)
+onMounted(async () => {
+  await refreshCachedStatus()
+  // Show whatever the device already knows, without starting a search.
+  try { await loadUpdateStatus() } catch { /* Karte zeigt dann "noch keine Suche". */ }
+})
 </script>
 
 <style scoped>
 .status-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-bottom:var(--card-padding); }
 .content-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--card-padding); }
+.channel-row { display:flex; align-items:center; gap:var(--space-3); margin-bottom:var(--space-3); }
+.channel-label { color:var(--color-text-secondary); font-size:var(--fs-sm); font-weight:var(--font-weight-medium); margin:0; }
+.channel-select { max-width:200px; }
 .panel { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); }
 .status-card { padding:var(--space-4); display:flex; flex-direction:column; gap:5px; }
 .status-card .label,.status-card small { color:var(--color-text-secondary); font-size: var(--fs-xs); }

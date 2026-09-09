@@ -120,3 +120,5 @@ extern httpd_uri_t post_ota_update_handler;    // webui_ota.cpp
 extern httpd_uri_t post_restart_handler;       // webui_ota.cpp
 extern httpd_uri_t post_factory_reset_handler; // webui_ota.cpp
 extern httpd_uri_t get_ota_status_handler;     // webui_ota.cpp
+extern httpd_uri_t get_update_status_handler;  // update_api.cpp
+extern httpd_uri_t post_update_check_handler;  // update_api.cpp

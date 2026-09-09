@@ -319,6 +319,10 @@ HA-Discovery-Runde.
 | `status/serial` | string | `A1B2C3D4E5F6` | ESP32-MAC-basierte Geräteseriennr. |
 | `status/firmware_version` | string | `2.2.6-Beta.4` | Aktuell laufende Firmware-Version |
 | `status/webui_version` | string | `1.0.0-Beta.16` | Effektiv ausgelieferte WebUI-Version |
+| `status/latest_firmware_version` | string | `2.2.7` | Neueste veröffentlichte Firmware laut letzter Update-Suche. Leer, solange noch nie gesucht wurde |
+| `status/latest_webui_version` | string | `1.0.0` | Neueste veröffentlichte WebUI laut letzter Update-Suche. Leer, solange noch nie gesucht wurde |
+| `status/firmware_update_available` | bool | `false` | Nur `true`, wenn die veröffentlichte Version echt neuer ist als die laufende. Leer = noch nie gesucht (nicht „kein Update“) |
+| `status/webui_update_available` | bool | `false` | Wie oben für die WebUI |
 | `status/board_revision` | string | `REV 1.10 (PUB)` | Hardware-Revision der Platine |
 
 #### System-Metriken

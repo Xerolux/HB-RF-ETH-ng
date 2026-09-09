@@ -230,6 +230,74 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/update/status:
+    get:
+      tags:
+        - Updates
+      summary: Read the result of the last update search
+      description: >
+        Returns what the last search found. Does not start one. While
+        everChecked is false no statement about updates has been made, which is
+        not the same as being up to date. lastSkipReason is set when the search
+        did not run at all and must never be presented as "no update found".
+      responses:
+        '200':
+          description: Current update-search state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/update/check:
+    post:
+      tags:
+        - Updates
+      summary: Start one update search
+      description: >
+        Starts a single search and returns immediately; the work runs on its own
+        task. Poll /api/update/status for the outcome. The device only searches
+        when asked - nothing is scheduled. The search reports versions only and
+        never downloads or installs anything.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum: [stable, beta]
+                  default: stable
+                  description: Release channel to query. Not persisted on the device.
+      responses:
+        '202':
+          description: Search accepted and started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCheckOutcome'
+        '200':
+          description: >
+            Request understood but no search started - outcome is busy (one is
+            already running) or cooldown (asked again within 60 seconds).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCheckOutcome'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: The search worker could not be started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateCheckOutcome'
+
   /api/restart:
     post:
       tags:
@@ -259,6 +327,68 @@ components:
       description: 'Token authentication. Format: "Token YOUR_TOKEN_HERE"'
 
   schemas:
+    UpdateStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [idle, running]
+          description: Poll until this leaves "running".
+        everChecked:
+          type: boolean
+          description: False until one search has completed successfully.
+        channel:
+          type: string
+          enum: [stable, beta]
+        lastCheck:
+          type: integer
+          format: int64
+          description: >
+            Unix seconds of the last completed search; 0 when never, or when the
+            clock was not yet synchronised.
+          example: 1789012345
+        runningFirmware:
+          type: string
+          example: 2.2.7-Beta.8
+        runningWebui:
+          type: string
+          example: 1.0.0
+        latestFirmware:
+          type: string
+          example: 2.2.5
+        latestWebui:
+          type: string
+          example: 1.0.0
+        firmwareUpdateAvailable:
+          type: boolean
+          description: >
+            True only when the published version is strictly newer than the
+            running one, so a device on a pre-release is never offered an older
+            stable build.
+        webuiUpdateAvailable:
+          type: boolean
+        notesUrl:
+          type: string
+          description: Release page for the published version; opened by the browser, never fetched by the device.
+        lastError:
+          type: string
+          description: Set when the search failed. Mutually exclusive with lastSkipReason.
+        lastSkipReason:
+          type: string
+          description: >
+            Set when the search did not run, for example too little free memory.
+            A skip is not a result.
+
+    UpdateCheckOutcome:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum: [accepted, busy, cooldown, unavailable]
+        channel:
+          type: string
+          enum: [stable, beta]
+
     SystemInfo:
       type: object
       properties:

@@ -24,6 +24,7 @@
 #include "mqtt_handler.h"
 #include "monitoring.h"
 #include "sysinfo.h"
+#include "update_check.h"
 #include "webui_storage.h"
 #include "reset_info.h"
 #include "crash_blackbox.h"
@@ -605,6 +606,33 @@ void mqtt_handler_publish_status(void)
     PUBLISH_STR("status/webui_version", webuiVersion);
     PUBLISH_STR("status/board_revision", sysInfo->getBoardRevisionString().c_str());
 
+    // ---- Manual update search --------------------------------------------
+    // Read-only reporting of the last search. There is deliberately no
+    // command topic: a remote trigger that flashes firmware unattended was
+    // removed for good reason and is not coming back through this door.
+    //
+    // Before the first search nothing is known, and "nothing is known" must
+    // not be published as "no update available" - that conflation is exactly
+    // how a skipped check once presented itself as an up-to-date device. An
+    // empty retained payload leaves the Home Assistant entity in its
+    // "unknown" state, which is the truthful answer.
+    {
+        const UpdateCheckStatus update = update_check_get_status();
+        if (update.everChecked) {
+            PUBLISH_STR("status/latest_firmware_version", update.latestFirmware);
+            PUBLISH_STR("status/latest_webui_version", update.latestWebui);
+            PUBLISH_STR("status/firmware_update_available",
+                        update.firmwareUpdateAvailable ? "true" : "false");
+            PUBLISH_STR("status/webui_update_available",
+                        update.webuiUpdateAvailable ? "true" : "false");
+        } else {
+            PUBLISH_STR("status/latest_firmware_version", "");
+            PUBLISH_STR("status/latest_webui_version", "");
+            PUBLISH_STR("status/firmware_update_available", "");
+            PUBLISH_STR("status/webui_update_available", "");
+        }
+    }
+
     // ---- System metrics ---------------------------------------------------
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
     PUBLISH_DOUBLE("status/memory_usage", sysInfo->getMemoryUsage(), 1);
@@ -754,7 +782,9 @@ void mqtt_handler_publish_status(void)
 //
 // We also clear supply_voltage (same removal commit) and the short-named
 // version / latest_version topics that were renamed to firmware_version /
-// latest_firmware_version. Each is an empty retained publish that the
+// latest_firmware_version - the renamed targets themselves are live topics
+// again and are deliberately absent from the list below. Each entry is an
+// empty retained publish that the
 // broker treats as "delete this retained value", mirroring the existing
 // remove_config() pattern for HA discovery topics. Idempotent and cheap,
 // so running it on every MQTT_EVENT_CONNECTED is safer than tracking
@@ -812,19 +842,15 @@ static void publish_legacy_topic_cleanup(void)
     }
 
     static const char *const legacy_subtopics[] = {
-        "status/temperature",
-        "status/supply_voltage",
-        "status/version",
-        "status/latest_version",
-        // Topics retired together with the automatic update-check feature.
-        "status/update_available",
-        "status/latest_firmware_version",
-        "status/latest_webui_version",
-        "status/firmware_update_available",
-        "status/webui_update_available",
-        "status/ota_state",
-        "status/ota_progress",
-        "status/ota_error",
+        "status/temperature", "status/supply_voltage", "status/version", "status/latest_version",
+        // Still retired: the combined legacy flag and the OTA progress topics,
+        // which only ever had meaning for the removed URL-based installer.
+        "status/update_available", "status/ota_state", "status/ota_progress", "status/ota_error",
+        // NOT listed any more: latest_firmware_version, latest_webui_version,
+        // firmware_update_available and webui_update_available. The manual
+        // update search publishes those four again, and deleting a retained
+        // value this firmware also writes would leave the subscriber's view
+        // depending on which publish happened to land last.
     };
 
     char topic[160];
@@ -981,14 +1007,23 @@ void mqtt_handler_publish_ha_discovery(void)
     remove_config("sensor", "latest_version");
     publish_config("sensor", "firmware_version", "Firmware Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:package-variant");
     publish_config("sensor", "webui_version", "WebUI Version", NULL, NULL, NULL, NULL, "diagnostic", "mdi:web");
-    // The automatic update-check feature was removed; drop the update-status
-    // entities older firmware may still have retained in HA / ioBroker so
-    // they don't linger as stale "(null)" / false sensors.
-    remove_config("sensor", "latest_firmware_version");
-    remove_config("sensor", "latest_webui_version");
-    remove_config("binary_sensor", "firmware_update_available");
-    remove_config("binary_sensor", "webui_update_available");
+    // Manual update search: reporting entities only. These replace the
+    // removals that stood here while the feature was gone - announcing and
+    // deleting the same entity in one pass would leave the outcome depending
+    // on ordering.
+    publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL, NULL,
+                   NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL, NULL,
+                   "diagnostic", "mdi:web-sync");
+    publish_config("binary_sensor", "firmware_update_available", "Firmware Update Available",
+                   "update", NULL, NULL, NULL, "diagnostic", "mdi:package-up", "true", "false");
+    publish_config("binary_sensor", "webui_update_available", "WebUI Update Available", "update",
+                   NULL, NULL, NULL, "diagnostic", "mdi:web-sync", "true", "false");
+    // Never reintroduced: the combined legacy entity, and any button that
+    // would let Home Assistant start an installation.
     remove_config("binary_sensor", "update_available");
+    remove_config("button", "check_update");
+    remove_config("update", "firmware_update");
     publish_config("sensor", "board_revision", "Board Revision", NULL, NULL, NULL, NULL, "diagnostic", "mdi:expansion-card");
 
     // ---- Sensors: network -----------------------------------------------

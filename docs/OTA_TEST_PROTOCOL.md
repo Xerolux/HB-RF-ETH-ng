@@ -117,6 +117,46 @@ flashing path.
 - [ ] Remove power during an incomplete upload: after power is restored, the
       previously selected firmware still boots.
 
+## Update search (manual, stage B1)
+
+The search reports versions only; it never downloads or installs anything.
+Everything below is read-only on the device apart from the outbound HTTPS
+request itself.
+
+**Memory gate — the acceptance criterion.** Read
+`esp_get_minimum_free_heap_size()` (WebUI system overview, or
+`status/min_free_heap`) before and after. The manual search must not push the
+minimum free heap below **80 KB**, and after twenty consecutive searches the
+free heap must return to within 4 KB of its starting value.
+
+- [ ] Press "Search for updates now" with the device idle: a result appears and
+      the displayed check time advances.
+- [ ] Press it again immediately: reported as cooldown, and the previously
+      displayed result and check time are unchanged.
+- [ ] Press it **while a CCU session is active and relaying**: the search
+      completes or is skipped with a visible reason, and the serial log shows
+      no UART overflow, no watchdog reset, and no CCU disconnect.
+- [ ] Unplug the uplink and press it: an explicit failure message appears. It
+      must not read as "up to date".
+- [ ] Force a low-memory state (start monitoring, MQTT-TLS and syslog, attach a
+      CCU) and press it: either it runs, or it is skipped with the free/largest
+      figures shown. A skip must never be displayed as "no update found".
+- [ ] Select the beta channel on a device running the newest beta: reported as
+      up to date, and **no** downgrade to the older stable release is offered.
+- [ ] Select the stable channel on that same beta device: still no downgrade.
+- [ ] Two browsers press it simultaneously: the second is reported as busy or
+      cooldown; only one outbound request is made.
+- [ ] Press it while a firmware upload is running: skipped with a reason, and
+      the upload is unaffected.
+- [ ] Home Assistant: before the first search the four update entities read
+      "unknown", not "off"/"no update". After a search they carry real values.
+- [ ] Restart the device: the search result is gone (it is not persisted) and
+      the card reads "no search has been run yet" rather than showing a stale
+      result.
+- [ ] Over an hour of normal CCU operation without pressing the button: no
+      outbound connection to github.io appears at the uplink (`tcpdump`). The
+      device must never search on its own.
+
 ## Long-run acceptance
 
 After a successful update, leave the device under its normal MQTT, CheckMK,
