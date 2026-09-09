@@ -282,7 +282,9 @@ paths:
         '200':
           description: >
             Request understood but no search started - outcome is busy (one is
-            already running) or cooldown (asked again within 60 seconds).
+            already running) or cooldown (asked again within 60 seconds; the
+            body then carries cooldownRemainingSec, the exact seconds until
+            the next attempt is allowed).
           content:
             application/json:
               schema:
@@ -347,6 +349,14 @@ components:
             Unix seconds of the last completed search; 0 when never, or when the
             clock was not yet synchronised.
           example: 1789012345
+        cooldownRemainingSec:
+          type: integer
+          description: >
+            Seconds until a new search may be triggered, 0 when none is active.
+            The window starts at the accepted attempt (including one that later
+            skips), so this - not lastCheck - is the basis for a "try again in
+            X seconds" hint.
+          example: 0
         runningFirmware:
           type: string
           example: 2.2.7-Beta.8
@@ -388,6 +398,12 @@ components:
         channel:
           type: string
           enum: [stable, beta]
+        cooldownRemainingSec:
+          type: integer
+          description: >
+            Only present when outcome is cooldown - the exact seconds until the
+            next attempt is allowed.
+          example: 42
 
     SystemInfo:
       type: object

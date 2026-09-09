@@ -474,6 +474,13 @@ UpdateCheckStatus update_check_get_status()
     if (!s_lock) return copy;
     xSemaphoreTake(s_lock, portMAX_DELAY);
     copy = s_status;
+    if (s_last_attempt_us != 0) {
+        const int64_t now = esp_timer_get_time();
+        if (now < s_last_attempt_us + COOLDOWN_US) {
+            copy.cooldownRemainingSec =
+                static_cast<uint32_t>((s_last_attempt_us + COOLDOWN_US - now + 999999) / 1000000);
+        }
+    }
     xSemaphoreGive(s_lock);
     return copy;
 }

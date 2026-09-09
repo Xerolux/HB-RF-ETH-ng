@@ -66,6 +66,12 @@ struct UpdateCheckStatus {
     // rendered as "up to date" - that conflation was a real defect once.
     char lastError[UPDATE_CHECK_REASON_LEN];
     char lastSkipReason[UPDATE_CHECK_REASON_LEN];
+
+    // Seconds until a new search may be triggered, 0 when none is active. The
+    // cooldown starts at the accepted attempt, so it counts down from 60 after
+    // a completed search and after a skip alike. Lets the UI say "try again
+    // in X seconds" without guessing the start of the window.
+    uint32_t cooldownRemainingSec;
 };
 
 enum update_check_trigger_result_t {

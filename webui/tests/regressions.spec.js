@@ -1607,8 +1607,28 @@ test('a skipped update search is never presented as an up-to-date result', async
 
   const card = page.locator('.firmware-page')
   await expect(card).toContainText('Search skipped')
-  await expect(card).toContainText('free=51 KB')
+  // The raw firmware reason is localized; the figures survive the mapping.
+  await expect(card).toContainText('too little free memory (free: 51 KB, largest block: 17 KB)')
   await expect(card).not.toContainText('Everything is current')
+})
+
+test('a cooldown names the seconds until the next attempt', async ({ page }) => {
+  await page.route('**/api/update/check', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ outcome: 'cooldown', channel: 'stable', cooldownRemainingSec: 42 })
+  }))
+  await page.route('**/api/update/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(idleUpdateStatus({}))
+  }))
+
+  await page.goto(`${BASE_URL}/updates/firmware`)
+  await page.getByRole('button', { name: /search for updates now/i }).click()
+
+  const card = page.locator('.firmware-page')
+  // The countdown ticks once per second, so match the wording with the figure
+  // rather than pinning one specific second.
+  await expect(card).toContainText(/try again in 4\d seconds/)
 })
 
 test('the update search reports its result durably, not only as a toast', async ({ page }) => {

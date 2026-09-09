@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- feat(api): `cooldownRemainingSec` in `GET /api/update/status` und in der
+  Cooldown-Antwort von `POST /api/update/check`. Das Fenster beginnt beim
+  angenommenen Versuch (auch wenn er später übersprungen wird), deshalb kann
+  die Oberfläche daraus exakt „in X Sekunden erneut versuchen“ anzeigen,
+  statt aus `lastCheck` zu raten.
+- feat(webui): Skip-Gründe der Update-Suche werden lokalisiert (zu wenig
+  Speicher mit Kennzahlen, Installation läuft, Netzwerk beschäftigt,
+  Versions-Puffer). Unbekannte Gründe neuerer Firmware werden unverändert
+  angezeigt, statt versteckt zu werden. Die Cooldown-Meldung zeigt einen
+  live tickenden Countdown „versuche es in X Sekunden erneut“.
+
 ## [2.2.7-Beta.9] - 2026-09-09
 
 ### Changes
