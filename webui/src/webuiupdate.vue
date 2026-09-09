@@ -84,9 +84,6 @@
               <AppIcon name="externalLink" />
               {{ updateStatus.notesUrl ? t('firmware.releaseNotes') : t('webuiUpdate.releaseLink') }}
             </a>
-            <BButton variant="outline-secondary" :disabled="loading" @click="refreshCachedStatus">
-              <AppIcon name="refresh" /> {{ t('webuiUpdate.reloadStatusButton') }}
-            </BButton>
           </div>
         </div>
       </section>
@@ -245,7 +242,7 @@ const clearFile = () => {
   fileError.value = ''
 }
 
-const selectFile = event => {
+const selectFile = async event => {
   fileError.value = ''
   selectedFile.value = event.target.files?.[0] || null
   if (!selectedFile.value) return
@@ -253,9 +250,17 @@ const selectFile = event => {
   const name = String(selectedFile.value.name || '').toLowerCase()
   if (!name.endsWith('.bin')) {
     fileError.value = t('webuiUpdate.fileInvalidExtension')
-  } else if (name.startsWith('firmware_')) {
+    return
+  }
+  if (name.startsWith('firmware_')) {
     fileError.value = t('webuiUpdate.fileIsFirmware')
-  } else if (!status.value.partitionSize) {
+    return
+  }
+  // Die Größenprüfung braucht die Partitionsgröße vom Gerät. Stand der
+  // Seitenaufruf fehlgeschlagen, wird er hier still einmal nachgeladen,
+  // statt die Dateiauswahl ohne Grund zu verweigern.
+  if (!status.value.partitionSize) await refreshCachedStatus()
+  if (!status.value.partitionSize) {
     fileError.value = t('webuiUpdate.fileStatusMissing')
   } else if (Number(selectedFile.value.size) !== Number(status.value.partitionSize)) {
     fileError.value = t('webuiUpdate.fileWrongSize', { expected: formatBytes(status.value.partitionSize), bytes: status.value.partitionSize })
