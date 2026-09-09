@@ -119,11 +119,10 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import axios from 'axios'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore } from './stores.js'
-import { safeLocal } from './composables/useSafeStorage'
+import { useUpdateSearch } from './composables/useUpdateSearch'
 
 const WEBUI_IMAGE_SIZE = 0x50000
 const ESP_IMAGE_MAGIC = 0xe9
@@ -135,136 +134,33 @@ const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
 
 // --- Online update search --------------------------------------------------
-// The device only searches when asked. The channel is a request parameter
-// rather than a device setting: with no automatic schedule there is nothing
-// on the device that would need to remember it, so it stays a per-browser
-// preference and the firmware writes no NVS for it.
-const CHANNEL_STORAGE_KEY = 'hb-rf-eth-ng-update-channel'
-const POLL_INTERVAL_MS = 1500
-const POLL_TIMEOUT_MS = 45000
+// Shared with the WebUI update page: one device-side search answers both, and
+// the logic lives in one place so a defect is fixed once. See
+// composables/useUpdateSearch.js.
+const {
+  channel,
+  checking,
+  updateStatus,
+  triggerMessage,
+  resultMessage,
+  checkForUpdates,
+  loadUpdateStatus,
+  stopPolling,
+  formatTimestamp
+} = useUpdateSearch(t)
 
-const channel = ref(safeLocal.get(CHANNEL_STORAGE_KEY) === 'beta' ? 'beta' : 'stable')
-const checking = ref(false)
-const updateStatus = ref({
-  everChecked: false,
-  lastCheck: 0,
-  latestFirmware: '',
-  latestWebui: '',
-  firmwareUpdateAvailable: false,
-  webuiUpdateAvailable: false,
-  notesUrl: '',
-  lastError: '',
-  lastSkipReason: ''
-})
-const triggerOutcome = ref('')
-let pollTimer = null
-
-const formatTimestamp = seconds => {
-  const value = Number(seconds) || 0
-  if (value <= 0) return '—'
-  return new Date(value * 1000).toLocaleString()
-}
-
-// Why the press did not start a search. Kept separate from the result below so
-// a cooldown never hides the finding the user is looking at - "I clicked and
-// the page told me nothing useful" was a real complaint about the old page.
-const triggerMessage = computed(() => {
-  switch (triggerOutcome.value) {
-    case 'cooldown': return { variant: 'info', text: t('firmware.checkCooldown') }
-    case 'busy': return { variant: 'info', text: t('firmware.checkBusy') }
-    case 'unavailable': return { variant: 'warning', text: t('firmware.checkUnavailable') }
-    default: return { variant: '', text: '' }
-  }
-})
-
-// One message, one meaning. A skip and a failure are shown as themselves and
-// never collapse into the reassuring "everything is current" case.
-const checkMessage = computed(() => {
-  const status = updateStatus.value
-  if (status.lastSkipReason) {
-    return { variant: 'warning', text: t('firmware.checkSkipped', { reason: status.lastSkipReason }) }
-  }
-  if (status.lastError) {
-    return { variant: 'danger', text: t('firmware.checkFailed', { reason: status.lastError }) }
-  }
-  if (!status.everChecked) return { variant: '', text: '' }
-  if (status.firmwareUpdateAvailable || status.webuiUpdateAvailable) {
-    const parts = []
-    if (status.firmwareUpdateAvailable) {
-      parts.push(t('firmware.firmwareAvailable', { version: status.latestFirmware }))
+const checkMessage = resultMessage(status => {
+  if (status.firmwareUpdateAvailable) {
+    return {
+      variant: 'success',
+      text: `${t('firmware.firmwareAvailable', { version: status.latestFirmware })} ${t('firmware.installHint')}`
     }
-    if (status.webuiUpdateAvailable) {
-      parts.push(t('firmware.webuiAvailable', { version: status.latestWebui }))
-    }
-    parts.push(t('firmware.installHint'))
-    return { variant: 'success', text: parts.join(' ') }
   }
   return {
     variant: 'success',
     text: t('firmware.upToDate', { fw: status.latestFirmware, ui: status.latestWebui })
   }
 })
-
-const loadUpdateStatus = async () => {
-  const response = await axios.get(`/api/update/status?t=${Date.now()}`, { timeout: 8000, silent: true })
-  updateStatus.value = response.data || updateStatus.value
-  return response.data
-}
-
-const stopPolling = () => {
-  if (pollTimer) {
-    clearTimeout(pollTimer)
-    pollTimer = null
-  }
-}
-
-const checkForUpdates = async () => {
-  if (checking.value) return
-  checking.value = true
-  triggerOutcome.value = ''
-  safeLocal.set(CHANNEL_STORAGE_KEY, channel.value)
-
-  try {
-    const response = await axios.post('/api/update/check', { channel: channel.value },
-                                      { timeout: 8000, silent: true })
-    const outcome = response.data?.outcome || 'accepted'
-    if (outcome !== 'accepted') {
-      // Rejected before any network activity - report it and stop; there is
-      // no result coming that polling could wait for.
-      triggerOutcome.value = outcome
-      await loadUpdateStatus().catch(() => {})
-      checking.value = false
-      return
-    }
-  } catch {
-    triggerOutcome.value = 'unavailable'
-    checking.value = false
-    return
-  }
-
-  // The device answers immediately and does the work on its own task, so the
-  // outcome is polled rather than awaited on the request.
-  const deadline = Date.now() + POLL_TIMEOUT_MS
-  const poll = async () => {
-    let status = null
-    try {
-      status = await loadUpdateStatus()
-    } catch {
-      // A transient read failure is not a failed search; keep polling until
-      // the deadline and let the device's own state have the last word.
-    }
-    if (status && status.state !== 'running') {
-      checking.value = false
-      return
-    }
-    if (Date.now() >= deadline) {
-      checking.value = false
-      return
-    }
-    pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
-  }
-  pollTimer = setTimeout(poll, POLL_INTERVAL_MS)
-}
 
 onBeforeUnmount(stopPolling)
 
