@@ -123,17 +123,73 @@ selbst zu zerlegen.
 > schlanke Geräte-Manifest existiert für sie ohnehin nicht. Fehlt das Feld,
 > gilt „keine Schranke"; der Parser behandelt es als optional.
 
-### 2.3 Betroffene Workflow-Änderungen
+Gepflegt wird der Wert in der Datei **`min_upgrade_from.txt`** im Repo-Wurzel-
+verzeichnis, neben `version.txt`. Sie existiert heute bewusst **nicht** — was
+„keine Schranke" bedeutet. Sie wird in genau dem Pull Request angelegt, der
+NVS- oder Partitions-Layout bricht, und ist dort reviewbar. Bewusst *nicht* in
+`release/`: dieses Verzeichnis enthält generierte Release-Artefakte und wird
+vom Release-Workflow überschrieben.
 
-- `.github/workflows/release.yml`: erzeugt zusätzlich `docs/updates/v1/{stable,beta}.json`
-  und committet sie mit den bestehenden Manifesten nach `main`.
-- `.github/workflows/release-webui.yml`: aktualisiert bei einem reinen
-  WebUI-Release nur die `ui*`-Felder, lässt `fw*` unangetastet.
-- `pages.yml` bleibt unverändert (liefert `./docs` bereits aus).
-- Neuer CI-Check in `docs.yml` oder `pr-check.yml`: Manifest ist gültiges JSON,
-  ≤ 1024 Byte, alle Pflichtfelder gesetzt, SHA-256 = 64 Hex, URLs `https://` mit
-  erlaubtem Host. **Ein zu großes Manifest bricht den Release-Build ab** — so
-  kann die Serverseite das Gerät nicht nachträglich in den OOM schieben.
+### 2.3 Umsetzung (Stufe A — implementiert)
+
+`scripts/device_manifest.py` ist die einzige Stelle, die das Geräteformat kennt.
+Sie kann beides, und teilt sich dadurch die Regeln:
+
+```bash
+scripts/device_manifest.py build <voll-manifest.json> <ausgabe.json>
+scripts/device_manifest.py check <manifest.json> [...]
+```
+
+Das schlanke Manifest wird **aus den vorhandenen vollen Manifesten abgeleitet**,
+nicht unabhängig erzeugt — damit können die beiden nicht auseinanderlaufen.
+
+Geprüft wird bei jedem `build` *vor* dem Schreiben und bei jedem `check`:
+
+- Größe ≤ 1024 Byte (die Schranke, die das Gerät durchsetzt);
+- Schema-Nummer exakt `1`;
+- alle Pflichtfelder vorhanden und vom richtigen Typ, **keine unbekannten Keys**
+  (ein Feld, das das Gerät nicht kennt, verbraucht nur Budget);
+- `fw`, `ui`, `uiMinFw`, `fwMinFrom` sind gültige SemVer;
+- `fwSha`/`uiSha` sind exakt 64 Hex-Zeichen in Kleinschreibung;
+- alle URLs `https://`, Host auf der Allowlist (`github.com`,
+  `githubusercontent.com` inkl. Subdomains), **kein expliziter Port**, und
+  `userinfo` vor dem `@` wird beim Host-Vergleich ignoriert, damit
+  `https://github.com@evil.example/…` nicht als vertrauenswürdig durchgeht.
+
+Workflow-Anbindung:
+
+- `.github/workflows/release.yml` und `release-webui.yml` erzeugen im
+  Publish-Schritt beide Geräte-Manifeste neu und committen sie zusammen mit den
+  vollen Manifesten nach `main`. Weil sie **jedes Mal komplett neu abgeleitet**
+  werden, repariert ein Release auch einen zwischenzeitlich verfälschten Stand.
+- `pages.yml` bleibt unverändert — es liefert `./docs` bereits aus.
+- `pr-check.yml` prüft in jedem PR zweierlei: dass die committeten Manifeste
+  gültig sind, **und** dass sie exakt dem entsprechen, was der Generator aus
+  `latest.json`/`beta.json` erzeugen würde. Eine Handänderung oder ein
+  vergessener Commit fällt damit im PR auf, nicht im Feld.
+
+**Ein zu großes oder ungültiges Manifest bricht den Release-Build ab**, statt
+veröffentlicht zu werden — die Serverseite kann das Gerät nicht nachträglich in
+den OOM schieben.
+
+#### Nachgetragen: `size` im vollen Manifest
+
+`fwSize` ließ sich nicht ableiten, weil die vollen Manifeste bisher nur für das
+WebUI eine Größe führten, für die Firmware aber nicht. `release.yml` schreibt
+jetzt zusätzlich `size` in den Firmware-Teil (analog zu `webui.size`), und die
+bestehenden `latest.json` / `beta.json` wurden mit den tatsächlichen
+Asset-Größen der jeweiligen Releases nachgetragen. Das Gerät prüft damit die
+`Content-Length` gegen die erwartete Größe, bevor es überhaupt Flash beschreibt.
+
+#### Aktueller Stand
+
+| Datei | Version | Größe |
+|---|---|---|
+| `docs/updates/v1/stable.json` | Firmware 2.2.5, WebUI 1.0.0 | 513 Byte |
+| `docs/updates/v1/beta.json` | Firmware 2.2.7-Beta.8, WebUI 1.0.0 | 542 Byte |
+
+Beide liegen bei rund der Hälfte des Budgets — auch mit `fwMinFrom` und einem
+längeren Tag-Namen bleibt reichlich Luft.
 
 ---
 
@@ -370,7 +426,7 @@ für den damaligen Rückbau und bleibt in v1 draußen. Eine spätere
 
 | Stufe | Inhalt | Freigabe erst wenn |
 |---|---|---|
-| A | Serverseite: schlankes Manifest auf Pages + CI-Größenprüfung | Manifest über HTTPS abrufbar, ≤ 1024 Byte |
+| A ✅ | Serverseite: schlankes Manifest auf Pages + CI-Größenprüfung | **umgesetzt** — siehe §2.3; verbleibende Bestätigung: Abruf über HTTPS nach dem ersten Pages-Deploy |
 | B | Modul 1 (Check) + `/api/update/status` + `/api/update/check` + UI-Anzeige, Modus `notify` | Heap-Messung §8 bestanden, 7 Tage Feldbetrieb ohne Auffälligkeit |
 | C | Modul 2 nur für **WebUI** + Modus `auto_webui` | Testprotokoll §8 vollständig grün |
 | D | Modul 2 für **Firmware** + Modus `auto_all` mit Wartungsfenster | Stufe C zwei Releases lang stabil |
@@ -485,6 +541,16 @@ den betroffenen Abschnitten oben bereits eingearbeitet.
 
 ## 12. Nächster Schritt
 
-Freigabe von **Stufe A** (Serverseite: schlankes Manifest unter
-`docs/updates/v1/` plus CI-Größenprüfung). Stufe A ist reine Workflow-Arbeit,
-berührt keine Firmware und ist damit risikofrei einzeln zu mergen.
+**Stufe A ist umgesetzt** (§2.3). Nach dem Merge deployt `pages.yml` die beiden
+Geräte-Manifeste; danach ist zu bestätigen, dass
+
+```
+https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/stable.json
+https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/beta.json
+```
+
+über HTTPS mit Status 200 ausgeliefert werden.
+
+Danach folgt **Stufe B**: `main/update_check.cpp` (Scheduler, Vorbedingungen,
+Manifest-Abruf, SemVer-Vergleich), `/api/update/status`, `/api/update/check` und
+die Anzeige in der Oberfläche — Modus `notify`, noch ohne Installationspfad.
