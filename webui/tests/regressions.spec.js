@@ -29,6 +29,24 @@ const settings = {
   flashPause: false
 }
 
+
+const idleUpdateStatus = (overrides = {}) => ({
+  state: 'idle',
+  everChecked: false,
+  channel: 'stable',
+  lastCheck: 0,
+  runningFirmware: '2.2.7-Beta.8',
+  runningWebui: '1.0.0',
+  latestFirmware: '',
+  latestWebui: '',
+  firmwareUpdateAvailable: false,
+  webuiUpdateAvailable: false,
+  notesUrl: '',
+  lastError: '',
+  lastSkipReason: '',
+  ...overrides
+})
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     if (!localStorage.getItem('locale')) localStorage.setItem('locale', 'en')
@@ -234,10 +252,14 @@ test('settings tabs and ping controls use desktop and mobile space responsively'
 })
 
 test('firmware update page follows the selected language completely', async ({ page }) => {
+  await page.route('**/api/update/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(idleUpdateStatus())
+  }))
   await page.goto(`${BASE_URL}/updates/firmware`)
 
   await expect(page.locator('.firmware-page .hero-title')).toHaveText('Update device firmware')
-  await expect(page.locator('.firmware-page')).toContainText('Available device firmware')
+  await expect(page.locator('.firmware-page')).toContainText('Update search')
   await expect(page.locator('.firmware-page')).toContainText('Install firmware manually')
   await expect(page.locator('.firmware-page')).not.toContainText('Firmware aktualisieren')
   await expect(page.locator('.firmware-page')).not.toContainText('Noch kein Prüfergebnis')
@@ -246,7 +268,7 @@ test('firmware update page follows the selected language completely', async ({ p
   await page.reload()
 
   await expect(page.locator('.firmware-page .hero-title')).toHaveText('Geräte-Firmware aktualisieren')
-  await expect(page.locator('.firmware-page')).toContainText('Verfügbare Geräte-Firmware')
+  await expect(page.locator('.firmware-page')).toContainText('Update-Suche')
   await expect(page.locator('.firmware-page')).toContainText('Firmware manuell installieren')
 })
 
@@ -1099,24 +1121,48 @@ test('incompatible installed WebUI is never presented as active and shows a pers
   await expect(page).toHaveURL(`${BASE_URL}/updates/webui`)
 })
 
-test('firmware page uses GitHub discovery and a local file without device-side search', async ({ page }) => {
+test('the firmware page never searches on its own and keeps the local upload path', async ({ page }) => {
+  // The device searches only when asked. Opening the page must not trigger a
+  // search, and the retired endpoint must stay retired.
   let retiredSearchRequests = 0
   await page.route('**/api/check_update**', route => {
     retiredSearchRequests++
     return route.abort()
   })
+  let searchRequests = 0
+  await page.route('**/api/update/check**', route => {
+    searchRequests++
+    return route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ outcome: 'accepted', channel: 'stable' })
+    })
+  })
+  await page.route('**/api/update/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(idleUpdateStatus())
+  }))
 
   await page.goto(`${BASE_URL}/updates/firmware`)
+  await page.waitForTimeout(500)
 
   const firmwarePage = page.locator('.firmware-page')
+  // Reading the stored result on load is fine; starting a search is not.
+  expect(searchRequests).toBe(0)
+  expect(retiredSearchRequests).toBe(0)
+
+  // Without a previous result the link still points at the release overview.
   await expect(firmwarePage.getByRole('link', { name: 'View on GitHub' })).toHaveAttribute(
     'href',
     'https://github.com/Xerolux/HB-RF-ETH-ng/releases'
   )
+  // The manual upload stays the installation path; the search only reports.
   await expect(firmwarePage).toContainText('Install firmware manually')
   await expect(firmwarePage.locator('input[type="file"]')).toHaveCount(1)
-  await expect(firmwarePage.getByRole('button', { name: /Search for updates/i })).toHaveCount(0)
-  expect(retiredSearchRequests).toBe(0)
+
+  // And a search happens exactly when the button is pressed.
+  await firmwarePage.getByRole('button', { name: 'Search for updates now' }).click()
+  await expect.poll(() => searchRequests).toBe(1)
 })
 
 test('manual WebUI upload uses a raw local image without release metadata', async ({ page }) => {
@@ -1543,4 +1589,71 @@ test('live log waits for the authenticated WebSocket acknowledgement and closes 
   await page.locator('.toggle-chip input').uncheck()
   await page.waitForTimeout(2200)
   expect(await logSocketCount()).toBe(1)
+})
+
+test('a skipped update search is never presented as an up-to-date result', async ({ page }) => {
+  // The defect this guards against: a search that never ran because memory was
+  // low used to surface as "no update found", which reads as a reassurance the
+  // device never actually earned.
+  await page.route('**/api/update/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(idleUpdateStatus({
+      everChecked: false,
+      lastSkipReason: 'Too little free memory (free=51 KB, largest block=17 KB)'
+    }))
+  }))
+
+  await page.goto(`${BASE_URL}/updates/firmware`)
+
+  const card = page.locator('.firmware-page')
+  await expect(card).toContainText('Search skipped')
+  await expect(card).toContainText('free=51 KB')
+  await expect(card).not.toContainText('Everything is current')
+})
+
+test('the update search reports its result durably, not only as a toast', async ({ page }) => {
+  let statusCalls = 0
+  await page.route('**/api/update/status**', route => {
+    statusCalls += 1
+    // First load: nothing known yet. After the check was triggered the device
+    // reports a real finding.
+    const body = statusCalls === 1
+      ? idleUpdateStatus()
+      : idleUpdateStatus({
+          everChecked: true,
+          lastCheck: 1789012345,
+          latestFirmware: '2.3.0',
+          latestWebui: '1.0.0',
+          firmwareUpdateAvailable: true,
+          notesUrl: 'https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.3.0'
+        })
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) })
+  })
+
+  let checkBody = null
+  await page.route('**/api/update/check**', route => {
+    checkBody = route.request().postDataJSON()
+    route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ outcome: 'accepted', channel: 'beta' })
+    })
+  })
+
+  await page.goto(`${BASE_URL}/updates/firmware`)
+  const card = page.locator('.firmware-page')
+
+  // Before any search the page says so explicitly rather than implying currency.
+  await expect(card).toContainText('No search has been run yet')
+
+  await page.locator('#update-channel').selectOption('beta')
+  await card.getByRole('button', { name: 'Search for updates now' }).click()
+
+  // The finding stays on the page; it does not disappear after a few seconds.
+  await expect(card).toContainText('New firmware available: 2.3.0')
+  await page.waitForTimeout(6000)
+  await expect(card).toContainText('New firmware available: 2.3.0')
+
+  // The selected channel is what the device was actually asked for.
+  expect(checkBody).toEqual({ channel: 'beta' })
 })

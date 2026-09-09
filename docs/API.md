@@ -524,6 +524,96 @@ curl -X POST http://192.168.1.100/api/monitoring \
 
 ---
 
+## Update Search
+
+The device can look up which firmware and WebUI versions have been published
+and compare them with what is installed. It only reports: there is no endpoint
+here that downloads or installs anything, and no remote trigger. Installation
+remains the manual upload to `POST /ota_update` (firmware) or
+`POST /api/webui/update` (WebUI).
+
+The search runs **only on request**. Nothing is scheduled, so an unattended
+device never opens an outbound connection of its own accord.
+
+### GET /api/update/status
+
+Read the result of the last search. Does not start one.
+
+**Authentication:** Required
+
+**Response (200 OK):**
+```json
+{
+  "state": "idle",
+  "everChecked": true,
+  "channel": "stable",
+  "lastCheck": 1789012345,
+  "runningFirmware": "2.2.7-Beta.8",
+  "runningWebui": "1.0.0",
+  "latestFirmware": "2.2.5",
+  "latestWebui": "1.0.0",
+  "firmwareUpdateAvailable": false,
+  "webuiUpdateAvailable": false,
+  "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5",
+  "lastError": "",
+  "lastSkipReason": ""
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `state` | `"idle"` or `"running"`. Poll until it leaves `"running"`. |
+| `everChecked` | `false` until a search has completed successfully. While it is `false`, no statement about updates has been made — this is not the same as "up to date". |
+| `lastCheck` | Unix seconds of the last completed search, or `0` when never, or when the clock was not yet synchronised. |
+| `latestFirmware` / `latestWebui` | Newest published versions on the selected channel. |
+| `firmwareUpdateAvailable` / `webuiUpdateAvailable` | True only when the published version is strictly newer than the running one. A device on a pre-release is therefore never offered an older stable build. |
+| `lastError` | Set when the search failed (network, TLS, malformed manifest). |
+| `lastSkipReason` | Set when the search did not run, for example because too little memory was free. **A skip is not a result.** Never render it as "no update found". |
+
+`lastError` and `lastSkipReason` are mutually exclusive and both are cleared by
+a successful search.
+
+---
+
+### POST /api/update/check
+
+Start one search. Returns immediately; the work runs on its own task, so an
+HTTP worker is never held for the duration of a TLS exchange. Poll
+`GET /api/update/status` for the outcome.
+
+**Authentication:** Required
+
+**Request (optional):**
+```json
+{ "channel": "stable" }
+```
+
+`channel` is `"stable"` (default) or `"beta"`. Any other value is rejected with
+`400` and `invalid_channel`. The channel is not persisted on the device.
+
+**Response (202 Accepted):**
+```json
+{ "outcome": "accepted", "channel": "stable" }
+```
+
+**Response (200 OK)** when the request was understood but no search was
+started:
+
+| `outcome` | Meaning |
+|-----------|---------|
+| `busy` | A search is already running. |
+| `cooldown` | The last attempt was less than 60 seconds ago. |
+
+**Response (503 Service Unavailable):** `outcome` is `unavailable` when the
+worker task could not be created.
+
+A search is refused before any network activity when free memory is too low,
+when a firmware or WebUI installation is in progress, or when another outbound
+TLS operation holds the device-wide network gate. The reason then appears in
+`lastSkipReason`.
+
+---
+
 ## Firmware Management
 
 ### GET /api/ota_status

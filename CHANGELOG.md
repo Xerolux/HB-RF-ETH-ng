@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- feat(update): Manuelle Update-Suche. Auf Knopfdruck holt das Gerät eine
+  kleine Versionsdatei (max. 1024 Byte) von GitHub Pages und vergleicht sie mit
+  der laufenden Firmware und WebUI. Es lädt und installiert dabei nichts —
+  Installation bleibt der manuelle Upload. Kanal (stabil/beta) ist wählbar.
+- feat(mqtt): Vier **lesende** Home-Assistant-Entitäten für das Ergebnis
+  (`latest_firmware_version`, `latest_webui_version`,
+  `firmware_update_available`, `webui_update_available`). Vor der ersten Suche
+  melden sie „unbekannt“ statt „kein Update“. Bewusst kein Kommando-Topic und
+  kein Install-Button.
+- test: Host-Tests für die Zulassungsschranke der Suche und für den
+  Versionsvergleich; beide laufen in CI ohne Hardware.
+
+### Notes
+- Es gibt **keinen** Zeitplan und keine Hintergrundsuche: ein unbeaufsichtigtes
+  Gerät baut von sich aus keine ausgehende Verbindung auf. Der Worker läuft auf
+  Priorität 3 (Relay-Kette: 15) und kann dem Funkpfad keine CPU nehmen.
+- Eine übersprungene Suche wird als solche angezeigt und niemals als
+  „kein Update gefunden“.
+
 ## [2.2.7-Beta.8] - 2026-09-08
 
 ### Changes

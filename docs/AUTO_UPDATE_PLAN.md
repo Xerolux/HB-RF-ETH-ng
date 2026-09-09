@@ -427,12 +427,73 @@ für den damaligen Rückbau und bleibt in v1 draußen. Eine spätere
 | Stufe | Inhalt | Freigabe erst wenn |
 |---|---|---|
 | A ✅ | Serverseite: schlankes Manifest auf Pages + CI-Größenprüfung | **umgesetzt** — siehe §2.3; verbleibende Bestätigung: Abruf über HTTPS nach dem ersten Pages-Deploy |
-| B | Modul 1 (Check) + `/api/update/status` + `/api/update/check` + UI-Anzeige, Modus `notify` | Heap-Messung §8 bestanden, 7 Tage Feldbetrieb ohne Auffälligkeit |
+| B1 ✅ | Suche **nur auf Knopfdruck** + `/api/update/status` + `/api/update/check` + UI-Karte + lesende MQTT-Sensoren | **umgesetzt** — siehe §3.6; verbleibend: Heap-Messung §8 auf echter Hardware |
+| B2 | 24-h-Timer, Jitter, Backoff, Modus `notify`, persistierter Kanal | #362 im Feld bestätigt **und** B1 unauffällig |
 | C | Modul 2 nur für **WebUI** + Modus `auto_webui` | Testprotokoll §8 vollständig grün |
 | D | Modul 2 für **Firmware** + Modus `auto_all` mit Wartungsfenster | Stufe C zwei Releases lang stabil |
 
 Jede Stufe ist eigenständig nützlich und einzeln zurücknehmbar. Wenn Stufe D
 Probleme macht, bleiben B und C im Feld.
+
+### 3.6 Umsetzung B1 (implementiert)
+
+B1 ist bewusst die kleinstmögliche lauffähige Stufe: **kein Timer, kein
+Scheduler, keine Hintergrundaktivität.** Ein Abruf passiert ausschließlich,
+wenn jemand in der Oberfläche auf „Jetzt suchen" drückt. Ein unbeaufsichtigtes
+Gerät baut damit von sich aus nie eine ausgehende Verbindung auf — der Punkt,
+der bei noch nicht abschließend bestätigter Stabilitätslage (#362) zählt.
+
+| Datei | Rolle |
+|---|---|
+| `include/updatecheck_heap_policy.h` | Zulassungsschranke, header-only und ESP-frei, damit sie auf dem Host testbar ist |
+| `test/host/test_updatecheck_heap_policy.cpp` | Exakte Grenzfälle inkl. des Feldzustands 55/32 KiB |
+| `test/host/test_update_decision.cpp` | „Ist das ein Update?" gegen `include/semver.h` |
+| `main/update_check.cpp` | Abruf, Auswertung, Zustand |
+| `main/update_api.cpp` | `/api/update/status`, `/api/update/check` |
+
+**Wiederverwendet statt neu gebaut:** `include/semver.h` (vollständiger
+Prerelease-Vergleich, bereits von `webui_storage.cpp` genutzt),
+`configure_ota_http_client()` (Redirect-Fix #235), `g_net_fetch_mutex`,
+`crash_blackbox_net_op_begin/end` und das Deadline-Muster aus `events.cpp`.
+
+**Was den Relay-Pfad schützt:**
+
+- Der Worker läuft auf Priorität **3**. Die Relay-Kette (UART-Handler → UDP-Worker)
+  läuft auf **15**, lwIP auf 18 — der Abruf kann dem Funkpfad keine CPU nehmen.
+- Er läuft **nie** im httpd-Thread: ein TLS-Austausch würde sonst einen
+  Server-Worker sekundenlang belegen.
+- Der Worker ist transient (`xTaskCreate` → `vTaskDelete(NULL)`): im Leerlauf
+  kostet die Funktion keinen Task-Stack.
+- Absolute Deadline 20 s, Antwort hart auf 1024 Byte begrenzt, 60-s-Cooldown.
+- Abgewiesen wird **vor** jeder Netzwerkaktivität: zu wenig Speicher, laufende
+  Installation, belegtes Netz-Gate.
+
+**Die Zulassungsschranke ist nicht geschätzt.** Sie stammt aus
+`.planning/debug/live-updatecheck-rawuart-responsive.md`: ein Livegerät mit
+aktiver CCU-Sitzung meldete 55 KiB frei / 32 KiB größter Block — ein gesunder
+Zustand, den eine frühere eindimensionale 56-KiB-Regel abwies, woraufhin die
+Oberfläche „kein Update" zeigte, obwohl nie gesucht worden war. Zugelassen wird
+daher `(frei ≥ 56 KiB und Block ≥ 18 KiB)` **oder**
+`(frei ≥ 52 KiB und Block ≥ 28 KiB)`.
+
+**Übersprungen ist kein Ergebnis.** `lastSkipReason` und `lastError` sind
+getrennte Felder, schließen sich gegenseitig aus, und die Oberfläche zeigt sie
+als dauerhaften Seiteninhalt — nicht als Toast, der nach Sekunden verschwindet
+und einen übersprungenen Abruf wie „alles aktuell" aussehen lässt.
+
+**MQTT/Home Assistant** bekommt vier **lesende** Entitäten
+(`latest_firmware_version`, `latest_webui_version`, `firmware_update_available`,
+`webui_update_available`). Vor der ersten Suche wird ein leerer retained Payload
+veröffentlicht, sodass Home Assistant „unbekannt" anzeigt statt „kein Update".
+Kein Kommando-Topic, kein Install-Button. Dabei mussten diese vier Topics aus
+der Legacy-Aufräumliste in `mqtt_handler.cpp` entfernt werden — sie wurden dort
+bei jedem Verbindungsaufbau gelöscht und hätten die neuen Werte wieder
+weggeräumt.
+
+**Nicht enthalten (bewusst):** Timer, Jitter, Backoff, persistierter Kanal,
+`upd_mode`, jeglicher Installationspfad. Der Kanal ist ein Request-Parameter,
+was Backup/Restore-, Factory-Reset- und NVS-Pfade komplett aus dieser Änderung
+heraushält.
 
 ---
 

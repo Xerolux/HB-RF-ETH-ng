@@ -1949,6 +1949,8 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_restart_handler);
         httpd_register_uri_handler(_httpd_handle, &post_factory_reset_handler);
         httpd_register_uri_handler(_httpd_handle, &get_ota_status_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_update_status_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_update_check_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);
