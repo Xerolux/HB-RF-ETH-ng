@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.9] - 2026-09-09
+
+### Changes
+- docs: align update-search docs with hardware field test (#443)
+- feat(update): manual update search, reporting only (stage B1) (#442)
+- feat(release): slim device update manifest + auto-update plan (#441)
+- chore: update manifests for v2.2.7-Beta.8
+
 ### Added
 - feat(update): Manuelle Update-Suche. Auf Knopfdruck holt das Gerät eine
   kleine Versionsdatei (max. 1024 Byte) von GitHub Pages und vergleicht sie mit
