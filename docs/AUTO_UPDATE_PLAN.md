@@ -118,6 +118,11 @@ auf dieses Release erlaubt ist (Migrationsschranke, z. B. bei Partitions- oder
 NVS-Layout-Änderungen). Ältere Geräte melden „Update nur manuell" statt sich
 selbst zu zerlegen.
 
+> **Entscheidung (§11.4):** `fwMinFrom` wird ausschließlich für **neue** Releases
+> gesetzt. Bereits veröffentlichte Manifeste werden nicht nachgepflegt — das
+> schlanke Geräte-Manifest existiert für sie ohnehin nicht. Fehlt das Feld,
+> gilt „keine Schranke"; der Parser behandelt es als optional.
+
 ### 2.3 Betroffene Workflow-Änderungen
 
 - `.github/workflows/release.yml`: erzeugt zusätzlich `docs/updates/v1/{stable,beta}.json`
@@ -245,7 +250,26 @@ Identisch, aber:
 - **Kein Reboot nötig** — nur Remount. Deshalb ist der WebUI-Auto-Update-Pfad
   deutlich risikoärmer als der Firmware-Pfad und wird zuerst freigegeben (§7).
 
-### 4.3 Fehlerbehandlung (nicht verhandelbar)
+### 4.3 Wartungsfenster ohne gültige Uhrzeit
+
+Das Fenster ist in **Ortszeit** definiert und setzt damit eine synchronisierte Uhr
+voraus (NTP, DCF77, GPS oder RTC).
+
+> **Entscheidung (§11.3):** Liefert keine Zeitquelle eine gültige Zeit, wird die
+> **automatische Installation aufgeschoben** — die Update-Suche und die Anzeige
+> laufen unverändert weiter.
+
+Ohne verlässliche Ortszeit ist ein Fenster „03:00–05:00" bedeutungslos; eine
+Installation könnte mitten in den Tagesbetrieb fallen und den CCU-Relay-Pfad
+stören. Damit daraus kein stiller Stillstand wird:
+
+- `/api/update/status` meldet `installBlocked: "no_valid_time"`;
+- die Oberfläche zeigt einen Hinweis samt Verweis auf die Zeit-Einstellungen;
+- der Zustand wird einmalig als Event gemeldet, nicht bei jedem Zyklus;
+- die **manuelle** Installation über `POST /api/update/install` bleibt jederzeit
+  möglich — die Schranke gilt nur für den unbeaufsichtigten Pfad.
+
+### 4.4 Fehlerbehandlung (nicht verhandelbar)
 
 Bei **jedem** Abbruch — DNS, TLS, HTTP ≠ 200, Größenabweichung, SHA-Fehler,
 Stall, Deadline, Stromausfall des Gegenübers:
@@ -259,7 +283,7 @@ Stall, Deadline, Stromausfall des Gegenübers:
   (`events_emit`) — kein stiller Fehlschlag;
 - das Gerät ist danach **ohne Reboot** vollständig arbeitsfähig.
 
-### 4.4 Zweistufiges Update (Firmware + WebUI gleichzeitig neu)
+### 4.5 Zweistufiges Update (Firmware + WebUI gleichzeitig neu)
 
 Reihenfolge ist zwingend **Firmware → Reboot → WebUI**, weil das neue WebUI die
 neue Firmware-API voraussetzen darf. Zustand in NVS: ein Schlüssel `upd_stage`
@@ -278,7 +302,7 @@ Registrierung wie im Projekt üblich: `extern httpd_uri_t` in
 
 | Endpunkt | Zweck |
 |---|---|
-| `GET /api/update/status` | Laufende Versionen, letzte bekannte Versionen, `updateAvailable`-Flags, `lastCheck`, `lastError`, `mode`, `channel`, `notesUrl`, `stage` |
+| `GET /api/update/status` | Laufende Versionen, letzte bekannte Versionen, `updateAvailable`-Flags, `lastCheck`, `lastError`, `mode`, `channel`, `notesUrl`, `stage`, `installBlocked` (§4.3) |
 | `POST /api/update/check` | Sofort-Check anstoßen; per `rate_limiter` auf 1×/60 s begrenzt; kehrt sofort zurück, Ergebnis wird über `/api/update/status` abgeholt |
 | `POST /api/update/install` | Body ausschließlich `{"target":"firmware"\|"webui"}` — **niemals** eine URL |
 | `GET`/`PUT /api/update/config` | `mode`, `channel`, `interval`, `window`, `waitIdle` |
@@ -297,18 +321,27 @@ werden von diesem Plan nicht angefasst.
 
 | Schlüssel | Typ | Default | Bedeutung |
 |---|---|---|---|
-| `upd_mode` | u8 | `off` bei Bestandsgeräten, `notify` bei Werkszustand | `off` / `notify` / `auto_webui` / `auto_all` |
-| `upd_channel` | u8 | `stable` | `stable` / `beta` |
+| `upd_mode` | u8 | `off` bei Bestandsgeräten, `notify` bei Werkszustand (§11.1) | `off` / `notify` / `auto_webui` / `auto_all` |
+| `upd_channel` | u8 | `stable` | `stable` / `beta` — beide auswählbar (§11.2) |
 | `upd_interval` | u8 | 24 | Stunden, 6…168 |
 | `upd_win_start` | u8 | 3 | Beginn Wartungsfenster (Ortszeit) |
 | `upd_win_len` | u8 | 2 | Länge in Stunden |
 | `upd_idle_only` | u8 | 1 | Nur installieren, wenn ≥ 5 min kein Raw-UART-Client verbunden war |
 | `upd_seen` | str | – | Zuletzt gesehene Version (Anzeige ohne Fetch) |
-| `upd_stage` | str | – | Zweistufen-Marker (§4.4) |
+| `upd_stage` | str | – | Zweistufen-Marker (§4.5) |
 
 **Bestandsgeräte starten bewusst auf `off`.** Ein Firmware-Update darf keine
 neuen ausgehenden Netzwerkverbindungen einschalten, die der Betreiber nicht
 angefordert hat. Der Release-Hinweis muss das ausdrücklich erwähnen.
+
+**Der Werkszustand startet auf `notify`** (§11.1): reine Anzeige, keine
+Installation, ein Abruf pro Tag (~1 KB). Der Nutzen der gesamten Funktion
+entsteht erst, wenn Betreiber überhaupt mitbekommen, dass ein Update existiert;
+ein reiner Anzeigemodus flasht nichts und braucht kein Wartungsfenster.
+
+**Der Beta-Kanal ist auf dem Gerät wählbar** (§11.2), Vorgabe bleibt `stable`.
+`beta.json` wird bei jedem Prerelease ohnehin geschrieben — der Kanal kostet ein
+NVS-Byte und eine URL-Variante, keinen zusätzlichen Code.
 
 ### 6.2 WebUI (`webui/src/firmwareupdate.vue`)
 
@@ -380,6 +413,11 @@ Wird eine Schranke gerissen, wird die Stufe nicht freigegeben.
 - [ ] Zwei Install-Anfragen gleichzeitig → zweite abgewiesen
 - [ ] `off`-Modus → über 48 h **keine** ausgehende Verbindung zu GitHub/Pages
       (per `tcpdump` am Uplink nachgewiesen)
+- [ ] Ohne gültige Zeitquelle im Modus `auto_all` → keine Installation,
+      `installBlocked: "no_valid_time"` gemeldet, Check läuft weiter,
+      manuelle Installation weiterhin möglich
+- [ ] Kanal `beta` ausgewählt → Gerät liest `updates/v1/beta.json`, nicht `stable.json`
+- [ ] Manifest ohne `fwMinFrom` → als „keine Schranke" behandelt, kein Parser-Fehler
 - [ ] Zweistufiges Update (Firmware + WebUI) → korrekte Reihenfolge, Marker sauber aufgeräumt
 - [ ] 30 Tage Dauerlauf im `notify`-Modus → kein Heap-Trend nach unten
 
@@ -433,13 +471,20 @@ nie zusätzlich obendrauf, sondern immer nur abwechselnd.
 
 ---
 
-## 11. Offene Punkte für die Freigabe
+## 11. Getroffene Entscheidungen
 
-1. Soll `notify` bei Werkszustand wirklich der Default sein, oder soll auch dort
-   `off` gelten und der Betreiber schaltet bewusst ein?
-2. Beta-Kanal im Gerät anbieten oder nur `stable` (Beta-Tester laden ohnehin manuell)?
-3. Wartungsfenster in Ortszeit setzt eine gültige Zeitzone voraus — Verhalten
-   definieren, wenn NTP/DCF77/GPS keine Zeit liefern (Vorschlag: Installation
-   aufschieben, Check läuft weiter).
-4. Soll `fwMinFrom` rückwirkend in die bereits veröffentlichten Manifeste
-   eingetragen werden?
+Diese vier Punkte waren vor der Freigabe offen und sind entschieden. Sie sind in
+den betroffenen Abschnitten oben bereits eingearbeitet.
+
+| # | Frage | Entscheidung | Begründung |
+|---|---|---|---|
+| 11.1 | Update-Modus im Werkszustand | **`notify`** (Bestandsgeräte bleiben auf `off`) | Ein reiner Anzeigemodus flasht nichts und braucht kein Wartungsfenster, sorgt aber dafür, dass ein verfügbares Update überhaupt bemerkt wird. Ein Firmware-Update schaltet niemandem ungefragt eine neue ausgehende Verbindung ein — deshalb die Trennung Bestand/Werkszustand. |
+| 11.2 | Beta-Kanal auf dem Gerät | **Beide Kanäle, Vorgabe `stable`** | `beta.json` entsteht ohnehin bei jedem Prerelease; der Kanal kostet ein NVS-Byte und eine URL-Variante. Beta-Tester bekommen denselben Weg wie alle anderen, statt weiter manuell hochzuladen. |
+| 11.3 | Wartungsfenster ohne gültige Uhrzeit | **Automatische Installation aufschieben, Suche läuft weiter** | Ohne verlässliche Ortszeit ist ein Zeitfenster bedeutungslos und die Installation könnte den CCU-Relay-Pfad im Tagesbetrieb stören. Der Zustand wird sichtbar gemacht (`installBlocked: "no_valid_time"`), die manuelle Installation bleibt möglich. |
+| 11.4 | `fwMinFrom` rückwirkend nachtragen | **Nein — nur neue Releases** | Das schlanke Geräte-Manifest existiert für Altreleases gar nicht. Fehlendes Feld = keine Schranke. Eine Nachpflege wäre Handarbeit pro Release für Daten, die das Gerät nur für das jeweils neueste Release liest. |
+
+## 12. Nächster Schritt
+
+Freigabe von **Stufe A** (Serverseite: schlankes Manifest unter
+`docs/updates/v1/` plus CI-Größenprüfung). Stufe A ist reine Workflow-Arbeit,
+berührt keine Firmware und ist damit risikofrei einzeln zu mergen.
