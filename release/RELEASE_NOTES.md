@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.7-Beta.9
+# 🚀 HB-RF-ETH-ng v2.2.7-Beta.10
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,40 +11,22 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.7-Beta.9?
+## 🆕 Was ist neu in v2.2.7-Beta.10?
 
 ### Changes
-- docs: align update-search docs with hardware field test (#443)
-- feat(update): manual update search, reporting only (stage B1) (#442)
-- feat(release): slim device update manifest + auto-update plan (#441)
-- chore: update manifests for v2.2.7-Beta.8
+- chore: update WebUI manifest for webui-v1.0.2
 
 ### Added
-- feat(update): Manuelle Update-Suche. Auf Knopfdruck holt das Gerät eine
-  kleine Versionsdatei (max. 1024 Byte) von GitHub Pages und vergleicht sie mit
-  der laufenden Firmware und WebUI. Es lädt und installiert dabei nichts —
-  Installation bleibt der manuelle Upload. Kanal (stabil/beta) ist wählbar.
-- feat(mqtt): Vier **lesende** Home-Assistant-Entitäten für das Ergebnis
-  (`latest_firmware_version`, `latest_webui_version`,
-  `firmware_update_available`, `webui_update_available`). Vor der ersten Suche
-  melden sie „unbekannt“ statt „kein Update“. Bewusst kein Kommando-Topic und
-  kein Install-Button.
-- test: Host-Tests für die Zulassungsschranke der Suche und für den
-  Versionsvergleich; beide laufen in CI ohne Hardware.
-
-### Notes
-- Es gibt **keinen** Zeitplan und keine Hintergrundsuche: ein unbeaufsichtigtes
-  Gerät baut von sich aus keine ausgehende Verbindung auf. Der Worker läuft auf
-  Priorität 3 (Relay-Kette: 15) und kann dem Funkpfad keine CPU nehmen.
-- Eine übersprungene Suche wird als solche angezeigt und niemals als
-  „kein Update gefunden“.
-- Hardware-Feldtest (2026-09-09, productive Gerät mit aktiver CCU über die
-  UART/UDP-Brücke): 30+ Suchen über API und WebUI, Heap-Drift nach 20 Suchen
-  172 Bytes, kein Watchdog-Reset, keine CCU-Trennung, keine Crash-Einträge.
-  Doku entsprechend korrigiert: Die Suche blockt nur bei laufender
-  **Firmware**-Installation (nicht WebUI-Upload), und die
-  Speicher-Akzeptanzschwelle des Testprotokolls unterscheidet jetzt Idle- und
-  CCU-Lastfall.
+- feat(api): `cooldownRemainingSec` in `GET /api/update/status` und in der
+  Cooldown-Antwort von `POST /api/update/check`. Das Fenster beginnt beim
+  angenommenen Versuch (auch wenn er später übersprungen wird), deshalb kann
+  die Oberfläche daraus exakt „in X Sekunden erneut versuchen“ anzeigen,
+  statt aus `lastCheck` zu raten.
+- feat(webui): Skip-Gründe der Update-Suche werden lokalisiert (zu wenig
+  Speicher mit Kennzahlen, Installation läuft, Netzwerk beschäftigt,
+  Versions-Puffer). Unbekannte Gründe neuerer Firmware werden unverändert
+  angezeigt, statt versteckt zu werden. Die Cooldown-Meldung zeigt einen
+  live tickenden Countdown „versuche es in X Sekunden erneut“.
 
 ## ✨ Hauptfunktionen
 
@@ -81,8 +63,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.7-Beta.9.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.0.0.bin`)
+- **Firmware-Binary** (`firmware_2.2.7-Beta.10.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.0.2.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -123,6 +105,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.0`
+- WebUI version: `1.0.2`
 - WebUI API: `1`
 - Minimum firmware: `2.2.5-Beta.1`

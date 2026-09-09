@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.10] - 2026-09-09
+
+### Changes
+- chore: update WebUI manifest for webui-v1.0.2
+
 ### Added
 - feat(api): `cooldownRemainingSec` in `GET /api/update/status` und in der
   Cooldown-Antwort von `POST /api/update/check`. Das Fenster beginnt beim
