@@ -318,6 +318,7 @@ jobs:
           FIRMWARE_SHA256=$(awk -v file="$FIRMWARE_FILE" '$2 == file { print $1 }' release/SHA256SUMS.txt)
           WEBUI_SHA256=$(awk -v file="$WEBUI_FILE" '$2 == file { print $1 }' release/SHA256SUMS.txt)
           WEBUI_SIZE=$(stat -c '%s' "release/$WEBUI_FILE")
+          FIRMWARE_SIZE=$(stat -c '%s' "release/$FIRMWARE_FILE")
           test -n "$FIRMWARE_SHA256"
           test -n "$WEBUI_SHA256"
 
@@ -333,6 +334,7 @@ jobs:
           FIRMWARE_TAG="$FIRMWARE_TAG" \
           FIRMWARE_FILE="$FIRMWARE_FILE" \
           FIRMWARE_SHA256="$FIRMWARE_SHA256" \
+          FIRMWARE_SIZE="$FIRMWARE_SIZE" \
           WEBUI_VERSION="$WEBUI_VERSION" \
           WEBUI_FILE="$WEBUI_FILE" \
           WEBUI_SHA256="$WEBUI_SHA256" \
@@ -382,6 +384,7 @@ jobs:
               'publishedAt': published,
               'downloadUrl': f"{asset_base}/{os.environ['FIRMWARE_FILE']}",
               'sha256': os.environ['FIRMWARE_SHA256'],
+              'size': int(os.environ['FIRMWARE_SIZE']),
               'releaseUrl': release_url,
               'notesUrl': release_url,
               'webui': webui,
@@ -431,7 +434,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           cp ../manifest-out/*.json .
-          git add *.json
+          # Derive the slim device manifests from the full ones so the two can
+          # never drift. The generator refuses to write anything the firmware
+          # would have to reject, so an oversized or malformed manifest fails
+          # the release here rather than in the field.
+          python3 scripts/device_manifest.py build latest.json docs/updates/v1/stable.json
+          python3 scripts/device_manifest.py build beta.json docs/updates/v1/beta.json
+          python3 scripts/device_manifest.py check docs/updates/v1/stable.json docs/updates/v1/beta.json
+          git add *.json docs/updates/v1/*.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update manifests for ${{ steps.firmware.outputs.TAG }}"
           git push origin main

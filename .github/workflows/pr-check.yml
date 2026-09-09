@@ -93,6 +93,23 @@ jobs:
             python3 -m json.tool "$file" > /dev/null || exit 1
           done
 
+      - name: Validate device update manifests
+        run: |
+          # The device aborts the read past 1024 bytes without parsing anything,
+          # so an oversized or malformed manifest here would be unusable in the
+          # field. Fail the PR instead.
+          python3 scripts/device_manifest.py check docs/updates/v1/*.json
+
+      - name: Check device manifests match the published manifests
+        run: |
+          # The slim manifests are generated, not hand-maintained. Rebuild them
+          # and fail if the committed files differ, so a hand edit or a stale
+          # commit cannot ship.
+          python3 scripts/device_manifest.py build latest.json /tmp/stable.json
+          python3 scripts/device_manifest.py build beta.json /tmp/beta.json
+          diff -u docs/updates/v1/stable.json /tmp/stable.json
+          diff -u docs/updates/v1/beta.json /tmp/beta.json
+
   cpp-format:
     name: C++ Format (changed lines)
     runs-on: ubuntu-latest

@@ -273,7 +273,14 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           cp ../manifest-out/*.json .
-          git add *.json
+          # Derive the slim device manifests from the full ones so the two can
+          # never drift. The generator refuses to write anything the firmware
+          # would have to reject, so an oversized or malformed manifest fails
+          # the release here rather than in the field.
+          python3 scripts/device_manifest.py build latest.json docs/updates/v1/stable.json
+          python3 scripts/device_manifest.py build beta.json docs/updates/v1/beta.json
+          python3 scripts/device_manifest.py check docs/updates/v1/stable.json docs/updates/v1/beta.json
+          git add *.json docs/updates/v1/*.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update WebUI manifest for ${{ steps.webui.outputs.TAG }}"
           git push origin main
