@@ -93,14 +93,15 @@ static esp_err_t send_status(httpd_req_t *req)
     const int written = snprintf(
         body, sizeof(body),
         "{\"state\":\"%s\",\"everChecked\":%s,\"channel\":\"%s\","
-        "\"lastCheck\":%lld,"
+        "\"lastCheck\":%lld,\"cooldownRemainingSec\":%lu,"
         "\"runningFirmware\":\"%s\",\"runningWebui\":\"%s\","
         "\"latestFirmware\":\"%s\",\"latestWebui\":\"%s\","
         "\"firmwareUpdateAvailable\":%s,\"webuiUpdateAvailable\":%s,"
         "\"notesUrl\":\"%s\",\"lastError\":\"%s\",\"lastSkipReason\":\"%s\"}",
         state_name(status.state), status.everChecked ? "true" : "false", status.channel,
-        static_cast<long long>(status.lastCheckUnix), app ? app->version : "", running_webui,
-        latest_fw, latest_ui, status.firmwareUpdateAvailable ? "true" : "false",
+        static_cast<long long>(status.lastCheckUnix),
+        static_cast<unsigned long>(status.cooldownRemainingSec), app ? app->version : "",
+        running_webui, latest_fw, latest_ui, status.firmwareUpdateAvailable ? "true" : "false",
         status.webuiUpdateAvailable ? "true" : "false", notes, error, skip);
 
     if (written < 0 || static_cast<size_t>(written) >= sizeof(body)) {
@@ -177,8 +178,18 @@ static esp_err_t post_update_check_handler_func(httpd_req_t *req)
                          : (result == UPDATE_CHECK_TRIGGER_ACCEPTED ? "202 Accepted" : "200 OK"));
     httpd_resp_set_type(req, "application/json");
 
-    char body[96];
-    snprintf(body, sizeof(body), "{\"outcome\":\"%s\",\"channel\":\"%s\"}", outcome, channel);
+    char body[128];
+    if (result == UPDATE_CHECK_TRIGGER_COOLDOWN) {
+        // The caller cannot derive the remaining window from lastCheck: the
+        // cooldown starts at the accepted attempt, including skipped ones, so
+        // only the device knows where the window began.
+        snprintf(body, sizeof(body),
+                 "{\"outcome\":\"cooldown\",\"channel\":\"%s\",\"cooldownRemainingSec\":%lu}",
+                 channel,
+                 static_cast<unsigned long>(update_check_get_status().cooldownRemainingSec));
+    } else {
+        snprintf(body, sizeof(body), "{\"outcome\":\"%s\",\"channel\":\"%s\"}", outcome, channel);
+    }
     return httpd_resp_sendstr(req, body);
 }
 

@@ -548,6 +548,7 @@ Read the result of the last search. Does not start one.
   "everChecked": true,
   "channel": "stable",
   "lastCheck": 1789012345,
+  "cooldownRemainingSec": 0,
   "runningFirmware": "2.2.7-Beta.8",
   "runningWebui": "1.0.0",
   "latestFirmware": "2.2.5",
@@ -565,6 +566,7 @@ Read the result of the last search. Does not start one.
 | `state` | `"idle"` or `"running"`. Poll until it leaves `"running"`. |
 | `everChecked` | `false` until a search has completed successfully. While it is `false`, no statement about updates has been made — this is not the same as "up to date". |
 | `lastCheck` | Unix seconds of the last completed search, or `0` when never, or when the clock was not yet synchronised. |
+| `cooldownRemainingSec` | Seconds until a new search may be triggered, `0` when none is active. The window starts at the accepted attempt (including one that later skips), so this — not `lastCheck` — is the basis for a "try again in X seconds" hint. |
 | `latestFirmware` / `latestWebui` | Newest published versions on the selected channel. |
 | `firmwareUpdateAvailable` / `webuiUpdateAvailable` | True only when the published version is strictly newer than the running one. A device on a pre-release is therefore never offered an older stable build. |
 | `lastError` | Set when the search failed (network, TLS, malformed manifest). |
@@ -602,7 +604,7 @@ started:
 | `outcome` | Meaning |
 |-----------|---------|
 | `busy` | A search is already running. |
-| `cooldown` | The last attempt was less than 60 seconds ago. |
+| `cooldown` | The last attempt was less than 60 seconds ago. The body then carries `cooldownRemainingSec`, the exact seconds until the next attempt is allowed. |
 
 **Response (503 Service Unavailable):** `outcome` is `unavailable` when the
 worker task could not be created.

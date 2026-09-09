@@ -22,6 +22,7 @@ const emptyStatus = () => ({
   everChecked: false,
   channel: 'stable',
   lastCheck: 0,
+  cooldownRemainingSec: 0,
   runningFirmware: '',
   runningWebui: '',
   latestFirmware: '',
@@ -33,11 +34,45 @@ const emptyStatus = () => ({
   lastSkipReason: ''
 })
 
+// Skip reasons arrive as raw firmware strings. The known ones are mapped to
+// localized texts so a German interface does not quote English mid-sentence;
+// an unknown reason (newer firmware) is shown verbatim rather than hidden.
+const MEMORY_SKIP = /^Too little free memory \(free=(\d+) KB, largest block=(\d+) KB\)$/
+const KNOWN_SKIPS = {
+  'An update installation is currently running': 'firmware.skipInstallRunning',
+  'Network subsystem busy, please try again': 'firmware.skipNetworkBusy',
+  'Not enough memory for the manifest buffer': 'firmware.skipManifestBuffer'
+}
+const localizeSkipReason = (reason, t) => {
+  const memory = MEMORY_SKIP.exec(reason)
+  if (memory) return t('firmware.skipLowMemory', { free: memory[1], largest: memory[2] })
+  return KNOWN_SKIPS[reason] ? t(KNOWN_SKIPS[reason]) : reason
+}
+
 const channel = ref(safeLocal.get(CHANNEL_STORAGE_KEY) === 'beta' ? 'beta' : 'stable')
 const checking = ref(false)
 const updateStatus = ref(emptyStatus())
 const triggerOutcome = ref('')
+const cooldownRemaining = ref(0)
 let pollTimer = null
+let cooldownTimer = null
+
+const setCooldown = seconds => {
+  const value = Math.max(0, Math.ceil(Number(seconds) || 0))
+  cooldownRemaining.value = value
+  if (cooldownTimer) {
+    clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
+  if (value <= 0) return
+  cooldownTimer = setInterval(() => {
+    cooldownRemaining.value -= 1
+    if (cooldownRemaining.value <= 0) {
+      clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
+  }, 1000)
+}
 
 const stopPolling = () => {
   if (pollTimer) {
@@ -51,7 +86,14 @@ const loadUpdateStatus = async () => {
     timeout: 8000,
     silent: true
   })
-  if (response.data) updateStatus.value = response.data
+  if (response.data) {
+    updateStatus.value = response.data
+    // Entering the page while a cooldown is active (firmware that reports it):
+    // adopt the device's remaining seconds instead of guessing.
+    if (response.data.cooldownRemainingSec > 0 && cooldownRemaining.value === 0) {
+      setCooldown(response.data.cooldownRemainingSec)
+    }
+  }
   return response.data
 }
 
@@ -70,12 +112,20 @@ const checkForUpdates = async () => {
     const outcome = response.data?.outcome || 'accepted'
     if (outcome !== 'accepted') {
       // Refused before any network activity: no result is coming, so there is
-      // nothing to poll for.
+      // nothing to poll for. The cooldown outcome carries the device's exact
+      // remaining seconds; older firmware has no field and gets the full
+      // window as the safe upper bound.
+      if (outcome === 'cooldown') {
+        setCooldown(response.data?.cooldownRemainingSec ?? 60)
+      }
       triggerOutcome.value = outcome
       await loadUpdateStatus().catch(() => {})
       checking.value = false
       return
     }
+    // An accepted attempt (including one that later skips) starts the window
+    // on the device right away.
+    setCooldown(60)
   } catch {
     triggerOutcome.value = 'unavailable'
     checking.value = false
@@ -113,7 +163,10 @@ export function useUpdateSearch(t) {
   // cooldown never hides the finding the user is looking at.
   const triggerMessage = computed(() => {
     switch (triggerOutcome.value) {
-      case 'cooldown': return { variant: 'info', text: t('firmware.checkCooldown') }
+      case 'cooldown':
+        return cooldownRemaining.value > 0
+          ? { variant: 'info', text: t('firmware.checkCooldownRetry', { seconds: cooldownRemaining.value }) }
+          : { variant: 'info', text: t('firmware.checkCooldown') }
       case 'busy': return { variant: 'info', text: t('firmware.checkBusy') }
       case 'unavailable': return { variant: 'warning', text: t('firmware.checkUnavailable') }
       default: return { variant: '', text: '' }
@@ -126,7 +179,7 @@ export function useUpdateSearch(t) {
   const resultMessage = describe => computed(() => {
     const status = updateStatus.value
     if (status.lastSkipReason) {
-      return { variant: 'warning', text: t('firmware.checkSkipped', { reason: status.lastSkipReason }) }
+      return { variant: 'warning', text: t('firmware.checkSkipped', { reason: localizeSkipReason(status.lastSkipReason, t) }) }
     }
     if (status.lastError) {
       return { variant: 'danger', text: t('firmware.checkFailed', { reason: status.lastError }) }
@@ -142,6 +195,7 @@ export function useUpdateSearch(t) {
     triggerOutcome,
     triggerMessage,
     resultMessage,
+    cooldownRemaining,
     checkForUpdates,
     loadUpdateStatus,
     stopPolling,
