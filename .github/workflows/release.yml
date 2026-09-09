@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write  # dispatch pages.yml after the manifest push
 
     steps:
       - name: Checkout repository
@@ -459,3 +460,8 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update manifests for ${{ steps.firmware.outputs.TAG }}"
           git push origin main
+          # A GITHUB_TOKEN push raises no push event, so pages.yml would not
+          # run and devices would keep being served the previous manifest
+          # until the next human push to main. workflow_dispatch is the
+          # documented exception that triggers even for GITHUB_TOKEN.
+          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh workflow run pages.yml --ref main -R "${{ github.repository }}"
