@@ -57,8 +57,8 @@ static const char *TAG = "UpdateCheck";
 static constexpr size_t MANIFEST_MAX_BYTES = 1024;
 
 static constexpr int FETCH_TOTAL_TIMEOUT_MS = 20000;
-static constexpr int FETCH_ASYNC_RETRY_MS = 10;
-static constexpr int NET_MUTEX_WAIT_MS = 5000;
+static constexpr int FETCH_ASYNC_RETRY_MS   = 10;
+static constexpr int NET_MUTEX_WAIT_MS      = 5000;
 
 // Repeated presses must not turn into repeated TLS handshakes.
 static constexpr int64_t COOLDOWN_US = 60 * 1000000LL;
@@ -66,9 +66,9 @@ static constexpr int64_t COOLDOWN_US = 60 * 1000000LL;
 static constexpr const char *MANIFEST_URL_FORMAT =
     "https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/%s.json";
 
-static SemaphoreHandle_t s_lock = NULL;
+static SemaphoreHandle_t s_lock   = NULL;
 static UpdateCheckStatus s_status = {};
-static int64_t s_last_attempt_us = 0;
+static int64_t s_last_attempt_us  = 0;
 
 // ---------------------------------------------------------------------------
 // State helpers. Every field is written under s_lock so a WebUI poll can never
@@ -88,7 +88,7 @@ static void finish_with_skip(const char *reason)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     copy_into(s_status.lastSkipReason, sizeof(s_status.lastSkipReason), reason);
     s_status.lastError[0] = '\0';
-    s_status.state = UPDATE_CHECK_IDLE;
+    s_status.state        = UPDATE_CHECK_IDLE;
     xSemaphoreGive(s_lock);
     ESP_LOGW(TAG, "Update check skipped: %s", reason);
 }
@@ -98,7 +98,7 @@ static void finish_with_error(const char *reason)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     copy_into(s_status.lastError, sizeof(s_status.lastError), reason);
     s_status.lastSkipReason[0] = '\0';
-    s_status.state = UPDATE_CHECK_IDLE;
+    s_status.state             = UPDATE_CHECK_IDLE;
     xSemaphoreGive(s_lock);
     ESP_LOGE(TAG, "Update check failed: %s", reason);
 }
@@ -141,17 +141,17 @@ static void retry_delay(int64_t deadline_us)
 
 // Reads at most MANIFEST_MAX_BYTES into `buffer`, then one extra byte to detect
 // an oversized document. Returns the length, or -1 on failure.
-static int fetch_manifest(const char *url, char *buffer, size_t buffer_size,
-                          char *error, size_t error_size)
+static int fetch_manifest(const char *url, char *buffer, size_t buffer_size, char *error,
+                          size_t error_size)
 {
     const int64_t deadline_us =
         esp_timer_get_time() + static_cast<int64_t>(FETCH_TOTAL_TIMEOUT_MS) * 1000;
 
     esp_http_client_config_t cfg = {};
     configure_ota_http_client(cfg, url);
-    cfg.method = HTTP_METHOD_GET;
+    cfg.method     = HTTP_METHOD_GET;
     cfg.timeout_ms = remaining_ms(deadline_us);
-    cfg.is_async = true;
+    cfg.is_async   = true;
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (!client) {
@@ -159,7 +159,7 @@ static int fetch_manifest(const char *url, char *buffer, size_t buffer_size,
         return -1;
     }
 
-    int result = -1;
+    int result  = -1;
     bool opened = false;
 
     for (;;) {
@@ -208,7 +208,7 @@ static int fetch_manifest(const char *url, char *buffer, size_t buffer_size,
                 snprintf(error, error_size, "Timeout while reading the manifest");
                 goto done;
             }
-            errno = 0;
+            errno          = 0;
             const int read = esp_http_client_read(client, buffer + total,
                                                   static_cast<int>(buffer_size + 1 - total));
             if (read > 0) {
@@ -241,7 +241,7 @@ static int fetch_manifest(const char *url, char *buffer, size_t buffer_size,
             goto done;
         }
         buffer[total] = '\0';
-        result = static_cast<int>(total);
+        result        = static_cast<int>(total);
     }
 
 done:
@@ -257,9 +257,8 @@ done:
 static const char *json_string(const cJSON *root, const char *key)
 {
     const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, key);
-    return (cJSON_IsString(item) && item->valuestring && item->valuestring[0])
-               ? item->valuestring
-               : NULL;
+    return (cJSON_IsString(item) && item->valuestring && item->valuestring[0]) ? item->valuestring
+                                                                               : NULL;
 }
 
 static bool apply_manifest(const char *body, char *error, size_t error_size)
@@ -270,11 +269,11 @@ static bool apply_manifest(const char *body, char *error, size_t error_size)
         return false;
     }
 
-    bool ok = false;
-    const cJSON *schema = cJSON_GetObjectItemCaseSensitive(root, "s");
+    bool ok              = false;
+    const cJSON *schema  = cJSON_GetObjectItemCaseSensitive(root, "s");
     const char *firmware = json_string(root, "fw");
-    const char *webui = json_string(root, "ui");
-    const char *notes = json_string(root, "notes");
+    const char *webui    = json_string(root, "ui");
+    const char *notes    = json_string(root, "notes");
 
     if (!cJSON_IsNumber(schema) || schema->valueint != 1) {
         snprintf(error, error_size, "Unsupported manifest schema");
@@ -286,7 +285,7 @@ static bool apply_manifest(const char *body, char *error, size_t error_size)
     }
 
     {
-        const esp_app_desc_t *app = esp_app_get_description();
+        const esp_app_desc_t *app    = esp_app_get_description();
         const char *running_firmware = app ? app->version : "";
 
         char running_webui[UPDATE_CHECK_VERSION_LEN] = {};
@@ -297,8 +296,7 @@ static bool apply_manifest(const char *body, char *error, size_t error_size)
         // keeps a device on a beta from being offered the older stable build.
         const bool firmware_newer =
             running_firmware[0] && compareVersions(firmware, running_firmware) > 0;
-        const bool webui_newer =
-            running_webui[0] && compareVersions(webui, running_webui) > 0;
+        const bool webui_newer = running_webui[0] && compareVersions(webui, running_webui) > 0;
 
         int64_t now = 0;
         time_t wall = time(NULL);
@@ -311,18 +309,19 @@ static bool apply_manifest(const char *body, char *error, size_t error_size)
         copy_into(s_status.latestWebui, sizeof(s_status.latestWebui), webui);
         copy_into(s_status.notesUrl, sizeof(s_status.notesUrl), notes ? notes : "");
         s_status.firmwareUpdateAvailable = firmware_newer;
-        s_status.webuiUpdateAvailable = webui_newer;
-        s_status.everChecked = true;
-        s_status.lastCheckUnix = now;
-        s_status.lastError[0] = '\0';
-        s_status.lastSkipReason[0] = '\0';
-        s_status.state = UPDATE_CHECK_IDLE;
+        s_status.webuiUpdateAvailable    = webui_newer;
+        s_status.everChecked             = true;
+        s_status.lastCheckUnix           = now;
+        s_status.lastError[0]            = '\0';
+        s_status.lastSkipReason[0]       = '\0';
+        s_status.state                   = UPDATE_CHECK_IDLE;
         xSemaphoreGive(s_lock);
 
-        ESP_LOGI(TAG, "Update check done: firmware %s (running %s, newer=%d), "
-                      "WebUI %s (running %s, newer=%d)",
-                 firmware, running_firmware, firmware_newer ? 1 : 0, webui,
-                 running_webui, webui_newer ? 1 : 0);
+        ESP_LOGI(TAG,
+                 "Update check done: firmware %s (running %s, newer=%d), "
+                 "WebUI %s (running %s, newer=%d)",
+                 firmware, running_firmware, firmware_newer ? 1 : 0, webui, running_webui,
+                 webui_newer ? 1 : 0);
         ok = true;
     }
 
@@ -343,20 +342,18 @@ struct worker_args {
 
 static void update_check_task(void *parameter)
 {
-    worker_args *args = static_cast<worker_args *>(parameter);
+    worker_args *args                   = static_cast<worker_args *>(parameter);
     char error[UPDATE_CHECK_REASON_LEN] = {};
 
     // Total free memory bounds whether a TLS session fits; the largest block
     // decides whether it can be allocated at all. Both are needed - see
     // include/updatecheck_heap_policy.h.
     const size_t free_bytes = esp_get_free_heap_size();
-    const size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    const size_t largest    = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     if (!update_check_heap_allows(free_bytes, largest)) {
         char reason[UPDATE_CHECK_REASON_LEN];
-        snprintf(reason, sizeof(reason),
-                 "Too little free memory (free=%u KB, largest block=%u KB)",
-                 static_cast<unsigned>(free_bytes / 1024),
-                 static_cast<unsigned>(largest / 1024));
+        snprintf(reason, sizeof(reason), "Too little free memory (free=%u KB, largest block=%u KB)",
+                 static_cast<unsigned>(free_bytes / 1024), static_cast<unsigned>(largest / 1024));
         finish_with_skip(reason);
         goto cleanup;
     }
@@ -396,8 +393,7 @@ static void update_check_task(void *parameter)
             goto cleanup;
         }
 
-        const int length =
-            fetch_manifest(url, body, MANIFEST_MAX_BYTES, error, sizeof(error));
+        const int length = fetch_manifest(url, body, MANIFEST_MAX_BYTES, error, sizeof(error));
 
         crash_blackbox_net_op_end();
         xSemaphoreGive(g_net_fetch_mutex);

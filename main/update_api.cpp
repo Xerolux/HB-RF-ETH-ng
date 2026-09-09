@@ -42,7 +42,7 @@ static const char *TAG = "WebUI.update";
 // Responses are built in one fixed stack buffer. The largest field set is
 // bounded by UpdateCheckStatus, so no dynamic JSON assembly is needed.
 static constexpr size_t RESPONSE_BUFFER = 768;
-static constexpr size_t REQUEST_BUFFER = 128;
+static constexpr size_t REQUEST_BUFFER  = 128;
 
 static const char *state_name(update_check_state_t state)
 {
@@ -74,7 +74,7 @@ static esp_err_t send_status(httpd_req_t *req)
 {
     const UpdateCheckStatus status = update_check_get_status();
 
-    const esp_app_desc_t *app = esp_app_get_description();
+    const esp_app_desc_t *app                    = esp_app_get_description();
     char running_webui[UPDATE_CHECK_VERSION_LEN] = {};
     webui_storage_get_effective_version(running_webui, sizeof(running_webui));
 
@@ -98,10 +98,9 @@ static esp_err_t send_status(httpd_req_t *req)
         "\"latestFirmware\":\"%s\",\"latestWebui\":\"%s\","
         "\"firmwareUpdateAvailable\":%s,\"webuiUpdateAvailable\":%s,"
         "\"notesUrl\":\"%s\",\"lastError\":\"%s\",\"lastSkipReason\":\"%s\"}",
-        state_name(status.state), status.everChecked ? "true" : "false",
-        status.channel, static_cast<long long>(status.lastCheckUnix),
-        app ? app->version : "", running_webui, latest_fw, latest_ui,
-        status.firmwareUpdateAvailable ? "true" : "false",
+        state_name(status.state), status.everChecked ? "true" : "false", status.channel,
+        static_cast<long long>(status.lastCheckUnix), app ? app->version : "", running_webui,
+        latest_fw, latest_ui, status.firmwareUpdateAvailable ? "true" : "false",
         status.webuiUpdateAvailable ? "true" : "false", notes, error, skip);
 
     if (written < 0 || static_cast<size_t>(written) >= sizeof(body)) {
@@ -144,8 +143,7 @@ static esp_err_t post_update_check_handler_func(httpd_req_t *req)
             if (cJSON_IsString(item) && item->valuestring) {
                 if (!update_check_valid_channel(item->valuestring)) {
                     cJSON_Delete(root);
-                    return send_json_error(req, "400 Bad Request", "invalid_channel",
-                                           "channel");
+                    return send_json_error(req, "400 Bad Request", "invalid_channel", "channel");
                 }
                 snprintf(channel, sizeof(channel), "%s", item->valuestring);
             }
@@ -154,8 +152,8 @@ static esp_err_t post_update_check_handler_func(httpd_req_t *req)
     }
 
     const update_check_trigger_result_t result = update_check_trigger(channel);
-    const char *outcome = "accepted";
-    const char *status_line = NULL;
+    const char *outcome                        = "accepted";
+    const char *status_line                    = NULL;
     switch (result) {
         case UPDATE_CHECK_TRIGGER_ACCEPTED:
             break;
@@ -167,31 +165,29 @@ static esp_err_t post_update_check_handler_func(httpd_req_t *req)
             break;
         case UPDATE_CHECK_TRIGGER_NO_WORKER:
         default:
-            outcome = "unavailable";
+            outcome     = "unavailable";
             status_line = "503 Service Unavailable";
             break;
     }
 
     // 202 for accepted work, because the result is not ready yet and the client
     // has to poll /api/update/status for it.
-    httpd_resp_set_status(req, status_line ? status_line
-                                           : (result == UPDATE_CHECK_TRIGGER_ACCEPTED
-                                                  ? "202 Accepted"
-                                                  : "200 OK"));
+    httpd_resp_set_status(
+        req, status_line ? status_line
+                         : (result == UPDATE_CHECK_TRIGGER_ACCEPTED ? "202 Accepted" : "200 OK"));
     httpd_resp_set_type(req, "application/json");
 
     char body[96];
-    snprintf(body, sizeof(body), "{\"outcome\":\"%s\",\"channel\":\"%s\"}", outcome,
-             channel);
+    snprintf(body, sizeof(body), "{\"outcome\":\"%s\",\"channel\":\"%s\"}", outcome, channel);
     return httpd_resp_sendstr(req, body);
 }
 
-httpd_uri_t get_update_status_handler = {.uri = "/api/update/status",
-                                         .method = HTTP_GET,
-                                         .handler = get_update_status_handler_func,
+httpd_uri_t get_update_status_handler = {.uri      = "/api/update/status",
+                                         .method   = HTTP_GET,
+                                         .handler  = get_update_status_handler_func,
                                          .user_ctx = NULL};
 
-httpd_uri_t post_update_check_handler = {.uri = "/api/update/check",
-                                         .method = HTTP_POST,
-                                         .handler = post_update_check_handler_func,
+httpd_uri_t post_update_check_handler = {.uri      = "/api/update/check",
+                                         .method   = HTTP_POST,
+                                         .handler  = post_update_check_handler_func,
                                          .user_ctx = NULL};

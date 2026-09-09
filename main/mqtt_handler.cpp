@@ -842,16 +842,10 @@ static void publish_legacy_topic_cleanup(void)
     }
 
     static const char *const legacy_subtopics[] = {
-        "status/temperature",
-        "status/supply_voltage",
-        "status/version",
-        "status/latest_version",
+        "status/temperature", "status/supply_voltage", "status/version", "status/latest_version",
         // Still retired: the combined legacy flag and the OTA progress topics,
         // which only ever had meaning for the removed URL-based installer.
-        "status/update_available",
-        "status/ota_state",
-        "status/ota_progress",
-        "status/ota_error",
+        "status/update_available", "status/ota_state", "status/ota_progress", "status/ota_error",
         // NOT listed any more: latest_firmware_version, latest_webui_version,
         // firmware_update_available and webui_update_available. The manual
         // update search publishes those four again, and deleting a retained
@@ -1017,10 +1011,10 @@ void mqtt_handler_publish_ha_discovery(void)
     // removals that stood here while the feature was gone - announcing and
     // deleting the same entity in one pass would leave the outcome depending
     // on ordering.
-    publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL,
-                   NULL, NULL, "diagnostic", "mdi:package-up");
-    publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL,
-                   NULL, "diagnostic", "mdi:web-sync");
+    publish_config("sensor", "latest_firmware_version", "Latest Firmware Version", NULL, NULL, NULL,
+                   NULL, "diagnostic", "mdi:package-up");
+    publish_config("sensor", "latest_webui_version", "Latest WebUI Version", NULL, NULL, NULL, NULL,
+                   "diagnostic", "mdi:web-sync");
     publish_config("binary_sensor", "firmware_update_available", "Firmware Update Available",
                    "update", NULL, NULL, NULL, "diagnostic", "mdi:package-up", "true", "false");
     publish_config("binary_sensor", "webui_update_available", "WebUI Update Available", "update",

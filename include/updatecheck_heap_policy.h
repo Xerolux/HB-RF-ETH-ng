@@ -49,11 +49,11 @@
 // "skipped, too little memory" can never again be displayed as "up to date".
 
 // Nominal: comfortable total, ordinary fragmentation.
-#define UPDATE_CHECK_NOMINAL_FREE_BYTES (56u * 1024u)
+#define UPDATE_CHECK_NOMINAL_FREE_BYTES  (56u * 1024u)
 #define UPDATE_CHECK_NOMINAL_BLOCK_BYTES (18u * 1024u)
 
 // Compensated: less total memory, but a markedly larger contiguous block.
-#define UPDATE_CHECK_COMPENSATED_FREE_BYTES (52u * 1024u)
+#define UPDATE_CHECK_COMPENSATED_FREE_BYTES  (52u * 1024u)
 #define UPDATE_CHECK_COMPENSATED_BLOCK_BYTES (28u * 1024u)
 
 /**

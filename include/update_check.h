@@ -39,8 +39,8 @@
 // separate, later step (docs/AUTO_UPDATE_PLAN.md, stage B2).
 
 #define UPDATE_CHECK_VERSION_LEN 32
-#define UPDATE_CHECK_URL_LEN 128
-#define UPDATE_CHECK_REASON_LEN 96
+#define UPDATE_CHECK_URL_LEN     128
+#define UPDATE_CHECK_REASON_LEN  96
 
 enum update_check_state_t {
     UPDATE_CHECK_IDLE = 0,
