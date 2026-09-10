@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- feat(webui): Neue Seite **Funk & Relay** (`/diagnostics`) zeigt die Kennzahlen
+  der Raw-UART-Weiterleitung zwischen CCU und Funkmodul: empfangene und
+  gesendete Frames, Keepalives, verworfene Datagramme samt Verwerf-Rate,
+  längste Queue-Wartezeit, Spitzenbelegung gegen die Queue-Kapazität sowie
+  Verzögerungen über 10 ms / 100 ms / 1 s. Bisher waren diese Werte nur über
+  Prometheus oder MQTT sichtbar — also gerade nicht für die Anwender, die
+  Kommunikationsprobleme melden (#447).
+- feat(api): `ccuRelay` in `GET /api/system/overview` und
+  `POST /api/system/relay-stats/reset` zum Zurücksetzen der Spitzenwerte
+  (Frame-Zähler bleiben erhalten, damit die Verwerf-Rate ihren Nenner behält).
+
+### Fixed
+- fix(relay): UDP-Queue-Tiefe von 32 zurück auf 64 (Stand 2.1.10). Die
+  Halbierung war auf einem einzelnen, kaum belasteten Prüfstand gemessen
+  worden, nicht in einer Installation mit vielen Geräten; sie ist die einzige
+  Regression im Relay-Pfad gegenüber 2.1.10, die Anwender tatsächlich spüren
+  können. Kosten: ~1 KB Heap.
+- fix(webui): Der Countdown nach einem Firmware-Upload zählte 120 Sekunden
+  herunter, während der Text im selben Overlay „ca. 35 s“ nannte. Der
+  Neustart-Sync des Geräts dauert fest 35 s (`main/system_reset.cpp`), der
+  Countdown steht jetzt auf 40 s, und der Text übernimmt seine Zahl aus dem
+  laufenden Zähler — beide können nicht mehr auseinanderlaufen.
+
 ## [2.2.7-Beta.10] - 2026-09-09
 
 ### Changes

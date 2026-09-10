@@ -911,10 +911,8 @@ test('Raw-UART receive path avoids per-packet heap churn for ordinary frames', a
 
   expect(source).not.toContain('#include <vector>')
   expect(source).not.toContain('malloc(sizeof(udp_event_t))')
-  // 32 slots, not 64: the descriptor lives in the queue itself, and the
-  // deeper reserve cost ~1 KB of heap for no observed benefit on a single
-  // CCU-3 session (see "harden firmware for 2.2.6-Beta.4").
-  expect(source).toContain('xQueueCreate(32, sizeof(udp_event_t))')
+  // The descriptor lives in the queue itself; the depth it is created with is
+  // pinned by "the relay queue keeps the depth that 2.1.10 shipped" below.
   expect(source).toContain('unsigned char small_data[256]')
   expect(source).toContain('if (length > sizeof(small_data))')
   expect(source).toContain('if (!heap_data.value)')
@@ -1676,4 +1674,146 @@ test('the update search reports its result durably, not only as a toast', async 
 
   // The selected channel is what the device was actually asked for.
   expect(checkBody).toEqual({ channel: 'beta' })
+})
+
+test('the relay statistics page shows the whole relay picture and can reset its peaks', async ({ page }) => {
+  let resetCalls = 0
+  let overviewCalls = 0
+  await page.route('**/api/system/overview**', route => {
+    overviewCalls += 1
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        totalInternalHeap: 320000,
+        usedInternalHeap: 180000,
+        freeInternalHeap: 140000,
+        minimumFreeHeap: 120000,
+        largestFreeBlock: 90000,
+        resetReasonText: 'Power on',
+        psramAvailable: false,
+        ccuRelay: {
+          queueWaitMaxMs: 142,
+          queueWaitMaxUs: 142000,
+          queueDepthMax: 61,
+          queueCapacity: 64,
+          waitOver10ms: 37,
+          waitOver100ms: 9,
+          waitOver1s: 2,
+          drops: 4,
+          rxFrames: 20000,
+          txFrames: 19996,
+          keepalives: 512,
+          sessionActive: true,
+          lastRxAgeMs: 240
+        }
+      })
+    })
+  })
+  await page.route('**/api/system/relay-stats/reset', route => {
+    resetCalls += 1
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true }) })
+  })
+
+  await page.goto(`${BASE_URL}/diagnostics`)
+  const shell = page.locator('.diagnostics-page')
+
+  // Every figure the issue asked users for has to be readable here — the
+  // reporters have neither MQTT nor a Prometheus scrape.
+  await expect(shell).toContainText('142 ms')
+  await expect(shell).toContainText('61 / 64')
+  await expect(shell).toContainText('CCU connected')
+  for (const value of [/20[.,]000/, /19[.,]996/, /512/]) {
+    await expect(shell).toContainText(value)
+  }
+
+  // A drop count is meaningless without the traffic it happened in, so the
+  // page states the rate alongside the absolute number.
+  await expect(shell.locator('.stat', { hasText: 'Dropped' })).toContainText('%')
+
+  // Occupancy at 61 of 64, drops, and delays past 100 ms are exactly the
+  // situation this page exists to surface, so they must stand out, not blend in.
+  await expect(shell.locator('.stat-warn')).toHaveCount(5)
+
+  await shell.getByRole('button', { name: 'Reset peak values' }).click()
+  await expect.poll(() => resetCalls).toBe(1)
+  await expect.poll(() => overviewCalls).toBeGreaterThan(1)
+  // The reset has to be confirmed visibly; a silent no-op toast call leaves
+  // the user unable to tell whether anything happened.
+  await expect(page.locator('.app-toast-stack')).toContainText('Peak values reset')
+})
+
+test('firmware without relay counters is named as such, not rendered as all-clear', async ({ page }) => {
+  await page.route('**/api/system/overview**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ totalInternalHeap: 320000, freeInternalHeap: 140000 })
+  }))
+
+  await page.goto(`${BASE_URL}/diagnostics`)
+  const shell = page.locator('.diagnostics-page')
+
+  // Zeros from an initial client-side state would read as "no drops, no
+  // delays" — exactly the wrong conclusion on firmware that reports nothing.
+  await expect(shell).toContainText('does not report relay statistics yet')
+  await expect(shell.getByRole('button', { name: 'Reset peak values' })).toBeDisabled()
+})
+
+test('the relay queue keeps the depth that 2.1.10 shipped', async () => {
+  const header = await readFile('../include/rawuartudplistener.h', 'utf8')
+  const listenerSource = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+
+  // Halving this to 32 was measured on an idle bench, not on an installation
+  // with dozens of devices, and it is the one relay-path regression against
+  // 2.1.10 that reporters could actually feel.
+  expect(header).toContain('#define RAW_UART_UDP_QUEUE_DEPTH 64')
+  expect(listenerSource).toContain('xQueueCreate(RAW_UART_UDP_QUEUE_DEPTH, sizeof(udp_event_t))')
+
+  // Frame totals give the drop count a denominator; without them a "4 drops"
+  // reading cannot be judged at all.
+  for (const field of ['rx_frames', 'tx_frames', 'keepalives']) {
+    expect(header).toContain(field)
+    expect(listenerSource).toContain(`out->${field}`)
+  }
+})
+
+test('the restart countdown names the same duration it counts down', async ({ page }) => {
+  await page.route('**/settings.json**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ settings })
+  }))
+  await page.route('**/api/restart', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true })
+  }))
+
+  await page.goto(`${BASE_URL}/settings?tab=backup`)
+  await page.locator('.system-action.warning').click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Restart Now' }).click()
+
+  const overlay = page.locator('.restart-countdown-overlay')
+  await expect(overlay).toBeVisible()
+
+  // The hint used to claim a fixed "~35 s" while the firmware-update path
+  // counted 120 — the text now takes its number from the running counter, so
+  // the two cannot disagree again.
+  const counter = Number(await overlay.locator('.countdown-value').innerText())
+  expect(counter).toBeGreaterThan(0)
+  const hint = await overlay.locator('.countdown-text').innerText()
+  const stated = Number(hint.match(/~(\d+) s/)[1])
+  expect(stated).toBeGreaterThanOrEqual(counter)
+  expect(stated).toBeLessThanOrEqual(counter + 2)
+})
+
+test('the firmware upload countdown matches the firmware link-down window', async () => {
+  const firmwarePage = await readFile('../webui/src/firmwareupdate.vue', 'utf8')
+  const resetSource = await readFile('../main/system_reset.cpp', 'utf8')
+  const app = await readFile('../webui/src/app.vue', 'utf8')
+
+  // The countdown names the firmware's exact 35 s link-down window —
+  // same constant, no invented margin. 120/40 were both wrong.
+  expect(resetSource).toContain('Ethernet off for 35 s');
+  expect(firmwarePage).toContain('syncSeconds: FLASH_PAUSE_SECONDS')
+  expect(firmwarePage).not.toContain('syncSeconds: 120')
+  expect(firmwarePage).not.toContain('syncSeconds: 40')
+  expect(app).toContain("t('firmware.restartFlashPauseHint', { seconds: restartUiStore.phaseDuration })")
 })

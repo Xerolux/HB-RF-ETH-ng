@@ -103,6 +103,9 @@ void raw_uart_get_latency(raw_uart_latency_t *out)
     out->wait_over_100ms   = g_wait_over_100ms.get();
     out->wait_over_1s      = g_wait_over_1s.get();
     out->drops             = g_rx_drops.get();
+    out->rx_frames         = g_rx_frames.get();
+    out->tx_frames         = g_tx_frames.get();
+    out->keepalives        = g_keepalives.get();
 }
 
 void raw_uart_reset_latency_high_water(void)
@@ -455,9 +458,17 @@ void RawUartUdpListener::start()
 
     // Store the small event descriptor directly in the FreeRTOS queue. This
     // removes one malloc/free pair per UDP datagram from the LwIP callback.
-    // 32 slots is plenty for a single CCU-3 session; 64 reserved ~1 KB of
-    // queue storage for no observed benefit. Drop depth halves that reserve.
-    QueueHandle_t queue = xQueueCreate(32, sizeof(udp_event_t));
+    //
+    // Depth is back at v2.1.10's 64. It had been halved to 32 on the grounds
+    // that 32 was "plenty for a single CCU-3 session" with "no observed
+    // benefit" from 64 - but that was observed on a lightly loaded bench
+    // device, and the installations reporting disturbed device communication
+    // (#447) run 80+ radio devices, where the burst profile is not the same.
+    // The queue is the last buffer before a datagram is dropped outright, and
+    // at 16 bytes per slot the difference is 512 bytes of RAM against halving
+    // the burst reserve. g_queue_depth_max makes the actual occupancy visible,
+    // so this no longer has to be argued from assumption.
+    QueueHandle_t queue = xQueueCreate(RAW_UART_UDP_QUEUE_DEPTH, sizeof(udp_event_t));
     if (queue == NULL)
     {
         ESP_LOGE(TAG, "Failed to create UDP queue - out of memory");

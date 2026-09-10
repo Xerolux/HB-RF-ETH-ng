@@ -127,8 +127,10 @@ const restartCountdownTitle = computed(() => (
     : t('firmware.restarting')
 ))
 const restartCountdownText = computed(() => (
+  // The sync-phase hint names the same duration the overlay is counting down,
+  // so text and counter can never drift apart again.
   restartUiStore.phase === 'sync'
-    ? t('firmware.restartFlashPauseHint')
+    ? t('firmware.restartFlashPauseHint', { seconds: restartUiStore.phaseDuration })
     : t('firmware.restartingText')
 ))
 const restartCountdownProgress = computed(() => {

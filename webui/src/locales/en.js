@@ -41,6 +41,7 @@ export default {
     updates: 'Updates',
     documentation: 'Documentation',
     monitoring: 'Monitoring',
+    diagnostics: 'Radio & relay',
     systemlog: 'System Log',
     about: 'About',
     login: 'Login',
@@ -251,6 +252,37 @@ export default {
   },
 
   // System Info
+  diagnostics: {
+    eyebrow: 'Diagnostics',
+    pageTitle: 'Radio and relay statistics',
+    pageDescription: 'Figures from the raw-UART relay between the CCU and the radio module. They show whether datagrams were delayed or dropped — and therefore whether a reported device fault sits in the device or in the relay.',
+    sessionActive: 'CCU connected',
+    sessionIdle: 'no CCU session',
+    throughputKicker: 'Throughput',
+    throughputHeading: 'Frames relayed',
+    throughputHelp: 'The denominator for everything below: a drop count can only be judged against the traffic it occurred in.',
+    rxFrames: 'Received from the CCU',
+    txFrames: 'Sent to the CCU',
+    keepalives: 'Keepalives',
+    drops: 'Dropped',
+    latencyKicker: 'Latency',
+    latencyHeading: 'Queue and delays',
+    latencyHelp: 'The queue is the last buffer before a datagram is dropped outright. If it fills up, or frames wait a long time, switching commands arrive late.',
+    queueWaitMax: 'Longest wait',
+    queueDepthMax: 'Peak occupancy',
+    waitOver10ms: 'Delayed over 10 ms',
+    waitOver100ms: 'Delayed over 100 ms',
+    waitOver1s: 'Delayed over 1 s',
+    lastRx: 'Last packet',
+    highWaterNote: 'Peak values persist until reboot and never decay. Reset them to watch a fresh window — the frame totals are kept.',
+    resetButton: 'Reset peak values',
+    reloadButton: 'Reload',
+    resetDone: 'Peak values reset',
+    resetFailed: 'Reset failed',
+    loadError: 'The statistics could not be loaded.',
+    unsupported: 'This firmware does not report relay statistics yet, so the figures below say nothing. Update the firmware first.',
+    interpretHint: 'How to read this: if “Dropped” and the delay counters are zero and peak occupancy is low, the relay is working cleanly and a reported device fault has another cause. If occupancy approaches capacity, or delays above 100 ms appear, the relay path is implicated.',
+  },
   sysinfo: {
     updatesRecovery: 'Updates and recovery',
     liveStreamExport: 'Live stream and export',
@@ -427,7 +459,7 @@ export default {
     checkBusy: 'A search is already running.',
     checkUnavailable: 'The search cannot be started right now.',
     viewOnGithub: 'View on GitHub',
-    restartFlashPauseHint: 'Restart Sync is active — the Ethernet link will be held down for ~35 s before the device is available again after the restart, so the page reload will take a bit longer than usual.'
+    restartFlashPauseHint: 'Restart Sync is active — the Ethernet link will be held down for ~{seconds} s before the device is available again after the restart, so the page reload will take a bit longer than usual.'
   },
 
   // Monitoring

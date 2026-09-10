@@ -13,6 +13,8 @@
 #include "nvs.h"
 
 #include "log_manager.h"
+#include "esp_timer.h"
+#include "rawuartudplistener.h"
 #include "reset_info.h"
 #include "security_headers.h"
 #include "webui_storage.h"
@@ -189,6 +191,45 @@ esp_err_t get_system_overview(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "freePsram", free_psram);
     cJSON_AddNumberToObject(root, "usedPsram", used_psram);
 
+    // CCU relay latency. These have existed since #411/#362 but only through
+    // MQTT and the Prometheus endpoint - neither of which the people actually
+    // reporting disturbed device communication (#447) have set up. Without
+    // them in the WebUI the one measurement that separates "the CCU sent it
+    // late" from "the datagram waited in our queue" is unobtainable for the
+    // very users who could supply it.
+    {
+        raw_uart_latency_t latency = {};
+        raw_uart_get_latency(&latency);
+        cJSON *relay = cJSON_CreateObject();
+        if (relay) {
+            cJSON_AddNumberToObject(relay, "queueWaitMaxMs", latency.queue_wait_max_us / 1000);
+            cJSON_AddNumberToObject(relay, "queueWaitMaxUs", latency.queue_wait_max_us);
+            cJSON_AddNumberToObject(relay, "queueDepthMax", latency.queue_depth_max);
+            cJSON_AddNumberToObject(relay, "queueCapacity", RAW_UART_UDP_QUEUE_DEPTH);
+            cJSON_AddNumberToObject(relay, "waitOver10ms",
+                                    static_cast<double>(latency.wait_over_10ms));
+            cJSON_AddNumberToObject(relay, "waitOver100ms",
+                                    static_cast<double>(latency.wait_over_100ms));
+            cJSON_AddNumberToObject(relay, "waitOver1s", static_cast<double>(latency.wait_over_1s));
+            cJSON_AddNumberToObject(relay, "drops", static_cast<double>(latency.drops));
+            // Totals give the failure counts a denominator. Without them a
+            // drop count is unreadable.
+            cJSON_AddNumberToObject(relay, "rxFrames", static_cast<double>(latency.rx_frames));
+            cJSON_AddNumberToObject(relay, "txFrames", static_cast<double>(latency.tx_frames));
+            cJSON_AddNumberToObject(relay, "keepalives", static_cast<double>(latency.keepalives));
+            cJSON_AddBoolToObject(relay, "sessionActive", raw_uart_session_active());
+            // Age of the last datagram that reached the lwIP callback. A
+            // session that is active while this grows stale is the frozen-relay
+            // signature from #362, so it belongs next to the counters.
+            {
+                const uint32_t now_ms  = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+                const uint32_t last_ms = raw_uart_last_tcpip_rx_ms();
+                cJSON_AddNumberToObject(relay, "lastRxAgeMs", last_ms ? (now_ms - last_ms) : -1);
+            }
+            cJSON_AddItemToObject(root, "ccuRelay", relay);
+        }
+    }
+
     cJSON_AddStringToObject(root, "runningPartition",
                             running ? running->label : "unknown");
     cJSON_AddNumberToObject(root, "runningPartitionAddress",
@@ -258,6 +299,31 @@ esp_err_t get_system_overview(httpd_req_t *req)
     return result;
 }
 
+// Clearing the high-water marks lets an operator watch a fresh window after
+// changing something, instead of staring at a peak that was set days ago and
+// never decays. Only the marks and delay buckets reset; the frame totals stay,
+// because they are the denominator the rest is judged against.
+esp_err_t post_relay_stats_reset(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, nullptr);
+    }
+
+    raw_uart_reset_latency_high_water();
+    ESP_LOGI(TAG, "CCU relay high-water marks reset by operator");
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"success\":true}");
+}
+
+httpd_uri_t relay_stats_reset_uri = {
+    .uri      = "/api/system/relay-stats/reset",
+    .method   = HTTP_POST,
+    .handler  = post_relay_stats_reset,
+    .user_ctx = nullptr,
+};
+
 httpd_uri_t system_overview_uri = {
     .uri = "/api/system/overview",
     .method = HTTP_GET,
@@ -282,6 +348,12 @@ esp_err_t system_overview_api_register(httpd_handle_t server)
     {
         ESP_LOGE(TAG, "Could not register system overview API: %s",
                  esp_err_to_name(result));
+        return result;
+    }
+
+    result = httpd_register_uri_handler(server, &relay_stats_reset_uri);
+    if (result != ESP_OK) {
+        ESP_LOGE(TAG, "Could not register relay stats reset: %s", esp_err_to_name(result));
         return result;
     }
 

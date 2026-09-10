@@ -642,7 +642,7 @@
         fade
         class="mt-2 mb-0"
       >
-        {{ t('firmware.restartFlashPauseHint') }}
+        {{ t('firmware.restartFlashPauseHint', { seconds: FLASH_PAUSE_SECONDS }) }}
       </BAlert>
       <template #footer>
         <BButton variant="secondary" @click="showRestartModal = false">
@@ -671,7 +671,7 @@ import {
   requiredIf,
   requiredUnless
 } from '@vuelidate/validators'
-import { useSettingsStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore } from './stores.js'
+import { useSettingsStore, useUiStore, useSysInfoStore, useRestartUiStore, useExperimentalStore, FLASH_PAUSE_SECONDS } from './stores.js'
 import PasswordChangeModal from './components/PasswordChangeModal.vue'
 import FactoryResetModal from './components/FactoryResetModal.vue'
 import ThemeSettings from './theme.vue'

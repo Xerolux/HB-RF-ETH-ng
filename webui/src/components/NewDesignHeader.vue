@@ -207,7 +207,7 @@
         fade
         class="mt-2 mb-0"
       >
-        {{ t('firmware.restartFlashPauseHint') }}
+        {{ t('firmware.restartFlashPauseHint', { seconds: FLASH_PAUSE_SECONDS }) }}
       </BAlert>
     </BModal>
   </header>
@@ -218,7 +218,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
-import { useLoginStore, useThemeStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore } from '../stores.js'
+import { useLoginStore, useThemeStore, useSysInfoStore, useUiStore, useSettingsStore, useRestartUiStore, FLASH_PAUSE_SECONDS } from '../stores.js'
 import { availableLocales } from '../locales/index.js'
 import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 import { safeLocal } from '../composables/useSafeStorage'

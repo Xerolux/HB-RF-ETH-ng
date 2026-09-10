@@ -18,6 +18,9 @@ export const useHeaderNavigation = (t, loginStore) => {
       // reachable route for bookmarks but is not advertised in the sidebar.
       // Firmware + WebUI merged under /updates (Korrekturauftrag §6).
       { to: '/updates/firmware', icon: 'firmware', label: t('nav.updates'), group: 'system' },
+      // Radio/relay statistics. They existed only in Prometheus and MQTT,
+      // which the people who actually hit relay problems do not run.
+      { to: '/diagnostics', icon: 'radio', label: t('nav.diagnostics'), group: 'system' },
       { to: '/systemlog', icon: 'logs', label: t('nav.systemlog'), group: 'system' },
       { to: '/about', icon: 'info', label: t('nav.about'), group: 'info', public: true },
       // External documentation link (Korrekturauftrag §8). Lives in the info
