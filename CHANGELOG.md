@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.11] - 2026-09-10
+
+### Changes
+- chore: bump WebUI version to 1.0.3
+- fix(webui): live log auth, PWA asset routing, font CDN, ANSI display (#449)
+- feat(webui): add a Radio & Relay statistics page and restore the 2.1.10 queue depth (#448)
+- chore(deps)(deps): bump marked from 18.0.10 to 18.0.11 in /webui (#435)
+- chore(deps)(deps): bump axios from 1.19.0 to 1.20.0 in /webui (#434)
+- chore(deps)(deps): bump vue-router from 5.2.0 to 5.3.1 in /webui (#433)
+- chore(deps)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /webui (#432)
+- chore(deps)(deps-dev): bump sass from 1.103.1 to 1.104.0 in /webui (#431)
+- chore(ci)(deps): bump crate-ci/typos from 1.50.0 to 1.50.1 (#436)
+- chore: update manifests for v2.2.7-Beta.10
+
 ### Added
 - feat(webui): Neue Seite **Funk & Relay** (`/diagnostics`) zeigt die Kennzahlen
   der Raw-UART-Weiterleitung zwischen CCU und Funkmodul: empfangene und
