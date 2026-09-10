@@ -41,6 +41,7 @@ export default {
     updates: 'Updates',
     documentation: 'Documentazione',
     monitoring: 'Monitoraggio',
+    diagnostics: 'Radio e relè',
     systemlog: 'Registro di sistema',
     about: 'Informazioni',
     login: 'Accedi',
@@ -251,6 +252,37 @@ export default {
   },
 
   // System Info
+  diagnostics: {
+    eyebrow: 'Diagnostica',
+    pageTitle: 'Statistiche radio e relè',
+    pageDescription: 'Valori del relè raw-UART tra la CCU e il modulo radio. Mostrano se i datagrammi sono stati ritardati o scartati — e quindi se un guasto segnalato è del dispositivo o del relè.',
+    sessionActive: 'CCU collegata',
+    sessionIdle: 'nessuna sessione CCU',
+    throughputKicker: 'Throughput',
+    throughputHeading: 'Frame inoltrati',
+    throughputHelp: 'Il riferimento per tutto il resto: un conteggio di scarti si valuta solo rispetto al traffico complessivo.',
+    rxFrames: 'Ricevuti dalla CCU',
+    txFrames: 'Inviati alla CCU',
+    keepalives: 'Keepalive',
+    drops: 'Scartati',
+    latencyKicker: 'Latenza',
+    latencyHeading: 'Coda e ritardi',
+    latencyHelp: 'La coda è l’ultimo buffer prima che un datagramma venga scartato. Se si riempie o i frame attendono a lungo, i comandi arrivano in ritardo.',
+    queueWaitMax: 'Attesa più lunga',
+    queueDepthMax: 'Occupazione massima',
+    waitOver10ms: 'Ritardati oltre 10 ms',
+    waitOver100ms: 'Ritardati oltre 100 ms',
+    waitOver1s: 'Ritardati oltre 1 s',
+    lastRx: 'Ultimo pacchetto',
+    highWaterNote: 'I valori massimi restano fino al riavvio e non diminuiscono. Azzerali per osservare un nuovo intervallo — i contatori dei frame vengono mantenuti.',
+    resetButton: 'Azzera i massimi',
+    reloadButton: 'Ricarica',
+    resetDone: 'Massimi azzerati',
+    resetFailed: 'Azzeramento non riuscito',
+    loadError: 'Impossibile caricare le statistiche.',
+    unsupported: 'Questo firmware non riporta ancora le statistiche del relay, quindi i valori qui sotto non dicono nulla. Aggiorna prima il firmware.',
+    interpretHint: 'Come leggerlo: se «Scartati» e i contatori di ritardo sono a zero e l’occupazione è bassa, il relè funziona correttamente e un guasto segnalato ha un’altra causa. Se l’occupazione si avvicina alla capacità o compaiono ritardi oltre 100 ms, la causa è nel relè.',
+  },
   sysinfo: {
     updatesRecovery: 'Aggiornamenti e ripristino',
     liveStreamExport: 'Streaming live ed esportazione',
@@ -428,7 +460,7 @@ webuiUpdate: {
     checkBusy: 'Una ricerca è già in corso.',
     checkUnavailable: 'Al momento non è possibile avviare la ricerca.',
     viewOnGithub: 'Visualizza su GitHub',
-    restartFlashPauseHint: 'La sincronizzazione del riavvio è attiva: la connessione Ethernet verrà interrotta per circa 40 secondi prima che il dispositivo torni disponibile dopo il riavvio. Il ricaricamento della pagina richiederà quindi più tempo del normale.'
+    restartFlashPauseHint: 'La sincronizzazione del riavvio è attiva: la connessione Ethernet verrà interrotta per circa {seconds} s prima che il dispositivo torni disponibile dopo il riavvio. Il ricaricamento della pagina richiederà quindi più tempo del normale.'
   },
 
   // Monitoring

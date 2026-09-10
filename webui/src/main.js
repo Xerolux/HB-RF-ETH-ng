@@ -21,6 +21,7 @@ import About from './about.vue'
 import Monitoring from './monitoring.vue'
 import SystemLog from './systemlog.vue'
 import SystemOverview from './systemoverview.vue'
+import Diagnostics from './diagnostics.vue'
 import ThemeSettings from './theme.vue'
 import AppIcon from './components/AppIcon.vue'
 
@@ -48,6 +49,7 @@ const router = createRouter({
     { path: '/monitoring', component: Monitoring, meta: { requiresAuth: true } },
     { path: '/systemlog', component: SystemLog, meta: { requiresAuth: true } },
     { path: '/system-overview', component: SystemOverview, meta: { requiresAuth: true } },
+    { path: '/diagnostics', component: Diagnostics, meta: { requiresAuth: true } },
     { path: '/theme', component: ThemeSettings, meta: { requiresAuth: true } },
     { path: '/change-password', component: ChangePassword, meta: { requiresAuth: true } },
     { path: '/about', component: About },

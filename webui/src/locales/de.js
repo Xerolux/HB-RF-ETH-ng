@@ -41,6 +41,7 @@ export default {
     updates: 'Updates',
     documentation: 'Dokumentation',
     monitoring: 'Monitoring',
+    diagnostics: 'Funk & Relay',
     systemlog: 'System-Log',
     about: 'Über',
     login: 'Anmelden',
@@ -251,6 +252,37 @@ export default {
   },
 
   // System Info
+  diagnostics: {
+    eyebrow: 'Diagnose',
+    pageTitle: 'Funk- und Relay-Statistik',
+    pageDescription: 'Kennzahlen des Raw-UART-Relays zwischen CCU und Funkmodul. Sie zeigen, ob Datagramme verzögert oder verworfen wurden — und damit, ob eine gemeldete Gerätestörung am Gerät oder am Relay liegt.',
+    sessionActive: 'CCU verbunden',
+    sessionIdle: 'keine CCU-Sitzung',
+    throughputKicker: 'Durchsatz',
+    throughputHeading: 'Übertragene Frames',
+    throughputHelp: 'Bezugsgröße für alles Weitere: Verworfene Frames sind nur im Verhältnis zum Gesamtverkehr zu beurteilen.',
+    rxFrames: 'Von der CCU empfangen',
+    txFrames: 'An die CCU gesendet',
+    keepalives: 'Keepalives',
+    drops: 'Verworfen',
+    latencyKicker: 'Latenz',
+    latencyHeading: 'Warteschlange und Verzögerungen',
+    latencyHelp: 'Die Warteschlange ist der letzte Puffer, bevor ein Datagramm verworfen wird. Läuft sie voll oder warten Frames lange, kommen Schaltbefehle verspätet an.',
+    queueWaitMax: 'Längste Wartezeit',
+    queueDepthMax: 'Maximale Belegung',
+    waitOver10ms: 'Verzögert über 10 ms',
+    waitOver100ms: 'Verzögert über 100 ms',
+    waitOver1s: 'Verzögert über 1 s',
+    lastRx: 'Letztes Paket vor',
+    highWaterNote: 'Höchstwerte bleiben bis zum Neustart stehen und sinken nicht wieder. Zum Beobachten eines frischen Zeitraums zurücksetzen — die Frame-Zähler bleiben dabei erhalten.',
+    resetButton: 'Höchstwerte zurücksetzen',
+    reloadButton: 'Neu laden',
+    resetDone: 'Höchstwerte zurückgesetzt',
+    resetFailed: 'Zurücksetzen fehlgeschlagen',
+    loadError: 'Statistik konnte nicht geladen werden.',
+    unsupported: 'Diese Firmware meldet noch keine Relay-Statistik. Die Werte unten sind deshalb nicht aussagekräftig — bitte zuerst die Firmware aktualisieren.',
+    interpretHint: 'Zur Einordnung: Sind „Verworfen“ und die Verzögerungszähler null und die maximale Belegung niedrig, arbeitet das Relay sauber — eine gemeldete Gerätestörung hat dann eine andere Ursache. Nähert sich die Belegung der Kapazität oder steigen die Verzögerungen über 100 ms, liegt es am Relay-Pfad.',
+  },
   sysinfo: {
     updatesRecovery: 'Updates und Wiederherstellung',
     liveStreamExport: 'Live-Stream und Export',
@@ -428,7 +460,7 @@ export default {
     checkBusy: 'Es läuft bereits eine Suche.',
     checkUnavailable: 'Die Suche kann derzeit nicht gestartet werden.',
     viewOnGithub: 'Auf GitHub ansehen',
-    restartFlashPauseHint: 'Neustart-Sync ist aktiv — die Ethernet-Verbindung wird für ca. 40 s getrennt, bevor das Gerät nach dem Neustart wieder verfügbar ist. Das Neuladen der Seite dauert also etwas länger als sonst.'
+    restartFlashPauseHint: 'Neustart-Sync ist aktiv — die Ethernet-Verbindung wird für ca. {seconds} s getrennt, bevor das Gerät nach dem Neustart wieder verfügbar ist. Das Neuladen der Seite dauert also etwas länger als sonst.'
   },
 
   // Monitoring
