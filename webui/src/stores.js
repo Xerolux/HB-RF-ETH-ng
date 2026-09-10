@@ -3,6 +3,13 @@ import axios from 'axios'
 import { safeLocal, safeSession } from './composables/useSafeStorage'
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
+
+// The restart sync mirrors the firmware's fixed Ethernet link-down window
+// (system_reset.cpp holds the PHY in reset for 7 x 5 s = 35 s so the CCU
+// watchdog with its 30 s timeout sees the disconnect). Every countdown and
+// every hint text must name this one value — 40/120 s drift is how the
+// overlay ended up contradicting the device before.
+export const FLASH_PAUSE_SECONDS = 35
 const getStoredLastActivity = () => {
   const stored = Number(safeSession.get("hb-rf-eth-ng-last-activity"))
   return Number.isFinite(stored) && stored > 0 ? stored : Date.now()
@@ -154,7 +161,7 @@ export const useRestartUiStore = defineStore('restartUi', {
     start(options = {}) {
       const includeFlashPause = !!options.includeFlashPause
       const restartSeconds = options.restartSeconds || 30
-      const syncSeconds = options.syncSeconds || 40
+      const syncSeconds = options.syncSeconds || FLASH_PAUSE_SECONDS
       this.reloadUrl = options.reloadUrl || null
 
       if (this.timer) {

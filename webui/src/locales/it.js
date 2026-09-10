@@ -213,7 +213,7 @@ export default {
     experimentalDesign: 'Layout sperimentale',
     experimentalDesignHint: 'Attiva il nuovo layout sperimentale. La scelta viene salvata sul dispositivo e resta attiva dopo il riavvio.',
     flashPause: 'Sincronia riavvio',
-    flashPauseHint: 'Dopo un riavvio causato da un aggiornamento firmware o da una modifica delle impostazioni, scollega il collegamento Ethernet per circa 40 s prima del riavvio, in modo che il watchdog della CCU rilevi la disconnessione e riavvii in modo pulito.',
+    flashPauseHint: 'Dopo un riavvio causato da un aggiornamento firmware o da una modifica delle impostazioni, scollega il collegamento Ethernet per circa 35 s prima del riavvio, in modo che il watchdog della CCU rilevi la disconnessione e riavvii in modo pulito.',
     restoreSuccess: 'Impostazioni ripristinate con successo. Riavvio del sistema...',
     restoreError: 'Errore durante il ripristino delle impostazioni',
     backupError: 'Errore durante il download del backup',

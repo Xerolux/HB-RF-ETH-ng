@@ -213,7 +213,7 @@ export default {
     experimentalDesign: 'Design de test',
     experimentalDesignHint: 'Active la nouvelle mise en page expérimentale. Le choix est enregistré sur l’appareil et survit aux redémarrages.',
     flashPause: 'Sync. redémarrage',
-    flashPauseHint: 'Après un redémarrage déclenché par une mise à jour du firmware ou une modification des paramètres, coupe la liaison Ethernet pendant 40 s avant le redémarrage, pour que le watchdog de la CCU détecte la déconnexion et redémarre proprement.',
+    flashPauseHint: 'Après un redémarrage déclenché par une mise à jour du firmware ou une modification des paramètres, coupe la liaison Ethernet pendant 35 s avant le redémarrage, pour que le watchdog de la CCU détecte la déconnexion et redémarre proprement.',
     restoreSuccess: 'Paramètres restaurés avec succès. Redémarrage du système...',
     restoreError: 'Erreur lors de la restauration des paramètres',
     backupError: 'Erreur lors du téléchargement de la sauvegarde',

@@ -1809,10 +1809,11 @@ test('the firmware upload countdown matches the firmware link-down window', asyn
   const resetSource = await readFile('../main/system_reset.cpp', 'utf8')
   const app = await readFile('../webui/src/app.vue', 'utf8')
 
-  // 35 s link-down in the firmware, 40 s on screen: a margin, not a
-  // contradiction. 120 was neither.
+  // The countdown names the firmware's exact 35 s link-down window —
+  // same constant, no invented margin. 120/40 were both wrong.
   expect(resetSource).toContain('Ethernet off for 35 s');
-  expect(firmwarePage).toContain('syncSeconds: 40')
+  expect(firmwarePage).toContain('syncSeconds: FLASH_PAUSE_SECONDS')
   expect(firmwarePage).not.toContain('syncSeconds: 120')
+  expect(firmwarePage).not.toContain('syncSeconds: 40')
   expect(app).toContain("t('firmware.restartFlashPauseHint', { seconds: restartUiStore.phaseDuration })")
 })
