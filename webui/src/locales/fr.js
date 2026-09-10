@@ -41,6 +41,7 @@ export default {
     updates: 'Updates',
     documentation: 'Documentation',
     monitoring: 'Surveillance',
+    diagnostics: 'Radio et relais',
     systemlog: 'Journal système',
     about: 'À propos',
     login: 'Connexion',
@@ -212,7 +213,7 @@ export default {
     experimentalDesign: 'Design de test',
     experimentalDesignHint: 'Active la nouvelle mise en page expérimentale. Le choix est enregistré sur l’appareil et survit aux redémarrages.',
     flashPause: 'Sync. redémarrage',
-    flashPauseHint: 'Après un redémarrage déclenché par une mise à jour du firmware ou une modification des paramètres, coupe la liaison Ethernet pendant 40 s avant le redémarrage, pour que le watchdog de la CCU détecte la déconnexion et redémarre proprement.',
+    flashPauseHint: 'Après un redémarrage déclenché par une mise à jour du firmware ou une modification des paramètres, coupe la liaison Ethernet pendant 35 s avant le redémarrage, pour que le watchdog de la CCU détecte la déconnexion et redémarre proprement.',
     restoreSuccess: 'Paramètres restaurés avec succès. Redémarrage du système...',
     restoreError: 'Erreur lors de la restauration des paramètres',
     backupError: 'Erreur lors du téléchargement de la sauvegarde',
@@ -251,6 +252,37 @@ export default {
   },
 
   // System Info
+  diagnostics: {
+    eyebrow: 'Diagnostic',
+    pageTitle: 'Statistiques radio et relais',
+    pageDescription: 'Indicateurs du relais raw-UART entre la CCU et le module radio. Ils montrent si des datagrammes ont été retardés ou perdus — et donc si un défaut signalé vient de l’appareil ou du relais.',
+    sessionActive: 'CCU connectée',
+    sessionIdle: 'aucune session CCU',
+    throughputKicker: 'Débit',
+    throughputHeading: 'Trames relayées',
+    throughputHelp: 'La référence pour tout le reste : un nombre de pertes ne se juge qu’au regard du trafic total.',
+    rxFrames: 'Reçues de la CCU',
+    txFrames: 'Envoyées à la CCU',
+    keepalives: 'Keepalives',
+    drops: 'Perdues',
+    latencyKicker: 'Latence',
+    latencyHeading: 'File d’attente et retards',
+    latencyHelp: 'La file est le dernier tampon avant qu’un datagramme soit perdu. Si elle se remplit ou si les trames attendent longtemps, les commandes arrivent en retard.',
+    queueWaitMax: 'Attente la plus longue',
+    queueDepthMax: 'Occupation maximale',
+    waitOver10ms: 'Retardées de plus de 10 ms',
+    waitOver100ms: 'Retardées de plus de 100 ms',
+    waitOver1s: 'Retardées de plus de 1 s',
+    lastRx: 'Dernier paquet il y a',
+    highWaterNote: 'Les valeurs maximales restent jusqu’au redémarrage et ne diminuent pas. Réinitialisez-les pour observer une nouvelle période — les compteurs de trames sont conservés.',
+    resetButton: 'Réinitialiser les maxima',
+    reloadButton: 'Recharger',
+    resetDone: 'Maxima réinitialisés',
+    resetFailed: 'Échec de la réinitialisation',
+    loadError: 'Les statistiques n’ont pas pu être chargées.',
+    unsupported: 'Ce micrologiciel ne communique pas encore de statistiques de relais ; les valeurs ci-dessous ne signifient donc rien. Mettez d\'abord à jour le micrologiciel.',
+    interpretHint: 'Lecture : si « Perdues » et les compteurs de retard sont à zéro et l’occupation faible, le relais fonctionne correctement et un défaut signalé a une autre cause. Si l’occupation approche la capacité ou que des retards dépassent 100 ms, le relais est en cause.',
+  },
   sysinfo: {
     updatesRecovery: 'Mises à jour et récupération',
     liveStreamExport: 'Flux en direct et export',
@@ -428,7 +460,7 @@ export default {
     checkBusy: 'Une recherche est déjà en cours.',
     checkUnavailable: 'La recherche ne peut pas être lancée pour le moment.',
     viewOnGithub: 'Voir sur GitHub',
-    restartFlashPauseHint: 'Sync. redémarrage est activée : la liaison Ethernet sera coupée pendant environ 35 s avant le redémarrage effectif de l\'appareil. Le rechargement de la page prendra donc un peu plus de temps que d\'habitude.'
+    restartFlashPauseHint: 'Sync. redémarrage est activée : la liaison Ethernet sera coupée pendant environ {seconds} s avant que l\'appareil ne soit de nouveau disponible après le redémarrage. Le rechargement de la page prendra donc un peu plus de temps que d\'habitude.'
   },
 
   // Monitoring

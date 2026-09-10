@@ -22,11 +22,40 @@ ESP32-WROOM-32:
 - active WebUI source, version, mount state, and SPIFFS usage
 - log capture state, ring capacity, currently available bytes, total stream
   offset, active subscriber count, and crash-tail availability
+- `ccuRelay`: the raw-UART relay counters described below
 
 Values are calculated only when requested. No permanent diagnostic task,
 statistics buffer, history recorder, or additional polling loop is created in
 firmware. The New Design requests the data once when the page is opened and only
 again when the user presses **Refresh**.
+
+## Relay statistics (`ccuRelay`)
+
+The same response carries the counters of the raw-UART relay between the CCU and
+the radio module, which the **Radio & Relay** WebUI page renders:
+
+| Field | Meaning |
+|-------|---------|
+| `rxFrames` | Datagrams received from the CCU |
+| `txFrames` | Datagrams sent to the CCU |
+| `keepalives` | Keepalive datagrams handled |
+| `drops` | Datagrams discarded because the queue was full |
+| `queueWaitMaxMs` / `queueWaitMaxUs` | Longest observed wait between enqueue and dequeue |
+| `queueDepthMax` | Peak queue occupancy |
+| `queueCapacity` | Queue depth the firmware was built with (`RAW_UART_UDP_QUEUE_DEPTH`) |
+| `waitOver10ms`, `waitOver100ms`, `waitOver1s` | Disjoint delay buckets; one datagram counts once |
+| `sessionActive` | Whether a CCU session is currently bound |
+| `lastRxAgeMs` | Age of the last received datagram, `-1` when none |
+
+The peak values (`queueWaitMax*`, `queueDepthMax`) are high-water marks that
+never decay. `POST /api/system/relay-stats/reset` clears them so a fresh
+observation window can be watched; the frame totals and drop count are kept, as
+a drop count without its traffic denominator cannot be judged.
+
+These are the same counters already exported through Prometheus and MQTT
+(`ccu_queue_wait_max_ms`, `ccu_queue_depth_max`, `ccu_delayed_frames`,
+`ccu_dropped_frames`). The WebUI page exists because the users who hit relay
+problems generally run neither.
 
 ## Minimal recovery page
 

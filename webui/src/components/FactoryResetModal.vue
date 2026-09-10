@@ -81,6 +81,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import {
+  FLASH_PAUSE_SECONDS,
   useExperimentalStore,
   useLoginStore,
   useRestartUiStore,
@@ -185,7 +186,7 @@ const confirmFactoryReset = async () => {
     clearBrowserState()
     restartUiStore.start({
       includeFlashPause: true,
-      syncSeconds: 40,
+      syncSeconds: FLASH_PAUSE_SECONDS,
       restartSeconds: 30
     })
     emit('completed')

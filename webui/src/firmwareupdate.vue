@@ -121,7 +121,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore } from './stores.js'
+import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, FLASH_PAUSE_SECONDS } from './stores.js'
 import { useUpdateSearch } from './composables/useUpdateSearch'
 
 const WEBUI_IMAGE_SIZE = 0x50000
@@ -234,7 +234,9 @@ const uploadFirmware = async () => {
       }
     })
     uiStore.pushToast({ type: 'success', title: t('firmware.uploadCompleteTitle'), message: t('firmware.uploadCompleteMessage'), duration: 2500 })
-    restartUiStore.start({ includeFlashPause: true, syncSeconds: 120, restartSeconds: 30 })
+    // 40 s covers the firmware's fixed 35 s Ethernet link-down window (see
+    // main/system_reset.cpp); the following restart phase covers the boot.
+    restartUiStore.start({ includeFlashPause: true, syncSeconds: FLASH_PAUSE_SECONDS, restartSeconds: 30 })
   } catch (error) {
     const message = typeof error.response?.data === 'string'
       ? error.response.data

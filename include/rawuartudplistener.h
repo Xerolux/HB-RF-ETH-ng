@@ -74,11 +74,18 @@ public:
     bool _udpReceivePacket(pbuf *pb, const ip_addr_t *addr, uint16_t port);
 };
 
-// Snapshot of the CCU relay latency instrumentation. The values are already
-// exported through the Prometheus endpoint; this accessor exists so the MQTT
-// status batch can surface them too, since the users reporting delayed
-// switching commands (issues #411 / #362) are watching Home Assistant rather
-// than scraping /metrics.
+// Depth of the inbound datagram queue. Exported so the diagnostics view can
+// show occupancy against capacity rather than a bare number nobody can judge.
+#define RAW_UART_UDP_QUEUE_DEPTH 64
+
+// Snapshot of the CCU relay instrumentation. Exported through the Prometheus
+// endpoint, the MQTT status batch and the WebUI diagnostics page - the last of
+// these because the people reporting delayed switching commands and disturbed
+// device communication (#411 / #362 / #447) run neither a scraper nor a broker,
+// and were therefore the only ones who could not see the numbers.
+//
+// The frame totals matter as much as the failure counts: "17 drops" means
+// nothing without knowing whether 17 or 17 million frames went through.
 typedef struct {
     uint32_t queue_wait_max_us; // high-water since boot or last reset
     uint32_t queue_depth_max;   // high-water queue occupancy
@@ -86,6 +93,9 @@ typedef struct {
     uint64_t wait_over_100ms;   // datagrams delayed 100 ms .. 1 s
     uint64_t wait_over_1s;      // datagrams delayed more than 1 s
     uint64_t drops;             // datagrams dropped (queue full / invalid)
+    uint64_t rx_frames;         // datagrams accepted from the CCU
+    uint64_t tx_frames;         // datagrams sent to the CCU
+    uint64_t keepalives;        // keepalive probes sent
 } raw_uart_latency_t;
 
 void raw_uart_get_latency(raw_uart_latency_t *out);
