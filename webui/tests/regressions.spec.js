@@ -1641,6 +1641,11 @@ test('log lines render without raw ANSI escape sequences', async ({ page }) => {
 
   await page.goto(`${BASE_URL}/systemlog`)
 
+  // The socket is created asynchronously after the status check resolves.
+  await expect.poll(() => page.evaluate(() =>
+    window.__fakeWebSockets.filter(s => s.url.includes('/api/log/stream')).length
+  )).toBe(1)
+
   await page.evaluate(() => {
     const socket = window.__fakeWebSockets.find(s => s.url.includes('/api/log/stream'))
     const backlog = '\u001b[0;32mI (718) LogManager: Log buffering enabled (4096 bytes)\u001b[0m\n'
