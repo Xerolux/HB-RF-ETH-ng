@@ -23,6 +23,7 @@
 
 #include "log_stream.h"
 #include "log_manager.h"
+#include "url_decode.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -580,12 +581,16 @@ void log_stream_init(void)
     (void)stream_mutex();
 }
 
+// The browser sends the base64 admin token via encodeURIComponent(), so the
+// '+', '/' and '=' of the token arrive percent-encoded and must be decoded
+// before the comparison — see include/url_decode.h.
 static bool authenticate_websocket(httpd_req_t *req)
 {
     char q[256];
     if (httpd_req_get_url_query_str(req, q, sizeof(q)) == ESP_OK) {
         char token[80] = {};
         if (httpd_query_key_value(q, "token", token, sizeof(token)) == ESP_OK && token[0]) {
+            url_decode_in_place(token);
             return check_admin_token(token);
         }
     }

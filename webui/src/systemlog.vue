@@ -196,8 +196,11 @@ const appendChunk = (chunk) => {
     if (logEntries.value.length >= MAX_LOG_LINES) {
       logEntries.value.shift()
     }
+    // The device buffer carries ESP_LOG color codes; strip them once here so
+    // display, search and copy all work on the readable line. The download
+    // button fetches the raw file from /api/log/download directly.
     logEntries.value.push({
-      raw: line,
+      raw: stripAnsi(line),
       level: getEntryLevel(line),
       lowerRaw: line.toLowerCase()
     })
