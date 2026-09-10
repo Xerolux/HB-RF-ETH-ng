@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- fix(webui): Der WebSocket-Live-Stream des System-Logs war aus dem Browser
+  dauerhaft unautorisiert (Endlos-401-Reconnect). `httpd_query_key_value()`
+  liefert den Query-Wert undekodiert; der per `encodeURIComponent()` gesendete
+  Base64-Admin-Token (`%2B`/`%2F`/`%3D`) stimmte nie mit dem gespeicherten
+  Token überein. Der Wert wird jetzt vor dem Vergleich percent-dekodiert
+  (`include/url_decode.h`, Host-Test `test_url_decode.cpp`).
+- fix(webui): `/manifest.webmanifest` und `/icon-256.png` antworteten mit der
+  gzipped `index.html`, weil die PWA-Routen nach dem `/*`-SPA-Catch-all
+  registriert wurden und bei `httpd_uri_match_wildcard` die erste Registrierung
+  gewinnt. Die Routen sind jetzt vor dem Catch-all registriert; PWA-Installation
+  und Manifest laden wieder.
+- fix(webui): Die Google-Fonts-CDN-Links in `index.html` waren durch die
+  offline-first-CSP (`style-src/font-src 'self'`) blockiert und erzeugten bei
+  jedem Laden einen Konsole-Fehler. Entfernt; das `--font-sans`-Fallback
+  (Segoe UI/system-ui/Roboto) rendert unverändert.
+- fix(webui): Das Live-Log zeigte rohe ANSI-Farbcodes (`\x1b[0;32m…`) je
+  Zeile. Die Escape-Sequenzen werden jetzt beim Einlesen entfernt — Anzeige,
+  Suche und Kopieren arbeiten mit der lesbaren Zeile; der Download liefert
+  weiterhin die Rohdatei.
+
 ## [2.2.7-Beta.10] - 2026-09-09
 
 ### Changes

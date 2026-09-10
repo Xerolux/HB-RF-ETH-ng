@@ -70,6 +70,14 @@ jobs:
             -o build/host-tests/test_secure_utils
           build/host-tests/test_secure_utils
 
+      - name: Test query-value percent decoding
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror \
+            -Iinclude \
+            test/host/test_url_decode.cpp \
+            -o build/host-tests/test_url_decode
+          build/host-tests/test_url_decode
+
       - name: Test update-search admission policy and version decision
         run: |
           mkdir -p build/host-tests

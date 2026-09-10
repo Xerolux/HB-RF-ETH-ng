@@ -1967,13 +1967,18 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
         httpd_register_uri_handler(_httpd_handle, &get_crash_log_handler);
 
+        // With uri_match_wildcard the first matching registration wins, so
+        // every exact route must be registered BEFORE the "/*" SPA catch-all
+        // — the PWA assets used to sit behind it and were unreachable
+        // (manifest and icon answered with the gzipped index.html).
         httpd_register_uri_handler(_httpd_handle, &main_js_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &main_css_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &favicon_ico_gz_handler);
-        httpd_register_uri_handler(_httpd_handle, &index_html_gz_handler);
         // PWA assets
         httpd_register_uri_handler(_httpd_handle, &manifest_webmanifest_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &icon_256_png_gz_handler);
+        // SPA catch-all last.
+        httpd_register_uri_handler(_httpd_handle, &index_html_gz_handler);
     }
 }
 

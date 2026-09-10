@@ -33,15 +33,11 @@
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
 
-    <!-- Inter typeface (primary font family; loaded preconnect+swap so there
-         is no FOIT, and the system-ui fallback chain in main.css renders
-         cleanly while Inter loads or if the CDN is unreachable). -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-    />
+    <!-- No webfont CDN: the device CSP is offline-first (style-src/font-src
+         'self'), so an external stylesheet was blocked on every load and
+         only produced console errors. The --font-sans stack in main.css
+         (Inter first, then Segoe UI / system-ui / Roboto) renders with the
+         locally available fonts. -->
 </head>
 <body class="newdesign-active">
   <!-- The New Design is now the only supported WebUI. The class is fixed in

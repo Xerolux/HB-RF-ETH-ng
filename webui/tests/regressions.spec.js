@@ -1591,6 +1591,73 @@ test('live log waits for the authenticated WebSocket acknowledgement and closes 
   expect(await logSocketCount()).toBe(1)
 })
 
+test('log lines render without raw ANSI escape sequences', async ({ page }) => {
+  // The device log buffer captures ESP_LOG output with its color codes. The
+  // page used to print them verbatim, so every line started with a literal
+  // "\u001b[0;32m" — unreadable and breaking text selection.
+  await page.addInitScript(() => {
+    class FakeWebSocket {
+      static instances = []
+
+      constructor(url) {
+        this.url = url
+        this.readyState = 0
+        FakeWebSocket.instances.push(this)
+        queueMicrotask(() => {
+          if (this.readyState !== 0) return
+          this.readyState = 1
+          this.onopen?.({})
+        })
+      }
+
+      close() {
+        if (this.readyState === 3) return
+        this.readyState = 3
+        queueMicrotask(() => this.onclose?.({ code: 1000 }))
+      }
+
+      emit(data) {
+        this.onmessage?.({ data })
+      }
+    }
+
+    window.WebSocket = FakeWebSocket
+    window.__fakeWebSockets = FakeWebSocket.instances
+  })
+
+  await page.route('**/api/log/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ enabled: true, persistent: true, subscribers: 0 })
+  }))
+  await page.route(/\/api\/log(?:\?.*)?$/, route => route.fulfill({
+    contentType: 'text/plain',
+    headers: { 'X-Log-Total': '0' },
+    body: ''
+  }))
+  await page.route('**/api/crash_log**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ available: false, tail: '' })
+  }))
+
+  await page.goto(`${BASE_URL}/systemlog`)
+
+  await page.evaluate(() => {
+    const socket = window.__fakeWebSockets.find(s => s.url.includes('/api/log/stream'))
+    const backlog = '\u001b[0;32mI (718) LogManager: Log buffering enabled (4096 bytes)\u001b[0m\n'
+    const backlogBytes = new TextEncoder().encode(backlog).length
+    socket.emit(`stream snapshot ${backlogBytes}\n`)
+    socket.emit(`stream backlog ${backlogBytes}\n`)
+    socket.emit(backlog)
+    socket.emit(`stream connected ${backlogBytes}\n`)
+  })
+
+  await expect(page.locator('.log-container')).toContainText('Log buffering enabled')
+  const renderedText = await page.locator('.log-container').innerText()
+  expect(renderedText).not.toContain('\u001b')
+  // Level detection still works off the cleaned line.
+  await expect(page.locator('.log-line.info')).toHaveCount(1)
+})
+
 test('a skipped update search is never presented as an up-to-date result', async ({ page }) => {
   // The defect this guards against: a search that never ran because memory was
   // low used to surface as "no update found", which reads as a reassurance the
