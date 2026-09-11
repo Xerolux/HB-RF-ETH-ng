@@ -148,8 +148,8 @@ python3 rename_webui_files.py   # gzip-compresses the dist assets idf.py embeds
 |--------|------|
 | HM UART RX | GPIO 35 |
 | HM UART TX | GPIO 2 |
-| HM I2C SDA | GPIO 18 |
-| HM I2C SCL | GPIO 5 |
+| HM I2C SDA | GPIO 18 (bus used by the RX8130 RTC only) |
+| HM I2C SCL | GPIO 5 (bus used by the RX8130 RTC only) |
 | HM Reset | GPIO 23 |
 | HM Button | GPIO 34 |
 | RGB Red LED | GPIO 15 |
@@ -175,8 +175,8 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 |------|---------------|
 | `main.cpp` | Entry point, task orchestration, hardware init |
 | `ethernet.cpp` | Ethernet interface, DNS cache, DHCP/static IP |
-| `radiomoduledetector.cpp` | Auto-detects HM radio module type (UART/I2C probe) |
-| `radiomoduleconnector.cpp` | UART/I2C bridge to radio module |
+| `radiomoduledetector.cpp` | Auto-detects HM radio module type (UART probe) |
+| `radiomoduleconnector.cpp` | UART bridge to radio module |
 | `rawuartudplistener.cpp` | UDP↔UART bridge (the core protocol relay) |
 | `webui.cpp` | HTTP server, auth/login, settings, ping, log and password endpoints; owns `WebUI::start()` route registration |
 | `webui_backup.cpp` | `/api/backup` and `/api/restore` — full settings export/import |
