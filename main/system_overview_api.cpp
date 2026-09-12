@@ -15,6 +15,7 @@
 #include "log_manager.h"
 #include "esp_timer.h"
 #include "rawuartudplistener.h"
+#include "radiomoduleconnector.h"
 #include "reset_info.h"
 #include "security_headers.h"
 #include "webui_storage.h"
@@ -217,6 +218,12 @@ esp_err_t get_system_overview(httpd_req_t *req)
             cJSON_AddNumberToObject(relay, "rxFrames", static_cast<double>(latency.rx_frames));
             cJSON_AddNumberToObject(relay, "txFrames", static_cast<double>(latency.tx_frames));
             cJSON_AddNumberToObject(relay, "keepalives", static_cast<double>(latency.keepalives));
+            // Module->CCU losses that never reached a counter before: the
+            // pbuf allocation failure and the discarded lwIP send result.
+            cJSON_AddNumberToObject(relay, "txAllocFail",
+                                    static_cast<double>(latency.tx_alloc_fail));
+            cJSON_AddNumberToObject(relay, "txSendErrors",
+                                    static_cast<double>(latency.tx_send_err));
             cJSON_AddBoolToObject(relay, "sessionActive", raw_uart_session_active());
             // Age of the last datagram that reached the lwIP callback. A
             // session that is active while this grows stale is the frozen-relay
@@ -227,6 +234,40 @@ esp_err_t get_system_overview(httpd_req_t *req)
                 cJSON_AddNumberToObject(relay, "lastRxAgeMs", last_ms ? (now_ms - last_ms) : -1);
             }
             cJSON_AddItemToObject(root, "ccuRelay", relay);
+        }
+    }
+
+    // Radio-module UART side of the same bridge. Every counter above measures
+    // the CCU half; on the field units of #447 all of them read zero, which
+    // only rules out that half. The overflow path below flushes the driver
+    // buffer and destroys frames the module had already delivered, so the CCU
+    // repeats the transmission - a duty-cycle climb with no UDP-side trace.
+    {
+        radio_uart_stats_t uart = {};
+        radio_uart_get_stats(&uart);
+        cJSON *ru = cJSON_CreateObject();
+        if (ru) {
+            // Failure counters first: these are what the issue needs.
+            cJSON_AddNumberToObject(ru, "fifoOverflows", static_cast<double>(uart.fifo_ovf));
+            cJSON_AddNumberToObject(ru, "bufferFull", static_cast<double>(uart.buffer_full));
+            cJSON_AddNumberToObject(ru, "oversize", static_cast<double>(uart.oversize));
+            cJSON_AddNumberToObject(ru, "flushedBytes", static_cast<double>(uart.flushed_bytes));
+            cJSON_AddNumberToObject(ru, "breaks", static_cast<double>(uart.breaks));
+            cJSON_AddNumberToObject(ru, "parityErrors", static_cast<double>(uart.parity_err));
+            cJSON_AddNumberToObject(ru, "frameErrors", static_cast<double>(uart.frame_err));
+            cJSON_AddNumberToObject(ru, "readTimeouts", static_cast<double>(uart.read_timeouts));
+            cJSON_AddNumberToObject(ru, "txErrors", static_cast<double>(uart.tx_errors));
+            // Backlog against capacity - a bare byte count is unjudgeable.
+            cJSON_AddNumberToObject(ru, "rxBacklogMax", uart.rx_backlog_max);
+            cJSON_AddNumberToObject(ru, "rxRingSize", uart.rx_ring_size);
+            cJSON_AddNumberToObject(ru, "txRingSize", uart.tx_ring_size);
+            cJSON_AddNumberToObject(ru, "rxFullThreshold", uart.rx_full_thresh);
+            // Denominators.
+            cJSON_AddNumberToObject(ru, "rxFrames", static_cast<double>(uart.rx_frames));
+            cJSON_AddNumberToObject(ru, "txFrames", static_cast<double>(uart.tx_frames));
+            cJSON_AddNumberToObject(ru, "rxBytes", static_cast<double>(uart.rx_bytes));
+            cJSON_AddNumberToObject(ru, "txBytes", static_cast<double>(uart.tx_bytes));
+            cJSON_AddItemToObject(root, "radioUart", ru);
         }
     }
 
@@ -311,6 +352,9 @@ esp_err_t post_relay_stats_reset(httpd_req_t *req)
     }
 
     raw_uart_reset_latency_high_water();
+    // The UART backlog gauge belongs to the same window: resetting one and not
+    // the other would leave the page mixing two observation periods.
+    radio_uart_reset_high_water();
     ESP_LOGI(TAG, "CCU relay high-water marks reset by operator");
 
     httpd_resp_set_type(req, "application/json");

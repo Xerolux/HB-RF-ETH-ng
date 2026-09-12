@@ -47,6 +47,10 @@
           <span class="stat-label">{{ t('diagnostics.drops') }}</span>
           <span class="stat-value">{{ num(relay.drops) }}<small v-if="dropRate"> ({{ dropRate }})</small></span>
         </div>
+        <div class="stat" :class="{ 'stat-warn': txFailed > 0 }">
+          <span class="stat-label">{{ t('diagnostics.txFailed') }}</span>
+          <span class="stat-value">{{ num(txFailed) }}</span>
+        </div>
       </div>
     </section>
 
@@ -105,6 +109,67 @@
       </div>
     </section>
 
+    <!-- The radio-module half of the bridge. Everything above measures the
+         CCU side; an overflow here discards frames the module already
+         delivered, so the CCU repeats them and the duty cycle climbs without
+         a single CCU-side counter moving. -->
+    <section class="stat-card">
+      <div class="card-header">
+        <div class="header-icon bg-primary-light text-primary"><AppIcon name="radio" /></div>
+        <div class="header-text">
+          <span class="kicker">{{ t('diagnostics.uartKicker') }}</span>
+          <h2>{{ t('diagnostics.uartHeading') }}</h2>
+          <p>{{ t('diagnostics.uartHelp') }}</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <BAlert v-if="uartUnsupported" variant="warning" :model-value="true">
+          {{ t('diagnostics.uartUnsupported') }}
+        </BAlert>
+        <template v-else>
+          <div class="stat-grid">
+            <div class="stat" :class="{ 'stat-warn': uartOverflows > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartOverflows') }}</span>
+              <span class="stat-value">{{ num(uartOverflows) }}</span>
+            </div>
+            <div class="stat" :class="{ 'stat-warn': uart.flushedBytes > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartLostBytes') }}</span>
+              <span class="stat-value">{{ num(uart.flushedBytes) }}</span>
+            </div>
+            <div class="stat" :class="{ 'stat-warn': uartLineErrors > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartLineErrors') }}</span>
+              <span class="stat-value">{{ num(uartLineErrors) }}</span>
+            </div>
+            <div class="stat" :class="{ 'stat-warn': uart.txErrors > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartTxErrors') }}</span>
+              <span class="stat-value">{{ num(uart.txErrors) }}</span>
+            </div>
+          </div>
+
+          <div class="stat-grid secondary">
+            <div class="stat" :class="{ 'stat-warn': uartBacklogNearFull }">
+              <span class="stat-label">{{ t('diagnostics.uartBacklogMax') }}</span>
+              <span class="stat-value">{{ num(uart.rxBacklogMax) }} / {{ num(uart.rxRingSize) }} B</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">{{ t('diagnostics.uartRxFrames') }}</span>
+              <span class="stat-value">{{ num(uart.rxFrames) }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">{{ t('diagnostics.uartTxFrames') }}</span>
+              <span class="stat-value">{{ num(uart.txFrames) }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">{{ t('diagnostics.uartOversize') }}</span>
+              <span class="stat-value">{{ num(uart.oversize) }}</span>
+            </div>
+          </div>
+
+          <p class="muted-text">{{ t('diagnostics.uartNote') }}</p>
+        </template>
+      </div>
+    </section>
+
     <section class="stat-card">
       <div class="card-body">
         <p class="muted-text">{{ t('diagnostics.interpretHint') }}</p>
@@ -139,9 +204,35 @@ const relay = ref({
   rxFrames: 0,
   txFrames: 0,
   keepalives: 0,
+  txAllocFail: 0,
+  txSendErrors: 0,
   sessionActive: false,
   lastRxAgeMs: -1
 })
+
+// Radio-module UART counters. Reported by firmware that carries the #447
+// instrumentation; older builds omit the object entirely, which the
+// uartUnsupported flag turns into a notice instead of a wall of zeros.
+const uart = ref({
+  fifoOverflows: 0,
+  bufferFull: 0,
+  oversize: 0,
+  flushedBytes: 0,
+  breaks: 0,
+  parityErrors: 0,
+  frameErrors: 0,
+  readTimeouts: 0,
+  txErrors: 0,
+  rxBacklogMax: 0,
+  rxRingSize: 0,
+  txRingSize: 0,
+  rxFullThreshold: 0,
+  rxFrames: 0,
+  txFrames: 0,
+  rxBytes: 0,
+  txBytes: 0
+})
+const uartUnsupported = ref(false)
 let timer = null
 
 const num = value => new Intl.NumberFormat().format(Number(value) || 0)
@@ -158,9 +249,32 @@ const dropRate = computed(() => {
   return percent >= 0.01 ? `${fmt.format(percent)} %` : `< ${fmt.format(0.01)} %`
 })
 
+// Frames towards the CCU that this firmware failed to hand to the network -
+// no pbuf, or lwIP refused the datagram. Both were silent before.
+const txFailed = computed(
+  () => (Number(relay.value.txAllocFail) || 0) + (Number(relay.value.txSendErrors) || 0)
+)
+
 const queueNearFull = computed(() => {
   const cap = Number(relay.value.queueCapacity) || 0
   return cap > 0 && Number(relay.value.queueDepthMax) >= cap * 0.75
+})
+
+// Both overflow kinds have the same consequence - the driver buffer is
+// flushed and received frames are destroyed - so they are one number here.
+const uartOverflows = computed(
+  () => (Number(uart.value.fifoOverflows) || 0) + (Number(uart.value.bufferFull) || 0)
+)
+
+const uartLineErrors = computed(
+  () => (Number(uart.value.breaks) || 0)
+    + (Number(uart.value.parityErrors) || 0)
+    + (Number(uart.value.frameErrors) || 0)
+)
+
+const uartBacklogNearFull = computed(() => {
+  const cap = Number(uart.value.rxRingSize) || 0
+  return cap > 0 && Number(uart.value.rxBacklogMax) >= cap * 0.75
 })
 
 const lastRxText = computed(() => {
@@ -182,11 +296,20 @@ const load = async () => {
       relay.value = { ...relay.value, ...response.data.ccuRelay }
       unsupported.value = false
       loadError.value = ''
+      // Firmware that has the CCU counters but not the radio-module ones is a
+      // real combination during the beta, so this is checked separately.
+      if (response.data?.radioUart) {
+        uart.value = { ...uart.value, ...response.data.radioUart }
+        uartUnsupported.value = false
+      } else {
+        uartUnsupported.value = true
+      }
     } else {
       // Older firmware does not report these counters. Showing the initial
       // zeros would read as "everything is fine", which is the opposite of
       // what this page is for.
       unsupported.value = true
+      uartUnsupported.value = true
       loadError.value = ''
     }
   } catch {

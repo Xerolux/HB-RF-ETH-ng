@@ -49,6 +49,16 @@ static MetricsCounter g_keepalives("hbrfeth_udp_keepalive_total",
 static MetricsCounter g_rx_drops("hbrfeth_udp_drop_total",
                                  "Received UDP frames dropped (queue full / parse error)");
 
+// Module->CCU losses. Until now both were invisible: a failed pbuf_alloc()
+// only wrote a log line, and the err_t from _udp_sendto() was discarded
+// outright. Either one costs the CCU a radio frame it never learns about, so
+// it repeats the transmission - the duty-cycle mechanism of #447, on the
+// half of the bridge every existing counter declared healthy.
+static MetricsCounter g_tx_alloc_fail("hbrfeth_udp_tx_alloc_fail_total",
+                                      "Frames to the CCU lost because no pbuf could be allocated");
+static MetricsCounter g_tx_send_err("hbrfeth_udp_tx_send_err_total",
+                                    "Frames to the CCU rejected by the lwIP/Ethernet send path");
+
 // Latency instrumentation for the CCU relay path.
 //
 // Users report switching commands executing 20-30 seconds late after hours of
@@ -97,6 +107,8 @@ bool raw_uart_session_active(void)
 void raw_uart_get_latency(raw_uart_latency_t *out)
 {
     if (!out) return;
+    out->tx_alloc_fail     = g_tx_alloc_fail.get();
+    out->tx_send_err       = g_tx_send_err.get();
     out->queue_wait_max_us = g_queue_wait_max.get();
     out->queue_depth_max   = g_queue_depth_max.get();
     out->wait_over_10ms    = g_wait_over_10ms.get();
@@ -399,6 +411,7 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
 
     pbuf *pb = pbuf_alloc(PBUF_TRANSPORT, len + 4, PBUF_RAM);
     if (!pb) {
+        g_tx_alloc_fail.inc();
         ESP_LOGE(TAG, "Failed to allocate pbuf for sendMessage");
         return;
     }
@@ -420,7 +433,21 @@ void RawUartUdpListener::sendMessage(unsigned char command, unsigned char *buffe
     uint16_t crc_net = htons(HMFrame::crc(sendBuffer, len + 2));
     memcpy(sendBuffer + len + 2, &crc_net, sizeof(uint16_t));
 
-    _udp_sendto(pcb, pb, &addr, port);
+    // lwIP reports a rejected datagram here (ERR_MEM when the Ethernet DMA
+    // descriptors or the pbuf pool are exhausted, ERR_RTE without a route)
+    // and it was thrown away for years. Log at most once a second so a burst
+    // does not flood the ring buffer that the transcript capture relies on.
+    const err_t err = _udp_sendto(pcb, pb, &addr, port);
+    if (err != ERR_OK) {
+        g_tx_send_err.inc();
+        static uint32_t s_last_send_err_log_ms = 0;
+        const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+        if (now_ms - s_last_send_err_log_ms >= 1000) {
+            s_last_send_err_log_ms = now_ms;
+            ESP_LOGW(TAG, "Datagram to CCU rejected by lwIP: err %d (cmd %u, %u bytes)",
+                     (int)err, (unsigned)command, (unsigned)len);
+        }
+    }
     pbuf_free(pb);
 }
 

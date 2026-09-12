@@ -96,6 +96,8 @@ typedef struct {
     uint64_t rx_frames;         // datagrams accepted from the CCU
     uint64_t tx_frames;         // datagrams sent to the CCU
     uint64_t keepalives;        // keepalive probes sent
+    uint64_t tx_alloc_fail;     // frames to the CCU lost: no pbuf available
+    uint64_t tx_send_err;       // frames to the CCU rejected by lwIP/Ethernet
 } raw_uart_latency_t;
 
 void raw_uart_get_latency(raw_uart_latency_t *out);

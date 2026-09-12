@@ -32,6 +32,7 @@
 #include "nvs_storage_lock.h"
 #include "events.h"
 #include "rawuartudplistener.h"
+#include "radiomoduleconnector.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
@@ -671,6 +672,26 @@ void mqtt_handler_publish_status(void)
         PUBLISH_UINT64("status/ccu_delayed_frames",
                        latency.wait_over_10ms + latency.wait_over_100ms + latency.wait_over_1s);
         PUBLISH_UINT64("status/ccu_dropped_frames", latency.drops);
+        PUBLISH_UINT64("status/ccu_tx_failed_frames",
+                       latency.tx_alloc_fail + latency.tx_send_err);
+    }
+
+    // ---- Radio-module UART health -----------------------------------------
+    // The counters above cover the CCU half of the bridge only, and on the
+    // field units of #447 they all read zero. An RX overflow on the module
+    // side flushes the driver buffer, destroying frames the module already
+    // delivered; the CCU then repeats the transmission and the duty cycle
+    // climbs, with nothing visible on any CCU-side counter. Anything other
+    // than zero here is the fault, so it belongs in the status batch.
+    {
+        radio_uart_stats_t uart = {};
+        radio_uart_get_stats(&uart);
+        PUBLISH_UINT64("status/radio_uart_overflows", uart.fifo_ovf + uart.buffer_full);
+        PUBLISH_UINT64("status/radio_uart_lost_bytes", uart.flushed_bytes);
+        PUBLISH_UINT64("status/radio_uart_line_errors",
+                       uart.breaks + uart.parity_err + uart.frame_err);
+        PUBLISH_UINT64("status/radio_uart_tx_errors", uart.tx_errors);
+        PUBLISH_UINT64("status/radio_uart_rx_backlog_max", uart.rx_backlog_max);
     }
 
     // NVS fill level. 16 KiB shared by settings, MQTT credentials, TLS key
