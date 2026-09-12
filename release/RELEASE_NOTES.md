@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.7-Beta.12
+# 🚀 HB-RF-ETH-ng v2.2.7-Beta.13
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,14 +11,12 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.7-Beta.12?
+## 🆕 Was ist neu in v2.2.7-Beta.13?
 
 ### Changes
-- fix(diagnostics): keep UART capacity constants matchable by the policy test
-- chore: bump WebUI version to 1.0.4
-- feat(diagnostics): instrument radio-module UART and CCU send path (#447)
-- docs(claude): radio module detection and bridge are UART-only
-- chore: update manifests for v2.2.7-Beta.11
+- chore: bump WebUI version to 1.0.5
+- fix(diagnostics): keep module resets out of the UART line-error count and make the counters resettable (#447)
+- chore: update manifests for v2.2.7-Beta.12
 
 ## ✨ Hauptfunktionen
 
@@ -55,8 +53,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.7-Beta.12.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.0.4.bin`)
+- **Firmware-Binary** (`firmware_2.2.7-Beta.13.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.0.5.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -97,6 +95,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.4`
+- WebUI version: `1.0.5`
 - WebUI API: `1`
 - Minimum firmware: `2.2.5-Beta.1`

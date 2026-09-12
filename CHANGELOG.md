@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.13] - 2026-09-12
+
+### Changes
+- chore: bump WebUI version to 1.0.5
+- fix(diagnostics): keep module resets out of the UART line-error count and make the counters resettable (#447)
+- chore: update manifests for v2.2.7-Beta.12
+
 ## [2.2.7-Beta.12] - 2026-09-12
 
 ### Changes
