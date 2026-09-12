@@ -94,8 +94,8 @@ static MetricsHighWater g_uart_rx_backlog_max("hbrfeth_uart_rx_backlog_max",
 // the backlog high-water against the capacity it is approaching - a bare byte
 // count is unjudgeable. The rationale for each value is at its use site in
 // start().
-static const int HM_UART_TX_RING_BUF_SIZE  = 2048;
-static const int HM_UART_RX_RING_BUF_SIZE  = 2048;
+static const int HM_UART_TX_RING_BUF_SIZE = 2048;
+static const int HM_UART_RX_RING_BUF_SIZE = 2048;
 static const int HM_UART_RX_FULL_THRESHOLD = 64;
 
 void radio_uart_get_stats(radio_uart_stats_t *out)
