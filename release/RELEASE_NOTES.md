@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.7-Beta.11
+# 🚀 HB-RF-ETH-ng v2.2.7-Beta.12
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,63 +11,14 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.7-Beta.11?
+## 🆕 Was ist neu in v2.2.7-Beta.12?
 
 ### Changes
-- chore: bump WebUI version to 1.0.3
-- fix(webui): live log auth, PWA asset routing, font CDN, ANSI display (#449)
-- feat(webui): add a Radio & Relay statistics page and restore the 2.1.10 queue depth (#448)
-- chore(deps)(deps): bump marked from 18.0.10 to 18.0.11 in /webui (#435)
-- chore(deps)(deps): bump axios from 1.19.0 to 1.20.0 in /webui (#434)
-- chore(deps)(deps): bump vue-router from 5.2.0 to 5.3.1 in /webui (#433)
-- chore(deps)(deps-dev): bump eslint from 10.8.1 to 10.10.0 in /webui (#432)
-- chore(deps)(deps-dev): bump sass from 1.103.1 to 1.104.0 in /webui (#431)
-- chore(ci)(deps): bump crate-ci/typos from 1.50.0 to 1.50.1 (#436)
-- chore: update manifests for v2.2.7-Beta.10
-
-### Added
-- feat(webui): Neue Seite **Funk & Relay** (`/diagnostics`) zeigt die Kennzahlen
-  der Raw-UART-Weiterleitung zwischen CCU und Funkmodul: empfangene und
-  gesendete Frames, Keepalives, verworfene Datagramme samt Verwerf-Rate,
-  längste Queue-Wartezeit, Spitzenbelegung gegen die Queue-Kapazität sowie
-  Verzögerungen über 10 ms / 100 ms / 1 s. Bisher waren diese Werte nur über
-  Prometheus oder MQTT sichtbar — also gerade nicht für die Anwender, die
-  Kommunikationsprobleme melden (#447).
-- feat(api): `ccuRelay` in `GET /api/system/overview` und
-  `POST /api/system/relay-stats/reset` zum Zurücksetzen der Spitzenwerte
-  (Frame-Zähler bleiben erhalten, damit die Verwerf-Rate ihren Nenner behält).
-
-### Fixed
-- fix(relay): UDP-Queue-Tiefe von 32 zurück auf 64 (Stand 2.1.10). Die
-  Halbierung war auf einem einzelnen, kaum belasteten Prüfstand gemessen
-  worden, nicht in einer Installation mit vielen Geräten; sie ist die einzige
-  Regression im Relay-Pfad gegenüber 2.1.10, die Anwender tatsächlich spüren
-  können. Kosten: ~1 KB Heap.
-- fix(webui): Countdown und Text des Neustart-Sync-Overlays nannten
-  unterschiedliche Dauern (120 s vs. 40 s). Der Neustart-Sync des Geräts
-  hält Ethernet fest 35 s unten (`main/system_reset.cpp`); beide Zahlen
-  kommen jetzt aus derselben Konstanten `FLASH_PAUSE_SECONDS` — auch in den
-  Bestätigungsdialogen, die zuvor einen nicht interpolierten `{seconds}`-
-  Platzhalter zeigten, und in den fr/it-Hinweisen (standen auf 40 s).
-- fix(webui): Der WebSocket-Live-Stream des System-Logs war aus dem Browser
-  dauerhaft unautorisiert (Endlos-401-Reconnect). `httpd_query_key_value()`
-  liefert den Query-Wert undekodiert; der per `encodeURIComponent()` gesendete
-  Base64-Admin-Token (`%2B`/`%2F`/`%3D`) stimmte nie mit dem gespeicherten
-  Token überein. Der Wert wird jetzt vor dem Vergleich percent-dekodiert
-  (`include/url_decode.h`, Host-Test `test_url_decode.cpp`).
-- fix(webui): `/manifest.webmanifest` und `/icon-256.png` antworteten mit der
-  gzipped `index.html`, weil die PWA-Routen nach dem `/*`-SPA-Catch-all
-  registriert wurden und bei `httpd_uri_match_wildcard` die erste Registrierung
-  gewinnt. Die Routen sind jetzt vor dem Catch-all registriert; PWA-Installation
-  und Manifest laden wieder.
-- fix(webui): Die Google-Fonts-CDN-Links in `index.html` waren durch die
-  offline-first-CSP (`style-src/font-src 'self'`) blockiert und erzeugten bei
-  jedem Laden einen Konsole-Fehler. Entfernt; das `--font-sans`-Fallback
-  (Segoe UI/system-ui/Roboto) rendert unverändert.
-- fix(webui): Das Live-Log zeigte rohe ANSI-Farbcodes (`[0;32m…`) je
-  Zeile. Die Escape-Sequenzen werden jetzt beim Einlesen entfernt — Anzeige,
-  Suche und Kopieren arbeiten mit der lesbaren Zeile; der Download liefert
-  weiterhin die Rohdatei.
+- fix(diagnostics): keep UART capacity constants matchable by the policy test
+- chore: bump WebUI version to 1.0.4
+- feat(diagnostics): instrument radio-module UART and CCU send path (#447)
+- docs(claude): radio module detection and bridge are UART-only
+- chore: update manifests for v2.2.7-Beta.11
 
 ## ✨ Hauptfunktionen
 
@@ -104,8 +55,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.7-Beta.11.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.0.3.bin`)
+- **Firmware-Binary** (`firmware_2.2.7-Beta.12.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.0.4.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -146,6 +97,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.3`
+- WebUI version: `1.0.4`
 - WebUI API: `1`
 - Minimum firmware: `2.2.5-Beta.1`

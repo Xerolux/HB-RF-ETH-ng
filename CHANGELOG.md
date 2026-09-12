@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7-Beta.12] - 2026-09-12
+
+### Changes
+- fix(diagnostics): keep UART capacity constants matchable by the policy test
+- chore: bump WebUI version to 1.0.4
+- feat(diagnostics): instrument radio-module UART and CCU send path (#447)
+- docs(claude): radio module detection and bridge are UART-only
+- chore: update manifests for v2.2.7-Beta.11
+
 ## [2.2.7-Beta.11] - 2026-09-10
 
 ### Changes
