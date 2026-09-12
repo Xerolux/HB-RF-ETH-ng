@@ -294,7 +294,12 @@ export default {
     uartRxFrames: 'Frame dal modulo',
     uartTxFrames: 'Frame verso il modulo',
     uartOversize: 'Eventi sovradimensionati',
-    uartNote: 'Qualsiasi valore diverso da zero significa che traffico radio è andato perso in questo firmware. La CCU ripete la trasmissione, il duty cycle sale e prima o poi un dispositivo risulta guasto. In tal caso pubblicare uno screenshot nella issue #447.',
+    uartBreaks: 'Segnali di break',
+    uartParityErrors: 'Errori di parità',
+    uartFrameErrors: 'Errori di framing',
+    uartResetLineEvents: 'Durante il reset del modulo (atteso)',
+    uartNote: 'Overflow del buffer, byte scartati, errori di linea o errori di invio diversi da zero significano che traffico radio è andato perso in questo firmware. La CCU ripete la trasmissione, il duty cycle sale e prima o poi un dispositivo risulta guasto. In tal caso pubblicare uno screenshot nella issue #447.',
+    uartResetNote: 'Gli errori di linea che si verificano durante un reset del modulo avviato dal firmware vengono contati a parte e non sono un’anomalia — tre per avvio (avvio, dopo il rilevamento del modulo, connessione della CCU) sono normali. Il pulsante «Azzera i massimi» azzera anche i contatori di errore di questa scheda; i totali dei frame restano.',
     interpretHint: 'Come leggerlo: se «Scartati» e i contatori di ritardo sono a zero e l’occupazione è bassa, il relè funziona correttamente e un guasto segnalato ha un’altra causa. Se l’occupazione si avvicina alla capacità o compaiono ritardi oltre 100 ms, la causa è nel relè.',
   },
   sysinfo: {

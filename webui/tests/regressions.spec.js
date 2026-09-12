@@ -1814,6 +1814,86 @@ test('the relay statistics page shows the whole relay picture and can reset its 
   await expect(page.locator('.app-toast-stack')).toContainText('Peak values reset')
 })
 
+test('the radio-module card tells reset breaks apart from real line errors and can be reset', async ({ page }) => {
+  let resetCalls = 0
+  await page.route('**/api/system/overview**', route => {
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        totalInternalHeap: 320000,
+        freeInternalHeap: 140000,
+        ccuRelay: {
+          queueWaitMaxMs: 0, queueWaitMaxUs: 0, queueDepthMax: 0, queueCapacity: 64,
+          waitOver10ms: 0, waitOver100ms: 0, waitOver1s: 0, drops: 0,
+          rxFrames: 373, txFrames: 241, keepalives: 12, sessionActive: true, lastRxAgeMs: 1000
+        },
+        radioUart: {
+          fifoOverflows: 0, bufferFull: 0, oversize: 0, flushedBytes: 0,
+          breaks: 0, parityErrors: 0, frameErrors: 2,
+          // The three breaks every boot produces (start, after detection,
+          // CCU connect) used to show up as "3 line errors" in orange.
+          resetLineEvents: 3,
+          readTimeouts: 0, txErrors: 0,
+          rxBacklogMax: 39, rxRingSize: 2048, txRingSize: 2048, rxFullThreshold: 64,
+          rxFrames: 373, txFrames: 241, rxBytes: 9000, txBytes: 6000
+        }
+      })
+    })
+  })
+  await page.route('**/api/system/relay-stats/reset', route => {
+    resetCalls += 1
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true }) })
+  })
+
+  await page.goto(`${BASE_URL}/diagnostics`)
+  const shell = page.locator('.diagnostics-page')
+
+  // The summed "line errors" figure only carries the real ones; the reset
+  // breaks are shown on their own and never highlighted, because three per
+  // boot are the normal signature, not lost traffic.
+  await expect(shell.locator('.stat', { hasText: 'Line errors' })).toContainText('2')
+  const resetStat = shell.locator('.stat', { hasText: 'During module reset' })
+  await expect(resetStat).toContainText('3')
+  await expect(resetStat).not.toHaveClass(/stat-warn/)
+
+  // A break and a framing error point at different things (cable / reset
+  // line vs. baud rate / timing), so the page names each kind.
+  await expect(shell.locator('.stat', { hasText: 'Framing errors' })).toContainText('2')
+  await expect(shell.locator('.stat', { hasText: 'Framing errors' })).toHaveClass(/stat-warn/)
+  await expect(shell.locator('.stat', { hasText: 'Break conditions' })).toContainText('0')
+  await expect(shell.locator('.stat', { hasText: 'Break conditions' })).not.toHaveClass(/stat-warn/)
+  await expect(shell).toContainText('three per boot')
+
+  // The one reset button covers both halves of the bridge, and the page
+  // says so - "you cannot reset the UART values" was the first field report.
+  await expect(shell).toContainText('also clears the failure counters on this card')
+  await shell.getByRole('button', { name: 'Reset peak values' }).click()
+  await expect.poll(() => resetCalls).toBe(1)
+})
+
+test('module resets are excluded from the UART line-error counters in firmware', async () => {
+  const connector = await readFile('../main/radiomoduleconnector.cpp', 'utf8')
+  const header = await readFile('../include/radiomoduleconnector.h', 'utf8')
+  const overview = await readFile('../main/system_overview_api.cpp', 'utf8')
+
+  // resetModule() stamps the window before it pulls the reset line, and the
+  // UART task classifies break/parity/framing events against that stamp.
+  const stamp = connector.indexOf('s_module_reset_ms.store(nowMs()')
+  const pull = connector.indexOf('gpio_set_level(HM_RST_PIN, 1)')
+  expect(stamp).toBeGreaterThan(-1)
+  expect(pull).toBeGreaterThan(stamp)
+  expect(connector).toContain('if (insideModuleResetWindow())')
+  expect(connector).toContain('g_uart_reset_line_events.inc()')
+
+  // Real line errors leave a timestamped, rate-limited trace like overflows do.
+  expect(connector).toContain('on the radio module link, discarding partial frame')
+
+  // The reset endpoint rebases the UART failure counters, not only the gauge.
+  expect(header).toContain('void radio_uart_reset_window(void)')
+  expect(overview).toContain('radio_uart_reset_window();')
+  expect(overview).toContain('"resetLineEvents"')
+})
+
 test('firmware without relay counters is named as such, not rendered as all-clear', async ({ page }) => {
   await page.route('**/api/system/overview**', route => route.fulfill({
     contentType: 'application/json',

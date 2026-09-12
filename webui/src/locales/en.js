@@ -294,7 +294,12 @@ export default {
     uartRxFrames: 'Frames from module',
     uartTxFrames: 'Frames to module',
     uartOversize: 'Oversized events',
-    uartNote: 'Anything other than zero means radio traffic was lost inside this firmware. The CCU then repeats the transmission, which raises the duty cycle and eventually makes a device appear faulty. If you see it, please post a screenshot in issue #447.',
+    uartBreaks: 'Break conditions',
+    uartParityErrors: 'Parity errors',
+    uartFrameErrors: 'Framing errors',
+    uartResetLineEvents: 'During module reset (expected)',
+    uartNote: 'Buffer overflows, discarded bytes, line errors or send errors other than zero mean radio traffic was lost inside this firmware. The CCU then repeats the transmission, which raises the duty cycle and eventually makes a device appear faulty. If you see it, please post a screenshot in issue #447.',
+    uartResetNote: 'Line errors that occur while the firmware itself resets the module are counted separately and are not a finding — three per boot (start, after module detection, CCU connect) are normal. The “Reset peak values” button also clears the failure counters on this card; the frame totals are kept.',
     interpretHint: 'How to read this: if “Dropped” and the delay counters are zero and peak occupancy is low, the relay is working cleanly and a reported device fault has another cause. If occupancy approaches capacity, or delays above 100 ms appear, the relay path is implicated.',
   },
   sysinfo: {

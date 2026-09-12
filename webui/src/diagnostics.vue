@@ -165,7 +165,32 @@
             </div>
           </div>
 
+          <!-- Line errors broken down by kind. A break points at the reset
+               line or the cable, a framing error at baud rate or timing;
+               summed they cannot be told apart. The last column is the
+               firmware's own module resets (three per boot are normal) and
+               deliberately never highlighted. -->
+          <div class="stat-grid secondary uart-line-breakdown">
+            <div class="stat" :class="{ 'stat-warn': uart.breaks > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartBreaks') }}</span>
+              <span class="stat-value">{{ num(uart.breaks) }}</span>
+            </div>
+            <div class="stat" :class="{ 'stat-warn': uart.parityErrors > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartParityErrors') }}</span>
+              <span class="stat-value">{{ num(uart.parityErrors) }}</span>
+            </div>
+            <div class="stat" :class="{ 'stat-warn': uart.frameErrors > 0 }">
+              <span class="stat-label">{{ t('diagnostics.uartFrameErrors') }}</span>
+              <span class="stat-value">{{ num(uart.frameErrors) }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">{{ t('diagnostics.uartResetLineEvents') }}</span>
+              <span class="stat-value">{{ num(uart.resetLineEvents) }}</span>
+            </div>
+          </div>
+
           <p class="muted-text">{{ t('diagnostics.uartNote') }}</p>
+          <p class="muted-text">{{ t('diagnostics.uartResetNote') }}</p>
         </template>
       </div>
     </section>
@@ -213,6 +238,9 @@ const relay = ref({
 // Radio-module UART counters. Reported by firmware that carries the #447
 // instrumentation; older builds omit the object entirely, which the
 // uartUnsupported flag turns into a notice instead of a wall of zeros.
+// resetLineEvents arrived one beta later and simply stays 0 on firmware that
+// does not report it. The failure counters are windowed by the firmware: the
+// reset button rebases them, the frame totals stay.
 const uart = ref({
   fifoOverflows: 0,
   bufferFull: 0,
@@ -221,6 +249,7 @@ const uart = ref({
   breaks: 0,
   parityErrors: 0,
   frameErrors: 0,
+  resetLineEvents: 0,
   readTimeouts: 0,
   txErrors: 0,
   rxBacklogMax: 0,
