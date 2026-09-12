@@ -294,7 +294,12 @@ export default {
     uartRxFrames: 'Frames vom Modul',
     uartTxFrames: 'Frames zum Modul',
     uartOversize: 'Übergroße Ereignisse',
-    uartNote: 'Alles außer null bedeutet: Funkverkehr ist in dieser Firmware verloren gegangen. Die CCU wiederholt die Sendung dann, was den Duty Cycle erhöht und ein Gerät irgendwann als gestört erscheinen lässt. Bitte in diesem Fall einen Screenshot im Issue #447 posten.',
+    uartBreaks: 'Break-Signale',
+    uartParityErrors: 'Paritätsfehler',
+    uartFrameErrors: 'Framing-Fehler',
+    uartResetLineEvents: 'Während Modul-Reset (erwartet)',
+    uartNote: 'Pufferüberläufe, verworfene Bytes, Leitungsfehler und Sendefehler ungleich null bedeuten: Funkverkehr ist in dieser Firmware verloren gegangen. Die CCU wiederholt die Sendung dann, was den Duty Cycle erhöht und ein Gerät irgendwann als gestört erscheinen lässt. Bitte in diesem Fall einen Screenshot im Issue #447 posten.',
+    uartResetNote: 'Leitungsfehler, die während eines von der Firmware ausgelösten Modul-Resets auftreten, werden getrennt gezählt und sind kein Befund — drei pro Neustart (Start, nach der Modulerkennung, Verbindungsaufbau der CCU) sind normal. Der Knopf „Höchstwerte zurücksetzen“ setzt auch die Fehlerzähler dieser Karte auf null; die Frame-Zähler bleiben erhalten.',
     interpretHint: 'Zur Einordnung: Sind „Verworfen“ und die Verzögerungszähler null und die maximale Belegung niedrig, arbeitet das Relay sauber — eine gemeldete Gerätestörung hat dann eine andere Ursache. Nähert sich die Belegung der Kapazität oder steigen die Verzögerungen über 100 ms, liegt es am Relay-Pfad.',
   },
   sysinfo: {

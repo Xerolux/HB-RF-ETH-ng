@@ -294,7 +294,12 @@ export default {
     uartRxFrames: 'Trames du module',
     uartTxFrames: 'Trames vers le module',
     uartOversize: 'Événements surdimensionnés',
-    uartNote: 'Toute valeur non nulle signifie que du trafic radio a été perdu dans ce micrologiciel. La CCU réémet alors, ce qui augmente le duty cycle et finit par faire apparaître un appareil comme défectueux. Le cas échéant, publiez une capture dans le ticket #447.',
+    uartBreaks: 'Signaux break',
+    uartParityErrors: 'Erreurs de parité',
+    uartFrameErrors: 'Erreurs de trame',
+    uartResetLineEvents: 'Pendant la réinitialisation du module (attendu)',
+    uartNote: 'Des débordements de tampon, des octets rejetés, des erreurs de ligne ou des erreurs d’envoi non nuls signifient que du trafic radio a été perdu dans ce micrologiciel. La CCU réémet alors, ce qui augmente le duty cycle et finit par faire apparaître un appareil comme défectueux. Le cas échéant, publiez une capture dans le ticket #447.',
+    uartResetNote: 'Les erreurs de ligne survenant pendant une réinitialisation du module déclenchée par le micrologiciel sont comptées à part et ne constituent pas une anomalie — trois par démarrage (démarrage, après la détection du module, connexion de la CCU) sont normales. Le bouton « Réinitialiser les maxima » remet aussi à zéro les compteurs d’erreurs de cette carte ; les totaux de trames sont conservés.',
     interpretHint: 'Lecture : si « Perdues » et les compteurs de retard sont à zéro et l’occupation faible, le relais fonctionne correctement et un défaut signalé a une autre cause. Si l’occupation approche la capacité ou que des retards dépassent 100 ms, le relais est en cause.',
   },
   sysinfo: {

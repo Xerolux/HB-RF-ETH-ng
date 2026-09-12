@@ -255,6 +255,10 @@ esp_err_t get_system_overview(httpd_req_t *req)
             cJSON_AddNumberToObject(ru, "breaks", static_cast<double>(uart.breaks));
             cJSON_AddNumberToObject(ru, "parityErrors", static_cast<double>(uart.parity_err));
             cJSON_AddNumberToObject(ru, "frameErrors", static_cast<double>(uart.frame_err));
+            // Line-level events inside a firmware-initiated module reset:
+            // expected (three per boot), kept apart from the three above.
+            cJSON_AddNumberToObject(ru, "resetLineEvents",
+                                    static_cast<double>(uart.reset_line_events));
             cJSON_AddNumberToObject(ru, "readTimeouts", static_cast<double>(uart.read_timeouts));
             cJSON_AddNumberToObject(ru, "txErrors", static_cast<double>(uart.tx_errors));
             // Backlog against capacity - a bare byte count is unjudgeable.
@@ -352,10 +356,12 @@ esp_err_t post_relay_stats_reset(httpd_req_t *req)
     }
 
     raw_uart_reset_latency_high_water();
-    // The UART backlog gauge belongs to the same window: resetting one and not
-    // the other would leave the page mixing two observation periods.
-    radio_uart_reset_high_water();
-    ESP_LOGI(TAG, "CCU relay high-water marks reset by operator");
+    // The UART side belongs to the same window: resetting one and not the
+    // other would leave the page mixing two observation periods. This also
+    // rebases the UART failure counters, which a reporter has to be able to
+    // clear after the reconnect burst that follows a firmware update (#447).
+    radio_uart_reset_window();
+    ESP_LOGI(TAG, "CCU relay high-water marks and UART failure counters reset by operator");
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_sendstr(req, "{\"success\":true}");

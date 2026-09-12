@@ -690,6 +690,7 @@ void mqtt_handler_publish_status(void)
         PUBLISH_UINT64("status/radio_uart_lost_bytes", uart.flushed_bytes);
         PUBLISH_UINT64("status/radio_uart_line_errors",
                        uart.breaks + uart.parity_err + uart.frame_err);
+        PUBLISH_UINT64("status/radio_uart_reset_line_events", uart.reset_line_events);
         PUBLISH_UINT64("status/radio_uart_tx_errors", uart.tx_errors);
         PUBLISH_UINT64("status/radio_uart_rx_backlog_max", uart.rx_backlog_max);
     }

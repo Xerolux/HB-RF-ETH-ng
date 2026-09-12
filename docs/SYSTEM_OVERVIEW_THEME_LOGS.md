@@ -23,6 +23,7 @@ ESP32-WROOM-32:
 - log capture state, ring capacity, currently available bytes, total stream
   offset, active subscriber count, and crash-tail availability
 - `ccuRelay`: the raw-UART relay counters described below
+- `radioUart`: the radio-module UART counters described below
 
 Values are calculated only when requested. No permanent diagnostic task,
 statistics buffer, history recorder, or additional polling loop is created in
@@ -56,6 +57,39 @@ These are the same counters already exported through Prometheus and MQTT
 (`ccu_queue_wait_max_ms`, `ccu_queue_depth_max`, `ccu_delayed_frames`,
 `ccu_dropped_frames`). The WebUI page exists because the users who hit relay
 problems generally run neither.
+
+## Radio-module UART statistics (`radioUart`)
+
+The other half of the bridge: the UART link between the ESP32 and the radio
+module. This is the only path on which received radio frames can be destroyed
+without any CCU-side counter moving (issue #447).
+
+| Field | Meaning |
+|-------|---------|
+| `fifoOverflows` | Hardware RX-FIFO overflows reported by the UART driver |
+| `bufferFull` | Driver RX ring-buffer overruns |
+| `oversize` | UART data events larger than the read scratch buffer |
+| `flushedBytes` | Received bytes discarded by the flush that follows an overflow |
+| `breaks` / `parityErrors` / `frameErrors` | Line-level errors; each discards the partially assembled frame |
+| `resetLineEvents` | Break/parity/framing events inside the window of a firmware-initiated module reset. Expected, three per boot (start, after module detection, CCU connect); not counted in the three fields above |
+| `readTimeouts` | Bounded UART reads that returned no data |
+| `txErrors` | Failed or short writes towards the module |
+| `rxBacklogMax` | Peak driver RX ring occupancy in bytes, against `rxRingSize` |
+| `rxRingSize`, `txRingSize`, `rxFullThreshold` | Driver capacities the firmware was built with |
+| `rxFrames`, `txFrames`, `rxBytes`, `txBytes` | Traffic totals since boot; the denominators |
+
+Pulling the module's reset line drops its TX output, which the UART sees as a
+break. The firmware stamps every `resetModule()` call and attributes any line
+event within 500 ms of it to `resetLineEvents`, so the line-error figures only
+carry faults that occurred in normal operation. Real line errors and overflows
+each write a rate-limited, timestamped `RadioModuleConnector` warning to the
+system log; every module reset writes an info line.
+
+`POST /api/system/relay-stats/reset` also acts on this object: it clears
+`rxBacklogMax` and rebases every failure counter (everything except the four
+traffic totals and the capacities) to zero. The MQTT topics
+`status/radio_uart_*` report the same windowed view. The Prometheus counters
+`hbrfeth_uart_*_total` are not rebased and stay monotonic.
 
 ## Minimal recovery page
 

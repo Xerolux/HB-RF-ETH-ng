@@ -31,6 +31,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include <new>
+#include <atomic>
 #include "metrics.h"
 
 // --- Radio-module UART instrumentation (#447) ------------------------------
@@ -73,6 +74,15 @@ static MetricsCounter g_uart_parity_err("hbrfeth_uart_parity_err_total",
                                         "UART parity errors on the radio module link");
 static MetricsCounter g_uart_frame_err("hbrfeth_uart_frame_err_total",
                                        "UART framing errors on the radio module link");
+// Break / parity / framing events that arrive while the firmware itself holds
+// the module in reset. Pulling HM_RST_PIN drops the module's TX line, which
+// the UART sees as a break, and the module's boot can add a framing glitch
+// on top. Three such events per boot (start(), after detection, and the
+// CCU's reset command on connect) are the normal signature, not lost traffic,
+// so they get their own counter instead of inflating the line-error total.
+static MetricsCounter g_uart_reset_line_events("hbrfeth_uart_reset_line_events_total",
+                                               "Break/parity/framing events during a "
+                                               "firmware-initiated module reset (expected)");
 static MetricsCounter g_uart_read_timeout("hbrfeth_uart_read_timeout_total",
                                           "Bounded UART reads that returned no data");
 static MetricsCounter g_uart_tx_errors("hbrfeth_uart_tx_errors_total",
@@ -98,30 +108,95 @@ static const int HM_UART_TX_RING_BUF_SIZE = 2048;
 static const int HM_UART_RX_RING_BUF_SIZE = 2048;
 static const int HM_UART_RX_FULL_THRESHOLD = 64;
 
+// Module-reset window. resetModule() stamps the moment it starts pulling
+// HM_RST_PIN; a line-level UART event whose processing falls within this many
+// milliseconds of that stamp is attributed to the reset. 50 ms of reset pulse,
+// 50 ms of settle and the module's own boot all fit well inside it, and a
+// genuine line fault coinciding with a reset is the one case this trades
+// away. Milliseconds in 32 bits: the subtraction below is wrap-safe.
+static const uint32_t HM_UART_RESET_LINE_WINDOW_MS = 500;
+static std::atomic<uint32_t> s_module_reset_ms{0};
+static std::atomic<bool> s_module_reset_seen{false};
+
+static uint32_t nowMs()
+{
+    return (uint32_t)(esp_timer_get_time() / 1000ULL);
+}
+
+static bool insideModuleResetWindow()
+{
+    if (!s_module_reset_seen.load(std::memory_order_acquire)) return false;
+    const uint32_t since = nowMs() - s_module_reset_ms.load(std::memory_order_acquire);
+    return since <= HM_UART_RESET_LINE_WINDOW_MS;
+}
+
+// Observation-window baseline (#447). The MetricsCounters stay monotonic for
+// Prometheus; the WebUI and MQTT view subtracts the values captured at the
+// last reset so a reporter can start a clean window after the reconnect burst
+// that follows every firmware update. Written from the HTTP task, read from
+// HTTP and MQTT tasks: the copy is done under a short critical section so a
+// 64-bit field can never be read half-updated on this 32-bit core.
+static radio_uart_stats_t s_baseline = {};
+static portMUX_TYPE s_baseline_mux   = portMUX_INITIALIZER_UNLOCKED;
+
+static uint64_t sinceBaseline(uint64_t total, uint64_t base)
+{
+    return total >= base ? total - base : 0;
+}
+
+// Raw totals since boot, straight from the registry.
+static void readRawStats(radio_uart_stats_t *out)
+{
+    out->rx_bytes          = g_uart_rx_bytes.get();
+    out->tx_bytes          = g_uart_tx_bytes.get();
+    out->rx_frames         = g_uart_rx_frames.get();
+    out->tx_frames         = g_uart_tx_frames.get();
+    out->fifo_ovf          = g_uart_fifo_ovf.get();
+    out->buffer_full       = g_uart_buffer_full.get();
+    out->oversize          = g_uart_oversize.get();
+    out->breaks            = g_uart_break.get();
+    out->parity_err        = g_uart_parity_err.get();
+    out->frame_err         = g_uart_frame_err.get();
+    out->reset_line_events = g_uart_reset_line_events.get();
+    out->read_timeouts     = g_uart_read_timeout.get();
+    out->tx_errors         = g_uart_tx_errors.get();
+    out->flushed_bytes     = g_uart_flushed_bytes.get();
+    out->rx_backlog_max    = g_uart_rx_backlog_max.get();
+    out->rx_ring_size      = (uint32_t)HM_UART_RX_RING_BUF_SIZE;
+    out->tx_ring_size      = (uint32_t)HM_UART_TX_RING_BUF_SIZE;
+    out->rx_full_thresh    = (uint32_t)HM_UART_RX_FULL_THRESHOLD;
+}
+
 void radio_uart_get_stats(radio_uart_stats_t *out)
 {
     if (!out) return;
-    out->rx_bytes       = g_uart_rx_bytes.get();
-    out->tx_bytes       = g_uart_tx_bytes.get();
-    out->rx_frames      = g_uart_rx_frames.get();
-    out->tx_frames      = g_uart_tx_frames.get();
-    out->fifo_ovf       = g_uart_fifo_ovf.get();
-    out->buffer_full    = g_uart_buffer_full.get();
-    out->oversize       = g_uart_oversize.get();
-    out->breaks         = g_uart_break.get();
-    out->parity_err     = g_uart_parity_err.get();
-    out->frame_err      = g_uart_frame_err.get();
-    out->read_timeouts  = g_uart_read_timeout.get();
-    out->tx_errors      = g_uart_tx_errors.get();
-    out->flushed_bytes  = g_uart_flushed_bytes.get();
-    out->rx_backlog_max = g_uart_rx_backlog_max.get();
-    out->rx_ring_size   = (uint32_t)HM_UART_RX_RING_BUF_SIZE;
-    out->tx_ring_size   = (uint32_t)HM_UART_TX_RING_BUF_SIZE;
-    out->rx_full_thresh = (uint32_t)HM_UART_RX_FULL_THRESHOLD;
+    readRawStats(out);
+
+    radio_uart_stats_t base;
+    portENTER_CRITICAL(&s_baseline_mux);
+    base = s_baseline;
+    portEXIT_CRITICAL(&s_baseline_mux);
+
+    // Failure counters are windowed; the frame/byte denominators are not.
+    out->fifo_ovf          = sinceBaseline(out->fifo_ovf, base.fifo_ovf);
+    out->buffer_full       = sinceBaseline(out->buffer_full, base.buffer_full);
+    out->oversize          = sinceBaseline(out->oversize, base.oversize);
+    out->breaks            = sinceBaseline(out->breaks, base.breaks);
+    out->parity_err        = sinceBaseline(out->parity_err, base.parity_err);
+    out->frame_err         = sinceBaseline(out->frame_err, base.frame_err);
+    out->reset_line_events = sinceBaseline(out->reset_line_events, base.reset_line_events);
+    out->read_timeouts     = sinceBaseline(out->read_timeouts, base.read_timeouts);
+    out->tx_errors         = sinceBaseline(out->tx_errors, base.tx_errors);
+    out->flushed_bytes     = sinceBaseline(out->flushed_bytes, base.flushed_bytes);
 }
 
-void radio_uart_reset_high_water(void)
+void radio_uart_reset_window(void)
 {
+    radio_uart_stats_t now = {};
+    readRawStats(&now);
+    portENTER_CRITICAL(&s_baseline_mux);
+    s_baseline = now;
+    portEXIT_CRITICAL(&s_baseline_mux);
     g_uart_rx_backlog_max.reset();
 }
 
@@ -273,6 +348,14 @@ void RadioModuleConnector::resetModule()
     // driver is not installed (returns an error, checked by the driver).
     uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(250));
 
+    // Stamp the window before touching the pin, so the break the reset pulse
+    // produces on the RX line is classified as expected rather than as a
+    // line error. Logged at info level: three of these per boot are normal,
+    // and the timestamp pairs with the CCU reconnect in the system log.
+    s_module_reset_ms.store(nowMs(), std::memory_order_release);
+    s_module_reset_seen.store(true, std::memory_order_release);
+    ESP_LOGI("RadioModuleConnector", "Resetting radio module");
+
     gpio_set_level(HM_RST_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
     gpio_set_level(HM_RST_PIN, 0);
@@ -399,10 +482,39 @@ void RadioModuleConnector::_serialQueueHandler()
             case UART_PARITY_ERR:
             case UART_FRAME_ERR:
                 // A line-level error discards the partially assembled frame,
-                // so it costs the CCU a repeat just like an overflow does.
-                if (event.type == UART_BREAK)           g_uart_break.inc();
-                else if (event.type == UART_PARITY_ERR) g_uart_parity_err.inc();
-                else                                    g_uart_frame_err.inc();
+                // so it costs the CCU a repeat just like an overflow does -
+                // unless the firmware is holding the module in reset right
+                // now, in which case the break is our own doing and there is
+                // no frame to lose. Keep those apart, or every unit shows a
+                // handful of "line errors" from boot alone (#447).
+                {
+                    const char *kind = event.type == UART_BREAK        ? "break"
+                                       : event.type == UART_PARITY_ERR ? "parity error"
+                                                                       : "framing error";
+                    if (insideModuleResetWindow()) {
+                        g_uart_reset_line_events.inc();
+                        ESP_LOGD("RadioModuleConnector", "UART %s during module reset (expected)",
+                                 kind);
+                    } else {
+                        if (event.type == UART_BREAK)
+                            g_uart_break.inc();
+                        else if (event.type == UART_PARITY_ERR)
+                            g_uart_parity_err.inc();
+                        else
+                            g_uart_frame_err.inc();
+                        // Same rate limit and reason as the overflow line:
+                        // the timestamp is what lets a reporter match this
+                        // against the moment the CCU flagged a device.
+                        static uint32_t s_last_line_err_log_ms = 0;
+                        const uint32_t now_ms                  = nowMs();
+                        if (now_ms - s_last_line_err_log_ms >= 1000) {
+                            s_last_line_err_log_ms = now_ms;
+                            ESP_LOGW("RadioModuleConnector",
+                                     "UART %s on the radio module link, discarding partial frame",
+                                     kind);
+                        }
+                    }
+                }
                 _streamParser->flush();
                 break;
             default:

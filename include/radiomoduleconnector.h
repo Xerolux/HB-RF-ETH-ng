@@ -95,6 +95,9 @@ typedef struct {
     uint64_t breaks;         // break conditions on the link
     uint64_t parity_err;     // parity errors
     uint64_t frame_err;      // framing errors
+    uint64_t reset_line_events; // break/parity/framing events inside the
+                                // window of a firmware-initiated module reset
+                                // (expected; not counted in the three above)
     uint64_t read_timeouts;  // bounded reads that returned no data
     uint64_t tx_errors;      // failed or short writes towards the module
     uint64_t flushed_bytes;  // received bytes discarded by an overflow flush
@@ -104,9 +107,15 @@ typedef struct {
     uint32_t rx_full_thresh; // RX-FIFO "full" interrupt threshold, bytes
 } radio_uart_stats_t;
 
+// Snapshot of the counters since boot or since the last
+// radio_uart_reset_window(), whichever is later. The Prometheus registry keeps
+// the raw monotonic totals; this view is what the WebUI and MQTT report.
 void radio_uart_get_stats(radio_uart_stats_t *out);
 
-// Clear the backlog high-water mark so an operator can watch a fresh window.
-// The event counters are monotonic and deliberately not reset - they are the
-// evidence trail the issue needs.
-void radio_uart_reset_high_water(void);
+// Start a fresh observation window: clears the backlog high-water mark and
+// rebases every failure counter to zero. The frame and byte totals are kept -
+// they are the denominator the failures are judged against - and the
+// Prometheus counters stay monotonic. Exists so a reporter can flash, wait
+// out the reconnect burst, reset, and then read a window that only contains
+// steady-state traffic.
+void radio_uart_reset_window(void);
