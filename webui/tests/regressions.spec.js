@@ -1833,6 +1833,9 @@ test('the radio-module card tells reset breaks apart from real line errors and c
           // The three breaks every boot produces (start, after detection,
           // CCU connect) used to show up as "3 line errors" in orange.
           resetLineEvents: 3,
+          // Two boot resets plus one CCU start: normal. Only a CCU that
+          // keeps resetting the module in steady state is highlighted.
+          moduleResets: 7, moduleResetsCcu: 5,
           readTimeouts: 0, txErrors: 0,
           rxBacklogMax: 39, rxRingSize: 2048, txRingSize: 2048, rxFullThreshold: 64,
           rxFrames: 373, txFrames: 241, rxBytes: 9000, txBytes: 6000
@@ -1852,9 +1855,16 @@ test('the radio-module card tells reset breaks apart from real line errors and c
   // breaks are shown on their own and never highlighted, because three per
   // boot are the normal signature, not lost traffic.
   await expect(shell.locator('.stat', { hasText: 'Line errors' })).toContainText('2')
-  const resetStat = shell.locator('.stat', { hasText: 'During module reset' })
+  const resetStat = shell.locator('.stat', { hasText: 'After module reset' })
   await expect(resetStat).toContainText('3')
   await expect(resetStat).not.toHaveClass(/stat-warn/)
+
+  // The resets themselves are named, split by requester, and a handful per
+  // CCU start stays plain.
+  const ccuResets = shell.locator('.stat', { hasText: 'Module resets by CCU' })
+  await expect(ccuResets).toContainText('5')
+  await expect(ccuResets).not.toHaveClass(/stat-warn/)
+  await expect(shell.locator('.stat', { hasText: 'Module resets total' })).toContainText('7')
 
   // A break and a framing error point at different things (cable / reset
   // line vs. baud rate / timing), so the page names each kind.
@@ -1862,13 +1872,48 @@ test('the radio-module card tells reset breaks apart from real line errors and c
   await expect(shell.locator('.stat', { hasText: 'Framing errors' })).toHaveClass(/stat-warn/)
   await expect(shell.locator('.stat', { hasText: 'Break conditions' })).toContainText('0')
   await expect(shell.locator('.stat', { hasText: 'Break conditions' })).not.toHaveClass(/stat-warn/)
-  await expect(shell).toContainText('three per boot')
+  await expect(shell).toContainText('three to five')
 
   // The one reset button covers both halves of the bridge, and the page
   // says so - "you cannot reset the UART values" was the first field report.
-  await expect(shell).toContainText('also clears the failure counters on this card')
+  await expect(shell).toContainText('also clears the counters on this card')
   await shell.getByRole('button', { name: 'Reset peak values' }).click()
   await expect.poll(() => resetCalls).toBe(1)
+})
+
+test('a CCU that keeps resetting the module is highlighted as the finding', async ({ page }) => {
+  await page.route('**/api/system/overview**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      totalInternalHeap: 320000, freeInternalHeap: 140000,
+      ccuRelay: {
+        queueWaitMaxMs: 0, queueWaitMaxUs: 0, queueDepthMax: 0, queueCapacity: 64,
+        waitOver10ms: 0, waitOver100ms: 0, waitOver1s: 0, drops: 0,
+        rxFrames: 28008, txFrames: 59372, keepalives: 25736, sessionActive: true, lastRxAgeMs: 96
+      },
+      // The field picture from #447 on Beta.13: 238 line events after resets
+      // in seven hours, 2 real breaks, nothing else - which is only readable
+      // once the resets themselves are on the page.
+      radioUart: {
+        fifoOverflows: 0, bufferFull: 0, oversize: 0, flushedBytes: 0,
+        breaks: 2, parityErrors: 0, frameErrors: 0, resetLineEvents: 238,
+        moduleResets: 240, moduleResetsCcu: 238,
+        readTimeouts: 0, txErrors: 0,
+        rxBacklogMax: 64, rxRingSize: 2048, txRingSize: 2048, rxFullThreshold: 64,
+        rxFrames: 9028, txFrames: 3286, rxBytes: 90000, txBytes: 30000
+      }
+    })
+  }))
+
+  await page.goto(`${BASE_URL}/diagnostics`)
+  const shell = page.locator('.diagnostics-page')
+
+  const ccuResets = shell.locator('.stat', { hasText: 'Module resets by CCU' })
+  await expect(ccuResets).toContainText('238')
+  await expect(ccuResets).toHaveClass(/stat-warn/)
+  // The events those resets caused stay plain: they are the consequence.
+  await expect(shell.locator('.stat', { hasText: 'After module reset' })).not.toHaveClass(/stat-warn/)
+  await expect(shell).toContainText('the CCU keeps re-opening the link')
 })
 
 test('module resets are excluded from the UART line-error counters in firmware', async () => {
@@ -1882,8 +1927,16 @@ test('module resets are excluded from the UART line-error counters in firmware',
   const pull = connector.indexOf('gpio_set_level(HM_RST_PIN, 1)')
   expect(stamp).toBeGreaterThan(-1)
   expect(pull).toBeGreaterThan(stamp)
-  expect(connector).toContain('if (insideModuleResetWindow())')
+  expect(connector).toContain('if (insideModuleResetWindow(window_ms))')
   expect(connector).toContain('g_uart_reset_line_events.inc()')
+  // Breaks get the long window (the module firmware's start-up pulls the
+  // line low seconds after the reset); parity and framing errors the short one.
+  expect(connector).toContain('HM_UART_RESET_BREAK_WINDOW_MS = 10000')
+  expect(connector).toContain('HM_UART_RESET_LINE_WINDOW_MS  = 500')
+  // Resets are counted by requester, and the CCU's raw-uart command says so.
+  expect(connector).toContain('g_module_resets_ccu.inc()')
+  const listener = await readFile('../main/rawuartudplistener.cpp', 'utf8')
+  expect(listener).toContain('resetModule(RadioModuleConnector::RESET_BY_CCU)')
 
   // Real line errors leave a timestamped, rate-limited trace like overflows do.
   expect(connector).toContain('on the radio module link, discarding partial frame')
@@ -1892,6 +1945,7 @@ test('module resets are excluded from the UART line-error counters in firmware',
   expect(header).toContain('void radio_uart_reset_window(void)')
   expect(overview).toContain('radio_uart_reset_window();')
   expect(overview).toContain('"resetLineEvents"')
+  expect(overview).toContain('"moduleResetsCcu"')
 })
 
 test('firmware without relay counters is named as such, not rendered as all-clear', async ({ page }) => {

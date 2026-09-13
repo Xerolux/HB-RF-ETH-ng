@@ -326,7 +326,7 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             return true;
         }
 
-        _radioModuleConnector->resetModule();
+        _radioModuleConnector->resetModule(RadioModuleConnector::RESET_BY_CCU);
         break;
 
     case 5: // Start connection

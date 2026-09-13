@@ -167,9 +167,9 @@
 
           <!-- Line errors broken down by kind. A break points at the reset
                line or the cable, a framing error at baud rate or timing;
-               summed they cannot be told apart. The last column is the
-               firmware's own module resets (three per boot are normal) and
-               deliberately never highlighted. -->
+               summed they cannot be told apart. The last column is what
+               arrived in the window after a module reset and is deliberately
+               never highlighted: the resets themselves are, below. -->
           <div class="stat-grid secondary uart-line-breakdown">
             <div class="stat" :class="{ 'stat-warn': uart.breaks > 0 }">
               <span class="stat-label">{{ t('diagnostics.uartBreaks') }}</span>
@@ -186,6 +186,23 @@
             <div class="stat">
               <span class="stat-label">{{ t('diagnostics.uartResetLineEvents') }}</span>
               <span class="stat-value">{{ num(uart.resetLineEvents) }}</span>
+            </div>
+          </div>
+
+          <!-- The resets themselves. A handful per CCU start is normal; a
+               count that keeps climbing means the CCU keeps re-opening the
+               link, and each reset takes the module off the air for seconds.
+               That is the one figure here a device would actually notice, so
+               it is highlighted past the number a couple of CCU starts
+               produce. -->
+          <div class="stat-grid secondary uart-reset-breakdown">
+            <div class="stat" :class="{ 'stat-warn': ccuResetsExcessive }">
+              <span class="stat-label">{{ t('diagnostics.uartModuleResetsCcu') }}</span>
+              <span class="stat-value">{{ num(uart.moduleResetsCcu) }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">{{ t('diagnostics.uartModuleResets') }}</span>
+              <span class="stat-value">{{ num(uart.moduleResets) }}</span>
             </div>
           </div>
 
@@ -238,9 +255,10 @@ const relay = ref({
 // Radio-module UART counters. Reported by firmware that carries the #447
 // instrumentation; older builds omit the object entirely, which the
 // uartUnsupported flag turns into a notice instead of a wall of zeros.
-// resetLineEvents arrived one beta later and simply stays 0 on firmware that
-// does not report it. The failure counters are windowed by the firmware: the
-// reset button rebases them, the frame totals stay.
+// resetLineEvents and the module-reset counters arrived in later releases and
+// simply stay 0 on firmware that does not report them. The failure counters
+// are windowed by the firmware: the reset button rebases them, the frame
+// totals stay.
 const uart = ref({
   fifoOverflows: 0,
   bufferFull: 0,
@@ -250,6 +268,8 @@ const uart = ref({
   parityErrors: 0,
   frameErrors: 0,
   resetLineEvents: 0,
+  moduleResets: 0,
+  moduleResetsCcu: 0,
   readTimeouts: 0,
   txErrors: 0,
   rxBacklogMax: 0,
@@ -299,6 +319,15 @@ const uartLineErrors = computed(
   () => (Number(uart.value.breaks) || 0)
     + (Number(uart.value.parityErrors) || 0)
     + (Number(uart.value.frameErrors) || 0)
+)
+
+// A CCU start issues a handful of resets (rfd, HmIPServer and the config
+// scripts each open the link). Ten covers two or three starts inside one
+// observation window; beyond that the CCU is resetting the module in steady
+// state, which is a finding on the CCU side rather than on this board.
+const CCU_RESETS_PER_START = 5
+const ccuResetsExcessive = computed(
+  () => (Number(uart.value.moduleResetsCcu) || 0) > CCU_RESETS_PER_START * 2
 )
 
 const uartBacklogNearFull = computed(() => {

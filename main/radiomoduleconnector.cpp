@@ -81,8 +81,16 @@ static MetricsCounter g_uart_frame_err("hbrfeth_uart_frame_err_total",
 // CCU's reset command on connect) are the normal signature, not lost traffic,
 // so they get their own counter instead of inflating the line-error total.
 static MetricsCounter g_uart_reset_line_events("hbrfeth_uart_reset_line_events_total",
-                                               "Break/parity/framing events during a "
-                                               "firmware-initiated module reset (expected)");
+                                               "Break/parity/framing events inside the "
+                                               "window that follows a module reset");
+// The resets themselves. Three to five per CCU start are the normal picture;
+// a count that keeps climbing in steady state means the CCU keeps re-opening
+// the raw-uart link, and every such reset takes the module off the air for
+// seconds - which is the one thing on this page a device would notice.
+static MetricsCounter g_module_resets("hbrfeth_radio_module_resets_total",
+                                      "Radio module resets, all sources");
+static MetricsCounter g_module_resets_ccu("hbrfeth_radio_module_resets_ccu_total",
+                                          "Radio module resets requested by the CCU");
 static MetricsCounter g_uart_read_timeout("hbrfeth_uart_read_timeout_total",
                                           "Bounded UART reads that returned no data");
 static MetricsCounter g_uart_tx_errors("hbrfeth_uart_tx_errors_total",
@@ -108,13 +116,22 @@ static const int HM_UART_TX_RING_BUF_SIZE = 2048;
 static const int HM_UART_RX_RING_BUF_SIZE = 2048;
 static const int HM_UART_RX_FULL_THRESHOLD = 64;
 
-// Module-reset window. resetModule() stamps the moment it starts pulling
-// HM_RST_PIN; a line-level UART event whose processing falls within this many
-// milliseconds of that stamp is attributed to the reset. 50 ms of reset pulse,
-// 50 ms of settle and the module's own boot all fit well inside it, and a
-// genuine line fault coinciding with a reset is the one case this trades
-// away. Milliseconds in 32 bits: the subtraction below is wrap-safe.
-static const uint32_t HM_UART_RESET_LINE_WINDOW_MS = 500;
+// Module-reset windows. resetModule() stamps the moment it starts pulling
+// HM_RST_PIN; a line-level UART event whose processing falls within the
+// window of its kind is attributed to the reset rather than to the link.
+//
+// Parity and framing errors get 500 ms: the 50 ms reset pulse, 50 ms of
+// settle and the module's own boot all fit inside it, and a genuine line
+// fault coinciding with a reset is the one case this trades away.
+//
+// Breaks get 10 s. Field logs on Beta.13 show one break about 2.5 s after the
+// last reset of a CCU start: that is the CCU telling the bootloader to start
+// the module firmware, whose UART re-initialisation pulls the line low for a
+// moment. No frame is in flight then, so nothing is lost, and a break that
+// close to a reset is the module coming back, not the link failing.
+// Milliseconds in 32 bits: the subtractions below are wrap-safe.
+static const uint32_t HM_UART_RESET_LINE_WINDOW_MS  = 500;
+static const uint32_t HM_UART_RESET_BREAK_WINDOW_MS = 10000;
 static std::atomic<uint32_t> s_module_reset_ms{0};
 static std::atomic<bool> s_module_reset_seen{false};
 
@@ -123,11 +140,11 @@ static uint32_t nowMs()
     return (uint32_t)(esp_timer_get_time() / 1000ULL);
 }
 
-static bool insideModuleResetWindow()
+static bool insideModuleResetWindow(uint32_t window_ms)
 {
     if (!s_module_reset_seen.load(std::memory_order_acquire)) return false;
     const uint32_t since = nowMs() - s_module_reset_ms.load(std::memory_order_acquire);
-    return since <= HM_UART_RESET_LINE_WINDOW_MS;
+    return since <= window_ms;
 }
 
 // Observation-window baseline (#447). The MetricsCounters stay monotonic for
@@ -158,6 +175,8 @@ static void readRawStats(radio_uart_stats_t *out)
     out->parity_err        = g_uart_parity_err.get();
     out->frame_err         = g_uart_frame_err.get();
     out->reset_line_events = g_uart_reset_line_events.get();
+    out->module_resets     = g_module_resets.get();
+    out->module_resets_ccu = g_module_resets_ccu.get();
     out->read_timeouts     = g_uart_read_timeout.get();
     out->tx_errors         = g_uart_tx_errors.get();
     out->flushed_bytes     = g_uart_flushed_bytes.get();
@@ -185,6 +204,8 @@ void radio_uart_get_stats(radio_uart_stats_t *out)
     out->parity_err        = sinceBaseline(out->parity_err, base.parity_err);
     out->frame_err         = sinceBaseline(out->frame_err, base.frame_err);
     out->reset_line_events = sinceBaseline(out->reset_line_events, base.reset_line_events);
+    out->module_resets     = sinceBaseline(out->module_resets, base.module_resets);
+    out->module_resets_ccu = sinceBaseline(out->module_resets_ccu, base.module_resets_ccu);
     out->read_timeouts     = sinceBaseline(out->read_timeouts, base.read_timeouts);
     out->tx_errors         = sinceBaseline(out->tx_errors, base.tx_errors);
     out->flushed_bytes     = sinceBaseline(out->flushed_bytes, base.flushed_bytes);
@@ -340,7 +361,7 @@ void RadioModuleConnector::setLED(bool red, bool green, bool blue)
     _blueLED->setState(blue ? LED_STATE_ON : LED_STATE_OFF);
 }
 
-void RadioModuleConnector::resetModule()
+void RadioModuleConnector::resetModule(ResetSource source)
 {
     // With the TX ring buffer, queued bytes may not have hit the wire yet;
     // the module reset would cut them off mid-frame. Drain first (bounded —
@@ -349,12 +370,16 @@ void RadioModuleConnector::resetModule()
     uart_wait_tx_done(UART_NUM_1, pdMS_TO_TICKS(250));
 
     // Stamp the window before touching the pin, so the break the reset pulse
-    // produces on the RX line is classified as expected rather than as a
-    // line error. Logged at info level: three of these per boot are normal,
+    // produces on the RX line is attributed to the reset rather than to the
+    // link. Logged at info level with the requester: a few of these per CCU
+    // start are normal, a steady stream of CCU-requested ones is the finding,
     // and the timestamp pairs with the CCU reconnect in the system log.
     s_module_reset_ms.store(nowMs(), std::memory_order_release);
     s_module_reset_seen.store(true, std::memory_order_release);
-    ESP_LOGI("RadioModuleConnector", "Resetting radio module");
+    g_module_resets.inc();
+    if (source == RESET_BY_CCU) g_module_resets_ccu.inc();
+    ESP_LOGI("RadioModuleConnector", "Resetting radio module (%s)",
+             source == RESET_BY_CCU ? "requested by CCU" : "firmware start-up");
 
     gpio_set_level(HM_RST_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -491,10 +516,12 @@ void RadioModuleConnector::_serialQueueHandler()
                     const char *kind = event.type == UART_BREAK        ? "break"
                                        : event.type == UART_PARITY_ERR ? "parity error"
                                                                        : "framing error";
-                    if (insideModuleResetWindow()) {
+                    const uint32_t window_ms = event.type == UART_BREAK
+                                                   ? HM_UART_RESET_BREAK_WINDOW_MS
+                                                   : HM_UART_RESET_LINE_WINDOW_MS;
+                    if (insideModuleResetWindow(window_ms)) {
                         g_uart_reset_line_events.inc();
-                        ESP_LOGD("RadioModuleConnector", "UART %s during module reset (expected)",
-                                 kind);
+                        ESP_LOGD("RadioModuleConnector", "UART %s after module reset", kind);
                     } else {
                         if (event.type == UART_BREAK)
                             g_uart_break.inc();
