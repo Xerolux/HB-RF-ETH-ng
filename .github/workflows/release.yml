@@ -460,8 +460,26 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update manifests for ${{ steps.firmware.outputs.TAG }}"
           git push origin main
+          MANIFEST_SHA="$(git rev-parse HEAD)"
           # A GITHUB_TOKEN push raises no push event, so pages.yml would not
           # run and devices would keep being served the previous manifest
           # until the next human push to main. workflow_dispatch is the
           # documented exception that triggers even for GITHUB_TOKEN.
-          GH_TOKEN="${{ secrets.GITHUB_TOKEN }}" gh workflow run pages.yml --ref main -R "${{ github.repository }}"
+          #
+          # The dispatch resolves "main" on GitHub's side, and right after a
+          # push that can still be the previous head: v2.2.7-Beta.13 deployed
+          # the Beta.12 manifest that way, and every device kept reporting
+          # "up to date". So wait until the API sees the pushed commit as
+          # the branch head, and hand the exact commit to pages.yml as well,
+          # so the deploy checks out the manifest commit whatever the ref
+          # resolved to.
+          export GH_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          for attempt in $(seq 1 30); do
+            HEAD_SHA="$(gh api "repos/${{ github.repository }}/branches/main" --jq .commit.sha 2>/dev/null || true)"
+            if [ "$HEAD_SHA" = "$MANIFEST_SHA" ]; then
+              break
+            fi
+            echo "main is at ${HEAD_SHA:-unknown}, waiting for $MANIFEST_SHA (attempt $attempt)"
+            sleep 2
+          done
+          gh workflow run pages.yml --ref main -R "${{ github.repository }}" -f "sha=$MANIFEST_SHA"
