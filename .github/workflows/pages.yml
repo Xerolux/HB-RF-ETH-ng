@@ -4,6 +4,11 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit to deploy (defaults to the head of the dispatched ref)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +28,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # release.yml passes the manifest commit explicitly: a dispatch on
+          # "main" issued right after a push can still resolve to the previous
+          # head, which once published a stale update manifest.
+          ref: ${{ inputs.sha || github.sha }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
