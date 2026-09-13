@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.7] - 2026-09-13
+
+### Changes
+- chore: bump WebUI version to 1.0.6
+- feat(diagnostics): count module resets by requester and widen the break window after a reset (#447)
+- fix(release): deploy the manifest commit to Pages, not whatever "main" resolved to (#451)
+- chore: update manifests for v2.2.7-Beta.13
+
 ## [2.2.7-Beta.13] - 2026-09-12
 
 ### Changes
