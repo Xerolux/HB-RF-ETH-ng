@@ -297,9 +297,11 @@ export default {
     uartBreaks: 'Segnali di break',
     uartParityErrors: 'Errori di parità',
     uartFrameErrors: 'Errori di framing',
-    uartResetLineEvents: 'Durante il reset del modulo (atteso)',
+    uartResetLineEvents: 'Dopo reset del modulo',
+    uartModuleResetsCcu: 'Reset del modulo dalla CCU',
+    uartModuleResets: 'Reset del modulo totali',
     uartNote: 'Overflow del buffer, byte scartati, errori di linea o errori di invio diversi da zero significano che traffico radio è andato perso in questo firmware. La CCU ripete la trasmissione, il duty cycle sale e prima o poi un dispositivo risulta guasto. In tal caso pubblicare uno screenshot nella issue #447.',
-    uartResetNote: 'Gli errori di linea che si verificano durante un reset del modulo avviato dal firmware vengono contati a parte e non sono un’anomalia — tre per avvio (avvio, dopo il rilevamento del modulo, connessione della CCU) sono normali. Il pulsante «Azzera i massimi» azzera anche i contatori di errore di questa scheda; i totali dei frame restano.',
+    uartResetNote: 'Gli errori di linea subito dopo un reset del modulo (segnali di break entro 10 s, errori di parità e framing entro 0,5 s) vengono contati sotto «Dopo reset del modulo» e non sono un’anomalia: il modulo si sta riavviando e nessun frame è in transito. Ciò che conta è il numero di reset del modulo richiesti dalla CCU. Un avvio della CCU ne genera da tre a cinque; se il valore continua a salire durante il normale funzionamento, la CCU riapre continuamente il collegamento e ogni reset toglie il modulo dalla radio per alcuni secondi — la causa è allora sulla CCU, non su questa scheda. Ogni reset è nel log di sistema con orario e origine. Il pulsante «Azzera i massimi» azzera anche i contatori di questa scheda; i totali dei frame restano.',
     interpretHint: 'Come leggerlo: se «Scartati» e i contatori di ritardo sono a zero e l’occupazione è bassa, il relè funziona correttamente e un guasto segnalato ha un’altra causa. Se l’occupazione si avvicina alla capacità o compaiono ritardi oltre 100 ms, la causa è nel relè.',
   },
   sysinfo: {

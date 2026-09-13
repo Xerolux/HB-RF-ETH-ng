@@ -71,7 +71,8 @@ without any CCU-side counter moving (issue #447).
 | `oversize` | UART data events larger than the read scratch buffer |
 | `flushedBytes` | Received bytes discarded by the flush that follows an overflow |
 | `breaks` / `parityErrors` / `frameErrors` | Line-level errors; each discards the partially assembled frame |
-| `resetLineEvents` | Break/parity/framing events inside the window of a firmware-initiated module reset. Expected, three per boot (start, after module detection, CCU connect); not counted in the three fields above |
+| `resetLineEvents` | Break/parity/framing events inside the window that follows a module reset (breaks: 10 s, parity/framing: 500 ms); not counted in the three fields above |
+| `moduleResets` / `moduleResetsCcu` | Module resets, all sources / requested by the CCU's raw-uart reset command. The firmware itself resets twice at boot; a CCU start adds three to five. A count climbing in steady state means the CCU keeps re-opening the link and is the finding |
 | `readTimeouts` | Bounded UART reads that returned no data |
 | `txErrors` | Failed or short writes towards the module |
 | `rxBacklogMax` | Peak driver RX ring occupancy in bytes, against `rxRingSize` |
@@ -79,11 +80,14 @@ without any CCU-side counter moving (issue #447).
 | `rxFrames`, `txFrames`, `rxBytes`, `txBytes` | Traffic totals since boot; the denominators |
 
 Pulling the module's reset line drops its TX output, which the UART sees as a
-break. The firmware stamps every `resetModule()` call and attributes any line
-event within 500 ms of it to `resetLineEvents`, so the line-error figures only
-carry faults that occurred in normal operation. Real line errors and overflows
-each write a rate-limited, timestamped `RadioModuleConnector` warning to the
-system log; every module reset writes an info line.
+break, and the module firmware's start-up (which the CCU commands a couple of
+seconds after the reset) pulls the line low once more. The firmware stamps
+every `resetModule()` call and attributes a break within 10 s, or a parity or
+framing error within 500 ms, to `resetLineEvents`, so the line-error figures
+only carry faults that occurred in normal operation. Real line errors and
+overflows each write a rate-limited, timestamped `RadioModuleConnector`
+warning to the system log; every module reset writes an info line naming the
+requester (`firmware start-up` or `requested by CCU`).
 
 `POST /api/system/relay-stats/reset` also acts on this object: it clears
 `rxBacklogMax` and rebases every failure counter (everything except the four

@@ -64,7 +64,13 @@ public:
 
     void setFrameHandler(FrameHandler *handler, bool decodeEscaped);
 
-    void resetModule();
+    // Who asked for the reset. The firmware resets the module at start-up
+    // and after detection; everything after that comes from the CCU's
+    // raw-uart reset command. The two are counted separately because a CCU
+    // that keeps re-issuing resets is a finding in its own right (#447).
+    enum ResetSource { RESET_BY_FIRMWARE = 0, RESET_BY_CCU = 1 };
+
+    void resetModule(ResetSource source = RESET_BY_FIRMWARE);
 
     void sendFrame(unsigned char *buffer, uint16_t len);
 
@@ -96,8 +102,10 @@ typedef struct {
     uint64_t parity_err;     // parity errors
     uint64_t frame_err;      // framing errors
     uint64_t reset_line_events; // break/parity/framing events inside the
-                                // window of a firmware-initiated module reset
-                                // (expected; not counted in the three above)
+                                // window that follows a module reset
+                                // (not counted in the three above)
+    uint64_t module_resets;     // module resets, all sources
+    uint64_t module_resets_ccu; // module resets requested by the CCU
     uint64_t read_timeouts;  // bounded reads that returned no data
     uint64_t tx_errors;      // failed or short writes towards the module
     uint64_t flushed_bytes;  // received bytes discarded by an overflow flush

@@ -255,10 +255,15 @@ esp_err_t get_system_overview(httpd_req_t *req)
             cJSON_AddNumberToObject(ru, "breaks", static_cast<double>(uart.breaks));
             cJSON_AddNumberToObject(ru, "parityErrors", static_cast<double>(uart.parity_err));
             cJSON_AddNumberToObject(ru, "frameErrors", static_cast<double>(uart.frame_err));
-            // Line-level events inside a firmware-initiated module reset:
-            // expected (three per boot), kept apart from the three above.
+            // Line-level events inside the window after a module reset, kept
+            // apart from the three above - and the resets themselves, split
+            // by requester: a CCU that keeps resetting the module is the
+            // finding, not the breaks it causes.
             cJSON_AddNumberToObject(ru, "resetLineEvents",
                                     static_cast<double>(uart.reset_line_events));
+            cJSON_AddNumberToObject(ru, "moduleResets", static_cast<double>(uart.module_resets));
+            cJSON_AddNumberToObject(ru, "moduleResetsCcu",
+                                    static_cast<double>(uart.module_resets_ccu));
             cJSON_AddNumberToObject(ru, "readTimeouts", static_cast<double>(uart.read_timeouts));
             cJSON_AddNumberToObject(ru, "txErrors", static_cast<double>(uart.tx_errors));
             // Backlog against capacity - a bare byte count is unjudgeable.
