@@ -1,6 +1,6 @@
 {
   "name": "webui",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Independent New Design WebUI for HB-RF-ETH-ng",
   "scripts": {
     "dev": "vite",
