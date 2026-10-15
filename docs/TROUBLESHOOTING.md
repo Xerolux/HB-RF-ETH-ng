@@ -295,11 +295,22 @@ With current firmware versions, reconnect handling after restarts has been impro
 
 ### New Version Not Shown Automatically
 
-This is expected. Automatic update searches, the beta-channel manifest, the
-firmware archive, and URL-based installation were removed. Open the project's
+This is expected. The device never searches on its own — there is no
+background poll. To search, open **System → Firmware** (or **System → WebUI**)
+and press **Search for Updates**: the device fetches a small version manifest
+over HTTPS and reports newer published firmware/WebUI versions with a link to
+the release. The search is reporting-only; it never downloads or installs
+anything, so installing still means downloading the `firmware_*.bin` from the
 [GitHub Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases) page on a
-computer, download the desired `firmware_*.bin`, and upload that local file in
-**System → Firmware**.
+computer and uploading that local file.
+
+If the search answers "Search skipped: too little free memory" on firmware
+**older than 2.2.8**, update to 2.2.8 or later once via a manual upload — from
+2.2.8 on, the search briefly releases the monitoring workers first so the
+fetch has room (see the
+[release notes](https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.8)).
+A search that reports a cooldown has simply just run; retry after the shown
+seconds.
 
 ### Firmware Upload Fails
 

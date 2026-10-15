@@ -67,8 +67,10 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 
 ### Firmware Updates
 * Manueller Upload einer lokalen `firmware_*.bin` mit Fortschrittsanzeige
-* Keine automatische Update-Suche und kein Download einer Firmware-URL durch
-  das Gerät
+* Kein automatischer Hintergrund-Check und kein Download einer Firmware-URL
+  durch das Gerät; die Update-Suche läuft nur auf Knopfdruck („Suche nach
+  Updates" unter *System → Firmware/WebUI*) und ist rein informativ — sie
+  vergleicht Versionen und verlinkt das Release, installiert aber nichts
 * Keine Firmware-Installation über MQTT oder Home Assistant
 * Automatischer Neustart nach erfolgreichem Update
 * Robuste Fehlerbehandlung verhindert Panic bei fehlerhaften Updates
@@ -187,8 +189,10 @@ Siehe Hilfe zum RPI-RF-MOD
 ## Firmware Updates
 Fertig kompilierte Firmware finden Sie unter
 [GitHub Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases). Das Gerät
-sucht nicht selbst nach Updates. Eine Firmware wird ausschließlich als lokale
-Raw-`.bin`-Datei installiert:
+sucht nicht selbst nach Updates; über die Schaltfläche **Suche nach Updates**
+in der WebUI können Sie prüfen, ob eine neuere Version veröffentlicht wurde
+(rein informativ, es wird nichts automatisch geladen oder installiert). Eine
+Firmware wird ausschließlich als lokale Raw-`.bin`-Datei installiert:
 
 **Per Webinterface (File Upload):**
 1. Herunterladen der passenden `firmware_*.bin` Datei aus dem Release
@@ -201,7 +205,8 @@ Raw-`.bin`-Datei installiert:
 - Die Standard-Authentifizierung schützt Firmware-Updates ausreichend
 - Die Firmware validiert alle Updates vor der Installation
 - Bei fehlerhaften Updates wird die OTA-Operation korrekt abgebrochen
-- URL-Download, automatische Suche und MQTT/Home-Assistant-OTA sind entfernt
+- URL-Download, automatische Hintergrund-Suche und MQTT/Home-Assistant-OTA
+  sind entfernt; die manuelle Suche vergleicht ausschließlich Versionen
 
 ## Notfall-Wiederherstellung (Rescue Script)
 Sollte die WebUI nicht mehr erreichbar sein, aber die Platine noch im Netzwerk antworten (Ping), kann die Firmware über das mitgelieferte Python-Script `test_ota_function.py` neu installiert werden.
