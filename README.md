@@ -92,6 +92,34 @@ python3 rename_webui_files.py
   lokale Datei über die WebUI.
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
+### Migration von der Original-Firmware (1.3.x)
+Der WebUI-Upload der **Original-Firmware 1.3.x** aktiviert eine hochgeladene
+Firmware nicht zuverlässig: dessen Update-Handler bricht nach 5 Sekunden
+Socket-Timeout ab, bevor er die Boot-Partition umschaltet — das Gerät startet
+nach dem Neustart weiterhin die alte Version, obwohl das Image vollständig
+übertragen wurde. Dass ein identischer erneuter Versuch „auf einmal doch
+funktioniert", ist der seltene Fall, in dem der Browser die Verbindung
+zufällig sauber geschlossen hat (siehe [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)).
+
+Für die initiale Migration gibt es zwei zuverlässige Wege:
+
+1. **Migrationsskript (empfohlen):** Das im Repository liegende Skript meldet
+   sich wie die WebUI an, lädt die `*.bin` hoch und schließt die Verbindung
+   exakt so, wie es der Handler der Original-Firmware zur Aktivierung braucht:
+   ```bash
+   # Passwort wird interaktiv abgefragt
+   python3 migrate_original_firmware.py <GERÄTE-IP> firmware_<version>.bin
+   ```
+   Nach der Erfolgsmeldung das Gerät einmal vom Strom trennen und wieder
+   verbinden (1.3.x hat keinen Neustart-Button). Anschließend dient dieselbe
+   Adresse der HB-RF-ETH-ng-Weboberfläche.
+2. **Seriell flashen** — nach einem Geräteausfall oder wenn das Netzwerk nicht
+   erreichbar ist; siehe
+   [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#device-wont-boot-after-update).
+
+Details zur Ursache und zum Ablauf stehen im
+[Troubleshooting-Guide](docs/TROUBLESHOOTING.md#migration-from-the-original-firmware-13x-keeps-booting-the-old-version).
+
 ### Screenshots
 Die Aufnahmen zeigen die aktuelle WebUI im NewDesign mit der smaragdgrünen
 Akzentfarbe `#2F8B57` (helles Theme). Farbschema und Akzentfarbe lassen sich

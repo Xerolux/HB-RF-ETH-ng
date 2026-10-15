@@ -335,6 +335,46 @@ computer, download the desired `firmware_*.bin`, and upload that local file in
    - OTA partition may be full
    - Factory reset before update
 
+### Migration From the Original Firmware (1.3.x) Keeps Booting the Old Version
+
+**Symptoms:**
+- You upload an HB-RF-ETH-ng `firmware_*.bin` through the WebUI of the
+  **original** firmware (1.3.x); the transfer itself completes
+- After a restart the device still reports 1.3.x
+- Retrying sometimes works "magically" after several attempts
+
+**Cause (in the original firmware, not in HB-RF-ETH-ng):** the 1.3.x
+`POST /ota_update` handler (`src/webui.cpp` in `alexreinert/HB-RF-ETH`) can
+never finish its receive loop by counting bytes — the first chunk's bytes are
+never counted, so with the multipart body its own WebUI sends, the loop only
+ends via the HTTP server's 5-second socket timeout. That timeout path aborts
+with "Error writing OTA" **before** `esp_ota_end()` and
+`esp_ota_set_boot_partition()` run, so the boot selector is never switched and
+the old firmware stays active — even though the new image was completely
+written into the inactive OTA slot. Only when the client happens to close the
+connection cleanly right after the upload does the loop exit in time and the
+update get activated, which is why an identical retry occasionally succeeds.
+
+**Solutions:**
+
+1. **Migration script (recommended, no serial access needed)** — use the
+   `migrate_original_firmware.py` script from the repository root. It logs in
+   like the WebUI, uploads the `.bin`, and closes the connection in exactly
+   the way the 1.3.x handler needs to activate the update:
+   ```bash
+   # The password is requested interactively
+   python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin
+   ```
+   After the script reports success, power-cycle the device (1.3.x has no
+   restart button). On the next boot the HB-RF-ETH-ng firmware starts and
+   passes its self-test, and the same address then serves the new WebUI.
+
+2. **Serial flash** — flash the firmware via USB/serial as described under
+   *Device Won't Boot After Update* below.
+
+HB-RF-ETH-ng-to-HB-RF-ETH-ng updates are not affected: the rewritten upload
+handler in this firmware finalizes uploads synchronously.
+
 ### Device Won't Boot After Update
 
 **Symptoms:**

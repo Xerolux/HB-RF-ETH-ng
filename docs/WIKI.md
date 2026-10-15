@@ -73,6 +73,10 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * Automatischer Neustart nach erfolgreichem Update
 * Robuste Fehlerbehandlung verhindert Panic bei fehlerhaften Updates
 * Werksreset per Taster oder über die WebUI
+* Migration von der Original-Firmware 1.3.x: deren WebUI-Upload aktiviert die
+  neue Firmware nicht zuverlässig — dafür gibt es das Skript
+  `migrate_original_firmware.py` (siehe
+  [Troubleshooting](TROUBLESHOOTING.md#migration-from-the-original-firmware-13x-keeps-booting-the-old-version))
 
 ### Sicherheit
 * **Sichere JSON-Verarbeitung** mit cJSON-Bibliothek (keine Buffer Overflows)
