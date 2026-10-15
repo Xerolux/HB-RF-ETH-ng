@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.8] - 2026-10-15
+
+### Changes
+- fix(update): release monitoring workers before refusing the manifest fetch (#462)
+- fix(migration): make WebUI migration from original 1.3.x reliable (#461)
+- chore(deps): update all webui npm dependencies to latest
+- chore(deps)(deps-dev): bump vite from 8.2.2 to 8.3.2 in /webui (#454)
+- chore(deps)(deps-dev): bump eslint-plugin-vue in /webui (#453)
+- chore(deps)(deps-dev): bump @playwright/test in /webui (#455)
+- chore(deps)(deps): bump marked from 18.0.11 to 18.0.13 in /webui (#457)
+- chore(deps)(deps): bump vue-i18n from 11.4.10 to 11.4.12 in /webui (#459)
+- chore(ci)(deps): bump crate-ci/typos from 1.50.1 to 1.50.3 (#460)
+- chore: update manifests for v2.2.7
+
 ## [2.2.7] - 2026-09-13
 
 ### Changes
