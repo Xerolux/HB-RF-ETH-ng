@@ -609,11 +609,14 @@ started:
 **Response (503 Service Unavailable):** `outcome` is `unavailable` when the
 worker task could not be created.
 
-A search is refused before any network activity when free memory is too low,
-when a firmware installation is in progress, or when another outbound TLS
-operation holds the device-wide network gate. (A WebUI upload does not gate
-the search; both were verified to run concurrently on hardware.) The reason
-then appears in `lastSkipReason`.
+A search is refused before any network activity when a firmware installation
+is in progress, or when another outbound TLS operation holds the device-wide
+network gate. (A WebUI upload does not gate the search; both were verified to
+run concurrently on hardware.) When the free heap is below the fetch budget,
+the search first releases the monitoring workers — the same transaction an
+OTA restart uses — and measures again; only if the heap is still short does
+the search skip, with the post-release figures in the reason. The reason then
+appears in `lastSkipReason`.
 
 ---
 

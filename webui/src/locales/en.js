@@ -477,6 +477,7 @@ export default {
     skipInstallRunning: 'an update installation is currently running',
     skipNetworkBusy: 'the network subsystem is busy',
     skipManifestBuffer: 'not enough memory for the version buffer',
+    skipReleaseFailed: 'background services could not be released, please try again',
     checkBusy: 'A search is already running.',
     checkUnavailable: 'The search cannot be started right now.',
     viewOnGithub: 'View on GitHub',

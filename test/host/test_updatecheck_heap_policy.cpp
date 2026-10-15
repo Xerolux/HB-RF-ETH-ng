@@ -44,5 +44,37 @@ int main()
     assert(!update_check_heap_allows(0, 0));
     assert(update_check_heap_allows(kib(200), kib(200)));
 
+    // --- update_check_heap_decide -----------------------------------------
+    //
+    // The issue #462 case: a device in a perfectly ordinary steady state
+    // (free=51 KiB / largest=27 KiB, one KiB short of both branches) used to
+    // be refused for good, with no way for the user to ever get past the
+    // message. The decision is therefore two-phase: an unreleased heap gets
+    // one chance to release the monitoring workers before the refusal is
+    // final, and a healthy device is never disturbed at all.
+
+    // The issue #462 steady state: not admitted, but the monitoring workers
+    // have not been released yet - the fetch must ask for a release first.
+    assert(update_check_heap_decide(kib(51), kib(27), false) == UPDATE_CHECK_HEAP_RELEASE_FIRST);
+
+    // The same figures after a release that did not free enough: now the
+    // refusal is final and carries the measured figures.
+    assert(update_check_heap_decide(kib(51), kib(27), true) == UPDATE_CHECK_HEAP_REFUSE);
+
+    // A healthy device (the calibration regression case) proceeds without
+    // any release - a manual check must not stop MQTT for nothing.
+    assert(update_check_heap_decide(kib(55), kib(32), false) == UPDATE_CHECK_HEAP_PROCEED);
+
+    // Exactly at a gate boundary: proceeds even before any release.
+    assert(update_check_heap_decide(kib(52), kib(28), false) == UPDATE_CHECK_HEAP_PROCEED);
+    assert(update_check_heap_decide(kib(56), kib(18), false) == UPDATE_CHECK_HEAP_PROCEED);
+
+    // A release that freed enough room admits the fetch.
+    assert(update_check_heap_decide(kib(60), kib(30), true) == UPDATE_CHECK_HEAP_PROCEED);
+
+    // Trivial figures never proceed, with or without a release.
+    assert(update_check_heap_decide(0, 0, false) == UPDATE_CHECK_HEAP_RELEASE_FIRST);
+    assert(update_check_heap_decide(0, 0, true) == UPDATE_CHECK_HEAP_REFUSE);
+
     return 0;
 }

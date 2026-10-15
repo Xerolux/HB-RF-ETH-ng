@@ -41,7 +41,8 @@ const MEMORY_SKIP = /^Too little free memory \(free=(\d+) KB, largest block=(\d+
 const KNOWN_SKIPS = {
   'An update installation is currently running': 'firmware.skipInstallRunning',
   'Network subsystem busy, please try again': 'firmware.skipNetworkBusy',
-  'Not enough memory for the manifest buffer': 'firmware.skipManifestBuffer'
+  'Not enough memory for the manifest buffer': 'firmware.skipManifestBuffer',
+  'Monitoring workers could not be released, please try again': 'firmware.skipReleaseFailed'
 }
 const localizeSkipReason = (reason, t) => {
   const memory = MEMORY_SKIP.exec(reason)

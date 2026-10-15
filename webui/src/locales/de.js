@@ -478,6 +478,7 @@ export default {
     skipInstallRunning: 'eine Update-Installation läuft gerade',
     skipNetworkBusy: 'das Netzwerk-Subsystem ist beschäftigt',
     skipManifestBuffer: 'zu wenig Speicher für den Versions-Puffer',
+    skipReleaseFailed: 'Hintergrunddienste konnten nicht freigegeben werden, bitte erneut versuchen',
     checkBusy: 'Es läuft bereits eine Suche.',
     checkUnavailable: 'Die Suche kann derzeit nicht gestartet werden.',
     viewOnGithub: 'Auf GitHub ansehen',

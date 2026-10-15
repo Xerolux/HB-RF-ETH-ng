@@ -344,19 +344,9 @@ static void update_check_task(void *parameter)
 {
     worker_args *args                   = static_cast<worker_args *>(parameter);
     char error[UPDATE_CHECK_REASON_LEN] = {};
-
-    // Total free memory bounds whether a TLS session fits; the largest block
-    // decides whether it can be allocated at all. Both are needed - see
-    // include/updatecheck_heap_policy.h.
-    const size_t free_bytes = esp_get_free_heap_size();
-    const size_t largest    = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (!update_check_heap_allows(free_bytes, largest)) {
-        char reason[UPDATE_CHECK_REASON_LEN];
-        snprintf(reason, sizeof(reason), "Too little free memory (free=%u KB, largest block=%u KB)",
-                 static_cast<unsigned>(free_bytes / 1024), static_cast<unsigned>(largest / 1024));
-        finish_with_skip(reason);
-        goto cleanup;
-    }
+    uint32_t released_mask              = 0;
+    bool monitoring_released            = false; // decision input: release phase done
+    bool we_own_release                 = false; // cleanup owns monitoring_resume_after_ota
 
     // A firmware or WebUI image is being written: that operation owns the
     // flash and the network budget, and a manifest is never worth disturbing it.
@@ -368,6 +358,60 @@ static void update_check_task(void *parameter)
     if (g_net_fetch_mutex == NULL) {
         finish_with_error("Network subsystem not ready");
         goto cleanup;
+    }
+
+    // Total free memory bounds whether a TLS session fits; the largest block
+    // decides whether it can be allocated at all. Both are needed - see
+    // include/updatecheck_heap_policy.h. A steady state below the gate is not
+    // final: the monitoring workers hold the TLS sessions and stacks that
+    // account for most of a fragmented heap, so they are released once - the
+    // same transaction the OTA path runs before a restart - and the heap is
+    // measured again before the fetch is refused for good (issue #462).
+    for (;;)
+    {
+        const size_t free_bytes = esp_get_free_heap_size();
+        const size_t largest    = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+
+        const update_check_heap_decision_t decision =
+            update_check_heap_decide(free_bytes, largest, monitoring_released);
+        if (decision == UPDATE_CHECK_HEAP_PROCEED) {
+            if (monitoring_released) {
+                ESP_LOGI(TAG,
+                         "Update fetch admitted after releasing monitoring workers "
+                         "(free=%u KB, largest block=%u KB)",
+                         static_cast<unsigned>(free_bytes / 1024),
+                         static_cast<unsigned>(largest / 1024));
+            }
+            break;
+        }
+        if (decision == UPDATE_CHECK_HEAP_REFUSE) {
+            char reason[UPDATE_CHECK_REASON_LEN];
+            snprintf(reason, sizeof(reason),
+                     "Too little free memory (free=%u KB, largest block=%u KB)",
+                     static_cast<unsigned>(free_bytes / 1024),
+                     static_cast<unsigned>(largest / 1024));
+            finish_with_skip(reason);
+            goto cleanup;
+        }
+
+        // RELEASE_FIRST: stop the heap-heavy workers exactly like the OTA
+        // path does, give the heap a moment to settle, then decide again.
+        const esp_err_t pause_result = monitoring_pause_for_ota(&released_mask);
+        if (pause_result == ESP_OK) {
+            we_own_release = true;
+        } else if (pause_result != ESP_ERR_INVALID_STATE) {
+            finish_with_skip("Monitoring workers could not be released, please try again");
+            goto cleanup;
+        } else {
+            // Another transaction (restart, OTA) already stopped the workers,
+            // so the heap is as released as it will get - but it is not ours
+            // to undo, so only the measurement proceeds, not the resume.
+            ESP_LOGI(TAG, "Monitoring workers already released by another transaction");
+        }
+        // Both successful outcomes mean the workers are stopped and the
+        // decision must not ask for another release.
+        monitoring_released = true;
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 
     // One outbound TLS session at a time, device-wide. Waiting rather than
@@ -407,6 +451,11 @@ static void update_check_task(void *parameter)
     }
 
 cleanup:
+    // Only a release this task performed is undone; when another transaction
+    // had already stopped the workers, its own resume stays in charge.
+    if (we_own_release) {
+        monitoring_resume_after_ota(released_mask);
+    }
     free(args);
     vTaskDelete(NULL);
 }
@@ -454,7 +503,11 @@ update_check_trigger_result_t update_check_trigger(const char *channel)
 
     // The fetch never runs on an HTTP server thread: a TLS exchange would hold
     // a server worker for seconds and starve the rest of the WebUI.
-    if (!args || xTaskCreate(update_check_task, "upd_check", 5120, args, 3, NULL) != pdPASS) {
+    // 6 KiB stack: the fetch itself runs an mbedTLS handshake here, and the
+    // low-memory path additionally walks the monitoring pause/resume
+    // machinery before that. The task exists only for the duration of one
+    // check, so the extra KiB costs nothing while idle.
+    if (!args || xTaskCreate(update_check_task, "upd_check", 6144, args, 3, NULL) != pdPASS) {
         free(args);
         xSemaphoreTake(s_lock, portMAX_DELAY);
         s_status.state = UPDATE_CHECK_IDLE;

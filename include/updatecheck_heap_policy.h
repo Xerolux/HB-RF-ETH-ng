@@ -71,3 +71,48 @@ static inline bool update_check_heap_allows(size_t free_bytes, size_t largest_bl
                              largest_block >= UPDATE_CHECK_COMPENSATED_BLOCK_BYTES;
     return nominal || compensated;
 }
+
+// A device whose steady state sits below the gate is not out of luck: the
+// monitoring workers hold the TLS sessions and task stacks that account for
+// most of a fragmented heap, and the firmware already has a transaction to
+// stop them (the same one the OTA path uses before a restart). Releasing
+// them for the duration of one manual manifest fetch turns states like the
+// issue #462 report (free=51 KiB / largest=27 KiB, one KiB short of both
+// branches) into an admitted fetch, without weakening the floors for a
+// fetch that would then fail mid-handshake.
+//
+// Hence the decision is two-phase. PROCEED starts the fetch. RELEASE_FIRST
+// instructs the caller to stop the monitoring workers once and re-measure;
+// the caller may also learn the workers are already stopped by another
+// transaction, which counts as released but is not the caller's to undo.
+// REFUSE is final and must carry the measured figures, so the WebUI can show
+// why nothing was fetched.
+
+typedef enum
+{
+    UPDATE_CHECK_HEAP_PROCEED = 0,
+    UPDATE_CHECK_HEAP_RELEASE_FIRST,
+    UPDATE_CHECK_HEAP_REFUSE
+} update_check_heap_decision_t;
+
+/**
+ * @brief Plan the admission of a manifest fetch for the given heap figures.
+ *
+ * @param free_bytes          Total free heap.
+ * @param largest_block       Largest allocatable contiguous block.
+ * @param monitoring_released true once the monitoring workers have been
+ *                            stopped (by this caller or another transaction)
+ *                            and the heap has had time to settle.
+ * @return PROCEED when the fetch may start, RELEASE_FIRST to stop the
+ *         monitoring workers and ask again, REFUSE when the fetch stays
+ *         below the gate even after a release.
+ */
+static inline update_check_heap_decision_t update_check_heap_decide(size_t free_bytes,
+                                                                    size_t largest_block,
+                                                                    bool monitoring_released)
+{
+    if (update_check_heap_allows(free_bytes, largest_block)) {
+        return UPDATE_CHECK_HEAP_PROCEED;
+    }
+    return monitoring_released ? UPDATE_CHECK_HEAP_REFUSE : UPDATE_CHECK_HEAP_RELEASE_FIRST;
+}

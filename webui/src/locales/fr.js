@@ -478,6 +478,7 @@ export default {
     skipInstallRunning: 'une installation de mise à jour est en cours',
     skipNetworkBusy: 'le sous-système réseau est occupé',
     skipManifestBuffer: 'mémoire insuffisante pour le tampon des versions',
+    skipReleaseFailed: 'les services d’arrière-plan n’ont pas pu être libérés, veuillez réessayer',
     checkBusy: 'Une recherche est déjà en cours.',
     checkUnavailable: 'La recherche ne peut pas être lancée pour le moment.',
     viewOnGithub: 'Voir sur GitHub',

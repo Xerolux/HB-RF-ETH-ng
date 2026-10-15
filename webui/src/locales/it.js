@@ -478,6 +478,7 @@ webuiUpdate: {
     skipInstallRunning: 'un’installazione di aggiornamento è in corso',
     skipNetworkBusy: 'il sottosistema di rete è occupato',
     skipManifestBuffer: 'memoria insufficiente per il buffer delle versioni',
+    skipReleaseFailed: 'i servizi di background non sono stati rilasciati, riprovare',
     checkBusy: 'Una ricerca è già in corso.',
     checkUnavailable: 'Al momento non è possibile avviare la ricerca.',
     viewOnGithub: 'Visualizza su GitHub',
