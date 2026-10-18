@@ -14,6 +14,7 @@ when Content-Length is consumed, even if the TCP connection remains open.
 
 import argparse
 import getpass
+import http.client
 import json
 import socket
 import struct
@@ -202,7 +203,7 @@ def verify_running_firmware(target, expected_version, timeout):
                     return
             else:
                 first_match = None
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, http.client.HTTPException) as exc:
             first_match = None
             # Do not print response bodies, URLs or device identifiers from errors.
             last_observation = f"version query failed ({type(exc).__name__})"
@@ -337,7 +338,7 @@ def main():
         print(f"Waiting up to {args.wait_seconds}s for firmware {expected_version} "
               f"to remain reachable for {VERIFY_STABLE_SECONDS}s...", flush=True)
         verify_running_firmware(target, expected_version, args.wait_seconds)
-    except (RuntimeError, ValueError, OSError) as exc:
+    except (RuntimeError, ValueError, OSError, http.client.HTTPException) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 

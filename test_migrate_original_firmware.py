@@ -520,6 +520,18 @@ class MigrationVerificationTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "NOT verified"):
                 migrator.verify_running_firmware(target, "2.2.8", 30)
 
+    def test_interrupted_http_response_during_reboot_is_retried(self):
+        target = migrator.OriginalFirmwareTarget(self.args.device)
+        clock = FakeClock()
+        def query(*args, **kwargs):
+            if clock.now < 4:
+                raise migrator.http.client.IncompleteRead(b"{", 100)
+            return "2.2.8"
+        with mock.patch.object(migrator, "time", clock), \
+                mock.patch.object(migrator, "get_running_version", side_effect=query):
+            migrator.verify_running_firmware(target, "2.2.8", 30)
+        self.assertGreaterEqual(clock.now, 24)
+
     def test_rejects_bootloader_other_chip_and_oversize_before_login(self):
         for kind in ("bootloader", "other_chip", "oversize", "other_project"):
             with self.subTest(kind=kind):
