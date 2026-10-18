@@ -93,31 +93,33 @@ python3 rename_webui_files.py
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
 ### Migration von der Original-Firmware (1.3.x)
-Der WebUI-Upload der **Original-Firmware 1.3.x** aktiviert eine hochgeladene
-Firmware nicht zuverlässig: dessen Update-Handler bricht nach 5 Sekunden
-Socket-Timeout ab, bevor er die Boot-Partition umschaltet — das Gerät startet
-nach dem Neustart weiterhin die alte Version, obwohl das Image vollständig
-übertragen wurde. Dass ein identischer erneuter Versuch „auf einmal doch
-funktioniert", ist der seltene Fall, in dem der Browser die Verbindung
-zufällig sauber geschlossen hat (siehe [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)).
+Ein bestätigter Upload beweist noch nicht, dass die neue Firmware startet.
+In [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461) läuft nach
+bestätigtem Upload und Neustart weiterhin 1.3.0. Die Ursache dieses
+Startproblems ist noch nicht geklärt; die frühere Timeout-Erklärung und das
+Versprechen einer zuverlässigen Migration per Skript waren nicht belegt.
 
-Für die initiale Migration gibt es zwei zuverlässige Wege:
+Das Migrationsskript prüft die Firmware-Datei, lädt sie einmal hoch und wartet
+anschließend auf einen **manuellen** Neustart. Erst wenn `/sysinfo.json` die
+Version aus der Datei über mindestens 20 Sekunden meldet, endet es erfolgreich:
 
-1. **Migrationsskript (empfohlen):** Das im Repository liegende Skript meldet
-   sich wie die WebUI an, lädt die `*.bin` hoch und schließt die Verbindung
-   exakt so, wie es der Handler der Original-Firmware zur Aktivierung braucht:
-   ```bash
-   # Passwort wird interaktiv abgefragt
-   python3 migrate_original_firmware.py <GERÄTE-IP> firmware_<version>.bin
-   ```
-   Nach der Erfolgsmeldung das Gerät einmal vom Strom trennen und wieder
-   verbinden (1.3.x hat keinen Neustart-Button). Anschließend dient dieselbe
-   Adresse der HB-RF-ETH-ng-Weboberfläche.
-2. **Seriell flashen** — nach einem Geräteausfall oder wenn das Netzwerk nicht
-   erreichbar ist; siehe
-   [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#device-wont-boot-after-update).
+```bash
+# Passwort wird interaktiv abgefragt; nach Aufforderung einmal stromlos machen
+python3 migrate_original_firmware.py <GERÄTE-IP> firmware_<version>.bin
 
-Details zur Ursache und zum Ablauf stehen im
+# Nach einem späteren Neustart nur prüfen, ohne erneutes Flashen oder Anmeldung
+python3 migrate_original_firmware.py <GERÄTE-IP> firmware_<version>.bin --verify-only
+```
+
+Standardmäßig bleiben 180 Sekunden für Neustart und Prüfung; mit
+`--wait-seconds 300` lässt sich das verlängern. Exit-Code 0 bedeutet, dass die
+Zielversion über das Beobachtungsfenster erreichbar war. Bei weiterlaufender
+alter Version, abweichender Version oder fehlender Erreichbarkeit endet das
+Skript mit Exit-Code 1. Die interne OTA-Validierung wird damit nicht ausgelesen.
+
+Falls nach dem Neustart weiterhin 1.3.x läuft, Uploads nicht ständig wiederholen:
+Für die weitere Diagnose wird das serielle Startprotokoll mit 115200 Baud
+benötigt. Vorgehen, Nachweisgrenzen und serielle Wiederherstellung stehen im
 [Troubleshooting-Guide](docs/TROUBLESHOOTING.md#migration-from-the-original-firmware-13x-keeps-booting-the-old-version).
 
 ### Screenshots

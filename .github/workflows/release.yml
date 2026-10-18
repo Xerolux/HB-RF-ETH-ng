@@ -107,6 +107,9 @@ jobs:
       - name: Prepare embedded and standalone WebUI assets
         run: python3 rename_webui_files.py
 
+      - name: Test original-firmware migration and reboot verification
+        run: python3 -m unittest test_migrate_original_firmware -v
+
       - name: Test monitoring defaults and empty-NVS recovery
         run: |
           mkdir -p build/host-tests
