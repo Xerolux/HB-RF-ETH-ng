@@ -31,15 +31,30 @@ When experiencing issues:
 
 ### Serial Console Access
 
-Connect to the device via USB and use a serial terminal:
+The board's **Micro-USB port is the serial console**: an on-board CH340
+USB-to-UART bridge connects it to the ESP32's UART0, including the
+DTR/RTS circuit esptool uses to enter the download mode automatically.
+No external USB-to-UART adapter is needed — only a **data-capable**
+Micro-USB cable (many cheap cables are charge-only). Depending on the
+host, the port appears as `/dev/ttyUSB0` (Linux),
+`/dev/tty.wchusbserial*` or `/dev/tty.usbserial*` (macOS) or
+`USB-SERIAL CH340 (COMx)` in the Windows Device Manager (the CH340
+driver from wch-ic.com may be required on Windows).
 
 ```bash
 # Linux/Mac
 screen /dev/ttyUSB0 115200
 
+# Alternative (cross-platform, after `pip3 install pyserial`)
+python3 -m serial.tools.miniterm /dev/ttyUSB0 115200
+
 # Windows (using PuTTY)
 # Set COM port and 115200 baud rate
 ```
+
+The board has no ESP32 reset button (the mounted push button belongs to
+the radio module). To capture a log from the very first line, start the
+terminal first and then power-cycle the board.
 
 Look for error messages, warnings, or crash logs.
 
@@ -400,10 +415,12 @@ upload/preflight/verification failed; an accepted upload alone is never success.
 
 1. Use `--verify-only` to check the device API independently of browser caching.
 2. Capture the serial output at **115200 baud** from power-on through fallback
-   to the old application, using a suitable **3.3 V UART** connection. Reading
-   the log does not require erasing or flashing. Do not power the board from two
-   sources. Record bootloader errors, reset reason and any application panic;
-   remove credentials and personal/network identifiers before sharing the log.
+   to the old application, through the board's Micro-USB port (see
+   *Serial Console Access* above; no external UART adapter is required).
+   Reading the log does not require erasing or flashing. Do not power the
+   board from two sources. Record bootloader errors, reset reason and any
+   application panic; remove credentials and personal/network identifiers
+   before sharing the log.
 3. Use the log to determine whether the image was rejected before startup or
    the application started and then reset/rolled back. Do not keep uploading
    the identical image or claim the migration is fixed without that evidence.
