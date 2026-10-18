@@ -1,41 +1,25 @@
 #!/usr/bin/env python3
-"""Migrate a device running the ORIGINAL HB-RF-ETH firmware (1.3.x) to HB-RF-ETH-ng.
+"""Upload to original HB-RF-ETH 1.3.x and verify the running version after reboot.
 
-Why this script exists
-----------------------
-The original firmware's POST /ota_update handler (src/webui.cpp in
-alexreinert/HB-RF-ETH 1.3.x) finalizes an uploaded image - esp_ota_end() plus
-esp_ota_set_boot_partition() - only when its receive loop terminates before
-the HTTP server's 5-second socket timeout. That loop can never terminate on
-its byte counter for the multipart body the original WebUI sends (the first
-chunk's bytes are never counted), so a browser upload almost always ends in a
-timeout, the handler aborts with "Error writing OTA", and the boot selector is
-never switched: after the restart the old firmware is still running. Only when
-the client happens to close the connection right after the request body does
-recv() return 0, the loop exit cleanly, and the update get activated - which
-is why retrying the identical upload occasionally "magically" worked (see
-HB-RF-ETH-ng issue #461).
+An upload acknowledgement does not prove that the new application boots
+(issue #461). The script waits for a manual power-cycle and checks sysinfo.json
+against the version embedded in the supplied image. It never reboots the
+device or retries a flash automatically. --verify-only performs no upload.
 
-This script performs the upload in exactly the shape the original handler
-needs to succeed deterministically:
-
-1. a multipart-style body whose part header ends at the first "\r\n\r\n"
-   (the handler strips everything up to that marker and writes the rest
-   verbatim), followed by the exact firmware image with no trailing boundary,
-   so the written image is byte-identical to the .bin file;
-2. a clean half-close of the client side of the TCP connection after the
-   body, which makes the handler's recv() return 0 and the update finalize.
-
-After the script reports success, power-cycle the device. The 1.3.x WebUI has
-no restart button, and on the next boot the HB-RF-ETH-ng firmware starts and
-confirms itself during a short self-test window.
+The legacy handler strips the first multipart header and writes the rest
+verbatim. We omit the trailing boundary to preserve the exact image bytes.
+Contrary to the initial diagnosis, ESP-IDF's httpd_req_recv() returns zero
+when Content-Length is consumed, even if the TCP connection remains open.
 """
 
 import argparse
 import getpass
+import http.client
 import json
 import socket
+import struct
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -43,6 +27,11 @@ from pathlib import Path
 LOGIN_TIMEOUT_SECONDS = 10
 UPLOAD_TIMEOUT_SECONDS = 600
 SEND_CHUNK_BYTES = 4096
+OTA_PARTITION_BYTES = 0x1D0000
+VERIFY_TIMEOUT_SECONDS = 180
+VERIFY_STABLE_SECONDS = 20  # longer than the firmware's 15-second self-test
+POLL_SECONDS = 2
+SUCCESS_BODY = "Firmware update completed, please restart to activate new firmware."
 
 # The original handler locates the payload with strstr(buf, "\r\n\r\n") + 4.
 # This part header guarantees that marker is ours and short enough to sit in
@@ -151,7 +140,83 @@ def read_firmware(path):
         raise RuntimeError(
             "file is not an ESP32 firmware image (expected magic byte 0xE9)"
         )
+    firmware_version(image)
     return firmware_path, image
+
+
+def firmware_version(image):
+    """Read esp_app_desc_t at the first segment's data offset (24 + 8)."""
+    if len(image) > OTA_PARTITION_BYTES:
+        raise RuntimeError("firmware image exceeds the original OTA partition size")
+    if len(image) < 288 or image[0] != 0xE9 or image[1] == 0:
+        raise RuntimeError("file is not a complete ESP32 application image")
+    if struct.unpack_from("<H", image, 12)[0] != 0:
+        raise RuntimeError("firmware targets a chip other than ESP32")
+    if struct.unpack_from("<I", image, 28)[0] < 256:
+        raise RuntimeError("application descriptor is missing from the first segment")
+    if struct.unpack_from("<I", image, 32)[0] != 0xABCD5432:
+        raise RuntimeError("application descriptor is missing (do not upload a bootloader)")
+    try:
+        version = image[48:80].split(b"\0", 1)[0].decode("ascii")
+        project = image[80:112].split(b"\0", 1)[0].decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise RuntimeError("invalid application descriptor") from exc
+    if project != "HB-RF-ETH-ng" or not version or not version[0].isdigit():
+        raise RuntimeError("image must be an HB-RF-ETH-ng firmware application")
+    return version
+
+
+def get_running_version(target, timeout=LOGIN_TIMEOUT_SECONDS):
+    """Read the unauthenticated endpoint shared by original and ng firmware."""
+    request = urllib.request.Request(
+        f"{target.base_url}/sysinfo.json",
+        headers={"Cache-Control": "no-cache"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    info = data.get("sysInfo") if isinstance(data, dict) else None
+    version = info.get("currentVersion") if isinstance(info, dict) else None
+    if not isinstance(version, str) or not version:
+        raise ValueError("sysinfo.json does not contain sysInfo.currentVersion")
+    return version
+
+
+def verify_running_firmware(target, expected_version, timeout):
+    """Require the expected version to remain reachable across the self-test window.
+
+    This observes the running application, not the private OTA validation state.
+    A reset, rollback, wrong version or unreachable device breaks the window.
+    """
+    deadline = time.monotonic() + timeout
+    first_match = None
+    last_observation = "device not yet reachable"
+    while time.monotonic() < deadline:
+        try:
+            version = get_running_version(
+                target, timeout=min(LOGIN_TIMEOUT_SECONDS, max(0.1, deadline - time.monotonic()))
+            )
+            last_observation = f"running firmware {version}"
+            if version == expected_version:
+                if first_match is None:
+                    first_match = time.monotonic()
+                if time.monotonic() - first_match >= VERIFY_STABLE_SECONDS:
+                    return
+            else:
+                first_match = None
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            first_match = None
+            # Do not print response bodies, URLs or device identifiers from errors.
+            last_observation = f"version query failed ({type(exc).__name__})"
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(POLL_SECONDS, remaining))
+    raise RuntimeError(
+        f"migration NOT verified: expected {expected_version}; {last_observation}. "
+        "If still on 1.3.x after a power-cycle, do not keep repeating uploads. "
+        "Capture the serial boot log (115200 baud) to diagnose boot failure/rollback; "
+        "see docs/TROUBLESHOOTING.md. Verification can be retried with --verify-only "
+        "without writing flash."
+    )
 
 
 def build_request(target, token, filename, image):
@@ -179,12 +244,7 @@ def build_request(target, token, filename, image):
 
 
 def upload_image(target, token, filename, image):
-    """Upload the image so the original handler finalizes the update.
-
-    Closing the write side of the connection right after the body makes the
-    handler's recv() return 0; its receive loop then exits before the 5-second
-    socket timeout and runs esp_ota_end() + esp_ota_set_boot_partition().
-    """
+    """Upload the exact image; the response acknowledges staging, not booting."""
     head, body = build_request(target, token, filename, image)
 
     try:
@@ -223,10 +283,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Migrate a device running the original HB-RF-ETH firmware (1.3.x) "
-            "to an HB-RF-ETH-ng firmware .bin over its WebUI API. Use this "
-            "instead of the browser upload: the original firmware's update "
-            "handler only activates an upload when the client closes the "
-            "connection after the body, which this script does reliably."
+            "to an HB-RF-ETH-ng firmware .bin over its WebUI API, then verify "
+            "the running version after a manual power-cycle."
         )
     )
     parser.add_argument(
@@ -238,6 +296,10 @@ def parse_args():
         "--password",
         help="administrator password (omit to enter it without shell-history exposure)",
     )
+    parser.add_argument("--verify-only", action="store_true",
+                        help="only check the running version; no login or upload")
+    parser.add_argument("--wait-seconds", type=int, default=VERIFY_TIMEOUT_SECONDS,
+                        help="time allowed for manual reboot and version verification (default: 180)")
     return parser.parse_args()
 
 
@@ -247,33 +309,40 @@ def main():
     try:
         target = OriginalFirmwareTarget(args.device)
         firmware_path, image = read_firmware(args.firmware)
-        password = args.password
-        if password is None:
-            password = getpass.getpass("Administrator password: ")
+        expected_version = firmware_version(image)
+        if args.wait_seconds <= VERIFY_STABLE_SECONDS:
+            raise ValueError(f"--wait-seconds must exceed {VERIFY_STABLE_SECONDS}")
+        if not args.verify_only:
+            current_version = get_running_version(target)
+            if not current_version.startswith("1.3."):
+                raise RuntimeError(
+                    f"device reports {current_version}, not original 1.3.x; "
+                    "use --verify-only to check an already migrated device"
+                )
+            password = args.password
+            if password is None:
+                password = getpass.getpass("Administrator password: ")
 
-        print(f"Authenticating at {target.base_url}...")
-        token = get_token(target, password)
-        print(
-            f"Uploading {firmware_path.name} ({len(image)} bytes) "
-            "to POST /ota_update..."
-        )
-        response = upload_image(target, token, firmware_path.name, image)
-        status, body = parse_response(response)
-    except (RuntimeError, ValueError) as exc:
+            print(f"Authenticating at {target.base_url}...")
+            token = get_token(target, password)
+            print(f"Uploading {firmware_path.name} ({len(image)} bytes) to POST /ota_update...")
+            response = upload_image(target, token, firmware_path.name, image)
+            status, body = parse_response(response)
+            if status != 200 or body.strip() != SUCCESS_BODY:
+                raise RuntimeError(
+                    f"upload was not acknowledged (HTTP {status}): "
+                    f"{body.strip() or '<no response body>'}"
+                )
+            print("Upload acknowledged. The new firmware has NOT yet been verified running.")
+            print("Now power-cycle the device once (unplug and reconnect the power supply).", flush=True)
+        print(f"Waiting up to {args.wait_seconds}s for firmware {expected_version} "
+              f"to remain reachable for {VERIFY_STABLE_SECONDS}s...", flush=True)
+        verify_running_firmware(target, expected_version, args.wait_seconds)
+    except (RuntimeError, ValueError, OSError, http.client.HTTPException) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    if status != 200 or "completed" not in body:
-        print(
-            f"Error: upload not activated by the device (HTTP {status}): "
-            f"{body.strip() or '<no response body>'}",
-            file=sys.stderr,
-        )
-        return 1
-
-    print("Firmware update completed and activated by the device.")
-    print("Now power-cycle the device (unplug and reconnect the power supply).")
-    print("After the reboot the HB-RF-ETH-ng WebUI is served at the same address.")
+    print(f"Verified: device reports firmware {expected_version} across the observation window.")
     return 0
 
 

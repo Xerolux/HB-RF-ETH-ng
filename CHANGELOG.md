@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Migration helper (#461): verify the image's running version after a manual
+  reboot instead of reporting upload acknowledgement as migration success.
+  Add read-only `--verify-only`, a bounded observation window and application
+  descriptor/chip/partition-size preflight checks. Correct the legacy HTTP
+  simulation and retract the unsupported socket-timeout diagnosis. The reported
+  device's boot/fallback cause remains unresolved pending a serial boot log.
+
 ## [2.2.8] - 2026-10-15
 
 ### Changes

@@ -1,45 +1,23 @@
 #!/usr/bin/env python3
-"""Verify migrate_original_firmware.py against a simulation of the ORIGINAL
-HB-RF-ETH 1.3.x /ota_update handler (issue #461).
+"""Regression tests for legacy upload acknowledgement and post-reboot verification.
 
-The simulation reproduces alexreinert/HB-RF-ETH 1.3.0 (master) src/webui.cpp
-post_ota_update_handler_func() as literally as Python allows, including the
-behaviour of the surrounding ESP-IDF pieces that make the handler fail:
-
-- HTTPD_DEFAULT_CONFIG() recv_wait_timeout = 5 s: a recv() with no data
-  returns HTTPD_SOCK_ERR_TIMEOUT (-2) after five seconds.
-- The receive loop counts only the bytes of chunks AFTER the first one
-  (content_received += recv_len lives in the else branch), so with the
-  multipart body the original WebUI sends, content_received tops out at
-  content_length - 1024 and the loop can never end on the byte counter.
-  It only exits via recv() returning <= 0.
-- On the timeout path the handler calls esp_ota_write() with the negative
-  recv_len. As a size_t that is a huge value; the block/size checks in
-  esp_ota_write turn it into an error (or, on a sector-aligned offset, into
-  a corrupted stream write). Either way the handler aborts and
-  esp_ota_end()/esp_ota_set_boot_partition() are never reached.
-- Only recv() == 0 (client closed the connection after the body) exits the
-  loop cleanly and runs the finalize sequence.
-
-Two scenarios are asserted:
-
-1. A browser-style upload (multipart with trailing boundary, connection kept
-   open like axios does) fails to activate the update even though the image
-   is completely written - this is issue #461.
-2. The migration script (multipart part header + exact image + TCP
-   half-close) finalizes the update and the written image is byte-identical
-   to the .bin file.
-
-Run:  python3 test_migrate_original_firmware.py
-(Takes ~5 s per browser-style scenario because of the faithful 5 s timeout.)
+The handler simulation includes ESP-IDF's Content-Length accounting: once the
+request is consumed, httpd_req_recv returns zero without waiting on TCP EOF.
+Image validation accepts trailing multipart bytes like esp_image_verify does.
+Boot success is modelled separately from a successful upload acknowledgement.
 """
 
+import contextlib
+import io
 import json
+import struct
 import os
 import socket
 import tempfile
 import threading
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 from pathlib import Path
 
 import migrate_original_firmware as migrator
@@ -65,6 +43,8 @@ class OriginalHandlerSim:
         self.password = password
         self.expected_image = expected_image
         self.token = "simulated-webui-token"
+        self.running_version = "1.3.0"
+        self.upload_count = 0
         # State of the last /ota_update request:
         self.flash = bytearray()
         self.finalized = False
@@ -131,7 +111,11 @@ class OriginalHandlerSim:
 
     def _handle_connection(self, conn):
         method, path, headers, leftover = self._read_request_head(conn)
-        if method == "POST" and path == "/login.json":
+        if method == "GET" and path == "/sysinfo.json":
+            self._send_response(conn, 200, json.dumps({
+                "sysInfo": {"currentVersion": self.running_version}
+            }).encode())
+        elif method == "POST" and path == "/login.json":
             self._handle_login(conn, headers, leftover)
         elif method == "POST" and path == "/ota_update":
             self._handle_ota_update(conn, headers, leftover)
@@ -166,6 +150,7 @@ class OriginalHandlerSim:
             self.outcome = "unauthorized"
             return
 
+        self.upload_count += 1
         content_length = int(headers.get("content-length", "0"))
         self.flash.clear()
         self.finalized = False
@@ -210,9 +195,8 @@ class OriginalHandlerSim:
         self.flash.extend(data)
 
     def _esp_ota_end(self):
-        """Model esp_ota_end() -> esp_image_verify(): the written image must
-        be exactly the expected firmware (magic byte + checksum/SHA256)."""
-        return bytes(self.flash) == self.expected_image
+        """Image verification consumes the image, allowing trailing bytes."""
+        return bytes(self.flash).startswith(self.expected_image)
 
     def _ota_receive_loop(self, conn, content_length, buffered_body):
         """The original do/while receive loop, including its bugs.
@@ -224,15 +208,23 @@ class OriginalHandlerSim:
         conn.settimeout(HTTPD_RECV_WAIT_TIMEOUT_SECONDS)
 
         pending = bytearray(buffered_body)
+        remaining = content_length
 
         def httpd_req_recv(buf_len):
+            nonlocal remaining
+            buf_len = min(buf_len, remaining)
+            if buf_len == 0:
+                return b""
             # Returns bytes, HTTPD_SOCK_ERR_TIMEOUT, or b"" (peer closed).
             if pending:
                 out = bytes(pending[:buf_len])
                 del pending[:buf_len]
+                remaining -= len(out)
                 return out
             try:
-                return conn.recv(buf_len)
+                out = conn.recv(buf_len)
+                remaining -= len(out)
+                return out
             except socket.timeout:
                 return HTTPD_SOCK_ERR_TIMEOUT
 
@@ -302,6 +294,12 @@ def make_fake_esp32_image(size=65536):
     while len(image) < size:
         image.append((counter * 7 + 13) & 0xFF)
         counter += 1
+    image[1] = 1
+    struct.pack_into("<H", image, 12, 0)  # ESP32 chip ID
+    struct.pack_into("<I", image, 28, size - 32)
+    struct.pack_into("<I", image, 32, 0xABCD5432)
+    image[48:80] = b"2.2.8".ljust(32, b"\0")
+    image[80:112] = b"HB-RF-ETH-ng".ljust(32, b"\0")
     image[1000:1004] = b"\r\n\r\n"
     return bytes(image)
 
@@ -361,8 +359,8 @@ class MigrationSimulationTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.sim.shutdown()
 
-    def test_01_browser_upload_reproduces_issue_461(self):
-        """A WebUI-style multipart upload does not activate the update."""
+    def test_01_browser_upload_ends_at_content_length_without_tcp_eof(self):
+        """Correct IDF accounting disproves the earlier timeout diagnosis."""
         part_header, body = axios_style_multipart(self.image)
         head, rest = raw_http_post(
             self.sim.port,
@@ -373,12 +371,13 @@ class MigrationSimulationTest(unittest.TestCase):
         )
 
         status_line = head.split(b"\r\n", 1)[0]
-        self.assertIn(b"500", status_line)
-        self.assertIn(b"Error writing OTA", rest)
-        self.assertEqual(self.sim.outcome, "esp_ota_write_failed_timeout_path")
-        self.assertFalse(self.sim.finalized)
-        # The image was completely written (plus the trailing boundary the
-        # browser appends), but the boot selector was never switched:
+        self.assertIn(b"200", status_line)
+        self.assertEqual(rest, SUCCESS_BODY)
+        self.assertEqual(self.sim.outcome, "finalized")
+        self.assertTrue(self.sim.finalized)
+        # Upload success does not change the running application.
+        self.assertEqual(self.sim.running_version, "1.3.0")
+        # The original handler writes the trailing boundary too:
         self.assertEqual(bytes(self.sim.flash), self.image + b"\r\n--%s--\r\n" % BOUNDARY.encode("ascii"))
 
     def test_02_migration_script_finalizes(self):
@@ -405,6 +404,152 @@ class MigrationSimulationTest(unittest.TestCase):
                 migrator.read_firmware(Path(name))
         finally:
             os.unlink(name)
+
+
+class FakeClock:
+    def __init__(self, on_sleep=None):
+        self.now = 0
+        self.on_sleep = on_sleep
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+        if self.on_sleep:
+            self.on_sleep(self.now)
+
+
+class MigrationVerificationTest(unittest.TestCase):
+    def setUp(self):
+        self.image = make_fake_esp32_image()
+        self.sim = OriginalHandlerSim("test-password", self.image)
+        self.temp = tempfile.TemporaryDirectory()
+        self.image_path = Path(self.temp.name) / "firmware.bin"
+        self.image_path.write_bytes(self.image)
+        self.args = SimpleNamespace(
+            device=f"127.0.0.1:{self.sim.port}", firmware=self.image_path,
+            password="test-password", verify_only=False, wait_seconds=30,
+        )
+
+    def tearDown(self):
+        self.sim.shutdown()
+        self.temp.cleanup()
+
+    def run_main(self, clock):
+        output = io.StringIO()
+        with mock.patch.object(migrator, "parse_args", return_value=self.args), \
+                mock.patch.object(migrator, "time", clock), \
+                contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            result = migrator.main()
+        return result, output.getvalue()
+
+    def test_acknowledged_upload_but_original_still_running_fails(self):
+        result, output = self.run_main(FakeClock())
+        self.assertTrue(self.sim.finalized)  # device sent a real HTTP 200
+        self.assertEqual(self.sim.upload_count, 1)
+        self.assertEqual(result, 1)
+        self.assertIn("migration NOT verified", output)
+        self.assertIn("running firmware 1.3.0", output)
+        self.assertNotIn("Verified:", output)
+
+    def test_reboot_to_expected_version_is_observed_before_success(self):
+        def reboot(now):
+            if now >= 4:
+                self.sim.running_version = "2.2.8"
+        clock = FakeClock(reboot)
+        result, output = self.run_main(clock)
+        self.assertEqual(result, 0)
+        self.assertIn("Verified:", output)
+        self.assertGreaterEqual(clock.now, 24)
+        self.assertEqual(self.sim.upload_count, 1)
+
+    def test_brief_new_version_then_rollback_does_not_pass(self):
+        def reboot_then_rollback(now):
+            self.sim.running_version = "2.2.8" if 4 <= now < 16 else "1.3.0"
+        result, output = self.run_main(FakeClock(reboot_then_rollback))
+        self.assertEqual(result, 1)
+        self.assertIn("migration NOT verified", output)
+
+    def test_verify_only_never_logs_in_or_uploads(self):
+        self.args.verify_only = True
+        self.sim.running_version = "2.2.8"
+        with mock.patch.object(migrator, "get_token", side_effect=AssertionError("login")), \
+                mock.patch.object(migrator.getpass, "getpass", side_effect=AssertionError("password")):
+            result, output = self.run_main(FakeClock())
+        self.assertEqual(result, 0)
+        self.assertEqual(self.sim.upload_count, 0)
+        self.assertIn("Verified:", output)
+
+    def test_unexpected_ng_version_fails_verification(self):
+        self.args.verify_only = True
+        self.sim.running_version = "2.2.7"
+        result, output = self.run_main(FakeClock())
+        self.assertEqual(result, 1)
+        self.assertIn("running firmware 2.2.7", output)
+
+    def test_already_migrated_target_is_not_flashed(self):
+        self.sim.running_version = "2.2.8"
+        result, _ = self.run_main(FakeClock())
+        self.assertEqual(result, 1)
+        self.assertEqual(self.sim.upload_count, 0)
+
+    def test_timeout_must_allow_observation_window(self):
+        self.args.wait_seconds = 20
+        result, _ = self.run_main(FakeClock())
+        self.assertEqual(result, 1)
+        self.assertEqual(self.sim.upload_count, 0)
+
+    def test_misleading_success_substring_is_not_accepted(self):
+        response = b"HTTP/1.1 200 OK\r\n\r\nUpdate not completed"
+        with mock.patch.object(migrator, "upload_image", return_value=response), \
+                mock.patch.object(migrator, "verify_running_firmware") as verify:
+            result, _ = self.run_main(FakeClock())
+        self.assertEqual(result, 1)
+        verify.assert_not_called()
+
+    def test_unreachable_device_during_observation_breaks_window(self):
+        target = migrator.OriginalFirmwareTarget(self.args.device)
+        clock = FakeClock()
+        def query(*args, **kwargs):
+            if clock.now == 10:
+                raise OSError("connection reset")
+            return "2.2.8"
+        with mock.patch.object(migrator, "time", clock), \
+                mock.patch.object(migrator, "get_running_version", side_effect=query):
+            with self.assertRaisesRegex(RuntimeError, "NOT verified"):
+                migrator.verify_running_firmware(target, "2.2.8", 30)
+
+    def test_interrupted_http_response_during_reboot_is_retried(self):
+        target = migrator.OriginalFirmwareTarget(self.args.device)
+        clock = FakeClock()
+        def query(*args, **kwargs):
+            if clock.now < 4:
+                raise migrator.http.client.IncompleteRead(b"{", 100)
+            return "2.2.8"
+        with mock.patch.object(migrator, "time", clock), \
+                mock.patch.object(migrator, "get_running_version", side_effect=query):
+            migrator.verify_running_firmware(target, "2.2.8", 30)
+        self.assertGreaterEqual(clock.now, 24)
+
+    def test_rejects_bootloader_other_chip_and_oversize_before_login(self):
+        for kind in ("bootloader", "other_chip", "oversize", "other_project"):
+            with self.subTest(kind=kind):
+                image = bytearray(self.image)
+                if kind == "bootloader":
+                    image[32:36] = b"\0" * 4
+                elif kind == "other_chip":
+                    struct.pack_into("<H", image, 12, 9)
+                elif kind == "other_project":
+                    image[80:112] = b"other-project".ljust(32, b"\0")
+                else:
+                    image.extend(b"\0" * migrator.OTA_PARTITION_BYTES)
+                self.image_path.write_bytes(image)
+                with mock.patch.object(migrator, "get_token") as login:
+                    result, _ = self.run_main(FakeClock())
+                self.assertEqual(result, 1)
+                login.assert_not_called()
+                self.assertEqual(self.sim.upload_count, 0)
 
 
 if __name__ == "__main__":

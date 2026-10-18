@@ -348,43 +348,75 @@ seconds.
 
 ### Migration From the Original Firmware (1.3.x) Keeps Booting the Old Version
 
-**Symptoms:**
-- You upload an HB-RF-ETH-ng `firmware_*.bin` through the WebUI of the
-  **original** firmware (1.3.x); the transfer itself completes
-- After a restart the device still reports 1.3.x
-- Retrying sometimes works "magically" after several attempts
+**Confirmed symptom (issue #461):** the original firmware acknowledges the
+upload, but the reporter still sees 1.3.0 after a power-cycle, including with
+the migration script and the 2.2.8 image. The reported board revision is 1.11
+(02/2026); a causal relationship to that revision has not been established.
 
-**Cause (in the original firmware, not in HB-RF-ETH-ng):** the 1.3.x
-`POST /ota_update` handler (`src/webui.cpp` in `alexreinert/HB-RF-ETH`) can
-never finish its receive loop by counting bytes — the first chunk's bytes are
-never counted, so with the multipart body its own WebUI sends, the loop only
-ends via the HTTP server's 5-second socket timeout. That timeout path aborts
-with "Error writing OTA" **before** `esp_ota_end()` and
-`esp_ota_set_boot_partition()` run, so the boot selector is never switched and
-the old firmware stays active — even though the new image was completely
-written into the inactive OTA slot. Only when the client happens to close the
-connection cleanly right after the upload does the loop exit in time and the
-update get activated, which is why an identical retry occasionally succeeds.
+**Correction to the previous diagnosis:** the legacy handler's own byte
+counter omits its first chunk, but ESP-IDF independently tracks the remaining
+request length. `httpd_req_recv()` returns zero when `Content-Length` has been
+consumed, without waiting for the peer to close the socket. Consequently, a
+fully received request does not inherently wait for the five-second socket
+timeout. The old regression simulation omitted that IDF accounting, and its
+assertion that a browser upload must time out was incorrect.
 
-**Solutions:**
+Source evidence:
+- [Original OTA handler](https://github.com/alexreinert/HB-RF-ETH/blob/eda7bfe28f95ecabb919e2b1f6100deaaa246cee/src/webui.cpp)
+  acknowledges only after `esp_ota_end()` and `esp_ota_set_boot_partition()`.
+- [ESP-IDF v4.0 request reader](https://github.com/espressif/esp-idf/blob/v4.0/components/esp_http_server/src/httpd_txrx.c)
+  clamps reads to `remaining_len` and returns zero when it reaches zero.
+- [Reporter follow-up](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)
+  contradicts the former claim that upload acknowledgement proves migration.
 
-1. **Migration script (recommended, no serial access needed)** — use the
-   `migrate_original_firmware.py` script from the repository root. It logs in
-   like the WebUI, uploads the `.bin`, and closes the connection in exactly
-   the way the 1.3.x handler needs to activate the update:
-   ```bash
-   # The password is requested interactively
-   python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin
-   ```
-   After the script reports success, power-cycle the device (1.3.x has no
-   restart button). On the next boot the HB-RF-ETH-ng firmware starts and
-   passes its self-test, and the same address then serves the new WebUI.
+The reason the new application does not remain running on the reported device
+is **still unresolved**. Bootloader/image rejection, an application startup
+failure with rollback, and stale browser content must be distinguished using
+current device evidence. Do not infer one from the HTTP upload response alone.
 
-2. **Serial flash** — flash the firmware via USB/serial as described under
-   *Device Won't Boot After Update* below.
+**Upload and verification:**
 
-HB-RF-ETH-ng-to-HB-RF-ETH-ng updates are not affected: the rewritten upload
-handler in this firmware finalizes uploads synchronously.
+```bash
+# Upload once; password requested interactively
+python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin
+# Power-cycle once when prompted. The script waits up to 180 seconds.
+
+# Read-only check after a later reboot; no login, upload or automatic restart
+python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin --verify-only
+# Optional: allow more time for reboot and observation
+python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin --verify-only --wait-seconds 300
+```
+
+The script compares `sysInfo.currentVersion` from `/sysinfo.json` with the
+version in the image's application descriptor, using fresh HTTP requests. It
+requires the expected version to remain reachable for at least 20 seconds
+(longer than the application's 15-second self-test delay); an unreachable
+device or another version resets that observation window. Exit code 0 means
+this running-version observation passed. It does **not** independently read
+flash contents or prove the private OTA validation state. Exit code 1 means
+upload/preflight/verification failed; an accepted upload alone is never success.
+
+**If 1.3.x is still running:**
+
+1. Use `--verify-only` to check the device API independently of browser caching.
+2. Capture the serial output at **115200 baud** from power-on through fallback
+   to the old application, using a suitable **3.3 V UART** connection. Reading
+   the log does not require erasing or flashing. Do not power the board from two
+   sources. Record bootloader errors, reset reason and any application panic;
+   remove credentials and personal/network identifiers before sharing the log.
+3. Use the log to determine whether the image was rejected before startup or
+   the application started and then reset/rolled back. Do not keep uploading
+   the identical image or claim the migration is fixed without that evidence.
+4. If serial recovery is chosen, use *Device Won't Boot After Update* below.
+   A network firmware upload only replaces the inactive application slot; it
+   does not replace the bootloader or partition table.
+
+**Regression coverage:** `python3 -m unittest test_migrate_original_firmware -v`
+models correct IDF request accounting, acknowledged upload with old firmware
+still running, successful observed reboot, transient new version followed by
+rollback, unavailable device, wrong version, read-only verification and image
+preflight failures. These simulations do not replace a test on the affected
+board with its installed bootloader.
 
 ### Device Won't Boot After Update
 
