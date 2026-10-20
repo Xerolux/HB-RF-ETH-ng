@@ -98,3 +98,18 @@ UpdateCheckStatus update_check_get_status();
 
 /** True when `channel` is one this firmware knows how to fetch. */
 bool update_check_valid_channel(const char *channel);
+
+/**
+ * @brief Fetch the device manifest for one channel into `buffer`.
+ *
+ * Shared by the update search and the online installer so both read the exact
+ * same fixed-shape document through the same bounded, deadline-driven client.
+ * Reads at most `buffer_size` bytes; an oversized document is reported as an
+ * error rather than truncated. Returns the length, or -1 with a reason in
+ * `error`.
+ */
+int update_check_fetch_manifest(const char *channel, char *buffer, size_t buffer_size,
+                                char *error, size_t error_size);
+
+/** Size of the device manifest the firmware is willing to parse. */
+#define UPDATE_CHECK_MANIFEST_MAX_BYTES 1024

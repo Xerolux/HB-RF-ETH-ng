@@ -94,6 +94,8 @@ jobs:
             test/host/test_update_decision.cpp \
             -o build/host-tests/test_update_decision
           build/host-tests/test_update_decision
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror             -Iinclude             test/host/test_update_url_policy.cpp             -o build/host-tests/test_update_url_policy
+          build/host-tests/test_update_url_policy
 
       - name: Test stability and storage policies
         run: python3 -m unittest discover -s test/host -p 'test_*policy.py'

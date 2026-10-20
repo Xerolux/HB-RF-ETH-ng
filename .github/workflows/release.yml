@@ -161,6 +161,8 @@ jobs:
             test/host/test_update_decision.cpp \
             -o build/host-tests/test_update_decision
           build/host-tests/test_update_decision
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror             -Iinclude             test/host/test_update_url_policy.cpp             -o build/host-tests/test_update_url_policy
+          build/host-tests/test_update_url_policy
 
       - name: Test stability and storage policies
         run: python3 -m unittest discover -s test/host -p 'test_*policy.py'
@@ -459,7 +461,13 @@ jobs:
           python3 scripts/device_manifest.py build latest.json docs/updates/v1/stable.json
           python3 scripts/device_manifest.py build beta.json docs/updates/v1/beta.json
           python3 scripts/device_manifest.py check docs/updates/v1/stable.json docs/updates/v1/beta.json
-          git add *.json docs/updates/v1/*.json
+          # Mirror the release notes next to the manifests: the WebUI fetches
+          # them for the changelog-before-install dialog (GitHub Pages serves
+          # them with Access-Control-Allow-Origin: *, so the device origin can
+          # read them directly).
+          mkdir -p docs/updates/notes
+          cp ../release/RELEASE_NOTES.md "docs/updates/notes/${{ steps.firmware.outputs.VERSION }}.md"
+          git add *.json docs/updates/v1/*.json docs/updates/notes/*.md
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: update manifests for ${{ steps.firmware.outputs.TAG }}"
           git push origin main

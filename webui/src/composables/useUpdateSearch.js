@@ -16,6 +16,24 @@ import { safeLocal } from './useSafeStorage'
 const CHANNEL_STORAGE_KEY = 'hb-rf-eth-ng-update-channel'
 const POLL_INTERVAL_MS = 1500
 const POLL_TIMEOUT_MS = 45000
+const INSTALL_POLL_INTERVAL_MS = 1000
+// A firmware install ends in a device restart; polls fail while the device is
+// down. Keep trying through that window instead of declaring failure.
+const INSTALL_POLL_MAX_CONSECUTIVE_ERRORS = 30
+
+// Release notes for the changelog-before-install view are mirrored on the
+// Pages site (same origin policy does not apply here: GitHub Pages sends
+// Access-Control-Allow-Origin: *). Older releases without a mirrored notes
+// file simply fall back to the external release link.
+const NOTES_BASE_URL = 'https://xerolux.github.io/HB-RF-ETH-ng/updates/notes/'
+
+const emptyInstall = () => ({
+  state: 'idle',
+  target: '',
+  progress: 0,
+  version: '',
+  error: ''
+})
 
 const emptyStatus = () => ({
   state: 'idle',
@@ -31,7 +49,8 @@ const emptyStatus = () => ({
   webuiUpdateAvailable: false,
   notesUrl: '',
   lastError: '',
-  lastSkipReason: ''
+  lastSkipReason: '',
+  install: emptyInstall()
 })
 
 // Skip reasons arrive as raw firmware strings. The known ones are mapped to
@@ -80,6 +99,7 @@ const stopPolling = () => {
     clearTimeout(pollTimer)
     pollTimer = null
   }
+  stopInstallPolling()
   // Called from onBeforeUnmount: without this, leaving the page mid-search
   // keeps `checking` true forever and permanently disables the check buttons
   // on both update pages (the state is shared at module scope). The cooldown
@@ -93,7 +113,13 @@ const loadUpdateStatus = async () => {
     silent: true
   })
   if (response.data) {
-    updateStatus.value = response.data
+    // Older firmware has no "install" block; merge with defaults so template
+    // access never hits undefined.
+    updateStatus.value = {
+      ...emptyStatus(),
+      ...response.data,
+      install: { ...emptyInstall(), ...(response.data.install || {}) }
+    }
     // Entering the page while a cooldown is active (firmware that reports it):
     // adopt the device's remaining seconds instead of guessing.
     if (response.data.cooldownRemainingSec > 0 && cooldownRemaining.value === 0) {
@@ -101,6 +127,93 @@ const loadUpdateStatus = async () => {
     }
   }
   return response.data
+}
+
+// ---------------------------------------------------------------------------
+// Online install. The device downloads and verifies the release artifact
+// named by its own manifest; this side only names the target and tracks
+// progress through the install block of /api/update/status.
+// ---------------------------------------------------------------------------
+
+let installPollTimer = null
+let installPollErrors = 0
+
+const INSTALL_ACTIVE_STATES = ['preparing', 'downloading', 'verifying']
+
+const stopInstallPolling = () => {
+  if (installPollTimer) {
+    clearTimeout(installPollTimer)
+    installPollTimer = null
+  }
+}
+
+const scheduleInstallPoll = () => {
+  if (installPollTimer) return
+  installPollTimer = setTimeout(pollInstall, INSTALL_POLL_INTERVAL_MS)
+}
+
+const pollInstall = async () => {
+  installPollTimer = null
+  try {
+    await loadUpdateStatus()
+    installPollErrors = 0
+  } catch {
+    installPollErrors++
+  }
+  const state = updateStatus.value.install.state
+  if (INSTALL_ACTIVE_STATES.includes(state)) {
+    scheduleInstallPoll()
+    return
+  }
+  // "finalizing" is terminal from the browser's perspective: the pages switch
+  // to their restart overlay, whose countdown covers the link-down window.
+  // A device that went unreachable without ever reporting a terminal state
+  // (e.g. power loss mid-download, firmware rebooting) stops the loop after a
+  // bounded error streak instead of polling forever.
+  if (state === 'finalizing') return
+  if (installPollErrors > 0 && installPollErrors < INSTALL_POLL_MAX_CONSECUTIVE_ERRORS) {
+    scheduleInstallPoll()
+  }
+}
+
+// Returns the outcome string from the device ('accepted', 'busy',
+// 'unavailable', 'invalid_target') or 'network' when the request itself failed.
+const startInstall = async target => {
+  if (installBusy.value) return 'busy'
+  try {
+    const response = await axios.post('/api/update/install', { target }, { timeout: 8000, silent: true })
+    const outcome = response.data?.outcome || 'unavailable'
+    if (outcome === 'accepted') {
+      installPollErrors = 0
+      updateStatus.value = { ...updateStatus.value, install: { ...emptyInstall(), state: 'preparing', target } }
+      scheduleInstallPoll()
+    }
+    return outcome
+  } catch {
+    return 'network'
+  }
+}
+
+const installBusy = computed(() =>
+  INSTALL_ACTIVE_STATES.includes(updateStatus.value.install.state) ||
+  updateStatus.value.install.state === 'finalizing'
+)
+
+// Changelog for the confirm dialog. Plain markdown text; rendering happens
+// escaped by the caller (the project deliberately ships no HTML renderer).
+const fetchReleaseNotes = async version => {
+  if (!version) return null
+  try {
+    const response = await axios.get(`${NOTES_BASE_URL}${encodeURIComponent(version)}.md`, {
+      timeout: 8000,
+      responseType: 'text',
+      transformResponse: [data => data],
+      silent: true
+    })
+    return typeof response.data === 'string' && response.data.trim() ? response.data : null
+  } catch {
+    return null
+  }
 }
 
 const checkForUpdates = async () => {
@@ -205,6 +318,9 @@ export function useUpdateSearch(t) {
     checkForUpdates,
     loadUpdateStatus,
     stopPolling,
-    formatTimestamp
+    formatTimestamp,
+    startInstall,
+    installBusy,
+    fetchReleaseNotes
   }
 }

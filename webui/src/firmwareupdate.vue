@@ -48,7 +48,7 @@
           </p>
 
           <div class="actions">
-            <BButton variant="success" class="action-btn" :disabled="checking" @click="checkForUpdates">
+            <BButton variant="success" class="action-btn" :disabled="checking || installBusy" @click="checkForUpdates">
               <span v-if="checking" class="spinner-border spinner-border-sm me-2"></span>
               <AppIcon v-else name="refresh" /> {{ checking ? t('firmware.checking') : t('firmware.checkNow') }}
             </BButton>
@@ -61,6 +61,25 @@
               <AppIcon name="externalLink" />
               {{ updateStatus.notesUrl ? t('firmware.releaseNotes') : t('firmware.viewOnGithub') }}
             </a>
+          </div>
+
+          <!-- Online install: the device itself downloads the release named by
+               its own manifest, verifies SHA-256 and reboots to activate. -->
+          <div v-if="updateStatus.firmwareUpdateAvailable || installPanelVisible" class="install-panel">
+            <BButton v-if="!installBusy" variant="primary" class="action-btn"
+                     :disabled="checking || installStarting" @click="openInstallConfirm">
+              <AppIcon name="download" /> {{ t('firmware.installNow') }}
+            </BButton>
+            <template v-else>
+              <div class="progress-container">
+                <div class="progress-bar"><div class="progress-value" :style="{ width: installProgressPct + '%' }"></div></div>
+                <span class="progress-label">{{ installProgressPct }}%</span>
+              </div>
+              <p class="muted-text">{{ installStateText }}</p>
+            </template>
+            <BAlert v-if="installError" variant="danger" :model-value="true">
+              {{ t('firmware.installFailed') }} {{ installError }}
+            </BAlert>
           </div>
         </div>
       </section>
@@ -115,11 +134,40 @@
         </div>
       </section>
     </div>
-</div>
+
+    <!-- Changelog-before-install confirmation. The notes are rendered as
+         plain text (no HTML renderer in this project by design). -->
+    <Transition name="fade">
+      <div v-if="showInstallConfirm" class="modal-backdrop" @click.self="closeInstallConfirm">
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <h3>{{ t('firmware.installConfirmTitle', { version: updateStatus.latestFirmware }) }}</h3>
+          <p class="muted-text">{{ t('firmware.installConfirmBody') }}</p>
+          <div class="changelog-box">
+            <h4>{{ t('firmware.installChangelogTitle') }}</h4>
+            <p v-if="notesLoading" class="muted-text">{{ t('firmware.installChangelogLoading') }}</p>
+            <pre v-else-if="releaseNotes" class="changelog-text">{{ releaseNotes }}</pre>
+            <p v-else class="muted-text">
+              {{ t('firmware.installChangelogMissing') }}
+              <a :href="updateStatus.notesUrl" target="_blank" rel="noopener noreferrer">{{ t('firmware.releaseNotes') }}</a>
+            </p>
+          </div>
+          <div class="modal-actions">
+            <BButton variant="outline-secondary" :disabled="installStarting" @click="closeInstallConfirm">
+              {{ t('common.cancel') }}
+            </BButton>
+            <BButton variant="primary" :disabled="installStarting" @click="confirmInstall">
+              <span v-if="installStarting" class="spinner-border spinner-border-sm me-2"></span>
+              {{ t('firmware.installConfirmButton') }}
+            </BButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, FLASH_PAUSE_SECONDS } from './stores.js'
 import { useUpdateSearch } from './composables/useUpdateSearch'
@@ -146,7 +194,10 @@ const {
   checkForUpdates,
   loadUpdateStatus,
   stopPolling,
-  formatTimestamp
+  formatTimestamp,
+  startInstall,
+  installBusy,
+  fetchReleaseNotes
 } = useUpdateSearch(t)
 
 const checkMessage = resultMessage(status => {
@@ -159,6 +210,69 @@ const checkMessage = resultMessage(status => {
   return {
     variant: 'success',
     text: t('firmware.upToDate', { fw: status.latestFirmware, ui: status.latestWebui })
+  }
+})
+
+// --- Online install --------------------------------------------------------
+// The changelog is fetched from the Pages notes mirror before the admin
+// confirms; plain markdown text, never rendered as HTML.
+const showInstallConfirm = ref(false)
+const installStarting = ref(false)
+const notesLoading = ref(false)
+const releaseNotes = ref('')
+
+const firmwareInstall = computed(() => (
+  updateStatus.value.install.target === 'firmware' ? updateStatus.value.install : { state: 'idle', progress: 0, error: '' }
+))
+const installProgressPct = computed(() => firmwareInstall.value.progress || 0)
+const installError = computed(() => firmwareInstall.value.error || '')
+const installPanelVisible = computed(() =>
+  ['downloading', 'verifying', 'preparing', 'finalizing', 'error'].includes(firmwareInstall.value.state))
+
+const installStateText = computed(() => {
+  switch (firmwareInstall.value.state) {
+    case 'preparing': return t('firmware.installPreparing')
+    case 'downloading': return t('firmware.installDownloading')
+    case 'verifying': return t('firmware.installVerifying')
+    case 'finalizing': return t('firmware.installFinalizing')
+    default: return ''
+  }
+})
+
+const openInstallConfirm = async () => {
+  showInstallConfirm.value = true
+  releaseNotes.value = ''
+  notesLoading.value = true
+  releaseNotes.value = await fetchReleaseNotes(updateStatus.value.latestFirmware) || ''
+  notesLoading.value = false
+}
+
+const closeInstallConfirm = () => {
+  if (!installStarting.value) showInstallConfirm.value = false
+}
+
+const confirmInstall = async () => {
+  installStarting.value = true
+  const outcome = await startInstall('firmware')
+  installStarting.value = false
+  if (outcome === 'accepted') {
+    showInstallConfirm.value = false
+    return
+  }
+  uiStore.pushToast({
+    type: 'error',
+    title: t('firmware.installFailedTitle'),
+    message: t('firmware.installStartFailed'),
+    duration: 6000
+  })
+}
+
+// "finalizing" means the image is verified and selected: the restart countdown
+// overlay takes over from here, exactly like the manual upload flow (40 s
+// covers the firmware's fixed 35 s Ethernet link-down window).
+watch(() => updateStatus.value.install.state, state => {
+  if (state === 'finalizing' && updateStatus.value.install.target === 'firmware') {
+    restartUiStore.start({ includeFlashPause: true, syncSeconds: FLASH_PAUSE_SECONDS, restartSeconds: 30 })
   }
 })
 
@@ -285,5 +399,13 @@ onMounted(async () => {
 .progress-container { display:flex; align-items:center; gap:10px; }
 .progress-bar { flex:1; height:10px; border-radius:var(--radius-pill); background:var(--color-bg-alt); overflow:hidden; }
 .progress-value { height:100%; background:var(--color-primary); }
+.install-panel { display:flex; flex-direction:column; gap:var(--space-3); }
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:1050; padding:var(--card-padding); }
+.modal-card { background:var(--color-surface); border-radius:var(--radius-lg); max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:calc(var(--card-padding) * 1.25); display:flex; flex-direction:column; gap:var(--space-3); }
+.modal-card h3 { margin:0; font-size:var(--fs-lg); }
+.modal-card h4 { margin:0 0 var(--space-2); font-size:var(--fs-md); }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+.changelog-box { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-3); background:var(--color-bg-alt); }
+.changelog-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono); font-size:var(--fs-xs); max-height:40vh; overflow-y:auto; }
 @media(max-width:900px){ .content-grid { grid-template-columns:1fr; } }
 </style>

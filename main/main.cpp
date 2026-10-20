@@ -46,6 +46,7 @@
 #include "radiomoduledetector.h"
 #include "rawuartudplistener.h"
 #include "update_check.h"
+#include "update_install.h"
 #include "webui.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
@@ -343,6 +344,7 @@ void app_main()
     // finding the module uninitialised. This allocates a mutex and nothing
     // else - no task, no timer, no network activity until someone asks.
     update_check_init();
+    update_install_init();
 
     // Register data providers for MQTT status topics (Ethernet link/IP,
     // radio module info, system clock / NTP sync state). Must happen before

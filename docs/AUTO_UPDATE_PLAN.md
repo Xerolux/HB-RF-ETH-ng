@@ -264,6 +264,16 @@ vorgeschlagen.
 Ein Downloader, zwei Senken. Der Code, der Bytes in den Flash schreibt,
 existiert bereits und wird **nicht** dupliziert.
 
+> **Umsetzungsstand:** der **manuelle** Installationspfad ist umgesetzt
+> (§4.6): `POST /api/update/install` mit `target` statt URL, Host-Allowlist
+> (`include/update_url_policy.h`, hostgetestet in
+> `test/host/test_update_url_policy.cpp`), Status über den `install`-Block
+> von `/api/update/status`, Changelog-Anzeige im Browser über das
+> Notes-Mirror unter `docs/updates/notes/` (Pages sendet
+> `Access-Control-Allow-Origin: *`). Nicht enthalten und weiterhin Stufe B2/C/D
+> vorbehalten: Timer/Jitter/Backoff, `upd_mode`, Wartungsfenster,
+> Zweistufen-Marker.
+
 ```
                        ┌─ Senke A: esp_ota_write()               (Firmware)
 HTTPS-Stream ──4 KiB──►┤
@@ -350,6 +360,31 @@ Zustand sich selbst aufräumt.
 
 ---
 
+### 4.6 Umsetzung des manuellen Installationspfads (implementiert)
+
+| Datei | Rolle |
+|---|---|
+| `include/update_url_policy.h` | Host-Allowlist, header-only und host-testbar (Spiegel von `scripts/device_manifest.py`) |
+| `test/host/test_update_url_policy.cpp` | Grenzfälle: fremde Hosts, UserInfo-Trick, Ports, Subdomains |
+| `include/update_install.h` / `main/update_install.cpp` | Installer-Task: Gates, Manifest-Fetch (geteilt mit der Suche über `update_check_fetch_manifest`), Streaming in beide Senken, SHA-256, Restart/Remount |
+| `main/update_api.cpp` | `POST /api/update/install` (nur `target`, nie eine URL) + `install`-Block im Status |
+
+Ergänzungen gegenüber §4.1-4.4 in der Umsetzung:
+
+- Der Manifest-Abruf läuft **vor** dem Download in derselben Task über die
+  bereits bestehende, geteilte Fetch-Funktion — Installieren ohne vorherige
+  Suche ist damit möglich und liest immer den aktuellen Stand.
+- `esp_ota_begin()` erfolgt erst **nach** dem ersten gelesenen Byte (Magic
+  `0xE9` geprüft), damit eine falsche Datei den OTA-Partitionserase nie
+  auslöst.
+- Der Firmware-Erfolgspfad hält die Operation-Reservation bewusst fest und
+  übergibt sie an `full_system_restart_with_reserved_operation()`; auf dem
+  WebUI-Pfad (kein Reboot) wird alles zurückgegeben und die Worker neu
+  gestartet.
+- Fortschritt/Status läuft additiv über den `install`-Block von
+  `/api/update/status` statt `/api/ota_status`, damit der manuelle Upload-
+  Zustand nicht mit einer Online-Installation verwechselt werden kann.
+
 ## 5. Firmware — Modul 3: REST-API (`main/update_api.cpp`)
 
 Alle Antworten sind feste, kleine Puffer (≤ 512 Byte), kein dynamisches JSON.
@@ -429,7 +464,8 @@ für den damaligen Rückbau und bleibt in v1 draußen. Eine spätere
 | A ✅ | Serverseite: schlankes Manifest auf Pages + CI-Größenprüfung | **umgesetzt** — siehe §2.3; verbleibende Bestätigung: Abruf über HTTPS nach dem ersten Pages-Deploy |
 | B1 ✅ | Suche **nur auf Knopfdruck** + `/api/update/status` + `/api/update/check` + UI-Karte + lesende MQTT-Sensoren | **umgesetzt** — siehe §3.6; verbleibend: Heap-Messung §8 auf echter Hardware |
 | B2 | 24-h-Timer, Jitter, Backoff, Modus `notify`, persistierter Kanal | #362 im Feld bestätigt **und** B1 unauffällig |
-| C | Modul 2 nur für **WebUI** + Modus `auto_webui` | Testprotokoll §8 vollständig grün |
+| B3 ✅ | Modul 2 als **manuelle** Installation (beide Ziele, Knopfdruck, Changelog vor Install) | **umgesetzt** — siehe §4.6; das Testprotokoll §8 gilt unverändert für die Freigabe der Folge-Stufen |
+| C | Modus `auto_webui` (automatische WebUI-Installation im Wartungsfenster) | Testprotokoll §8 vollständig grün |
 | D | Modul 2 für **Firmware** + Modus `auto_all` mit Wartungsfenster | Stufe C zwei Releases lang stabil |
 
 Jede Stufe ist eigenständig nützlich und einzeln zurücknehmbar. Wenn Stufe D

@@ -557,7 +557,14 @@ Read the result of the last search. Does not start one.
   "webuiUpdateAvailable": false,
   "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5",
   "lastError": "",
-  "lastSkipReason": ""
+  "lastSkipReason": "",
+  "install": {
+    "state": "idle",
+    "target": "firmware",
+    "progress": 0,
+    "version": "",
+    "error": ""
+  }
 }
 ```
 
@@ -574,6 +581,50 @@ Read the result of the last search. Does not start one.
 
 `lastError` and `lastSkipReason` are mutually exclusive and both are cleared by
 a successful search.
+
+The `install` block reports an online installation (`POST /api/update/install`):
+
+| Field | Meaning |
+|-------|---------|
+| `state` | `idle`, `preparing`, `downloading`, `verifying`, `finalizing`, `success`, `error`. `finalizing` (firmware only) means the image is verified and selected and the restart is imminent. |
+| `target` | `"firmware"` or `"webui"`. |
+| `progress` | 0-100 while `downloading`. |
+| `version` | Target version once the manifest was validated. |
+| `error` | Reason when `state` is `error`. A failed install never changes what is running; the device stays fully operational without a reboot. |
+
+---
+
+### POST /api/update/install
+
+Start one online installation. The device itself downloads the release
+artifact named by its own manifest over HTTPS, verifies SHA-256 before
+anything is activated, and streams it into flash with the monitoring workers
+paused (their memory pays for the TLS session). Firmware installs end in an
+automatic restart; WebUI installs remount the image without a restart.
+
+The request **never carries a URL** — the download address comes exclusively
+from the device manifest and is re-checked against a host allowlist
+(`github.com`, `githubusercontent.com`) before the first byte is fetched.
+
+**Authentication:** Required
+
+**Request:**
+```json
+{ "target": "firmware" }
+```
+
+`target` is `"firmware"` or `"webui"`. The manifest channel is the channel of
+the last search (`stable` before the first one).
+
+**Response (202 Accepted):**
+```json
+{ "outcome": "accepted", "target": "firmware" }
+```
+
+Other outcomes: `busy` (503, an installation or device operation is already
+running), `invalid_target` (400), `unavailable` (503, the worker could not be
+started). Progress and result arrive through the `install` block of
+`GET /api/update/status`.
 
 ---
 

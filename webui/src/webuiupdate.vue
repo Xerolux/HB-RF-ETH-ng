@@ -71,7 +71,7 @@
           </p>
 
           <div class="actions">
-            <BButton variant="success" class="action-btn" :disabled="checking" @click="checkForUpdates">
+            <BButton variant="success" class="action-btn" :disabled="checking || installBusy" @click="checkForUpdates">
               <span v-if="checking" class="spinner-border spinner-border-sm me-2"></span>
               <AppIcon v-else name="refresh" /> {{ checking ? t('firmware.checking') : t('firmware.checkNow') }}
             </BButton>
@@ -84,6 +84,29 @@
               <AppIcon name="externalLink" />
               {{ updateStatus.notesUrl ? t('firmware.releaseNotes') : t('webuiUpdate.releaseLink') }}
             </a>
+          </div>
+
+          <!-- Online install: the device downloads the WebUI image named by
+               its own manifest, verifies SHA-256 and remounts it - no reboot,
+               but the browser needs a reload to pick up the new assets. -->
+          <div v-if="updateStatus.webuiUpdateAvailable || webuiInstallVisible || webuiInstallDone" class="install-panel">
+            <BButton v-if="!installBusy && !webuiInstallDone" variant="primary" class="action-btn"
+                     :disabled="checking || installStarting" @click="openInstallConfirm">
+              <AppIcon name="download" /> {{ t('firmware.installNow') }}
+            </BButton>
+            <div v-if="installBusy" class="progress-panel">
+              <div class="progress-copy"><span>{{ installStateText }}</span><strong>{{ installProgressPct }}%</strong></div>
+              <div class="track"><span :style="{ width: installProgressPct + '%' }"></span></div>
+            </div>
+            <BAlert v-if="installError" variant="danger" :model-value="true">
+              {{ t('firmware.installFailed') }} {{ installError }}
+            </BAlert>
+            <BAlert v-if="webuiInstallDone" variant="success" :model-value="true" class="install-done">
+              <span>{{ t('webuiUpdate.installDone') }}</span>
+              <BButton variant="outline-success" size="sm" @click="reloadPage">
+                {{ t('webuiUpdate.reloadAfterInstall') }}
+              </BButton>
+            </BAlert>
           </div>
         </div>
       </section>
@@ -129,11 +152,39 @@
         </div>
       </section>
     </div>
+
+    <!-- Changelog-before-install confirmation; notes are plain text. -->
+    <Transition name="fade">
+      <div v-if="showInstallConfirm" class="modal-backdrop" @click.self="closeInstallConfirm">
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <h3>{{ t('webuiUpdate.installConfirmTitle', { version: updateStatus.latestWebui }) }}</h3>
+          <p class="muted-text">{{ t('webuiUpdate.installConfirmBody') }}</p>
+          <div class="changelog-box">
+            <h4>{{ t('firmware.installChangelogTitle') }}</h4>
+            <p v-if="notesLoading" class="muted-text">{{ t('firmware.installChangelogLoading') }}</p>
+            <pre v-else-if="releaseNotes" class="changelog-text">{{ releaseNotes }}</pre>
+            <p v-else class="muted-text">
+              {{ t('firmware.installChangelogMissing') }}
+              <a :href="updateStatus.notesUrl" target="_blank" rel="noopener noreferrer">{{ t('firmware.releaseNotes') }}</a>
+            </p>
+          </div>
+          <div class="modal-actions">
+            <BButton variant="outline-secondary" :disabled="installStarting" @click="closeInstallConfirm">
+              {{ t('common.cancel') }}
+            </BButton>
+            <BButton variant="primary" :disabled="installStarting" @click="confirmInstall">
+              <span v-if="installStarting" class="spinner-border spinner-border-sm me-2"></span>
+              {{ t('firmware.installConfirmButton') }}
+            </BButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from './stores.js'
@@ -151,7 +202,10 @@ const {
   checkForUpdates,
   loadUpdateStatus,
   stopPolling,
-  formatTimestamp
+  formatTimestamp,
+  startInstall,
+  installBusy,
+  fetchReleaseNotes
 } = useUpdateSearch(t)
 
 const searchMessage = resultMessage(status => {
@@ -162,6 +216,72 @@ const searchMessage = resultMessage(status => {
     }
   }
   return { variant: 'success', text: t('webuiUpdate.upToDate', { version: status.latestWebui }) }
+})
+
+// --- Online install --------------------------------------------------------
+// Same flow as the firmware page, but without a reboot: on success the device
+// already serves the new image and the browser just needs a reload.
+const showInstallConfirm = ref(false)
+const installStarting = ref(false)
+const notesLoading = ref(false)
+const releaseNotes = ref('')
+
+const webuiInstall = computed(() => (
+  updateStatus.value.install.target === 'webui'
+    ? updateStatus.value.install
+    : { state: 'idle', progress: 0, error: '' }
+))
+const installProgressPct = computed(() => webuiInstall.value.progress || 0)
+const installError = computed(() => webuiInstall.value.error || '')
+const webuiInstallVisible = computed(() =>
+  ['preparing', 'downloading', 'verifying', 'error'].includes(webuiInstall.value.state))
+const webuiInstallDone = computed(() => webuiInstall.value.state === 'success')
+
+const installStateText = computed(() => {
+  switch (webuiInstall.value.state) {
+    case 'preparing': return t('firmware.installPreparing')
+    case 'downloading': return t('firmware.installDownloading')
+    case 'verifying': return t('firmware.installVerifying')
+    default: return ''
+  }
+})
+
+const openInstallConfirm = async () => {
+  showInstallConfirm.value = true
+  releaseNotes.value = ''
+  notesLoading.value = true
+  releaseNotes.value = await fetchReleaseNotes(updateStatus.value.latestWebui) || ''
+  notesLoading.value = false
+}
+
+const closeInstallConfirm = () => {
+  if (!installStarting.value) showInstallConfirm.value = false
+}
+
+const confirmInstall = async () => {
+  installStarting.value = true
+  const outcome = await startInstall('webui')
+  installStarting.value = false
+  if (outcome === 'accepted') {
+    showInstallConfirm.value = false
+    return
+  }
+  uiStore.pushToast({
+    type: 'error',
+    title: t('firmware.installFailedTitle'),
+    message: t('firmware.installStartFailed'),
+    duration: 6000
+  })
+}
+
+const reloadPage = () => window.location.reload()
+
+// Freshly mounted image: refresh the storage status so the installed version
+// chip reflects what just happened.
+watch(() => updateStatus.value.install.state, state => {
+  if (state === 'success' && updateStatus.value.install.target === 'webui') {
+    refreshCachedStatus().catch(() => {})
+  }
 })
 
 onBeforeUnmount(stopPolling)
@@ -334,5 +454,14 @@ onMounted(async () => {
 .track span { display:block; height:100%; background:var(--color-primary); }
 .progress-panel { display:flex; flex-direction:column; gap:var(--space-2); }
 .progress-copy { display:flex; justify-content:space-between; gap:var(--space-3); }
+.install-panel { display:flex; flex-direction:column; gap:var(--space-3); }
+.install-done { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); flex-wrap:wrap; }
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:1050; padding:var(--card-padding); }
+.modal-card { background:var(--color-surface); border-radius:var(--radius-lg); max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:calc(var(--card-padding) * 1.25); display:flex; flex-direction:column; gap:var(--space-3); }
+.modal-card h3 { margin:0; font-size:var(--fs-lg); }
+.modal-card h4 { margin:0 0 var(--space-2); font-size:var(--fs-md); }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; }
+.changelog-box { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-3); background:var(--color-bg-alt); }
+.changelog-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono); font-size:var(--fs-xs); max-height:40vh; overflow-y:auto; }
 @media(max-width:900px){ .status-grid,.content-grid { grid-template-columns:1fr; } }
 </style>

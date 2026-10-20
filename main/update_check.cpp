@@ -537,3 +537,21 @@ UpdateCheckStatus update_check_get_status()
     xSemaphoreGive(s_lock);
     return copy;
 }
+
+int update_check_fetch_manifest(const char *channel, char *buffer, size_t buffer_size,
+                                char *error, size_t error_size)
+{
+    if (error && error_size) error[0] = '\0';
+    if (!buffer || buffer_size == 0) {
+        if (error && error_size) snprintf(error, error_size, "No manifest buffer");
+        return -1;
+    }
+    if (!update_check_valid_channel(channel)) {
+        if (error && error_size) snprintf(error, error_size, "Unknown update channel");
+        return -1;
+    }
+
+    char url[160];
+    snprintf(url, sizeof(url), MANIFEST_URL_FORMAT, channel);
+    return fetch_manifest(url, buffer, buffer_size, error, error_size);
+}

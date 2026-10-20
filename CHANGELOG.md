@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Online install ("Jetzt installieren", plan stage B3 in
+  docs/AUTO_UPDATE_PLAN.md §4.6): after a search, both update pages can let
+  the **device itself** download and install the release named by its own
+  manifest over HTTPS — no browser upload, no own server. The installer
+  (`main/update_install.cpp`) pauses the monitoring workers before the TLS
+  session (their memory pays for it), streams into the existing flash sinks,
+  verifies SHA-256 against the manifest before anything is activated, and
+  follows the plan's failure rules: every abort leaves the device fully
+  operational without a reboot, and the firmware path only reboots after the
+  digest matched (15-second self-test rollback covers the boot).
+  `POST /api/update/install` accepts a target name only — never a URL — and
+  the manifest's download URLs are re-checked against a host allowlist
+  (`include/update_url_policy.h`, host-tested in CI).
+- Changelog before install: the confirm dialog fetches the release notes from
+  the Pages notes mirror (`docs/updates/notes/`, `Access-Control-Allow-Origin:
+  *`) and renders them as plain text, with the external release link as
+  fallback. Release workflows mirror future notes automatically.
+
+### Changed
+- WebUI update installs remount the image without a restart; the page offers
+  a reload afterwards. Firmware installs reuse the existing restart-countdown
+  overlay.
+
 ## [2.2.9-Beta.1] - 2026-10-20
 
 ### Changes
