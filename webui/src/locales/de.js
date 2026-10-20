@@ -181,6 +181,8 @@ export default {
     // Messages
     saveSuccess: 'Einstellungen wurden erfolgreich gespeichert.',
     saveError: 'Beim Speichern der Einstellungen ist ein Fehler aufgetreten.',
+    loadError: 'Einstellungen konnten nicht geladen werden. Bitte erneut versuchen.',
+    retryLoad: 'Erneut versuchen',
     restartTitle: 'Neustart erforderlich',
     restartMessage: 'Die Einstellungen wurden gespeichert. Möchten Sie das Gerät jetzt neu starten, um die Änderungen zu übernehmen?',
     restartNow: 'Jetzt neu starten',

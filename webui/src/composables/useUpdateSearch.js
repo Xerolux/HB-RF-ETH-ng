@@ -80,6 +80,11 @@ const stopPolling = () => {
     clearTimeout(pollTimer)
     pollTimer = null
   }
+  // Called from onBeforeUnmount: without this, leaving the page mid-search
+  // keeps `checking` true forever and permanently disables the check buttons
+  // on both update pages (the state is shared at module scope). The cooldown
+  // timer keeps running — it mirrors device-side state and self-clears at 0.
+  checking.value = false
 }
 
 const loadUpdateStatus = async () => {

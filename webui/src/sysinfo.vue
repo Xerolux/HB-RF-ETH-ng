@@ -302,17 +302,25 @@ const copyValue = async (value, label) => {
 
 let updateTimer = null
 let mounted = true
+let pollStarting = false
 
 const startPolling = async () => {
-  if (updateTimer) return
+  // pollStarting is set synchronously before the await below: two rapid
+  // visibility flips (e.g. iOS lock/unlock) would both pass an
+  // updateTimer-only guard while the first caller is still awaiting, and the
+  // second interval assignment would orphan the first — an interval that
+  // keeps polling after unmount for the rest of the session.
+  if (updateTimer || pollStarting) return
+  pollStarting = true
   try {
     await sysInfoStore.update()
   } catch (e) {
     console.warn('System info poll failed:', e.response?.status || e.message)
   } finally {
     isLoading.value = false
+    pollStarting = false
   }
-  if (!mounted) return
+  if (!mounted || updateTimer) return
   updateTimer = setInterval(() => {
     sysInfoStore.update().catch(() => { /* logged in the store; avoid unhandled rejection per tick */ })
   }, 5000)

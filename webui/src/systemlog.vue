@@ -219,7 +219,11 @@ const WS_BACKLOG_PREFIX = 'stream backlog '
 const WS_READY_PREFIX = 'stream connected '
 const WS_DATA_PREFIX = 'stream data '
 const WS_HANDSHAKE_TIMEOUT_MS = 5000
-const WS_RECONNECT_DELAY_MS = 2000
+// Grow the retry interval (2 s -> 4 s -> ... -> 30 s cap) while the device is
+// unreachable instead of hammering it every 2 s; reset once a socket opens.
+const WS_RECONNECT_DELAY_MIN_MS = 2000
+const WS_RECONNECT_DELAY_MAX_MS = 30000
+let wsReconnectAttempt = 0
 let ws = null
 let wsReconnectTimer = null
 let wsHandshakeTimer = null
@@ -237,6 +241,10 @@ const clearWsHandshakeTimer = () => {
 const scheduleNextPoll = () => {
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
+  // Never (re-)arm after the component unmounted: a timer that already fired
+  // survives stopPolling(), and its post-await continuation would otherwise
+  // poll for the rest of the SPA session.
+  if (!mounted) return
   // The acknowledged WebSocket snapshot/live offsets are authoritative.
   // Poll only as a fallback while no application-level stream is ready.
   if (!logEnabled.value || wsConnected.value) return
@@ -244,16 +252,24 @@ const scheduleNextPoll = () => {
   pollTimer = setTimeout(async () => {
     pollTimer = null
     await fetchLog()
+    if (!mounted) return
     scheduleNextPoll()
   }, wsConnected.value ? 30000 : 5000)
 }
 
 const scheduleWsReconnect = () => {
-  if (!logEnabled.value || wsReconnectTimer) return
+  if (!mounted || !logEnabled.value || wsReconnectTimer) return
+  const delay = Math.min(
+    WS_RECONNECT_DELAY_MAX_MS,
+    WS_RECONNECT_DELAY_MIN_MS * 2 ** wsReconnectAttempt
+  )
   wsReconnectTimer = setTimeout(() => {
     wsReconnectTimer = null
-    if (logEnabled.value) openLogStream()
-  }, WS_RECONNECT_DELAY_MS)
+    if (logEnabled.value && mounted) {
+      wsReconnectAttempt++
+      openLogStream()
+    }
+  }, delay)
 }
 
 const openLogStream = () => {
@@ -272,6 +288,7 @@ const openLogStream = () => {
     // post-handshake acknowledgement before treating the stream as live.
     socket.onopen = () => {
       if (ws !== socket) return
+      wsReconnectAttempt = 0
       clearWsHandshakeTimer()
       wsHandshakeTimer = setTimeout(() => {
         if (ws === socket && !wsConnected.value) socket.close()
@@ -287,6 +304,7 @@ const openLogStream = () => {
       wsSnapshotOffset = null
       wsBacklogBytes = null
       await fetchLog()
+      if (!mounted) return
       scheduleNextPoll()
       scheduleWsReconnect()
     }

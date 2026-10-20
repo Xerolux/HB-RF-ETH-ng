@@ -181,6 +181,8 @@ export default {
     // Messages
     saveSuccess: 'Le impostazioni sono state salvate con successo.',
     saveError: 'Si è verificato un errore durante il salvataggio delle impostazioni.',
+    loadError: 'Impossibile caricare le impostazioni. Riprova.',
+    retryLoad: 'Riprova',
     restartTitle: 'Riavvio Richiesto',
     restartMessage: 'Le impostazioni sono state salvate. Vuoi riavviare il dispositivo ora per applicare le modifiche?',
     restartNow: 'Riavvia Ora',

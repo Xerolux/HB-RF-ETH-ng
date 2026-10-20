@@ -390,12 +390,28 @@ const resetStats = async () => {
   }
 }
 
+// Pause the poll while the tab is hidden so a background tab does not load
+// the ESP32 every 5 s (same pattern as the sysinfo dashboard).
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+    }
+  } else if (!timer) {
+    load()
+    timer = setInterval(load, REFRESH_MS)
+  }
+}
+
 onMounted(() => {
   load()
   timer = setInterval(load, REFRESH_MS)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

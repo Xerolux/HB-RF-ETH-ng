@@ -38,6 +38,17 @@
       </div>
     </div>
 
+    <!-- Initial load failed: without this banner the form silently sits on
+         hardcoded defaults while saving stays disabled. -->
+    <BAlert v-if="loadFailed" variant="danger" show class="load-banner">
+      <div class="load-banner-row">
+        <span>{{ t('settings.loadError') }}</span>
+        <BButton variant="outline-danger" size="sm" :disabled="reloading" @click="performInitialLoad">
+          {{ t('settings.retryLoad') }}
+        </BButton>
+      </div>
+    </BAlert>
+
     <!-- Tab Content -->
     <div class="settings-content">
       <!-- General Tab -->
@@ -1158,9 +1169,28 @@ const loadSettings = () => {
 let restartTimer = null
 let mounted = true
 
-onMounted(async () => {
-  await settingsStore.load()
-  loadSettings()
+const loadFailed = ref(false)
+const reloading = ref(false)
+
+// Loads the form baseline; on failure the page shows a banner + retry button
+// instead of silently sitting on hardcoded defaults.
+const performInitialLoad = async () => {
+  loadFailed.value = false
+  reloading.value = true
+  try {
+    await settingsStore.load()
+    loadSettings()
+  } catch {
+    loadFailed.value = true
+  } finally {
+    reloading.value = false
+  }
+}
+
+onMounted(() => {
+  performInitialLoad()
+  // Register unconditionally: a failed initial load must not silently skip
+  // the unsaved-changes guard for the rest of the visit.
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -1831,6 +1861,17 @@ hr {
 }
 
 /* Floating Footer */
+.load-banner {
+  margin-bottom: var(--card-padding);
+}
+.load-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .floating-footer {
   position: fixed;
   bottom: 0;

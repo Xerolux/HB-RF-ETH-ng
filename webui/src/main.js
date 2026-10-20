@@ -102,9 +102,18 @@ axios.interceptors.response.use(
     const silent = error.config?.silent === true
 
     if (error.response) {
-      if (error.response.status === 401 && !silent) {
-        loginStore.logout()
-        router.push('/login')
+      if (error.response.status === 401) {
+        // A 401 always invalidates the session. Polling paths request `silent`
+        // to avoid toast floods, not to hide an expired session: after a
+        // firmware restart the session tokens are gone, and silent pollers
+        // would otherwise keep showing stale data forever instead of
+        // redirecting to the login page.
+        if (loginStore.isLoggedIn) {
+          loginStore.logout()
+        }
+        if (router.currentRoute.value.path !== '/login') {
+          router.push('/login')
+        }
       }
       else if (error.response.status >= 500 && !silent) {
         uiStore.pushToast({

@@ -181,6 +181,8 @@ export default {
     // Messages
     saveSuccess: 'Les paramètres ont été enregistrés avec succès.',
     saveError: 'Une erreur s\'est produite lors de l\'enregistrement des paramètres.',
+    loadError: 'Impossible de charger les paramètres. Veuillez réessayer.',
+    retryLoad: 'Réessayer',
     restartTitle: 'Redémarrage requis',
     restartMessage: 'Les paramètres ont été enregistrés. Voulez-vous redémarrer l\'appareil maintenant pour appliquer les modifications ?',
     restartNow: 'Redémarrer maintenant',

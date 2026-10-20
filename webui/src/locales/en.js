@@ -181,6 +181,8 @@ export default {
     // Messages
     saveSuccess: 'Settings were successfully saved.',
     saveError: 'An error occurred while saving the settings.',
+    loadError: 'Settings could not be loaded. Please try again.',
+    retryLoad: 'Try again',
     restartTitle: 'Restart Required',
     restartMessage: 'Settings have been saved. Do you want to restart the device now for changes to take effect?',
     restartNow: 'Restart Now',
