@@ -218,8 +218,10 @@ Flashen gilt wie bei jedem Update: das Gerät nach dem ersten Start
 siehe [Troubleshooting](TROUBLESHOOTING.md#migration-from-the-original-firmware-13x-keeps-booting-the-old-version)).
 
 Der Web-Flasher nutzt [esptool-js](https://github.com/espressif/esptool-js)
-(Apache-2.0) von Espressif und die Web-Serial-API; alle Dateien stammen
-direkt aus den GitHub-Releases dieses Projekts.
+(Apache-2.0) von Espressif und die Web-Serial-API. Die Flash-Dateien sind
+die unveränderten Assets aus den offiziellen GitHub-Releases; der
+Pages-Deploy spiegelt sie automatisch auf die Seite (GitHub erlaubt keinen
+direkten Cross-Origin-Download von Release-Assets im Browser).
 
 ## Firmware Updates
 Fertig kompilierte Firmware finden Sie unter

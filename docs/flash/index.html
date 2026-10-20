@@ -281,7 +281,8 @@ const I18N = {
         footerCredits: "Basierend auf der HB-RF-ETH-Hardware und -Firmware von Alexander Reinert.",
         // dynamic
         loading: "Lade Versionen…",
-        loadFailed: "Versionen konnten nicht geladen werden (Netzwerk?). Eigene Dateien (manuell) nutzen oder Seite neu laden.",
+        loadFailed: "Die Flash-Dateien konnten nicht geladen werden (Netzwerk?). Bitte Seite neu laden oder eigene Dateien (manuell) nutzen.",
+        noBeta: "Aktuell ist keine Beta-Version verfügbar.",
         stableLabel: "Stabil",
         betaLabel: "Beta",
         prereleaseLabel: "Vorabversion",
@@ -342,7 +343,8 @@ const I18N = {
         footerMain: "Web flasher for HB-RF-ETH-ng · Uses <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) by Espressif and the Web Serial API.",
         footerCredits: "Based on the HB-RF-ETH hardware and firmware by Alexander Reinert.",
         loading: "Loading versions…",
-        loadFailed: "Could not load versions (network?). Use local files (manual) or reload the page.",
+        loadFailed: "Could not load the flash files (network?). Please reload the page or use local files (manual).",
+        noBeta: "No beta version is currently available.",
         stableLabel: "Stable",
         betaLabel: "Beta",
         prereleaseLabel: "pre-release",
@@ -465,115 +467,87 @@ async function sha256Hex(buf) {
     return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// ---------------------------------------------------------------- release catalog
-let manifests = { stable: null, beta: null };
-let allReleases = null;
-let selected = null; // {label, tag, urls:{firmware,bootloader,partitions,sha256sums}, sha256:{firmware}}
-const imageCache = new Map(); // url -> Uint8Array
+// ---------------------------------------------------------------- release catalog (same-origin mirror populated by pages.yml)
+let flashIndex = null; // newest first, loaded from releases/index.json
 
-async function fetchJson(url) {
-    const r = await fetch(url, { cache: "no-store" });
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.json();
-}
+function resolveUrl(rel) { return new URL(rel, location.href).toString(); }
 
-async function loadManifests() {
+async function loadFlashIndex() {
     try {
-        const [stable, beta] = await Promise.all([fetchJson(RAW + "latest.json"), fetchJson(RAW + "beta.json").catch(() => null)]);
-        manifests.stable = stable;
-        manifests.beta = beta && beta.version && beta.version !== stable.version ? beta : null;
+        const r = await fetch("releases/index.json", { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const list = await r.json();
+        flashIndex = Array.isArray(list) ? list : [];
     } catch (e) {
-        manifests.stable = null;
-        manifests.beta = null;
+        flashIndex = null;
     }
 }
 
-async function loadAllReleases() {
-    if (allReleases) return;
-    const list = await fetchJson("https://api.github.com/repos/" + REPO + "/releases?per_page=20");
-    allReleases = list.filter((r) => !r.draft).map((r) => {
-        const asset = (name) => (r.assets || []).find((a) => a.name === name);
-        return {
-            tag: r.tag_name,
-            name: r.name || r.tag_name,
-            prerelease: !!r.prerelease,
-            date: (r.published_at || "").slice(0, 10),
-            firmware: asset("firmware_" + r.tag_name.replace(/^v/, "").replace(/-/g, "_") + ".bin") || (r.assets || []).find((a) => /^firmware_.*\.bin$/.test(a.name)),
-            bootloader: asset("bootloader.bin"),
-            partitions: asset("partitions.bin"),
-            sha256sums: asset("SHA256SUMS.txt"),
-        };
-    }).filter((r) => r.firmware);
+function stableEntry() {
+    return flashIndex ? flashIndex.find((r) => !r.prerelease) || null : null;
+}
+function betaEntry() {
+    return flashIndex ? flashIndex.find((r) => r.prerelease) || null : null;
 }
 
-function manifestToEntry(m, channelLabel) {
-    const tag = m.releaseUrl.split("/").pop();
+function toEntry(r) {
     return {
-        label: m.version + " · " + channelLabel + " (" + (m.publishedAt || "").slice(0, 10) + ")",
-        tag,
+        label: r.tag + (r.prerelease ? " · " + t("prereleaseLabel") : "") + "  (" + (r.date || "").slice(0, 10) + ")",
+        tag: r.tag,
         urls: {
-            firmware: m.downloadUrl,
-            bootloader: tag ? DL + tag + "/bootloader.bin" : null,
-            partitions: tag ? DL + tag + "/partitions.bin" : null,
-            sha256sums: tag ? DL + tag + "/SHA256SUMS.txt" : null,
+            firmware: resolveUrl(r.files.firmware),
+            bootloader: resolveUrl(r.files.bootloader),
+            partitions: resolveUrl(r.files.partitions),
+            sha256sums: resolveUrl(r.files.sha256sums),
         },
-        sha256: { firmware: m.sha256 },
-        meta: channelLabel + " · " + m.size + " Bytes",
+        sha256: { firmware: r.firmwareSha256 },
     };
+}
+
+function currentEntry() {
+    if (!flashIndex || flashIndex.length === 0) return null;
+    if (channel() === "stable") { const r = stableEntry(); return r ? toEntry(r) : null; }
+    if (channel() === "beta") { const r = betaEntry(); return r ? toEntry(r) : null; }
+    if (channel() === "all") {
+        const tag = $("releaseSelect").value;
+        const r = flashIndex.find((x) => x.tag === tag);
+        return r ? toEntry(r) : null;
+    }
+    return null;
 }
 
 function renderReleases() {
     const sel = $("releaseSelect");
     const meta = $("releaseMeta");
     sel.innerHTML = "";
+    meta.textContent = "";
     if (channel() === "manual") return;
+    if (!flashIndex || flashIndex.length === 0) {
+        sel.disabled = true;
+        meta.textContent = t("loadFailed");
+        return;
+    }
     if (channel() === "all") {
-        if (!allReleases) { sel.disabled = true; meta.textContent = t("loading"); return; }
         sel.disabled = false;
-        for (const r of allReleases) {
+        for (const r of flashIndex) {
             const o = document.createElement("option");
             o.value = r.tag;
-            o.textContent = r.name + (r.prerelease ? " · " + t("prereleaseLabel") : "") + "  (" + r.date + ")";
+            o.textContent = toEntry(r).label;
             sel.appendChild(o);
         }
-        meta.textContent = "";
-        onReleaseChange();
-    } else {
-        const m = manifests[channel()];
-        if (!m) { sel.disabled = true; meta.textContent = t("loadFailed"); return; }
-        sel.disabled = false;
-        const entry = manifestToEntry(m, channel() === "stable" ? t("stableLabel") : t("betaLabel"));
-        const o = document.createElement("option");
-        o.value = "manifest";
-        o.textContent = entry.label;
-        sel.appendChild(o);
-        meta.textContent = "";
-        onReleaseChange();
+        return;
     }
-}
-
-function currentEntry() {
-    if (channel() === "manual") return null;
-    if (channel() === "all" && allReleases) {
-        const tag = $("releaseSelect").value;
-        const r = allReleases.find((x) => x.tag === tag);
-        if (!r) return null;
-        return {
-            label: r.name,
-            tag: r.tag,
-            urls: {
-                firmware: r.firmware.browser_download_url,
-                bootloader: r.bootloader ? r.bootloader.browser_download_url : null,
-                partitions: r.partitions ? r.partitions.browser_download_url : null,
-                sha256sums: r.sha256sums ? r.sha256sums.browser_download_url : null,
-            },
-            sha256: {},
-            meta: r.prerelease ? t("prereleaseLabel") : "stable",
-        };
+    const r = channel() === "stable" ? stableEntry() : betaEntry();
+    if (!r) {
+        sel.disabled = true;
+        meta.textContent = t("noBeta");
+        return;
     }
-    const m = manifests[channel()];
-    if (!m) return null;
-    return manifestToEntry(m, channel() === "stable" ? t("stableLabel") : t("betaLabel"));
+    sel.disabled = false;
+    const o = document.createElement("option");
+    o.value = r.tag;
+    o.textContent = toEntry(r).label;
+    sel.appendChild(o);
 }
 
 function channel() { return $("channelSelect").value; }
@@ -771,19 +745,11 @@ function renderStatuses() {
 // ---------------------------------------------------------------- wiring
 $("connectButton").addEventListener("click", connect);
 $("flashButton").addEventListener("click", flash);
-$("channelSelect").addEventListener("change", async () => {
-    selected = null;
+$("channelSelect").addEventListener("change", () => {
     $("manualBox").classList.toggle("hidden", channel() !== "manual");
     $("releaseSelectBox").classList.toggle("hidden", channel() === "manual");
-    if (channel() === "all") {
-        renderReleases();
-        try { await loadAllReleases(); } catch (e) { allReleases = null; }
-        renderReleases();
-    } else {
-        renderReleases();
-    }
+    renderReleases();
 });
-$("releaseSelect").addEventListener("change", () => { selected = null; });
 document.querySelectorAll("input[name=profile]").forEach((r) => r.addEventListener("change", () => {
     document.querySelectorAll(".radio-option").forEach((o) => o.classList.remove("selected"));
     r.closest(".radio-option").classList.add("selected");
@@ -801,7 +767,7 @@ if (!("serial" in navigator)) {
 // Initial catalog load
 (async () => {
     renderReleases();
-    await loadManifests();
+    await loadFlashIndex();
     renderReleases();
 })();
 </script>

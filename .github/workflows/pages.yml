@@ -34,6 +34,47 @@ jobs:
           # head, which once published a stale update manifest.
           ref: ${{ inputs.sha || github.sha }}
 
+      - name: Prepare web flasher release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # GitHub release assets cannot be fetched cross-origin from a browser
+          # (the download redirects carry no CORS headers), so the web flasher
+          # needs same-origin copies. Mirror the flash files of the most
+          # recent releases onto the Pages site on every deploy.
+          set -eu
+          mkdir -p docs/flash/releases
+          : > entries.jsonl
+          for tag in $(gh release list --limit 8 --json tagName --jq '.[].tagName'); do
+            meta="$(gh release view "$tag" --json isPrerelease,publishedAt,assets)"
+            if [ "$(echo "$meta" | jq '[.assets[] | select(.name == "bootloader.bin" or .name == "partitions.bin" or .name == "SHA256SUMS.txt" or (.name | startswith("firmware_")))] | length')" -lt 4 ]; then
+              continue
+            fi
+            dir="docs/flash/releases/$tag"
+            mkdir -p "$dir"
+            gh release download "$tag" \
+              -p 'bootloader.bin' -p 'partitions.bin' -p 'SHA256SUMS.txt' -p 'firmware_*.bin' \
+              -D "$dir" || { rm -rf "$dir"; continue; }
+            firmware="$(cd "$dir" && ls firmware_*.bin | head -1)"
+            fw_sha="$(awk -v f="$firmware" '$2 == f || $2 == "*"f {print $1}' "$dir/SHA256SUMS.txt")"
+            jq -n \
+              --arg tag "$tag" \
+              --arg date "$(echo "$meta" | jq -r .publishedAt)" \
+              --argjson prerelease "$(echo "$meta" | jq .isPrerelease)" \
+              --arg firmware "releases/$tag/$firmware" \
+              --arg bootloader "releases/$tag/bootloader.bin" \
+              --arg partitions "releases/$tag/partitions.bin" \
+              --arg sums "releases/$tag/SHA256SUMS.txt" \
+              --arg sha "$fw_sha" \
+              --argjson fwsize "$(stat -c%s "$dir/$firmware")" \
+              '{tag: $tag, date: $date, prerelease: $prerelease,
+                files: {firmware: $firmware, bootloader: $bootloader,
+                        partitions: $partitions, sha256sums: $sums},
+                firmwareSha256: $sha, firmwareSize: $fwsize}' >> entries.jsonl
+          done
+          jq -s '.' entries.jsonl > docs/flash/releases/index.json
+          jq 'length' docs/flash/releases/index.json | xargs -I{} echo "web flasher: {} release(s) mirrored"
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 

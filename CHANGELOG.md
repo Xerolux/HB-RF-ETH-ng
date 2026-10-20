@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   firmware over USB straight from Chrome/Edge using esptool-js and Web
   Serial — release picker (stable/beta/all/manual), full-install and
   firmware-only profiles, SHA256 verification and a clean OTA-selection
-  reset. Documented in README, wiki and troubleshooting guide.
+  reset. The Pages deploy mirrors the official release assets to the same
+  origin because GitHub release downloads cannot be fetched cross-origin
+  from a browser. Documented in README, wiki and troubleshooting guide.
 
 ### Documentation
 - Migration root cause (#461): original-firmware boards run the compatible
