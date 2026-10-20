@@ -92,7 +92,27 @@ python3 rename_webui_files.py
   lokale Datei über die WebUI.
 - Für produktive Systeme sollten bevorzugt Stable-Releases verwendet werden; Pre-Releases eignen sich zum Vorabtesten neuer Fixes.
 
+### Installation per Web-Flasher (USB, im Browser)
+Der einfachste Weg für Ersteinrichtung, Migration und Reparatur: der
+**Web-Flasher** flasht die Firmware direkt über das USB-Kabel im Browser —
+ohne Python, ohne esptool, ohne Installation:
+
+**→ [https://xerolux.github.io/HB-RF-ETH-ng/flash/](https://xerolux.github.io/HB-RF-ETH-ng/flash/)**
+
+Benötigt werden nur ein Desktop-**Chrome oder Edge** (Web-Serial-Unterstützung),
+ein Micro-USB-**Datenkabel** sowie das kurzzeitige Abziehen des Funkmoduls.
+Release auswählen (Stabil/Beta/beliebig oder eigene Dateien), Installationsart
+wählen — **Komplettinstallation** (Bootloader + Partitionstabelle + Firmware,
+ersetzt auch eine Original-Firmware 1.3.x in einem Durchgang) oder **Nur
+Firmware erneuern** — verbinden und flashen. Die Seite prüft SHA256-Prüfsummen
+der Release-Dateien, zeigt den Fortschritt pro Datei und setzt die
+OTA-Boot-Auswahl sauber zurück. Einstellungen bleiben erhalten.
+
 ### Migration von der Original-Firmware (1.3.x)
+Der empfohlene Weg ist der **Web-Flasher** oben mit der Installationsart
+„Komplettinstallation" — kein Python nötig. Alternativ die Migration über das
+Skript:
+
 Ein bestätigter Upload beweist noch nicht, dass die neue Firmware startet.
 Wie in [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)
 aufgeklärt, läuft die Ursache über die Rollback-Mechanik: Der Bootloader

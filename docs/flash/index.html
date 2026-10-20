@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HB-RF-ETH-ng Web-Flasher</title>
+    <meta name="description" content="HB-RF-ETH-ng Firmware direkt im Browser über USB flashen – ohne Installation. Release auswählen, verbinden, flashen.">
+    <meta name="robots" content="noindex, nofollow">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2196F3;
+            --primary-dark: #1976D2;
+            --accent: #2F8B57;
+            --danger: #c62828;
+            --warning-bg: #fff8e1;
+            --warning-border: #f9a825;
+            --text: #1a202c;
+            --muted: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+
+        body { background: var(--bg); color: var(--text); line-height: 1.6; }
+
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white; padding: 2.5rem 2rem 2rem; text-align: center;
+            position: relative;
+        }
+        header h1 { font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700; }
+        header p { font-size: 1.05rem; opacity: 0.92; max-width: 760px; margin: 0 auto; }
+        .lang-switch {
+            position: absolute; top: 1rem; right: 1rem;
+            background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 5px; padding: 0.3rem 0.8rem; cursor: pointer; font-weight: 600; font-size: 0.85rem;
+        }
+        .lang-switch:hover { background: rgba(255,255,255,0.3); }
+        .back-link { color: rgba(255,255,255,0.85); font-size: 0.9rem; text-decoration: none; display: inline-block; margin-top: 1rem; }
+        .back-link:hover { color: white; }
+
+        main { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+
+        .banner { border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.95rem; }
+        .banner-warning { background: var(--warning-bg); border: 1px solid var(--warning-border); }
+        .banner-error { background: #fdecea; border: 1px solid var(--danger); }
+
+        .step-card {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+            padding: 1.5rem 1.75rem; margin-bottom: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .step-card h2 { font-size: 1.15rem; color: #1e3a8a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+        .step-number {
+            background: #1e3a8a; color: white; width: 1.7rem; height: 1.7rem; border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem; flex-shrink: 0;
+        }
+
+        ul.checklist { list-style: none; }
+        ul.checklist li { padding-left: 1.7rem; position: relative; margin-bottom: 0.55rem; }
+        ul.checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+        ul.checklist li.warn::before { content: "!"; color: var(--warning-border); }
+
+        label.field-label { display: block; font-weight: 600; font-size: 0.9rem; margin: 1rem 0 0.35rem; color: var(--text); }
+        select, input[type="file"] {
+            width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 6px;
+            background: white; font-size: 0.95rem; color: var(--text);
+        }
+        select:disabled { background: #f1f5f9; color: var(--muted); }
+
+        .radio-group { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.4rem; }
+        .radio-option {
+            flex: 1 1 260px; border: 2px solid var(--border); border-radius: 8px; padding: 0.8rem 1rem;
+            cursor: pointer; display: flex; gap: 0.6rem; align-items: flex-start;
+        }
+        .radio-option.selected { border-color: var(--primary-dark); background: #eff6ff; }
+        .radio-option input { margin-top: 0.35rem; }
+        .radio-option .radio-title { font-weight: 600; }
+        .radio-option .radio-hint { font-size: 0.85rem; color: var(--muted); display: block; }
+
+        .hint-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.9rem; margin-top: 1rem; }
+        .file-status { font-size: 0.88rem; margin-top: 0.4rem; }
+        .file-status.ok { color: var(--accent); }
+        .file-status.err { color: var(--danger); }
+
+        .btn {
+            display: inline-block; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 700;
+            font-size: 1rem; border: none; cursor: pointer; transition: background 0.15s ease;
+        }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-primary { background: var(--primary-dark); color: white; }
+        .btn-primary:not(:disabled):hover { background: #1e3a8a; }
+        .btn-success { background: var(--accent); color: white; }
+        .btn-secondary { background: #e2e8f0; color: var(--text); }
+        .btn-secondary:not(:disabled):hover { background: #cbd5e1; }
+
+        .progress-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.6rem; font-size: 0.85rem; }
+        .progress-row .progress-name { width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .progress-row progress { flex: 1; height: 14px; }
+        .progress-row .progress-pct { width: 44px; text-align: right; }
+
+        #log {
+            background: #0f172a; color: #cbd5e1; font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.78rem; border-radius: 6px; padding: 0.8rem 1rem; margin-top: 1rem;
+            height: 220px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; display: none;
+        }
+
+        .after-steps ol { margin-left: 1.4rem; }
+        .after-steps li { margin-bottom: 0.5rem; }
+
+        .success-card { border: 2px solid var(--accent); display: none; }
+        .success-card h2 { color: var(--accent); }
+
+        footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 0.85rem; }
+        footer a { color: var(--primary-dark); }
+
+        .mono { font-family: 'Consolas', monospace; font-size: 0.9em; }
+        .muted { color: var(--muted); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<header>
+    <button class="lang-switch" id="langSwitch" type="button">English</button>
+    <h1 data-i18n="title">HB-RF-ETH-ng Web-Flasher</h1>
+    <p data-i18n="subtitle">Firmware direkt im Browser über das USB-Kabel flashen – ohne Python, ohne Installation.</p>
+    <a class="back-link" href="../" data-i18n="backLink">← Zur Übersichtsseite</a>
+</header>
+
+<main>
+    <div class="banner banner-warning hidden" id="browserWarning"></div>
+    <div class="banner banner-error hidden" id="errorBanner"></div>
+
+    <section class="step-card">
+        <h2><span class="step-number">1</span><span data-i18n="step1Title">Vorbereitung</span></h2>
+        <ul class="checklist">
+            <li data-i18n="prep1"><b>Datenkabel</b> verwenden – viele USB-Kabel sind reine Ladekabel ohne Datenleitungen.</li>
+            <li class="warn" data-i18n="prep2"><b>Funkmodul abziehen</b> (RPI-RF-MOD / HM-MOD-RPI-PCB) – es stört die serielle Verbindung beim Flashen.</li>
+            <li data-i18n="prep3">Platine <b>nur über USB</b> versorgen; PoE/Ethernet während des Flashens abziehen.</li>
+            <li data-i18n="prep4">Browser: <b>Chrome oder Edge am PC/Mac</b> (Web Serial). Firefox und Safari unterstützen das nicht.</li>
+            <li data-i18n="prep5">Windows: Falls der Port nicht erscheint, einmalig den CH340-Treiber von wch-ic.com installieren.</li>
+        </ul>
+    </section>
+
+    <section class="step-card">
+        <h2><span class="step-number">2</span><span data-i18n="step2Title">Firmware wählen</span></h2>
+
+        <label class="field-label" for="channelSelect" data-i18n="channelLabel">Kanal</label>
+        <select id="channelSelect">
+            <option value="stable" data-i18n="chStable">Stabil (empfohlen)</option>
+            <option value="beta" data-i18n="chBeta">Beta (Vorabversion)</option>
+            <option value="all" data-i18n="chAll">Alle Releases…</option>
+            <option value="manual" data-i18n="chManual">Eigene Dateien (manuell)</option>
+        </select>
+
+        <div id="releaseSelectBox">
+            <label class="field-label" for="releaseSelect" data-i18n="versionLabel">Version</label>
+            <select id="releaseSelect"></select>
+            <div class="file-status muted" id="releaseMeta"></div>
+        </div>
+
+        <div id="manualBox" class="hidden">
+            <label class="field-label" for="manualFirmware" data-i18n="manualFwLabel">Firmware-Datei (firmware_*.bin)</label>
+            <input type="file" id="manualFirmware" accept=".bin">
+            <label class="field-label" for="manualBootloader" data-i18n="manualBlLabel">Bootloader (bootloader.bin, optional)</label>
+            <input type="file" id="manualBootloader" accept=".bin">
+            <label class="field-label" for="manualPartitions" data-i18n="manualPtLabel">Partitionstabelle (partitions.bin, optional)</label>
+            <input type="file" id="manualPartitions" accept=".bin">
+        </div>
+
+        <label class="field-label" data-i18n="profileLabel">Installationsart</label>
+        <div class="radio-group" role="radiogroup">
+            <label class="radio-option selected" id="profileFull">
+                <input type="radio" name="profile" value="full" checked>
+                <span>
+                    <span class="radio-title" data-i18n="profileFullTitle">Komplettinstallation</span>
+                    <span class="radio-hint" data-i18n="profileFullHint">Bootloader, Partitionstabelle und Firmware. Für frisch bestückte Platinen, Neuanfang oder Reparatur. Einstellungen (Netzwerk, Passwort) bleiben erhalten.</span>
+                </span>
+            </label>
+            <label class="radio-option" id="profileFirmware">
+                <input type="radio" name="profile" value="firmware">
+                <span>
+                    <span class="radio-title" data-i18n="profileFwTitle">Nur Firmware erneuern</span>
+                    <span class="radio-hint" data-i18n="profileFwHint">Ersetzt nur die Firmware und setzt die Update-Auswahl zurück. Der vorhandene Bootloader bleibt – er ist mit dieser Firmware vollständig kompatibel.</span>
+                </span>
+            </label>
+        </div>
+
+        <div class="hint-box" data-i18n="migrationHint">
+            <b>Migration von der Original-Firmware (1.3.x):</b> „Komplettinstallation" wählen – sie ersetzt die alte Firmware
+            in einem Durchgang. Alternativ funktioniert weiterhin das Migrationsskript im Repository.
+        </div>
+    </section>
+
+    <section class="step-card">
+        <h2><span class="step-number">3</span><span data-i18n="step3Title">Verbinden &amp; Flashen</span></h2>
+
+        <label class="field-label" for="baudSelect" data-i18n="baudLabel">Übertragungsrate</label>
+        <select id="baudSelect">
+            <option value="921600">921600 Baud (schnell)</option>
+            <option value="460800">460800 Baud</option>
+            <option value="115200">115200 Baud (langsam, zuverlässig)</option>
+        </select>
+
+        <div style="margin-top: 1.2rem; display: flex; gap: 0.8rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary" id="connectButton" type="button" data-i18n="connectBtn">1. Gerät verbinden</button>
+            <button class="btn btn-primary" id="flashButton" type="button" disabled data-i18n="flashBtn">2. Flashen starten</button>
+        </div>
+        <div class="file-status" id="connectStatus"></div>
+        <div class="file-status" id="imageStatus"></div>
+        <div id="progressArea"></div>
+        <pre id="log"></pre>
+    </section>
+
+    <section class="step-card after-steps">
+        <h2><span class="step-number">4</span><span data-i18n="step4Title">Nach dem Flashen</span></h2>
+        <ol>
+            <li data-i18n="after1">Funkmodul wieder aufstecken und Ethernet verbinden.</li>
+            <li data-i18n="after2"><b>Wichtig:</b> Das Gerät nach dem ersten Start <b>mindestens 60 Sekunden in Ruhe lassen</b> – die neue Firmware läuft zunächst einen 15-sekündigen Selbsttest. Ein Stromausfall oder Neustart in diesem Fenster setzt das Gerät automatisch auf die vorherige Firmware zurück.</li>
+            <li data-i18n="after3">Danach die Weboberfläche öffnen und unter <span class="mono">System</span> die installierte Version prüfen.</li>
+        </ol>
+    </section>
+
+    <section class="step-card success-card" id="successCard">
+        <h2 data-i18n="successTitle">✓ Flashen abgeschlossen</h2>
+        <p data-i18n="successText">Die Firmware wurde übertragen und das Gerät startet neu. Jetzt Schritt 4 oben beachten – insbesondere die 60 Sekunden Ruhe nach dem Start.</p>
+    </section>
+</main>
+
+<footer>
+    <p data-i18n="footerMain">Web-Flasher für HB-RF-ETH-ng · Nutzt <a href="https://github.com/espressif/esptool-js" target="_blank" rel="noopener">esptool-js</a> (Apache-2.0) von Espressif und die Web Serial API.</p>
+    <p style="margin-top:8px;" data-i18n="footerCredits">Basierend auf der HB-RF-ETH-Hardware und -Firmware von Alexander Reinert.</p>
+</footer>
+
+<script type="module">
+import { ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/esptool-js@0.7.0/+esm";
+
+// ---------------------------------------------------------------- i18n
+const I18N = {
+    de: {
+        title: "HB-RF-ETH-ng Web-Flasher",
+        subtitle: "Firmware direkt im Browser über das USB-Kabel flashen – ohne Python, ohne Installation.",
+        backLink: "← Zur Übersichtsseite",
+        browserWarning: "Dieser Browser unterstützt die Web Serial API nicht. Bitte Google Chrome oder Microsoft Edge auf dem Desktop verwenden (kein Firefox, kein Safari, kein Mobilgerät).",
+        step1Title: "Vorbereitung",
+        prep1: "<b>Datenkabel</b> verwenden – viele USB-Kabel sind reine Ladekabel ohne Datenleitungen.",
+        prep2: "<b>Funkmodul abziehen</b> (RPI-RF-MOD / HM-MOD-RPI-PCB) – es stört die serielle Verbindung beim Flashen.",
+        prep3: "Platine <b>nur über USB</b> versorgen; PoE/Ethernet während des Flashens abziehen.",
+        prep4: "Browser: <b>Chrome oder Edge am PC/Mac</b> (Web Serial). Firefox und Safari unterstützen das nicht.",
+        prep5: "Windows: Falls der Port nicht erscheint, einmalig den CH340-Treiber von wch-ic.com installieren.",
+        step2Title: "Firmware wählen",
+        channelLabel: "Kanal",
+        chStable: "Stabil (empfohlen)",
+        chBeta: "Beta (Vorabversion)",
+        chAll: "Alle Releases…",
+        chManual: "Eigene Dateien (manuell)",
+        versionLabel: "Version",
+        manualFwLabel: "Firmware-Datei (firmware_*.bin)",
+        manualBlLabel: "Bootloader (bootloader.bin, optional)",
+        manualPtLabel: "Partitionstabelle (partitions.bin, optional)",
+        profileLabel: "Installationsart",
+        profileFullTitle: "Komplettinstallation",
+        profileFullHint: "Bootloader, Partitionstabelle und Firmware. Für frisch bestückte Platinen, Neuanfang oder Reparatur. Einstellungen (Netzwerk, Passwort) bleiben erhalten.",
+        profileFwTitle: "Nur Firmware erneuern",
+        profileFwHint: "Ersetzt nur die Firmware und setzt die Update-Auswahl zurück. Der vorhandene Bootloader bleibt – er ist mit dieser Firmware vollständig kompatibel.",
+        migrationHint: "<b>Migration von der Original-Firmware (1.3.x):</b> „Komplettinstallation“ wählen – sie ersetzt die alte Firmware in einem Durchgang. Alternativ funktioniert weiterhin das Migrationsskript im Repository.",
+        step3Title: "Verbinden & Flashen",
+        baudLabel: "Übertragungsrate",
+        connectBtn: "1. Gerät verbinden",
+        flashBtn: "2. Flashen starten",
+        step4Title: "Nach dem Flashen",
+        after1: "Funkmodul wieder aufstecken und Ethernet verbinden.",
+        after2: "<b>Wichtig:</b> Das Gerät nach dem ersten Start <b>mindestens 60 Sekunden in Ruhe lassen</b> – die neue Firmware läuft zunächst einen 15-sekündigen Selbsttest. Ein Stromausfall oder Neustart in diesem Fenster setzt das Gerät automatisch auf die vorherige Firmware zurück.",
+        after3: "Danach die Weboberfläche öffnen und unter <span class=\"mono\">System</span> die installierte Version prüfen.",
+        successTitle: "✓ Flashen abgeschlossen",
+        successText: "Die Firmware wurde übertragen und das Gerät startet neu. Jetzt Schritt 4 oben beachten – insbesondere die 60 Sekunden Ruhe nach dem Start.",
+        footerMain: "Web-Flasher für HB-RF-ETH-ng · Nutzt <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) von Espressif und die Web Serial API.",
+        footerCredits: "Basierend auf der HB-RF-ETH-Hardware und -Firmware von Alexander Reinert.",
+        // dynamic
+        loading: "Lade Versionen…",
+        loadFailed: "Versionen konnten nicht geladen werden (Netzwerk?). Eigene Dateien (manuell) nutzen oder Seite neu laden.",
+        stableLabel: "Stabil",
+        betaLabel: "Beta",
+        prereleaseLabel: "Vorabversion",
+        connectWait: "Verbinde – bitte am Platine-PoE/Ethernet ziehen und nur USB angeschlossen lassen, falls noch nicht geschehen …",
+        connectedChip: "Verbunden: {chip} – bereit zum Flashen.",
+        connectFailed: "Verbindung fehlgeschlagen. Häufigste Ursachen: Ladekabel statt Datenkabel, Funkmodul noch aufgesteckt, falscher Port, oder das Gerät ist nicht über USB verbunden.",
+        wrongChip: "Am Port meldet sich „{chip}“ – dieser Flasher ist nur für ESP32-Boards (HB-RF-ETH).",
+        abortedByUser: "Kein Port ausgewählt – abgebrochen.",
+        fetchImages: "Lade Firmware-Dateien herunter und prüfe Prüfsummen …",
+        shaOk: "Prüfsumme OK: {file} ({size} KB)",
+        shaBad: "PRÜFSUMMEN-FEHLER bei {file} – Download beschädigt. Bitte Version neu wählen oder Seite neu laden.",
+        fetchFailed: "Download fehlgeschlagen ({file}): {err}",
+        manualMissing: "Bitte eine Firmware-Datei auswählen.",
+        manualFullMissing: "Die Komplettinstallation benötigt zusätzlich bootloader.bin und partitions.bin – entweder beide Dateien wählen oder „Nur Firmware erneuern“ verwenden.",
+        needConnect: "Bitte zuerst das Gerät verbinden (Schritt 1).",
+        flashing: "Flashen läuft – Verbindung nicht trennen!",
+        flashDone: "Fertig. Das Gerät startet jetzt neu.",
+        flashFailed: "Flashen fehlgeschlagen: {err}",
+        logTitle: "Protokoll",
+    },
+    en: {
+        title: "HB-RF-ETH-ng Web Flasher",
+        subtitle: "Flash firmware straight from your browser over the USB cable – no Python, no installation.",
+        backLink: "← Back to overview",
+        browserWarning: "This browser does not support the Web Serial API. Please use Google Chrome or Microsoft Edge on desktop (no Firefox, no Safari, no mobile).",
+        step1Title: "Preparation",
+        prep1: "Use a <b>data cable</b> – many USB cables are charge-only.",
+        prep2: "<b>Remove the radio module</b> (RPI-RF-MOD / HM-MOD-RPI-PCB) – it disturbs the serial link while flashing.",
+        prep3: "Power the board <b>from USB only</b>; disconnect PoE/Ethernet while flashing.",
+        prep4: "Browser: <b>Chrome or Edge on desktop</b> (Web Serial). Firefox and Safari do not support it.",
+        prep5: "Windows: if no port shows up, install the CH340 driver from wch-ic.com once.",
+        step2Title: "Choose firmware",
+        channelLabel: "Channel",
+        chStable: "Stable (recommended)",
+        chBeta: "Beta (pre-release)",
+        chAll: "All releases…",
+        chManual: "Local files (manual)",
+        versionLabel: "Version",
+        manualFwLabel: "Firmware file (firmware_*.bin)",
+        manualBlLabel: "Bootloader (bootloader.bin, optional)",
+        manualPtLabel: "Partition table (partitions.bin, optional)",
+        profileLabel: "Installation type",
+        profileFullTitle: "Full installation",
+        profileFullHint: "Bootloader, partition table and firmware. For freshly assembled boards, fresh starts or repair. Settings (network, password) are preserved.",
+        profileFwTitle: "Firmware only",
+        profileFwHint: "Replaces only the firmware and resets the update selection. The existing bootloader stays – it is fully compatible with this firmware.",
+        migrationHint: "<b>Migrating from the original firmware (1.3.x):</b> choose “Full installation” – it replaces the old firmware in one go. The migration script in the repository keeps working as an alternative.",
+        step3Title: "Connect & flash",
+        baudLabel: "Baud rate",
+        connectBtn: "1. Connect device",
+        flashBtn: "2. Start flashing",
+        step4Title: "After flashing",
+        after1: "Re-attach the radio module and connect Ethernet.",
+        after2: "<b>Important:</b> leave the device powered and <b>untouched for at least 60 seconds</b> after the first start – the new firmware runs a 15-second self-test. Power loss or a reset inside that window automatically reverts to the previous firmware.",
+        after3: "Then open the web UI and check the installed version under <span class=\"mono\">System</span>.",
+        successTitle: "✓ Flashing complete",
+        successText: "The firmware has been transferred and the device is restarting. Now follow step 4 above – especially the 60 seconds of rest after boot.",
+        footerMain: "Web flasher for HB-RF-ETH-ng · Uses <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) by Espressif and the Web Serial API.",
+        footerCredits: "Based on the HB-RF-ETH hardware and firmware by Alexander Reinert.",
+        loading: "Loading versions…",
+        loadFailed: "Could not load versions (network?). Use local files (manual) or reload the page.",
+        stableLabel: "Stable",
+        betaLabel: "Beta",
+        prereleaseLabel: "pre-release",
+        connectWait: "Connecting – make sure PoE/Ethernet is unplugged and only USB is connected …",
+        connectedChip: "Connected: {chip} – ready to flash.",
+        connectFailed: "Connection failed. Most common causes: charge-only cable, radio module still attached, wrong port, or the board is not connected via USB.",
+        wrongChip: "The port reports “{chip}” – this flasher is for ESP32 boards (HB-RF-ETH) only.",
+        abortedByUser: "No port selected – aborted.",
+        fetchImages: "Downloading firmware files and verifying checksums …",
+        shaOk: "Checksum OK: {file} ({size} KB)",
+        shaBad: "CHECKSUM MISMATCH for {file} – download corrupted. Please re-select the version or reload.",
+        fetchFailed: "Download failed ({file}): {err}",
+        manualMissing: "Please choose a firmware file.",
+        manualFullMissing: "Full installation also needs bootloader.bin and partitions.bin – either provide both or use “Firmware only”.",
+        needConnect: "Please connect the device first (step 1).",
+        flashing: "Flashing – do not disconnect!",
+        flashDone: "Done. The device is restarting now.",
+        flashFailed: "Flashing failed: {err}",
+        logTitle: "Log",
+    },
+};
+
+let lang = "de";
+function t(key, vars) {
+    let s = (I18N[lang] && I18N[lang][key]) || I18N.de[key] || key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.split("{" + k + "}").join(v);
+    return s;
+}
+function applyI18n() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const v = I18N[lang][el.dataset.i18n];
+        if (v !== undefined) el.innerHTML = v;
+    });
+    document.getElementById("langSwitch").textContent = lang === "de" ? "English" : "Deutsch";
+}
+document.getElementById("langSwitch").addEventListener("click", () => {
+    lang = lang === "de" ? "en" : "de";
+    applyI18n();
+    renderReleases();
+    renderStatuses();
+});
+applyI18n();
+
+// ---------------------------------------------------------------- helpers
+const $ = (id) => document.getElementById(id);
+const REPO = "Xerolux/HB-RF-ETH-ng";
+const RAW = "https://raw.githubusercontent.com/" + REPO + "/main/";
+const DL = "https://github.com/" + REPO + "/releases/download/";
+
+function fmtKB(bytes) { return Math.round(bytes / 1024); }
+function setStatus(id, text, cls) {
+    const el = $(id);
+    el.textContent = text || "";
+    el.className = "file-status" + (cls ? " " + cls : "");
+}
+function showError(msg) {
+    const b = $("errorBanner");
+    if (!msg) { b.classList.add("hidden"); return; }
+    b.textContent = msg;
+    b.classList.remove("hidden");
+}
+
+// Log terminal for ESPLoader
+const logLines = [];
+function logLine(text) {
+    logLines.push(text);
+    if (logLines.length > 400) logLines.splice(0, logLines.length - 400);
+    const el = $("log");
+    el.style.display = "block";
+    el.textContent = logLines.join("\n") + "\n";
+    el.scrollTop = el.scrollHeight;
+}
+const loaderTerminal = {
+    clean: () => { logLines.length = 0; $("log").textContent = ""; },
+    writeLine: (d) => logLine(d),
+    write: (d) => { const last = logLines.length - 1; if (last >= 0) logLines[last] += d; else logLine(d); const el = $("log"); el.textContent = logLines.join("\n"); el.scrollTop = el.scrollHeight; },
+};
+
+// ---------------------------------------------------------------- MD5 (verified against RFC 1321 test vectors)
+function md5(bytes) {
+    const S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+    const K = new Int32Array(64);
+    for (let i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296);
+    const len = bytes.length;
+    const withPad = (((len + 8) >> 6) + 1) << 6;
+    const msg = new Uint8Array(withPad);
+    msg.set(bytes);
+    msg[len] = 0x80;
+    const dv = new DataView(msg.buffer);
+    dv.setUint32(withPad - 8, (len << 3) >>> 0, true);
+    dv.setUint32(withPad - 4, Math.floor(len / 536870912), true);
+    let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+    const M = new Int32Array(16);
+    const rol = (x, c) => (x << c) | (x >>> (32 - c));
+    for (let off = 0; off < withPad; off += 64) {
+        for (let i = 0; i < 16; i++) M[i] = dv.getInt32(off + i * 4, true);
+        let A = a0, B = b0, C = c0, D = d0;
+        for (let i = 0; i < 64; i++) {
+            let F, g;
+            if (i < 16) { F = (B & C) | (~B & D); g = i; }
+            else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+            else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+            else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+            F = (F + A + K[i] + M[g]) | 0;
+            A = D; D = C; C = B;
+            B = (B + rol(F, S[i])) | 0;
+        }
+        a0 = (a0 + A) | 0; b0 = (b0 + B) | 0; c0 = (c0 + C) | 0; d0 = (d0 + D) | 0;
+    }
+    const out = new DataView(new ArrayBuffer(16));
+    out.setInt32(0, a0, true); out.setInt32(4, b0, true); out.setInt32(8, c0, true); out.setInt32(12, d0, true);
+    let hex = "";
+    for (let i = 0; i < 16; i++) hex += out.getUint8(i).toString(16).padStart(2, "0");
+    return hex;
+}
+
+async function sha256Hex(buf) {
+    const h = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ---------------------------------------------------------------- release catalog
+let manifests = { stable: null, beta: null };
+let allReleases = null;
+let selected = null; // {label, tag, urls:{firmware,bootloader,partitions,sha256sums}, sha256:{firmware}}
+const imageCache = new Map(); // url -> Uint8Array
+
+async function fetchJson(url) {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+}
+
+async function loadManifests() {
+    try {
+        const [stable, beta] = await Promise.all([fetchJson(RAW + "latest.json"), fetchJson(RAW + "beta.json").catch(() => null)]);
+        manifests.stable = stable;
+        manifests.beta = beta && beta.version && beta.version !== stable.version ? beta : null;
+    } catch (e) {
+        manifests.stable = null;
+        manifests.beta = null;
+    }
+}
+
+async function loadAllReleases() {
+    if (allReleases) return;
+    const list = await fetchJson("https://api.github.com/repos/" + REPO + "/releases?per_page=20");
+    allReleases = list.filter((r) => !r.draft).map((r) => {
+        const asset = (name) => (r.assets || []).find((a) => a.name === name);
+        return {
+            tag: r.tag_name,
+            name: r.name || r.tag_name,
+            prerelease: !!r.prerelease,
+            date: (r.published_at || "").slice(0, 10),
+            firmware: asset("firmware_" + r.tag_name.replace(/^v/, "").replace(/-/g, "_") + ".bin") || (r.assets || []).find((a) => /^firmware_.*\.bin$/.test(a.name)),
+            bootloader: asset("bootloader.bin"),
+            partitions: asset("partitions.bin"),
+            sha256sums: asset("SHA256SUMS.txt"),
+        };
+    }).filter((r) => r.firmware);
+}
+
+function manifestToEntry(m, channelLabel) {
+    const tag = m.releaseUrl.split("/").pop();
+    return {
+        label: m.version + " · " + channelLabel + " (" + (m.publishedAt || "").slice(0, 10) + ")",
+        tag,
+        urls: {
+            firmware: m.downloadUrl,
+            bootloader: tag ? DL + tag + "/bootloader.bin" : null,
+            partitions: tag ? DL + tag + "/partitions.bin" : null,
+            sha256sums: tag ? DL + tag + "/SHA256SUMS.txt" : null,
+        },
+        sha256: { firmware: m.sha256 },
+        meta: channelLabel + " · " + m.size + " Bytes",
+    };
+}
+
+function renderReleases() {
+    const sel = $("releaseSelect");
+    const meta = $("releaseMeta");
+    sel.innerHTML = "";
+    if (channel() === "manual") return;
+    if (channel() === "all") {
+        if (!allReleases) { sel.disabled = true; meta.textContent = t("loading"); return; }
+        sel.disabled = false;
+        for (const r of allReleases) {
+            const o = document.createElement("option");
+            o.value = r.tag;
+            o.textContent = r.name + (r.prerelease ? " · " + t("prereleaseLabel") : "") + "  (" + r.date + ")";
+            sel.appendChild(o);
+        }
+        meta.textContent = "";
+        onReleaseChange();
+    } else {
+        const m = manifests[channel()];
+        if (!m) { sel.disabled = true; meta.textContent = t("loadFailed"); return; }
+        sel.disabled = false;
+        const entry = manifestToEntry(m, channel() === "stable" ? t("stableLabel") : t("betaLabel"));
+        const o = document.createElement("option");
+        o.value = "manifest";
+        o.textContent = entry.label;
+        sel.appendChild(o);
+        meta.textContent = "";
+        onReleaseChange();
+    }
+}
+
+function currentEntry() {
+    if (channel() === "manual") return null;
+    if (channel() === "all" && allReleases) {
+        const tag = $("releaseSelect").value;
+        const r = allReleases.find((x) => x.tag === tag);
+        if (!r) return null;
+        return {
+            label: r.name,
+            tag: r.tag,
+            urls: {
+                firmware: r.firmware.browser_download_url,
+                bootloader: r.bootloader ? r.bootloader.browser_download_url : null,
+                partitions: r.partitions ? r.partitions.browser_download_url : null,
+                sha256sums: r.sha256sums ? r.sha256sums.browser_download_url : null,
+            },
+            sha256: {},
+            meta: r.prerelease ? t("prereleaseLabel") : "stable",
+        };
+    }
+    const m = manifests[channel()];
+    if (!m) return null;
+    return manifestToEntry(m, channel() === "stable" ? t("stableLabel") : t("betaLabel"));
+}
+
+function channel() { return $("channelSelect").value; }
+function profile() { return document.querySelector("input[name=profile]:checked").value; }
+
+async function fetchBinary(url) {
+    if (imageCache.has(url)) return imageCache.get(url);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const buf = await r.arrayBuffer();
+    const data = new Uint8Array(buf);
+    imageCache.set(url, data);
+    return data;
+}
+
+async function parseShaSums(url) {
+    if (!url) return {};
+    try {
+        const txt = new TextDecoder().decode(await fetchBinary(url));
+        const map = {};
+        for (const line of txt.split(/\r?\n/)) {
+            const m = line.match(/^([0-9a-fA-F]{64})\s+\*?(.+)$/);
+            if (m) map[m[2].trim()] = m[1].toLowerCase();
+        }
+        return map;
+    } catch (e) { return {}; }
+}
+
+async function loadImages() {
+    const entry = currentEntry();
+    const need = { firmware: null, bootloader: null, partitions: null };
+    setStatus("imageStatus", t("fetchImages"), "");
+    try {
+        need.firmware = await fetchBinary(entry.urls.firmware);
+        if (profile() === "full") {
+            need.bootloader = await fetchBinary(entry.urls.bootloader);
+            need.partitions = await fetchBinary(entry.urls.partitions);
+        }
+    } catch (e) {
+        setStatus("imageStatus", t("fetchFailed", { file: e.message, err: "" }), "err");
+        return null;
+    }
+    const sums = await parseShaSums(entry.urls.sha256sums);
+    const base = (u) => u.split("/").pop();
+    const checks = [["firmware", base(entry.urls.firmware), entry.sha256 && entry.sha256.firmware],
+                    ["bootloader", "bootloader.bin", null],
+                    ["partitions", "partitions.bin", null]];
+    for (const [key, fname, fallback] of checks) {
+        if (!need[key]) continue;
+        const expected = sums[fname] || fallback;
+        if (!expected) continue;
+        const actual = await sha256Hex(need[key]);
+        if (actual !== expected) {
+            setStatus("imageStatus", t("shaBad", { file: fname }), "err");
+            return null;
+        }
+        logLine(t("shaOk", { file: fname, size: fmtKB(need[key].length) }));
+    }
+    return need;
+}
+
+// ---------------------------------------------------------------- connect & flash
+let esploader = null, transport = null;
+
+async function connect() {
+    showError("");
+    $("connectButton").disabled = true;
+    setStatus("connectStatus", t("connectWait"), "");
+    let port;
+    try {
+        port = await navigator.serial.requestPort({});
+    } catch (e) {
+        setStatus("connectStatus", t("abortedByUser"), "err");
+        $("connectButton").disabled = false;
+        return;
+    }
+    try {
+        transport = new Transport(port, true);
+        esploader = new ESPLoader({
+            transport,
+            baudrate: parseInt($("baudSelect").value, 10),
+            romBaudrate: 115200,
+            terminal: loaderTerminal,
+        });
+        const chip = await esploader.main();
+        const chipName = String(chip).trim();
+        if (chipName !== "ESP32" && !/^ESP32\b/.test(chipName)) {
+            setStatus("connectStatus", t("wrongChip", { chip: chipName }), "err");
+            await transport.disconnect().catch(() => {});
+            esploader = null; transport = null;
+            $("connectButton").disabled = false;
+            return;
+        }
+        setStatus("connectStatus", t("connectedChip", { chip: chipName }), "ok");
+        $("flashButton").disabled = false;
+    } catch (e) {
+        esploader = null; transport = null;
+        setStatus("connectStatus", t("connectFailed"), "err");
+        logLine("Error: " + (e && e.message ? e.message : e));
+        $("connectButton").disabled = false;
+    }
+}
+
+function progressRows(files) {
+    const area = $("progressArea");
+    area.innerHTML = "";
+    const rows = [];
+    for (const f of files) {
+        const row = document.createElement("div");
+        row.className = "progress-row";
+        const name = document.createElement("div");
+        name.className = "progress-name";
+        name.title = f.name;
+        name.textContent = f.name;
+        const bar = document.createElement("progress");
+        bar.max = 100; bar.value = 0;
+        const pct = document.createElement("div");
+        pct.className = "progress-pct";
+        pct.textContent = "0%";
+        row.append(name, bar, pct);
+        area.appendChild(row);
+        rows.push({ bar, pct });
+    }
+    return rows;
+}
+
+async function flash() {
+    if (!esploader) { setStatus("imageStatus", t("needConnect"), "err"); return; }
+    showError("");
+    $("flashButton").disabled = true;
+    try {
+        let files;
+        if (channel() === "manual") {
+            const fw = $("manualFirmware").files[0];
+            if (!fw) { setStatus("imageStatus", t("manualMissing"), "err"); return; }
+            const bl = $("manualBootloader").files[0];
+            const pt = $("manualPartitions").files[0];
+            if (profile() === "full" && (!bl || !pt)) { setStatus("imageStatus", t("manualFullMissing"), "err"); return; }
+            const read = (f) => f.arrayBuffer().then((b) => new Uint8Array(b));
+            const fwData = await read(fw);
+            files = [{ name: fw.name, address: 0x10000, data: fwData }];
+            if (profile() === "full") {
+                files.push({ name: bl.name, address: 0x1000, data: await read(bl) });
+                files.push({ name: pt.name, address: 0x8000, data: await read(pt) });
+            }
+        } else {
+            const imgs = await loadImages();
+            if (!imgs) return;
+            files = [{ name: "firmware", address: 0x10000, data: imgs.firmware }];
+            if (profile() === "full" && imgs.bootloader && imgs.partitions) {
+                files.push({ name: "bootloader", address: 0x1000, data: imgs.bootloader });
+                files.push({ name: "partitions", address: 0x8000, data: imgs.partitions });
+            }
+        }
+        // A block of 0xFF at the otadata range: writeFlash erases the covered
+        // sectors before writing, which resets the OTA boot selection cleanly.
+        files.push({ name: "otadata", address: 0xd000, data: new Uint8Array(0x2000).fill(0xff) });
+        files.sort((a, b) => a.address - b.address);
+
+        const rows = progressRows(files);
+        setStatus("imageStatus", t("flashing"), "");
+        await esploader.writeFlash({
+            fileArray: files.map((f) => ({ data: f.data, address: f.address })),
+            eraseAll: false,
+            compress: true,
+            flashMode: "keep",
+            flashFreq: "keep",
+            flashSize: "keep",
+            reportProgress: (fileIndex, written, total) => {
+                const p = total ? Math.round((written / total) * 100) : 0;
+                rows[fileIndex].bar.value = p;
+                rows[fileIndex].pct.textContent = p + "%";
+            },
+            calculateMD5Hash: (image) => md5(image),
+        });
+        await esploader.after();
+        setStatus("imageStatus", t("flashDone"), "ok");
+        $("successCard").style.display = "block";
+        $("successCard").scrollIntoView({ behavior: "smooth" });
+    } catch (e) {
+        setStatus("imageStatus", t("flashFailed", { err: (e && e.message) || String(e) }), "err");
+        logLine("Error: " + ((e && e.message) || String(e)));
+    } finally {
+        if (transport) { await transport.disconnect().catch(() => {}); }
+        esploader = null; transport = null;
+        $("flashButton").disabled = true;
+        $("connectButton").disabled = false;
+    }
+}
+
+function renderStatuses() {
+    if (esploader) setStatus("connectStatus", t("connectedChip", { chip: "ESP32" }), "ok");
+}
+
+// ---------------------------------------------------------------- wiring
+$("connectButton").addEventListener("click", connect);
+$("flashButton").addEventListener("click", flash);
+$("channelSelect").addEventListener("change", async () => {
+    selected = null;
+    $("manualBox").classList.toggle("hidden", channel() !== "manual");
+    $("releaseSelectBox").classList.toggle("hidden", channel() === "manual");
+    if (channel() === "all") {
+        renderReleases();
+        try { await loadAllReleases(); } catch (e) { allReleases = null; }
+        renderReleases();
+    } else {
+        renderReleases();
+    }
+});
+$("releaseSelect").addEventListener("change", () => { selected = null; });
+document.querySelectorAll("input[name=profile]").forEach((r) => r.addEventListener("change", () => {
+    document.querySelectorAll(".radio-option").forEach((o) => o.classList.remove("selected"));
+    r.closest(".radio-option").classList.add("selected");
+}));
+
+// Browser support
+if (!("serial" in navigator)) {
+    const w = $("browserWarning");
+    w.textContent = t("browserWarning");
+    w.classList.remove("hidden");
+    $("connectButton").disabled = true;
+    $("flashButton").disabled = true;
+}
+
+// Initial catalog load
+(async () => {
+    renderReleases();
+    await loadManifests();
+    renderReleases();
+})();
+</script>
+</body>
+</html>

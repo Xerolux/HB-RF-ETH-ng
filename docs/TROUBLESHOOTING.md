@@ -417,6 +417,15 @@ to identify the panic.
 
 **Upload and verification:**
 
+The easiest path for a serial install is the **web flasher**:
+[https://xerolux.github.io/HB-RF-ETH-ng/flash/](https://xerolux.github.io/HB-RF-ETH-ng/flash/)
+(Chrome/Edge on desktop, data-capable Micro-USB cable, radio module removed
+during flashing). It flashes a selected release — or repairs a device — without
+installing any tools, verifies SHA256 checksums and resets the OTA boot
+selection in the same pass.
+
+Alternatively, use the migration script over the network:
+
 ```bash
 # Upload once; password requested interactively
 python3 migrate_original_firmware.py <DEVICE_IP> firmware_<version>.bin
@@ -484,8 +493,10 @@ board with its installed bootloader.
    - Look for "Boot failed" messages
 
 3. **Manual Flash**
-   - Flash firmware via USB/serial
-   - Use esptool.py or ESP-IDF (`idf.py`)
+   - Flash firmware via USB/serial — easiest with the
+     [web flasher](https://xerolux.github.io/HB-RF-ETH-ng/flash/)
+     (no tools required, see the wiki section *Installation per Web-Flasher*);
+     alternatively use esptool.py or ESP-IDF (`idf.py`) as below
    - **Important:** When the device has done any OTA update in the past, the
      bootloader may be configured to boot from `ota_1` (the second OTA slot).
      Flashing `ota_0` alone will not change the running firmware in that case.

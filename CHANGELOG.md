@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   descriptor/chip/partition-size preflight checks. Correct the legacy HTTP
   simulation and retract the unsupported socket-timeout diagnosis.
 
+### Added
+- Web flasher (`/flash/` on the GitHub Pages site): install or repair the
+  firmware over USB straight from Chrome/Edge using esptool-js and Web
+  Serial — release picker (stable/beta/all/manual), full-install and
+  firmware-only profiles, SHA256 verification and a clean OTA-selection
+  reset. Documented in README, wiki and troubleshooting guide.
+
 ### Documentation
 - Migration root cause (#461): original-firmware boards run the compatible
   v0.9.0 release bootloader with application rollback; any reset inside the

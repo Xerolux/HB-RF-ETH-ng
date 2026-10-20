@@ -186,6 +186,41 @@ Siehe Hilfe zum RPI-RF-MOD
   automatisch ausgelöst, weil das Gerät nicht nach Releases sucht
 * Dauerhaftes Leuchten der grünen Power LED: Sytem ist gestartet
 
+## Installation per Web-Flasher (USB, im Browser)
+Für Ersteinrichtung, Migration von der Original-Firmware und Reparatur gibt es
+einen **Web-Flasher** – eine Seite, die die Firmware direkt über das USB-Kabel
+im Browser flasht, ohne Python oder sonstige Installation:
+
+**→ [https://xerolux.github.io/HB-RF-ETH-ng/flash/](https://xerolux.github.io/HB-RF-ETH-ng/flash/)**
+
+**Voraussetzungen:**
+- Desktop-Browser mit Web-Serial-Unterstützung: **Chrome oder Edge** (kein
+  Firefox, kein Safari, kein Mobilgerät)
+- Micro-USB-**Datenkabel** (kein reines Ladekabel)
+- Das Funkmodul wird für die Dauer des Flashens **abgezogen** (es stört die
+  serielle Verbindung); die Platine wird **nur über USB** versorgt
+  (PoE/Ethernet trennen)
+
+**Ablauf:**
+1. Kanal (Stabil/Beta/ beliebiges Release oder eigene Dateien) und Version wählen
+2. Installationsart wählen: **Komplettinstallation** (Bootloader, Partitionstabelle
+   und Firmware; ersetzt auch eine Original-Firmware 1.3.x in einem Durchgang)
+   oder **Nur Firmware erneuern** (Bootloader bleibt; er ist vollständig kompatibel)
+3. „Gerät verbinden" – im Browser-Dialog den CH340-Seriellport auswählen
+4. „Flashen starten" – die Seite lädt die Dateien aus dem Release, prüft die
+   SHA256-Prüfsummen und schreibt sie mit Fortschrittsanzeige; ein separater
+   Löschblock setzt die OTA-Boot-Auswahl sauber zurück
+
+Einstellungen (Netzwerk, Passwort, Konfiguration) bleiben erhalten – nur bei
+einer leeren, frisch bestückten Platine gibt es nichts zu erhalten. Nach dem
+Flashen gilt wie bei jedem Update: das Gerät nach dem ersten Start
+**mindestens 60 Sekunden in Ruhe lassen** (15-Sekunden-Selbsttestfenster,
+siehe [Troubleshooting](TROUBLESHOOTING.md#migration-from-the-original-firmware-13x-keeps-booting-the-old-version)).
+
+Der Web-Flasher nutzt [esptool-js](https://github.com/espressif/esptool-js)
+(Apache-2.0) von Espressif und die Web-Serial-API; alle Dateien stammen
+direkt aus den GitHub-Releases dieses Projekts.
+
 ## Firmware Updates
 Fertig kompilierte Firmware finden Sie unter
 [GitHub Releases](https://github.com/Xerolux/HB-RF-ETH-ng/releases). Das Gerät
