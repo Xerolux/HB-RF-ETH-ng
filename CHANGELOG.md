@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.9-Beta.1] - 2026-10-20
+
+### Changes
+- chore: bump WebUI version to 1.0.7
+- chore(webui): drop unused marked dependency; changelog for stability batch
+- fix(webui): lifecycle and session robustness batch
+- fix(firmware): stability batch - detector UAF, syslog backoff, httpd unblocking
+- docs: update landing page to ESP-IDF 6.1
+- fix(flasher): serve release assets same-origin via Pages mirror
+- feat(docs): add browser-based web flasher on GitHub Pages
+- docs: resolve migration root cause - rollback reverts updates inside the 15s self-test window
+- chore(deps)(deps): bump pinia from 4.0.3 to 4.1.0 in /webui (#474)
+- chore(deps)(deps): bump vue-i18n from 11.4.13 to 11.4.14 in /webui (#473)
+- chore(deps)(deps-dev): bump sass from 1.105.1 to 1.105.2 in /webui (#471)
+- chore(deps)(deps-dev): bump @playwright/test in /webui (#470)
+- docs: document the on-board CH340 USB serial console
+- chore(deps)(deps-dev): bump @playwright/test in /webui (#467)
+- chore(deps)(deps-dev): bump vite from 8.3.2 to 8.3.4 in /webui (#466)
+- chore(deps)(deps): bump vue-router from 5.3.1 to 5.4.0 in /webui (#465)
+- chore(deps)(deps): bump marked from 18.0.14 to 18.1.0 in /webui (#464)
+- chore(ci)(deps): bump crate-ci/typos from 1.50.3 to 1.51.1 (#463)
+- fix(migration): verify running firmware after legacy upload (#469)
+- chore(deps): bump source-map-js to 1.2.2 and postcss-selector-parser to 7.1.6
+- docs: describe the manual update search that stage B1 re-added
+- chore(deps)(deps-dev): bump brace-expansion (#468)
+- chore: update manifests for v2.2.8
+
 ### Fixed
 - Migration helper (#461): verify the image's running version after a manual
   reboot instead of reporting upload acknowledgement as migration success.
