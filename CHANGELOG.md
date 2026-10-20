@@ -13,6 +13,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Add read-only `--verify-only`, a bounded observation window and application
   descriptor/chip/partition-size preflight checks. Correct the legacy HTTP
   simulation and retract the unsupported socket-timeout diagnosis.
+- Stability batch — firmware:
+  - Boot: the radio-module detector no longer deletes its frame-data
+    semaphore while the UART task may still be inside the frame handler —
+    a rare use-after-free that could surface as unexplained crashes after
+    module detection (the semaphore now lives for the object's lifetime,
+    as upstream intended).
+  - Syslog forwarder: reconnects to an unreachable server now back off
+    (5 s → 30 s cap, reset on success) instead of re-resolving and
+    re-connecting on every dequeued log line, which could overflow the
+    queue while a flapping link generated log spam.
+  - `POST /api/monitoring` sizes its body buffer to the actual request
+    instead of reserving a fixed contiguous 16 KiB block, so monitoring
+    saves no longer fail with "Out of memory" on a fragmented heap (same
+    fix the settings handler already has).
+  - WebUI image install: the 320 KiB partition erase runs in 32 KiB chunks
+    with yields between them, keeping the HTTP server — including the
+    upload status poll — responsive during the erase.
+  - Restart, factory reset and restore hand the post-response restart to a
+    background task (like the OTA finalize), so the HTTP server is no
+    longer blocked for the potentially 90 s worker-stop phase.
+  - RTC: out-of-range register values (dead backup battery, halted
+    oscillator) are rejected instead of being converted into an absurd
+    system time.
+- Stability batch — WebUI:
+  - Leaving the syslog page mid-poll no longer leaves a zombie 5 s poll
+    loop and a reconnecting WebSocket running for the rest of the browser
+    session.
+  - A 401 response now always invalidates the session; `silent` requests
+    only suppress the toast. After a firmware restart, stale tabs redirect
+    to the login page instead of showing outdated data forever.
+  - Navigating away during an update search no longer permanently disables
+    the "check now" buttons on both update pages.
+  - The dashboard poller can no longer orphan an interval on rapid
+    visibility changes (iOS lock/unlock).
+  - The diagnostics page pauses its 5 s poll while the tab is hidden, and
+    the syslog WebSocket reconnect backs off up to 30 s while the device
+    is unreachable.
+  - A failed initial settings load shows an error banner with a retry
+    button instead of silently presenting defaults, and the
+    unsaved-changes guard is always armed.
 
 ### Added
 - Web flasher (`/flash/` on the GitHub Pages site): install or repair the
@@ -22,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reset. The Pages deploy mirrors the official release assets to the same
   origin because GitHub release downloads cannot be fetched cross-origin
   from a browser. Documented in README, wiki and troubleshooting guide.
+
+### Changed
+- WebUI: removed the unused `marked` dependency (declared but never
+  imported; it never entered the bundle).
 
 ### Documentation
 - Migration root cause (#461): original-firmware boards run the compatible
