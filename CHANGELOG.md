@@ -12,8 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reboot instead of reporting upload acknowledgement as migration success.
   Add read-only `--verify-only`, a bounded observation window and application
   descriptor/chip/partition-size preflight checks. Correct the legacy HTTP
-  simulation and retract the unsupported socket-timeout diagnosis. The reported
-  device's boot/fallback cause remains unresolved pending a serial boot log.
+  simulation and retract the unsupported socket-timeout diagnosis.
+
+### Documentation
+- Migration root cause (#461): original-firmware boards run the compatible
+  v0.9.0 release bootloader with application rollback; any reset inside the
+  15-second self-test window reverts the update although the upload was
+  activated. Documented the keep-powered rule for every firmware update and
+  removed the unresolved-cause notices from README and troubleshooting guide.
 
 ## [2.2.8] - 2026-10-15
 

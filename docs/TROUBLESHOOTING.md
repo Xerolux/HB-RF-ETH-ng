@@ -384,10 +384,36 @@ Source evidence:
 - [Reporter follow-up](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)
   contradicts the former claim that upload acknowledgement proves migration.
 
-The reason the new application does not remain running on the reported device
-is **still unresolved**. Bootloader/image rejection, an application startup
-failure with rollback, and stale browser content must be distinguished using
-current device evidence. Do not infer one from the HTTP upload response alone.
+**Root cause (resolved, issue #461):** the device runs the bootloader from
+the original v0.9.0 release — the only original release that ever shipped a
+bootloader image (all later releases ship the application only). That
+bootloader is built with ESP-IDF v4.0.1 and application-rollback support and
+is **fully compatible** with HB-RF-ETH-ng: it uses the same 32-byte otadata
+entry format and the same entry checksum. Upload, activation and first boot
+all work. What reverts the device is the rollback contract around the
+15-second self-test window (`validate_running_firmware_task` in
+`main/main.cpp`):
+
+1. The activated boot entry starts as `ESP_OTA_IMG_NEW`; the bootloader
+   marks it `ESP_OTA_IMG_PENDING_VERIFY` and boots the new image once.
+2. The new firmware confirms itself (`esp_ota_mark_app_valid_cancel_rollback`)
+   only after the 15-second self-test window.
+3. **Any reset before that — power-cycle, brownout, or an application
+   crash — makes the bootloader mark the entry `ESP_OTA_IMG_ABORTED` and
+   fall back to the previously valid image.**
+
+A power-cycle inside the window (for example while the WebUI is not yet
+serving and the operator re-plugs the device) therefore silently reverts
+every migration or update attempt, although each upload itself succeeded.
+This also matches the "identical retry suddenly works" pattern reported for
+the original firmware: the only difference is leaving the device powered
+long enough. The rule applies to **every** firmware update, not only to the
+initial migration: after a restart, leave the device powered for at least
+one minute.
+
+If the device reverts even though it was left powered undisturbed, the new
+application itself reset inside the window; capture the serial log (below)
+to identify the panic.
 
 **Upload and verification:**
 
@@ -414,19 +440,23 @@ upload/preflight/verification failed; an accepted upload alone is never success.
 **If 1.3.x is still running:**
 
 1. Use `--verify-only` to check the device API independently of browser caching.
-2. Capture the serial output at **115200 baud** from power-on through fallback
-   to the old application, through the board's Micro-USB port (see
-   *Serial Console Access* above; no external UART adapter is required).
-   Reading the log does not require erasing or flashing. Do not power the
-   board from two sources. Record bootloader errors, reset reason and any
-   application panic; remove credentials and personal/network identifiers
-   before sharing the log.
-3. Use the log to determine whether the image was rejected before startup or
-   the application started and then reset/rolled back. Do not keep uploading
-   the identical image or claim the migration is fixed without that evidence.
+2. Re-run the migration once with the device left completely undisturbed for
+   at least 60 seconds after the requested power-cycle. Most reverts are a
+   power-cycle inside the 15-second self-test window.
+3. If it reverts again, capture the serial output at **115200 baud** from
+   power-on through fallback to the old application, through the board's
+   Micro-USB port (see *Serial Console Access* above; no external UART
+   adapter is required — a data-capable Micro-USB cable is enough). Reading
+   the log does not require erasing or flashing. Do not power the board from
+   two sources. Record bootloader errors, reset reason and any application
+   panic; remove credentials and personal/network identifiers before sharing
+   the log. The log distinguishes an application panic inside the window
+   from an external reset.
 4. If serial recovery is chosen, use *Device Won't Boot After Update* below.
    A network firmware upload only replaces the inactive application slot; it
-   does not replace the bootloader or partition table.
+   does not replace the bootloader or partition table. On original-firmware
+   boards the v0.9.0 bootloader does not need to be replaced — it is
+   compatible, including OTA activation.
 
 **Regression coverage:** `python3 -m unittest test_migrate_original_firmware -v`
 models correct IDF request accounting, acknowledged upload with old firmware

@@ -94,10 +94,16 @@ python3 rename_webui_files.py
 
 ### Migration von der Original-Firmware (1.3.x)
 Ein bestätigter Upload beweist noch nicht, dass die neue Firmware startet.
-In [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461) läuft nach
-bestätigtem Upload und Neustart weiterhin 1.3.0. Die Ursache dieses
-Startproblems ist noch nicht geklärt; die frühere Timeout-Erklärung und das
-Versprechen einer zuverlässigen Migration per Skript waren nicht belegt.
+Wie in [Issue #461](https://github.com/Xerolux/HB-RF-ETH-ng/issues/461)
+aufgeklärt, läuft die Ursache über die Rollback-Mechanik: Der Bootloader
+startet die neue Firmware zunächst „zur Probe" und die Firmware bestätigt
+sich erst nach einem **15-Sekunden-Selbsttestfenster** selbst. Jeder
+Neustart oder Stromausfall **innerhalb** dieses Fensters — auch ein
+ungeduldiges Stromlosmachen, weil die Weboberfläche noch nicht antwortet —
+lässt den Bootloader automatisch auf die vorherige Version zurückfallen,
+obwohl der Upload vollständig und aktiviert war. Deshalb: nach dem
+angeforderten Neustart das Gerät **mindestens eine Minute in Ruhe lassen**.
+Dies gilt für jedes Firmware-Update, nicht nur für die Migration.
 
 Das Migrationsskript prüft die Firmware-Datei, lädt sie einmal hoch und wartet
 anschließend auf einen **manuellen** Neustart. Erst wenn `/sysinfo.json` die
