@@ -39,7 +39,18 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
 
     _radioModuleType = RADIO_MODULE_NONE;
 
-    sem_init(_detectWaitFrameDataSemaphore);
+    // The semaphore is created once and kept for the object's lifetime: after
+    // setFrameHandler(NULL) returns, the UART task may still be inside
+    // handleFrame() and about to sem_give, so deleting it would touch freed
+    // memory (upstream never deletes it either).
+    if (_detectWaitFrameDataSemaphore == NULL)
+    {
+        sem_init(_detectWaitFrameDataSemaphore);
+    }
+    while (sem_take(_detectWaitFrameDataSemaphore, 0))
+    {
+        // drain stale signals from a previous detection run
+    }
 
     _radioModuleConnector->setFrameHandler(this, true);
 
@@ -126,11 +137,6 @@ void RadioModuleDetector::detectRadioModule(RadioModuleConnector *radioModuleCon
     }
 
     _radioModuleConnector->setFrameHandler(NULL, false);
-    if (_detectWaitFrameDataSemaphore)
-    {
-        vSemaphoreDelete(_detectWaitFrameDataSemaphore);
-        _detectWaitFrameDataSemaphore = NULL;
-    }
 }
 
 void RadioModuleDetector::handleFrame(unsigned char *buffer, uint16_t len)

@@ -162,12 +162,29 @@ struct timeval Rtc::GetTime()
         return res;
     }
 
-    res.tv_sec = bcd2bin(rawData[0]);         // seconds
-    res.tv_sec += bcd2bin(rawData[1]) * 60;   // minutes
-    res.tv_sec += bcd2bin(rawData[2]) * 3600; // hours
+    // A DS3231/RX8130 with a dead backup battery or halted oscillator returns
+    // 0xFF register bytes (bcd2bin(0xFF) = 165), which would read past
+    // daysInMonth[] and install an absurd time. Range-check like the DCF
+    // decoder does and report "time not set" (epoch 0) instead.
+    const uint8_t seconds = bcd2bin(rawData[0]);
+    const uint8_t minutes = bcd2bin(rawData[1]);
+    const uint8_t hours = bcd2bin(rawData[2]);
+    const uint8_t date = bcd2bin(rawData[4]);
+    const uint8_t month = bcd2bin(rawData[5]);
+    if (seconds > 59 || minutes > 59 || hours > 23 ||
+        date < 1 || date > 31 || month < 1 || month > 12)
+    {
+        ESP_LOGW(TAG, "RTC returned out-of-range time (backup battery dead?); ignoring");
+        res.tv_sec = 0;
+        res.tv_usec = 0;
+        return res;
+    }
 
-    uint16_t days = bcd2bin(rawData[4]);
-    uint8_t month = bcd2bin(rawData[5]);
+    res.tv_sec = seconds;
+    res.tv_sec += minutes * 60;
+    res.tv_sec += hours * 3600;
+
+    uint16_t days = date;
     uint8_t year = bcd2bin(rawData[6]);
 
     for (uint8_t i = 1; i < month; ++i)

@@ -303,13 +303,27 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
-    // Heap-allocate to keep stack usage within httpd task limits
-    char *content = (char *)malloc(16384);
+    // Keep the 16 KiB request limit, but allocate only what this request needs.
+    // A typical monitoring payload is 1-2 KB; reserving a fixed contiguous
+    // 16 KiB block made saves fail on fragmented/low-memory ESP32 devices even
+    // though the body itself was small (same fix as post_settings_json_handler).
+    constexpr size_t maxMonitoringBodySize = 16384;
+    if (req->content_len == 0)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No data received");
+    }
+    if (req->content_len >= maxMonitoringBodySize)
+    {
+        return httpd_resp_send_err(req, HTTPD_413_CONTENT_TOO_LARGE, "Request body too large");
+    }
+
+    const size_t bufferSize = req->content_len + 1;
+    char *content = (char *)malloc(bufferSize);
     if (!content)
     {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
     }
-    int ret = recv_full_body(req, content, 16384);
+    int ret = recv_full_body(req, content, bufferSize);
     if (ret <= 0)
     {
         free(content);

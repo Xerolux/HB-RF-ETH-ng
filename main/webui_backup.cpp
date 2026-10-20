@@ -451,6 +451,23 @@ httpd_uri_t get_backup_handler = {
 // Serializes restore/factory-reset mutations with monitoring configuration,
 // manual firmware writes and MQTT restarts.  Every early return releases the
 // reservation automatically; a successful reserved restart never returns.
+
+// Background task for the post-restore restart: the reserved full-system
+// restart pauses the monitoring workers (potentially ~90 s) and then holds the
+// Ethernet PHY in reset for 35 s. Offload it so the httpd thread stays
+// servable after the response has been flushed (same pattern as the OTA
+// finalize task); the operation reservation travels with the task.
+static void restore_finalize_task(void *pv)
+{
+    ScopedOperationReservation *operation = static_cast<ScopedOperationReservation *>(pv);
+    vTaskDelay(pdMS_TO_TICKS(1000)); // allow response to be sent
+    refresh_restart_sync_from_settings();
+    full_system_restart_with_reserved_operation();
+    ESP_LOGE(TAG, "Background restore restart was rejected; device stays up");
+    delete operation;
+    vTaskDelete(NULL);
+}
+
 esp_err_t post_restore_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -461,8 +478,10 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    ScopedOperationReservation operation;
-    if (!operation) {
+    // Heap-allocated in a unique_ptr so every early return below still
+    // releases the gate; ownership moves to the restart task only at the end.
+    std::unique_ptr<ScopedOperationReservation> operation(new ScopedOperationReservation());
+    if (!*operation) {
         httpd_resp_set_status(req, "503 Service Unavailable");
         return httpd_resp_sendstr(req, "Another configuration or restart operation is active");
     }
@@ -994,10 +1013,16 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"success\":true}");
 
-    // Restart
+    // Restart — off the httpd thread (see restore_finalize_task).
+    if (xTaskCreate(restore_finalize_task, "restart_fin", 8192, operation.get(), 2, NULL) == pdPASS) {
+        operation.release(); // the task owns the reservation now
+        return ESP_OK;
+    }
+    ESP_LOGE(TAG, "Could not create restart task; restarting on httpd thread");
     vTaskDelay(pdMS_TO_TICKS(1000));
     refresh_restart_sync_from_settings();
     full_system_restart_with_reserved_operation();
+    // The unique_ptr releases the gate if the restart was rejected.
 
     return ESP_OK;
 }

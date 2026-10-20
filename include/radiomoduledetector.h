@@ -69,7 +69,7 @@ private:
     int _detectState;
     int _detectRetryCount;
     int _detectMsgCounter;
-    SemaphoreHandle_t _detectWaitFrameDataSemaphore;
+    SemaphoreHandle_t _detectWaitFrameDataSemaphore = NULL;
     RadioModuleConnector *_radioModuleConnector;
 
 public:

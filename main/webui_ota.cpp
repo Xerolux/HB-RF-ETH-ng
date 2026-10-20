@@ -433,6 +433,36 @@ httpd_uri_t post_ota_update_handler = {.uri      = "/ota_update",
                                        .handler  = post_ota_update_handler_func,
                                        .user_ctx = NULL};
 
+// Background restart tasks: a full-system restart pauses the monitoring
+// workers (potentially ~90 s) and then holds the Ethernet PHY in reset for
+// 35 s. Running that on the httpd thread keeps the whole HTTP server dead
+// after the response has already been sent, so hand it off like the OTA
+// finalize path does.
+static void restart_finalize_task(void *)
+{
+    vTaskDelay(pdMS_TO_TICKS(1000)); // allow response to be sent
+    refresh_restart_sync_from_settings();
+    full_system_restart();
+    // Only reachable when the restart was rejected (e.g. an upload owns the
+    // operation gate); the device stays up and the owner surfaces the error.
+    ESP_LOGE(TAG, "Background restart was rejected; device stays up");
+    vTaskDelete(NULL);
+}
+
+// Variant for callers that already own the operation reservation: the
+// reservation travels with the task so the reserved restart still sees an
+// active operation, and is released only on the rejected path.
+static void reserved_restart_finalize_task(void *pv)
+{
+    ScopedOperationReservation *operation = static_cast<ScopedOperationReservation *>(pv);
+    vTaskDelay(pdMS_TO_TICKS(1000)); // allow response to be sent
+    refresh_restart_sync_from_settings();
+    full_system_restart_with_reserved_operation();
+    ESP_LOGE(TAG, "Background reserved restart was rejected; device stays up");
+    delete operation;
+    vTaskDelete(NULL);
+}
+
 esp_err_t post_restart_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -455,10 +485,14 @@ esp_err_t post_restart_handler_func(httpd_req_t *req)
     // only if the worker already dequeued the entry.
     events_emit(EVENT_RESTART, "manual restart via WebUI/API");
 
-    // Restart after a short delay to allow response to be sent
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    refresh_restart_sync_from_settings();
-    full_system_restart();
+    // Restart after a short delay to allow the response to be sent — off the
+    // httpd thread (see restart_finalize_task).
+    if (xTaskCreate(restart_finalize_task, "restart_fin", 8192, NULL, 2, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "Could not create restart task; restarting on httpd thread");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        refresh_restart_sync_from_settings();
+        full_system_restart();
+    }
 
     return ESP_OK;
 }
@@ -476,8 +510,10 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
         return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
     }
 
-    ScopedOperationReservation operation;
-    if (!operation) {
+    // Heap-allocated in a unique_ptr so every early return below still
+    // releases the gate; ownership moves to the restart task only at the end.
+    std::unique_ptr<ScopedOperationReservation> operation(new ScopedOperationReservation());
+    if (!*operation) {
         httpd_resp_set_status(req, "503 Service Unavailable");
         return httpd_resp_sendstr(req, "Another configuration or restart operation is active");
     }
@@ -505,10 +541,18 @@ esp_err_t post_factory_reset_handler_func(httpd_req_t *req)
     /* CORS header removed - same-origin requests only */
     httpd_resp_sendstr(req, "{\"success\":true}");
 
-    // Restart after a short delay to allow response to be sent
+    // Hand the operation reservation to the background restart task so the
+    // httpd thread is freed once the response is flushed (see
+    // reserved_restart_finalize_task).
+    if (xTaskCreate(reserved_restart_finalize_task, "restart_fin", 8192, operation.get(), 2, NULL) == pdPASS) {
+        operation.release(); // the task owns the reservation now
+        return ESP_OK;
+    }
+    ESP_LOGE(TAG, "Could not create restart task; restarting on httpd thread");
     vTaskDelay(pdMS_TO_TICKS(1000));
     refresh_restart_sync_from_settings();
     full_system_restart_with_reserved_operation();
+    // The unique_ptr releases the gate if the restart was rejected.
 
     return ESP_OK;
 }

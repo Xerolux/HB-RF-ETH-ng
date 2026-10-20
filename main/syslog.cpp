@@ -359,6 +359,23 @@ static bool tick_timeout_elapsed(TickType_t start, TickType_t timeout)
     return (TickType_t)(xTaskGetTickCount() - start) >= timeout;
 }
 
+// Reconnect backoff: while the server is unreachable, retry the resolve +
+// connect at most once per backoff window instead of once per dequeued log
+// line, so a down syslog server combined with log spam (e.g. a flapping
+// Ethernet link) cannot turn into per-line getaddrinfo/socket churn that
+// overflows the queue. 5 s -> 10 s -> 20 s -> 30 s cap, reset on success.
+static constexpr uint32_t SYSLOG_RECONNECT_BACKOFF_MIN_MS = 5000;
+static constexpr uint32_t SYSLOG_RECONNECT_BACKOFF_MAX_MS = 30000;
+
+static TickType_t syslog_backoff_ticks(uint32_t consecutive_failures)
+{
+    const uint32_t shift =
+        consecutive_failures > 3 ? 3 : (consecutive_failures ? consecutive_failures - 1 : 0);
+    uint32_t ms = SYSLOG_RECONNECT_BACKOFF_MIN_MS << shift;
+    if (ms > SYSLOG_RECONNECT_BACKOFF_MAX_MS) ms = SYSLOG_RECONNECT_BACKOFF_MAX_MS;
+    return pdMS_TO_TICKS(ms);
+}
+
 // Tear down everything but keep the struct alive (caller frees the struct).
 static void syslog_tls_teardown(syslog_tls_session *s)
 {
@@ -494,6 +511,11 @@ static void syslog_task(void *pv)
     struct sockaddr_in udp_dst;
     memset(&udp_dst, 0, sizeof(udp_dst));
 
+    // Shared reconnect-backoff state for all transports (see
+    // syslog_backoff_ticks). Zero failures means "reconnect always allowed".
+    TickType_t last_connect_fail_tick = 0;
+    uint32_t connect_fail_count = 0;
+
     // Persistent TLS session for the TLS transport. Allocated once on the
     // worker's stack; mbedtls contexts inside it are set up lazily.
     syslog_tls_session tls;
@@ -532,8 +554,17 @@ static void syslog_task(void *pv)
             // UDP — keep a persistent socket + resolved destination (analogous
             // to the TCP path) instead of open/close + getaddrinfo per line.
             if (udp_sock < 0 &&
-                s_running.load(std::memory_order_acquire)) {
+                s_running.load(std::memory_order_acquire) &&
+                (connect_fail_count == 0 ||
+                 tick_timeout_elapsed(last_connect_fail_tick,
+                                      syslog_backoff_ticks(connect_fail_count)))) {
                 udp_sock = resolve_and_connect_udp(s_cfg.server, s_cfg.port, &udp_dst);
+                if (udp_sock < 0) {
+                    last_connect_fail_tick = xTaskGetTickCount();
+                    connect_fail_count++;
+                } else {
+                    connect_fail_count = 0;
+                }
             }
             if (udp_sock >= 0) {
                 ssize_t w = sendto(udp_sock, wire, wire_len, 0,
@@ -546,10 +577,21 @@ static void syslog_task(void *pv)
                 }
             }
         } else if (s_cfg.transport == 1) {
-            // TCP — reconnect lazily and reuse the socket.
+            // TCP — reconnect lazily and reuse the socket, gated by the same
+            // shared backoff window so an unreachable server is retried at most
+            // once per window rather than once per log line.
             if (tcp_sock < 0 &&
-                s_running.load(std::memory_order_acquire)) {
+                s_running.load(std::memory_order_acquire) &&
+                (connect_fail_count == 0 ||
+                 tick_timeout_elapsed(last_connect_fail_tick,
+                                      syslog_backoff_ticks(connect_fail_count)))) {
                 tcp_sock = resolve_and_connect_tcp(s_cfg.server, s_cfg.port);
+                if (tcp_sock < 0) {
+                    last_connect_fail_tick = xTaskGetTickCount();
+                    connect_fail_count++;
+                } else {
+                    connect_fail_count = 0;
+                }
             }
             if (tcp_sock >= 0) {
                 ssize_t w = send(tcp_sock, wire, wire_len, 0);
@@ -559,21 +601,33 @@ static void syslog_task(void *pv)
                 }
             }
         } else {
-            // TLS — persistent session, reconnect on failure.
+            // TLS — persistent session, reconnect on failure, gated by the
+            // same shared backoff window.
             //
             // Skip while a manual firmware upload is in progress: the upload
             // owns g_net_fetch_mutex while writing, and contending
             // for it (or opening a second TLS context) risks starving the
             // upload of heap. The log line is dropped; the queue keeps moving.
-            if (!net_fetch_ota_active() && g_net_fetch_mutex) {
+            if (!net_fetch_ota_active() && g_net_fetch_mutex &&
+                (tls.handshake_ok ||
+                 connect_fail_count == 0 ||
+                 tick_timeout_elapsed(last_connect_fail_tick,
+                                      syslog_backoff_ticks(connect_fail_count)))) {
                 if (xSemaphoreTake(g_net_fetch_mutex, 0) == pdTRUE) {
                     crash_blackbox_net_op_begin("syslog_tls");
                     // Stop may race with the non-blocking mutex acquisition.
                     // Recheck after ownership so no TLS setup begins while the
                     // lifecycle is already unwinding.
                     if (s_running.load(std::memory_order_acquire)) {
-                        syslog_tls_send(&tls, s_cfg.server, s_cfg.port,
-                                        wire, wire_len);
+                        const bool sent_ok = syslog_tls_send(&tls, s_cfg.server,
+                                                             s_cfg.port,
+                                                             wire, wire_len);
+                        if (sent_ok) {
+                            connect_fail_count = 0;
+                        } else {
+                            last_connect_fail_tick = xTaskGetTickCount();
+                            connect_fail_count++;
+                        }
                     }
                     crash_blackbox_net_op_end();
                     xSemaphoreGive(g_net_fetch_mutex);

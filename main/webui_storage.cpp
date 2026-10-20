@@ -1091,12 +1091,24 @@ esp_err_t webui_storage_update_begin(size_t expected_size,
     unmount_locked();
     sha_cleanup_locked();
 
-    const esp_err_t erase_result =
-        esp_partition_erase_range(s_partition, 0, s_partition->size);
-    if (erase_result != ESP_OK)
+    // Erase in sub-ranges with a yield between chunks: a single full-partition
+    // erase (80 sectors) blocks the calling httpd task - and the flash cache -
+    // for several seconds, stalling every HTTP endpoint including the upload
+    // status poll. The upload loop throttles itself the same way.
+    constexpr size_t erase_chunk = INVALIDATE_SECTOR_SIZE * 8; // 32 KiB
+    for (size_t erased = 0; erased < s_partition->size; erased += erase_chunk)
     {
-        invalidate_image_locked("Could not erase WWW partition", erase_result);
-        return erase_result;
+        const size_t length = s_partition->size - erased < erase_chunk
+            ? s_partition->size - erased
+            : erase_chunk;
+        const esp_err_t erase_result =
+            esp_partition_erase_range(s_partition, erased, length);
+        if (erase_result != ESP_OK)
+        {
+            invalidate_image_locked("Could not erase WWW partition", erase_result);
+            return erase_result;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
     mbedtls_md_init(&s_sha_context);
