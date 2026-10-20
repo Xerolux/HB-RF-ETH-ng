@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.9-Beta.2] - 2026-10-20
+
+### Changes
+- feat(update): online install with device-side download and changelog (plan stage B3)
+- chore: update manifests for v2.2.9-Beta.1
+
 ### Added
 - Online install ("Jetzt installieren", plan stage B3 in
   docs/AUTO_UPDATE_PLAN.md §4.6): after a search, both update pages can let

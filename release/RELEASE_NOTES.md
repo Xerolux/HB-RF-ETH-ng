@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.2.9-Beta.1
+# 🚀 HB-RF-ETH-ng v2.2.9-Beta.2
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,99 +11,35 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.2.9-Beta.1?
+## 🆕 Was ist neu in v2.2.9-Beta.2?
 
 ### Changes
-- chore: bump WebUI version to 1.0.7
-- chore(webui): drop unused marked dependency; changelog for stability batch
-- fix(webui): lifecycle and session robustness batch
-- fix(firmware): stability batch - detector UAF, syslog backoff, httpd unblocking
-- docs: update landing page to ESP-IDF 6.1
-- fix(flasher): serve release assets same-origin via Pages mirror
-- feat(docs): add browser-based web flasher on GitHub Pages
-- docs: resolve migration root cause - rollback reverts updates inside the 15s self-test window
-- chore(deps)(deps): bump pinia from 4.0.3 to 4.1.0 in /webui (#474)
-- chore(deps)(deps): bump vue-i18n from 11.4.13 to 11.4.14 in /webui (#473)
-- chore(deps)(deps-dev): bump sass from 1.105.1 to 1.105.2 in /webui (#471)
-- chore(deps)(deps-dev): bump @playwright/test in /webui (#470)
-- docs: document the on-board CH340 USB serial console
-- chore(deps)(deps-dev): bump @playwright/test in /webui (#467)
-- chore(deps)(deps-dev): bump vite from 8.3.2 to 8.3.4 in /webui (#466)
-- chore(deps)(deps): bump vue-router from 5.3.1 to 5.4.0 in /webui (#465)
-- chore(deps)(deps): bump marked from 18.0.14 to 18.1.0 in /webui (#464)
-- chore(ci)(deps): bump crate-ci/typos from 1.50.3 to 1.51.1 (#463)
-- fix(migration): verify running firmware after legacy upload (#469)
-- chore(deps): bump source-map-js to 1.2.2 and postcss-selector-parser to 7.1.6
-- docs: describe the manual update search that stage B1 re-added
-- chore(deps)(deps-dev): bump brace-expansion (#468)
-- chore: update manifests for v2.2.8
-
-### Fixed
-- Migration helper (#461): verify the image's running version after a manual
-  reboot instead of reporting upload acknowledgement as migration success.
-  Add read-only `--verify-only`, a bounded observation window and application
-  descriptor/chip/partition-size preflight checks. Correct the legacy HTTP
-  simulation and retract the unsupported socket-timeout diagnosis.
-- Stability batch — firmware:
-  - Boot: the radio-module detector no longer deletes its frame-data
-    semaphore while the UART task may still be inside the frame handler —
-    a rare use-after-free that could surface as unexplained crashes after
-    module detection (the semaphore now lives for the object's lifetime,
-    as upstream intended).
-  - Syslog forwarder: reconnects to an unreachable server now back off
-    (5 s → 30 s cap, reset on success) instead of re-resolving and
-    re-connecting on every dequeued log line, which could overflow the
-    queue while a flapping link generated log spam.
-  - `POST /api/monitoring` sizes its body buffer to the actual request
-    instead of reserving a fixed contiguous 16 KiB block, so monitoring
-    saves no longer fail with "Out of memory" on a fragmented heap (same
-    fix the settings handler already has).
-  - WebUI image install: the 320 KiB partition erase runs in 32 KiB chunks
-    with yields between them, keeping the HTTP server — including the
-    upload status poll — responsive during the erase.
-  - Restart, factory reset and restore hand the post-response restart to a
-    background task (like the OTA finalize), so the HTTP server is no
-    longer blocked for the potentially 90 s worker-stop phase.
-  - RTC: out-of-range register values (dead backup battery, halted
-    oscillator) are rejected instead of being converted into an absurd
-    system time.
-- Stability batch — WebUI:
-  - Leaving the syslog page mid-poll no longer leaves a zombie 5 s poll
-    loop and a reconnecting WebSocket running for the rest of the browser
-    session.
-  - A 401 response now always invalidates the session; `silent` requests
-    only suppress the toast. After a firmware restart, stale tabs redirect
-    to the login page instead of showing outdated data forever.
-  - Navigating away during an update search no longer permanently disables
-    the "check now" buttons on both update pages.
-  - The dashboard poller can no longer orphan an interval on rapid
-    visibility changes (iOS lock/unlock).
-  - The diagnostics page pauses its 5 s poll while the tab is hidden, and
-    the syslog WebSocket reconnect backs off up to 30 s while the device
-    is unreachable.
-  - A failed initial settings load shows an error banner with a retry
-    button instead of silently presenting defaults, and the
-    unsaved-changes guard is always armed.
+- feat(update): online install with device-side download and changelog (plan stage B3)
+- chore: update manifests for v2.2.9-Beta.1
 
 ### Added
-- Web flasher (`/flash/` on the GitHub Pages site): install or repair the
-  firmware over USB straight from Chrome/Edge using esptool-js and Web
-  Serial — release picker (stable/beta/all/manual), full-install and
-  firmware-only profiles, SHA256 verification and a clean OTA-selection
-  reset. The Pages deploy mirrors the official release assets to the same
-  origin because GitHub release downloads cannot be fetched cross-origin
-  from a browser. Documented in README, wiki and troubleshooting guide.
+- Online install ("Jetzt installieren", plan stage B3 in
+  docs/AUTO_UPDATE_PLAN.md §4.6): after a search, both update pages can let
+  the **device itself** download and install the release named by its own
+  manifest over HTTPS — no browser upload, no own server. The installer
+  (`main/update_install.cpp`) pauses the monitoring workers before the TLS
+  session (their memory pays for it), streams into the existing flash sinks,
+  verifies SHA-256 against the manifest before anything is activated, and
+  follows the plan's failure rules: every abort leaves the device fully
+  operational without a reboot, and the firmware path only reboots after the
+  digest matched (15-second self-test rollback covers the boot).
+  `POST /api/update/install` accepts a target name only — never a URL — and
+  the manifest's download URLs are re-checked against a host allowlist
+  (`include/update_url_policy.h`, host-tested in CI).
+- Changelog before install: the confirm dialog fetches the release notes from
+  the Pages notes mirror (`docs/updates/notes/`, `Access-Control-Allow-Origin:
+  *`) and renders them as plain text, with the external release link as
+  fallback. Release workflows mirror future notes automatically.
 
 ### Changed
-- WebUI: removed the unused `marked` dependency (declared but never
-  imported; it never entered the bundle).
-
-### Documentation
-- Migration root cause (#461): original-firmware boards run the compatible
-  v0.9.0 release bootloader with application rollback; any reset inside the
-  15-second self-test window reverts the update although the upload was
-  activated. Documented the keep-powered rule for every firmware update and
-  removed the unresolved-cause notices from README and troubleshooting guide.
+- WebUI update installs remount the image without a restart; the page offers
+  a reload afterwards. Firmware installs reuse the existing restart-countdown
+  overlay.
 
 ## ✨ Hauptfunktionen
 
@@ -140,7 +76,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.2.9-Beta.1.bin`)
+- **Firmware-Binary** (`firmware_2.2.9-Beta.2.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.0.7.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
