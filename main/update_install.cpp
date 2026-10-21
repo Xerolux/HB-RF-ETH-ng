@@ -500,15 +500,14 @@ static void install_task(void *parameter)
         // the policy check in between.
         static constexpr size_t EFFECTIVE_URL_MAX_BYTES = 2048;
         static constexpr int MAX_REDIRECT_HOPS = 5;
+        esp_http_client_handle_t client = NULL;
+        int redirect_hops = 0;
         char *effective_url = static_cast<char *>(malloc(EFFECTIVE_URL_MAX_BYTES));
         if (!effective_url) {
             finish_with_error("Not enough memory for the redirect buffer");
             goto download_done;
         }
         strlcpy(effective_url, url, EFFECTIVE_URL_MAX_BYTES);
-
-        esp_http_client_handle_t client = NULL;
-        int redirect_hops = 0;
 
         for (;;) {
             opened = false;
@@ -566,7 +565,7 @@ static void install_task(void *parameter)
                 }
                 // The pointer targets the client's header storage; copy
                 // before the client is torn down.
-                const char *location = NULL;
+                char *location = NULL;
                 if (esp_http_client_get_header(client, "Location", &location) != ESP_OK ||
                     location == NULL) {
                     finish_with_error("Redirect without a Location header");
