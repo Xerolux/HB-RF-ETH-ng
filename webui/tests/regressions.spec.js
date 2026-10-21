@@ -1056,9 +1056,9 @@ test('updates sub-navigation uses the shared design and switches child routes', 
   await expect(firmwareTab).toContainText('ESP32, network and radio')
   await expect(webUiTab).toContainText('Browser-based controls')
   await expect(page.locator('.firmware-page')).toBeVisible()
-  await expect(page.locator('.firmware-page .content-grid > .update-card')).toHaveCount(2)
-  await expect(page.locator('.firmware-page .update-card > .card-header')).toHaveCount(2)
-  await expect(page.locator('.firmware-page .update-card > .card-body')).toHaveCount(2)
+  await expect(page.locator('.firmware-page .content-grid > .update-card')).toHaveCount(3)
+  await expect(page.locator('.firmware-page .update-card > .card-header')).toHaveCount(3)
+  await expect(page.locator('.firmware-page .update-card > .card-body')).toHaveCount(3)
 
   const tabSizes = await control.locator('.segment-btn').evaluateAll(tabs => tabs.map(tab => ({
     width: tab.getBoundingClientRect().width,
@@ -1083,6 +1083,60 @@ test('updates sub-navigation uses the shared design and switches child routes', 
   })
   expect(mobileBounds.left).toBeGreaterThanOrEqual(0)
   expect(mobileBounds.right).toBeLessThanOrEqual(mobileBounds.viewportWidth)
+})
+
+test('automatic update configuration loads from and saves through the config endpoint', async ({ page }) => {
+  const savedConfigs = []
+  await page.route('**/api/update/config**', route => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          mode: 'notify', channel: 'stable', intervalHours: 24,
+          windowStart: 3, windowLength: 2, idleOnly: true
+        })
+      })
+    }
+    savedConfigs.push(route.request().postDataJSON())
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        mode: 'auto_webui', channel: 'stable', intervalHours: 12,
+        windowStart: 3, windowLength: 2, idleOnly: false
+      })
+    })
+  })
+  await page.route('**/api/update/status**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(idleUpdateStatus({
+      schedule: {
+        mode: 'notify', channel: 'stable', intervalHours: 24, windowStart: 3, windowLength: 2,
+        idleOnly: true, nextCheckIn: 3600, installBlocked: null, lastSeenCheck: 0,
+        seenFirmware: '', seenWebui: '', pending: null, stage: null
+      }
+    }))
+  }))
+
+  await page.goto(`${BASE_URL}/updates/firmware`)
+
+  // The loaded device configuration renders into the form.
+  const autoCard = page.locator('[data-testid="auto-update-card"]')
+  await expect(autoCard).toContainText('Search & notify only')
+  await expect(autoCard).toContainText('Next scheduled search')
+
+  // Saving is disabled until something changes; one change produces exactly
+  // one POST carrying the complete form.
+  const saveButton = autoCard.getByRole('button', { name: 'Save automation' })
+  await expect(saveButton).toBeDisabled()
+  await page.locator('#auto-mode').selectOption('auto_webui')
+  await expect(saveButton).toBeEnabled()
+  await saveButton.click()
+  await expect.poll(() => savedConfigs.length).toBe(1)
+  expect(savedConfigs[0]).toMatchObject({ mode: 'auto_webui', intervalHours: 24, idleOnly: true })
+
+  // The accepted answer re-populates the form, so the button disables again.
+  await expect(autoCard).toContainText('Install WebUI automatically')
+  await expect(saveButton).toBeDisabled()
 })
 
 test('incompatible installed WebUI is never presented as active and shows a persistent repair warning', async ({ page }) => {

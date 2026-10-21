@@ -22,7 +22,25 @@
           </div>
         </div>
         <div class="card-body">
-          <p class="muted-text">{{ t('firmware.onlineManualNote') }}</p>
+          <p class="muted-text">{{ manualNoteText }}</p>
+
+          <!-- One-shot install scheduled from the confirm dialog: shown as long
+               as the entry exists, cancellable at any time. -->
+          <BAlert v-if="updateStatus.schedule.pending" variant="info" :model-value="true">
+            {{ t('firmware.pendingScheduled', {
+              target: updateStatus.schedule.pending.target === 'firmware' ? t('updates.firmware') : t('updates.webui'),
+              version: updateStatus.schedule.pending.version
+            }) }}
+            <BButton variant="outline-secondary" size="sm" class="ms-2" :disabled="cancellingPending" @click="cancelPending">
+              {{ t('firmware.pendingCancel') }}
+            </BButton>
+          </BAlert>
+          <p v-if="updateStatus.schedule.stage" class="muted-text">
+            {{ t('firmware.stagePending', {
+              firmware: updateStatus.schedule.stage.firmware,
+              webui: updateStatus.schedule.stage.webui
+            }) }}
+          </p>
 
           <div class="channel-row">
             <label class="channel-label" for="update-channel">{{ t('firmware.channelLabel') }}</label>
@@ -81,6 +99,74 @@
               {{ t('firmware.installFailed') }} {{ installError }}
             </BAlert>
           </div>
+        </div>
+      </section>
+
+      <section class="update-card" data-testid="auto-update-card">
+        <div class="card-header">
+          <div class="header-icon bg-info-light text-info"><AppIcon name="refresh" /></div>
+          <div class="header-text">
+            <span class="kicker">{{ t('firmware.autoKicker') }}</span>
+            <h2>{{ t('firmware.autoHeading') }}</h2>
+            <p>{{ t('firmware.autoHelp') }}</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <template v-if="configLoaded">
+            <div class="auto-grid">
+              <div class="form-group">
+                <label class="form-label" for="auto-mode">{{ t('firmware.autoMode') }}</label>
+                <select id="auto-mode" v-model="autoMode" class="form-select" :disabled="configSaving">
+                  <option value="off">{{ t('firmware.autoModeOff') }}</option>
+                  <option value="notify">{{ t('firmware.autoModeNotify') }}</option>
+                  <option value="auto_webui">{{ t('firmware.autoModeWebui') }}</option>
+                  <option value="auto_all">{{ t('firmware.autoModeAll') }}</option>
+                </select>
+                <div class="form-text">{{ autoModeHelpText }}</div>
+              </div>
+              <div v-if="autoMode !== 'off'" class="form-group">
+                <label class="form-label" for="auto-interval">{{ t('firmware.autoInterval') }}</label>
+                <BFormInput
+                  id="auto-interval" type="number" v-model.number="autoInterval"
+                  min="6" max="168" :state="autoIntervalValid ? null : false" :disabled="configSaving"
+                />
+                <BFormInvalidFeedback v-if="!autoIntervalValid">{{ t('firmware.autoIntervalInvalid') }}</BFormInvalidFeedback>
+              </div>
+            </div>
+            <template v-if="autoMode !== 'off'">
+              <div class="auto-grid">
+                <div class="form-group">
+                  <label class="form-label" for="auto-win-start">{{ t('firmware.autoWindowStart') }}</label>
+                  <select id="auto-win-start" v-model.number="autoWinStart" class="form-select" :disabled="configSaving">
+                    <option v-for="hour in 24" :key="hour - 1" :value="hour - 1">{{ String(hour - 1).padStart(2, '0') }}:00</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="auto-win-len">{{ t('firmware.autoWindowLength') }}</label>
+                  <select id="auto-win-len" v-model.number="autoWinLen" class="form-select" :disabled="configSaving">
+                    <option v-for="hours in 24" :key="hours" :value="hours">{{ t('firmware.autoWindowHours', { hours }) }}</option>
+                  </select>
+                  <div class="form-text">{{ windowText }}</div>
+                </div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="auto-idle"
+                       v-model="autoIdle" :disabled="configSaving" />
+                <label class="form-check-label" for="auto-idle">{{ t('firmware.autoIdleLabel') }}</label>
+                <div class="form-text">{{ t('firmware.autoIdleHelp') }}</div>
+              </div>
+            </template>
+            <BAlert v-if="blockedHint" variant="info" :model-value="true">{{ blockedHint }}</BAlert>
+            <p v-if="nextCheckText" class="muted-text">{{ nextCheckText }}</p>
+            <div class="actions">
+              <BButton variant="primary" class="action-btn"
+                       :disabled="!autoDirty || !autoValid || configSaving" @click="saveAutoConfig">
+                <span v-if="configSaving" class="spinner-border spinner-border-sm me-2"></span>
+                {{ t('firmware.autoSave') }}
+              </BButton>
+            </div>
+          </template>
+          <p v-else class="muted-text">{{ t('firmware.autoUnavailable') }}</p>
         </div>
       </section>
 
@@ -155,6 +241,9 @@
             <BButton variant="outline-secondary" :disabled="installStarting" @click="closeInstallConfirm">
               {{ t('common.cancel') }}
             </BButton>
+            <BButton variant="outline-primary" :disabled="installStarting" @click="confirmScheduleInstall">
+              {{ t('firmware.installScheduleButton') }}
+            </BButton>
             <BButton variant="primary" :disabled="installStarting" @click="confirmInstall">
               <span v-if="installStarting" class="spinner-border spinner-border-sm me-2"></span>
               {{ t('firmware.installConfirmButton') }}
@@ -189,16 +278,128 @@ const {
   channel,
   checking,
   updateStatus,
+  updateConfig,
   triggerMessage,
   resultMessage,
   checkForUpdates,
   loadUpdateStatus,
+  loadUpdateConfig,
+  saveUpdateConfig,
+  scheduleInstall,
+  cancelScheduledInstall,
   stopPolling,
   formatTimestamp,
   startInstall,
   installBusy,
   fetchReleaseNotes
 } = useUpdateSearch(t)
+
+// --- Automatic update configuration (stages B2/C/D) -------------------------
+// The card mirrors GET/POST /api/update/config. Older firmware (no endpoint)
+// leaves configLoaded false and shows the unavailable note instead of
+// guessing defaults.
+const configSaving = ref(false)
+const autoMode = ref('off')
+const autoInterval = ref(24)
+const autoWinStart = ref(3)
+const autoWinLen = ref(2)
+const autoIdle = ref(true)
+let autoSnapshot = ''
+
+const configLoaded = computed(() => updateConfig.value !== null)
+const autoIntervalValid = computed(() =>
+  Number.isInteger(autoInterval.value) && autoInterval.value >= 6 && autoInterval.value <= 168)
+const autoValid = computed(() => autoIntervalValid.value)
+const autoSerialized = computed(() => JSON.stringify({
+  mode: autoMode.value,
+  intervalHours: autoInterval.value,
+  windowStart: autoWinStart.value,
+  windowLength: autoWinLen.value,
+  idleOnly: autoIdle.value
+}))
+const autoDirty = computed(() => configLoaded.value && autoSerialized.value !== autoSnapshot)
+
+const applyConfigToForm = config => {
+  if (!config) return
+  autoMode.value = config.mode || 'off'
+  autoInterval.value = Number(config.intervalHours) || 24
+  autoWinStart.value = Number(config.windowStart) || 0
+  autoWinLen.value = Number(config.windowLength) || 2
+  autoIdle.value = config.idleOnly !== false
+  autoSnapshot = autoSerialized.value
+}
+
+const saveAutoConfig = async () => {
+  if (!autoValid.value || configSaving.value) return
+  configSaving.value = true
+  try {
+    const saved = await saveUpdateConfig({
+      mode: autoMode.value,
+      intervalHours: autoInterval.value,
+      windowStart: autoWinStart.value,
+      windowLength: autoWinLen.value,
+      idleOnly: autoIdle.value
+    })
+    applyConfigToForm(saved)
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.autoSaveSuccess'), duration: 2500 })
+  } catch {
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('firmware.autoSaveError'), duration: 5000 })
+  } finally {
+    configSaving.value = false
+  }
+}
+
+// Dynamic mode descriptions: the keys live in every locale; the map keeps the
+// template free of string building.
+const AUTO_MODE_HELP_KEYS = {
+  off: 'firmware.autoModeOffHelp',
+  notify: 'firmware.autoModeNotifyHelp',
+  auto_webui: 'firmware.autoModeWebuiHelp',
+  auto_all: 'firmware.autoModeAllHelp'
+}
+const autoModeHelpText = computed(() => t(AUTO_MODE_HELP_KEYS[autoMode.value] || AUTO_MODE_HELP_KEYS.off))
+
+const pad2 = value => String(value).padStart(2, '0')
+const windowText = computed(() => t('firmware.autoWindowRange', {
+  start: `${pad2(autoWinStart.value)}:00`,
+  end: `${pad2((autoWinStart.value + autoWinLen.value) % 24)}:00`
+}))
+
+const nextCheckText = computed(() => {
+  const schedule = updateStatus.value.schedule
+  if (schedule.mode === 'off' || !schedule.nextCheckIn) return ''
+  const minutes = Math.max(1, Math.round(schedule.nextCheckIn / 60))
+  const humanized = minutes >= 90 ? `~${Math.round(minutes / 60)} h` : `~${minutes} min`
+  return t('firmware.autoNextCheck', { time: humanized })
+})
+
+const BLOCKED_KEYS = {
+  no_valid_time: 'firmware.blockedNoValidTime',
+  outside_window: 'firmware.blockedOutsideWindow',
+  session_active: 'firmware.blockedSessionActive',
+  busy: 'firmware.blockedBusy'
+}
+const blockedHint = computed(() => {
+  const blocked = updateStatus.value.schedule.installBlocked
+  return blocked && BLOCKED_KEYS[blocked] ? t(BLOCKED_KEYS[blocked]) : ''
+})
+
+const manualNoteText = computed(() => updateStatus.value.schedule.mode && updateStatus.value.schedule.mode !== 'off'
+  ? t('firmware.onlineScheduledNote', { interval: updateStatus.value.schedule.intervalHours })
+  : t('firmware.onlineManualNote'))
+
+const cancellingPending = ref(false)
+const cancelPending = async () => {
+  if (cancellingPending.value) return
+  cancellingPending.value = true
+  const outcome = await cancelScheduledInstall()
+  cancellingPending.value = false
+  if (outcome === 'cancelled' || outcome === 'nothing_scheduled') {
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.pendingCancelled'), duration: 2500 })
+  } else {
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('firmware.scheduleFailed'), duration: 5000 })
+  }
+}
 
 const checkMessage = resultMessage(status => {
   if (status.firmwareUpdateAvailable) {
@@ -265,6 +466,38 @@ const confirmInstall = async () => {
     message: t('firmware.installStartFailed'),
     duration: 6000
   })
+}
+
+// Schedule exactly this update for the next maintenance window instead of
+// installing now. The version always comes from the search result the
+// operator is looking at; the device re-verifies the manifest at window time.
+const confirmScheduleInstall = async () => {
+  installStarting.value = true
+  const outcome = await scheduleInstall('firmware')
+  installStarting.value = false
+  showInstallConfirm.value = false
+  if (outcome === 'scheduled') {
+    uiStore.pushToast({
+      type: 'success',
+      title: t('firmware.pendingScheduledTitle'),
+      message: t('firmware.pendingToast', { version: updateStatus.value.latestFirmware }),
+      duration: 5000
+    })
+  } else if (outcome === 'no_search_result') {
+    uiStore.pushToast({
+      type: 'info',
+      title: t('firmware.pendingScheduledTitle'),
+      message: t('firmware.scheduleNoSearch'),
+      duration: 5000
+    })
+  } else {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('firmware.installFailedTitle'),
+      message: t('firmware.scheduleFailed'),
+      duration: 6000
+    })
+  }
 }
 
 // "finalizing" means the image is verified and selected: the restart countdown
@@ -366,6 +599,10 @@ onMounted(async () => {
   try { await sysInfoStore.update() } catch { /* Anzeige bleibt mit Platzhalter nutzbar. */ }
   // Show whatever the device already knows, without starting a search.
   try { await loadUpdateStatus() } catch { /* Karte zeigt dann "noch keine Suche". */ }
+  // Load the automatic-update configuration (no search request is triggered;
+  // firmware without the endpoint leaves the card in its unavailable state).
+  await loadUpdateConfig()
+  applyConfigToForm(updateConfig.value)
 })
 </script>
 
@@ -400,6 +637,9 @@ onMounted(async () => {
 .progress-bar { flex:1; height:10px; border-radius:var(--radius-pill); background:var(--color-bg-alt); overflow:hidden; }
 .progress-value { height:100%; background:var(--color-primary); }
 .install-panel { display:flex; flex-direction:column; gap:var(--space-3); }
+.auto-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-3); }
+.form-text { color:var(--color-text-secondary); font-size:var(--fs-xs); }
+@media(max-width:600px){ .auto-grid { grid-template-columns:1fr; } }
 .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:1050; padding:var(--card-padding); }
 .modal-card { background:var(--color-surface); border-radius:var(--radius-lg); max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:calc(var(--card-padding) * 1.25); display:flex; flex-direction:column; gap:var(--space-3); }
 .modal-card h3 { margin:0; font-size:var(--fs-lg); }

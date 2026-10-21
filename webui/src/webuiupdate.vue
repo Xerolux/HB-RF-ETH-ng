@@ -58,6 +58,21 @@
 
           <!-- Same rule as on the firmware page: the outcome is durable page
                content, and a skip is never rendered as "up to date". -->
+          <BAlert v-if="updateStatus.schedule.pending" variant="info" :model-value="true">
+            {{ t('firmware.pendingScheduled', {
+              target: updateStatus.schedule.pending.target === 'firmware' ? t('updates.firmware') : t('updates.webui'),
+              version: updateStatus.schedule.pending.version
+            }) }}
+            <BButton variant="outline-secondary" size="sm" class="ms-2" :disabled="cancellingPending" @click="cancelPending">
+              {{ t('firmware.pendingCancel') }}
+            </BButton>
+          </BAlert>
+          <p v-if="updateStatus.schedule.stage" class="muted-text">
+            {{ t('firmware.stagePending', {
+              firmware: updateStatus.schedule.stage.firmware,
+              webui: updateStatus.schedule.stage.webui
+            }) }}
+          </p>
           <BAlert v-if="triggerMessage.text" :variant="triggerMessage.variant" :model-value="true">
             {{ triggerMessage.text }}
           </BAlert>
@@ -172,6 +187,9 @@
             <BButton variant="outline-secondary" :disabled="installStarting" @click="closeInstallConfirm">
               {{ t('common.cancel') }}
             </BButton>
+            <BButton variant="outline-primary" :disabled="installStarting" @click="confirmScheduleInstall">
+              {{ t('firmware.installScheduleButton') }}
+            </BButton>
             <BButton variant="primary" :disabled="installStarting" @click="confirmInstall">
               <span v-if="installStarting" class="spinner-border spinner-border-sm me-2"></span>
               {{ t('firmware.installConfirmButton') }}
@@ -201,12 +219,57 @@ const {
   resultMessage,
   checkForUpdates,
   loadUpdateStatus,
+  scheduleInstall,
+  cancelScheduledInstall,
   stopPolling,
   formatTimestamp,
   startInstall,
   installBusy,
   fetchReleaseNotes
 } = useUpdateSearch(t)
+
+// --- Scheduled one-shot install (pending banner + window button) -------------
+const cancellingPending = ref(false)
+const cancelPending = async () => {
+  if (cancellingPending.value) return
+  cancellingPending.value = true
+  const outcome = await cancelScheduledInstall()
+  cancellingPending.value = false
+  if (outcome === 'cancelled' || outcome === 'nothing_scheduled') {
+    uiStore.pushToast({ type: 'success', title: t('common.success'), message: t('firmware.pendingCancelled'), duration: 2500 })
+  } else {
+    uiStore.pushToast({ type: 'error', title: t('common.error'), message: t('firmware.scheduleFailed'), duration: 5000 })
+  }
+}
+
+const confirmScheduleInstall = async () => {
+  installStarting.value = true
+  const outcome = await scheduleInstall('webui')
+  installStarting.value = false
+  showInstallConfirm.value = false
+  if (outcome === 'scheduled') {
+    uiStore.pushToast({
+      type: 'success',
+      title: t('firmware.pendingScheduledTitle'),
+      message: t('firmware.pendingToast', { version: updateStatus.value.latestWebui }),
+      duration: 5000
+    })
+  } else if (outcome === 'no_search_result') {
+    uiStore.pushToast({
+      type: 'info',
+      title: t('firmware.pendingScheduledTitle'),
+      message: t('firmware.scheduleNoSearch'),
+      duration: 5000
+    })
+  } else {
+    uiStore.pushToast({
+      type: 'error',
+      title: t('firmware.installFailedTitle'),
+      message: t('firmware.scheduleFailed'),
+      duration: 6000
+    })
+  }
+}
 
 const searchMessage = resultMessage(status => {
   if (status.webuiUpdateAvailable) {

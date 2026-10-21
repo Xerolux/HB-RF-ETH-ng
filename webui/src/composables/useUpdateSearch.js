@@ -35,6 +35,24 @@ const emptyInstall = () => ({
   error: ''
 })
 
+// Mirror of the "schedule" block of /api/update/status (firmware >= 2.3.0;
+// older firmware has no block and these defaults apply).
+const emptySchedule = () => ({
+  mode: 'off',
+  channel: 'stable',
+  intervalHours: 24,
+  windowStart: 3,
+  windowLength: 2,
+  idleOnly: true,
+  nextCheckIn: 0,
+  installBlocked: null,
+  lastSeenCheck: 0,
+  seenFirmware: '',
+  seenWebui: '',
+  pending: null,
+  stage: null
+})
+
 const emptyStatus = () => ({
   state: 'idle',
   everChecked: false,
@@ -50,7 +68,8 @@ const emptyStatus = () => ({
   notesUrl: '',
   lastError: '',
   lastSkipReason: '',
-  install: emptyInstall()
+  install: emptyInstall(),
+  schedule: emptySchedule()
 })
 
 // Skip reasons arrive as raw firmware strings. The known ones are mapped to
@@ -74,6 +93,10 @@ const checking = ref(false)
 const updateStatus = ref(emptyStatus())
 const triggerOutcome = ref('')
 const cooldownRemaining = ref(0)
+// Automatic-update configuration from GET/POST /api/update/config. null until
+// loaded (or on firmware without the endpoint); the pages keep their controls
+// disabled rather than guessing defaults.
+const updateConfig = ref(null)
 let pollTimer = null
 let cooldownTimer = null
 
@@ -113,12 +136,13 @@ const loadUpdateStatus = async () => {
     silent: true
   })
   if (response.data) {
-    // Older firmware has no "install" block; merge with defaults so template
-    // access never hits undefined.
+    // Older firmware has no "install" or "schedule" block; merge with
+    // defaults so template access never hits undefined.
     updateStatus.value = {
       ...emptyStatus(),
       ...response.data,
-      install: { ...emptyInstall(), ...(response.data.install || {}) }
+      install: { ...emptyInstall(), ...(response.data.install || {}) },
+      schedule: { ...emptySchedule(), ...(response.data.schedule || {}) }
     }
     // Entering the page while a cooldown is active (firmware that reports it):
     // adopt the device's remaining seconds instead of guessing.
@@ -213,6 +237,71 @@ const fetchReleaseNotes = async version => {
     return typeof response.data === 'string' && response.data.trim() ? response.data : null
   } catch {
     return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Automatic updates (stages B2/C/D). The device channel becomes the source of
+// truth once the config endpoint answers; localStorage stays as the fallback
+// for older firmware.
+// ---------------------------------------------------------------------------
+
+const applyConfigChannel = config => {
+  if (!config || !config.channel) return
+  channel.value = config.channel === 'beta' ? 'beta' : 'stable'
+  safeLocal.set(CHANNEL_STORAGE_KEY, channel.value)
+}
+
+const loadUpdateConfig = async () => {
+  try {
+    const response = await axios.get(`/api/update/config?t=${Date.now()}`, {
+      timeout: 8000,
+      silent: true
+    })
+    if (response.data?.mode) {
+      updateConfig.value = response.data
+      applyConfigChannel(response.data)
+    }
+    return response.data || null
+  } catch {
+    return null
+  }
+}
+
+// Throws on transport/server errors so the page can toast; resolves with the
+// accepted configuration otherwise (the device answers with the saved state).
+const saveUpdateConfig = async config => {
+  const response = await axios.post('/api/update/config', config, { timeout: 10000, silent: true })
+  if (response.data?.mode) {
+    updateConfig.value = response.data
+    applyConfigChannel(response.data)
+    // Refresh the status so the schedule block reflects the saved config.
+    await loadUpdateStatus().catch(() => {})
+  }
+  return response.data
+}
+
+// Stage exactly the update the last search found for the next maintenance
+// window. Outcome: 'scheduled', 'no_search_result' (search first), 'network'.
+const scheduleInstall = async target => {
+  try {
+    const response = await axios.post('/api/update/schedule', { target }, { timeout: 8000, silent: true })
+    if (response.data?.outcome === 'scheduled') {
+      await loadUpdateStatus().catch(() => {})
+    }
+    return response.data?.outcome || 'unavailable'
+  } catch {
+    return 'network'
+  }
+}
+
+const cancelScheduledInstall = async () => {
+  try {
+    const response = await axios.post('/api/update/schedule', { cancel: true }, { timeout: 8000, silent: true })
+    await loadUpdateStatus().catch(() => {})
+    return response.data?.outcome || 'unavailable'
+  } catch {
+    return 'network'
   }
 }
 
@@ -311,6 +400,7 @@ export function useUpdateSearch(t) {
     channel,
     checking,
     updateStatus,
+    updateConfig,
     triggerOutcome,
     triggerMessage,
     resultMessage,
@@ -321,6 +411,10 @@ export function useUpdateSearch(t) {
     formatTimestamp,
     startInstall,
     installBusy,
-    fetchReleaseNotes
+    fetchReleaseNotes,
+    loadUpdateConfig,
+    saveUpdateConfig,
+    scheduleInstall,
+    cancelScheduledInstall
   }
 }
