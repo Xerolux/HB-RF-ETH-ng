@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0-Beta.1] - 2026-10-21
+
+### Changes
+- fix(update): size the schedule status block for -Wformat-truncation
+- test(update): correct the defensive-clamp backoff expectation
+- fix(webui): minFirmwareVersion 2.3.0-Beta.1 (semver: prerelease < release)
+- chore: bump firmware version to 2.3.0-Beta.1 (dev)
+- fix(update): review findings — parser strictness, lock scope, 2038, TZ race
+- docs: automatic updates B2/C/D + scheduled install; scheduler cycle fix
+- feat(webui): automatic-update card, window-install scheduling, pending banner
+- feat(update): config and schedule endpoints plus scheduler status (B2/C/D)
+- feat(update): scheduler for automatic checks and installs (stages B2/C/D)
+- feat(update): persisted automatic-update configuration (plan §6.1)
+- feat(update): host-tested scheduling policy for stages B2/C/D
+- feat(settings): configurable POSIX time zone
+- chore(deps)(deps-dev): bump @vitejs/plugin-vue in /webui (#472)
+- docs(troubleshooting): power-cycle requires unplugging both PoE and USB (issue #461)
+- chore: update manifests for v2.2.9-Beta.2
+
 ### Added
 - Automatic updates (plan stages B2/C/D in docs/AUTO_UPDATE_PLAN.md §7.1),
   strictly opt-in: `upd_mode` ships as `off` for every device updated to
