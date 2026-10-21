@@ -93,9 +93,10 @@ static void test_backoff_ladder()
     assert(update_schedule_delay_after_failures(3, 6) == 4);
     assert(update_schedule_delay_after_failures(4, 6) == 6);
 
-    // Defensive clamp for an unvalidated interval argument.
+    // Defensive clamp for an unvalidated interval argument: anything below
+    // the 6 h minimum behaves as 6 h, so the ladder applies unclamped.
     assert(update_schedule_delay_after_failures(1, 0) == 1);
-    assert(update_schedule_delay_after_failures(3, 2) == 2);
+    assert(update_schedule_delay_after_failures(3, 2) == 4);
 }
 
 static void test_window_wraparound()
