@@ -103,12 +103,12 @@ static void build_schedule_block(char *out, size_t size)
 
     char pending[96] = "null";
     if (sched.pendingValid) {
-        snprintf(pending, sizeof(pending), "{\"target\":\"%s\",\"version\":\"%s\"}",
+        snprintf(pending, sizeof(pending), "{\"target\":\"%s\",\"version\":\"%.31s\"}",
                  sched.pendingFirmware ? "firmware" : "webui", sched.pendingVersion);
     }
     char stage[128] = "null";
     if (sched.stageValid) {
-        snprintf(stage, sizeof(stage), "{\"firmware\":\"%s\",\"webui\":\"%s\"}",
+        snprintf(stage, sizeof(stage), "{\"firmware\":\"%.31s\",\"webui\":\"%.31s\"}",
                  sched.stageFwVersion, sched.stageUiVersion);
     }
     char blocked_json[40] = "null";
@@ -166,7 +166,11 @@ static esp_err_t send_status(httpd_req_t *req)
     append_escaped(install_version, sizeof(install_version), install.targetVersion);
     append_escaped(install_error, sizeof(install_error), install.error);
 
-    char schedule_block[512];
+    // Sized for the format-truncation worst case: fixed text plus the full
+    // declared sizes of every %s argument (31/31/95/127). The version fields
+    // are additionally precision-bounded in the sub-builders above, so real
+    // content stays far below this.
+    char schedule_block[768];
     build_schedule_block(schedule_block, sizeof(schedule_block));
 
     const int written = snprintf(
