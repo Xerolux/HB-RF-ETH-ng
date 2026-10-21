@@ -490,55 +490,110 @@ static void install_task(void *parameter)
         // cross its initialization (C++ forbids that even for scalars).
         bool opened               = false;
 
-        esp_http_client_config_t cfg = {};
-        configure_ota_http_client(cfg, url);
-        cfg.method     = HTTP_METHOD_GET;
-        cfg.timeout_ms = remaining_ms(deadline_ms);
-        cfg.is_async   = true;
-
-        esp_http_client_handle_t client = esp_http_client_init(&cfg);
-        if (!client) {
-            finish_with_error("HTTP client could not be created");
+        // Plan rule 7 + GitHub reality: release assets answer with a 302 to a
+        // signed CDN URL (currently release-assets.githubusercontent.com,
+        // carrying well over a kilobyte of Azure SAS parameters). The
+        // streaming API (open/fetch_headers) does not follow redirects the
+        // way esp_http_client_perform does, and the host allowlist has to be
+        // re-checked on every hop anyway - so each redirect is taken
+        // explicitly, with a fresh client (a new TLS session per host) and
+        // the policy check in between.
+        static constexpr size_t EFFECTIVE_URL_MAX_BYTES = 2048;
+        static constexpr int MAX_REDIRECT_HOPS = 5;
+        char *effective_url = static_cast<char *>(malloc(EFFECTIVE_URL_MAX_BYTES));
+        if (!effective_url) {
+            finish_with_error("Not enough memory for the redirect buffer");
             goto download_done;
         }
+        strlcpy(effective_url, url, EFFECTIVE_URL_MAX_BYTES);
+
+        esp_http_client_handle_t client = NULL;
+        int redirect_hops = 0;
 
         for (;;) {
-            if (!step_ready(client, deadline_ms)) {
-                finish_with_error("Timeout while connecting");
-                goto client_done;
-            }
-            const esp_err_t err = esp_http_client_open(client, 0);
-            if (err == ESP_OK) {
-                opened = true;
-                break;
-            }
-            if (err != ESP_ERR_HTTP_EAGAIN) {
-                snprintf(error, sizeof(error), "Connection failed: %s", esp_err_to_name(err));
-                finish_with_error(error);
-                goto client_done;
-            }
-            retry_delay(deadline_ms);
-        }
-        for (;;) {
-            if (!step_ready(client, deadline_ms)) {
-                finish_with_error("Timeout while reading response headers");
-                goto client_done;
-            }
-            const int64_t headers = esp_http_client_fetch_headers(client);
-            if (headers >= 0) break;
-            if (headers != -ESP_ERR_HTTP_EAGAIN) {
-                finish_with_error("Could not read response headers");
-                goto client_done;
-            }
-            retry_delay(deadline_ms);
-        }
+            opened = false;
 
-        if (esp_http_client_get_status_code(client) != 200) {
-            snprintf(error, sizeof(error), "Server returned HTTP %d",
-                     esp_http_client_get_status_code(client));
+            esp_http_client_config_t cfg = {};
+            configure_ota_http_client(cfg, effective_url);
+            cfg.method     = HTTP_METHOD_GET;
+            cfg.timeout_ms = remaining_ms(deadline_ms);
+            cfg.is_async   = true;
+
+            client = esp_http_client_init(&cfg);
+            if (!client) {
+                finish_with_error("HTTP client could not be created");
+                goto download_done;
+            }
+
+            for (;;) {
+                if (!step_ready(client, deadline_ms)) {
+                    finish_with_error("Timeout while connecting");
+                    goto client_done;
+                }
+                const esp_err_t err = esp_http_client_open(client, 0);
+                if (err == ESP_OK) {
+                    opened = true;
+                    break;
+                }
+                if (err != ESP_ERR_HTTP_EAGAIN) {
+                    snprintf(error, sizeof(error), "Connection failed: %s", esp_err_to_name(err));
+                    finish_with_error(error);
+                    goto client_done;
+                }
+                retry_delay(deadline_ms);
+            }
+            for (;;) {
+                if (!step_ready(client, deadline_ms)) {
+                    finish_with_error("Timeout while reading response headers");
+                    goto client_done;
+                }
+                const int64_t headers = esp_http_client_fetch_headers(client);
+                if (headers >= 0) break;
+                if (headers != -ESP_ERR_HTTP_EAGAIN) {
+                    finish_with_error("Could not read response headers");
+                    goto client_done;
+                }
+                retry_delay(deadline_ms);
+            }
+
+            const int status = esp_http_client_get_status_code(client);
+            if (status == 200) break;
+
+            if (status == 301 || status == 302 || status == 307 || status == 308) {
+                if (++redirect_hops > MAX_REDIRECT_HOPS) {
+                    finish_with_error("Too many redirects");
+                    goto client_done;
+                }
+                // The pointer targets the client's header storage; copy
+                // before the client is torn down.
+                const char *location = NULL;
+                if (esp_http_client_get_header(client, "Location", &location) != ESP_OK ||
+                    location == NULL) {
+                    finish_with_error("Redirect without a Location header");
+                    goto client_done;
+                }
+                if (strncmp(location, "https://", 8) != 0 ||
+                    !update_url_policy_allows(location)) {
+                    snprintf(error, sizeof(error), "Redirect target not allowed: %.48s", location);
+                    finish_with_error(error);
+                    goto client_done;
+                }
+                if (strlen(location) >= EFFECTIVE_URL_MAX_BYTES) {
+                    finish_with_error("Redirect URL too long");
+                    goto client_done;
+                }
+                strlcpy(effective_url, location, EFFECTIVE_URL_MAX_BYTES);
+                if (opened) esp_http_client_close(client);
+                esp_http_client_cleanup(client);
+                client = NULL;
+                continue;
+            }
+
+            snprintf(error, sizeof(error), "Server returned HTTP %d", status);
             finish_with_error(error);
             goto client_done;
         }
+
         if (esp_http_client_get_content_length(client) != (int64_t)expected_size) {
             finish_with_error("Download size does not match the manifest");
             goto client_done;
@@ -653,6 +708,7 @@ static void install_task(void *parameter)
         }
 
     download_done:
+        free(effective_url);
         if (!download_ok) {
             if (sha_started) {
                 sha_abort(&sha);
