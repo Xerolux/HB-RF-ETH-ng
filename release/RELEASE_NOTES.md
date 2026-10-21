@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.3.0-Beta.1
+# 🚀 HB-RF-ETH-ng v2.3.0-Beta.2
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,66 +11,18 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.3.0-Beta.1?
+## 🆕 Was ist neu in v2.3.0-Beta.2?
 
 ### Changes
-- fix(update): size the schedule status block for -Wformat-truncation
-- test(update): correct the defensive-clamp backoff expectation
-- fix(webui): minFirmwareVersion 2.3.0-Beta.1 (semver: prerelease < release)
-- chore: bump firmware version to 2.3.0-Beta.1 (dev)
-- fix(update): review findings — parser strictness, lock scope, 2038, TZ race
-- docs: automatic updates B2/C/D + scheduled install; scheduler cycle fix
-- feat(webui): automatic-update card, window-install scheduling, pending banner
-- feat(update): config and schedule endpoints plus scheduler status (B2/C/D)
-- feat(update): scheduler for automatic checks and installs (stages B2/C/D)
-- feat(update): persisted automatic-update configuration (plan §6.1)
-- feat(update): host-tested scheduling policy for stages B2/C/D
-- feat(settings): configurable POSIX time zone
-- chore(deps)(deps-dev): bump @vitejs/plugin-vue in /webui (#472)
-- docs(troubleshooting): power-cycle requires unplugging both PoE and USB (issue #461)
-- chore: update manifests for v2.2.9-Beta.2
-
-### Added
-- Automatic updates (plan stages B2/C/D in docs/AUTO_UPDATE_PLAN.md §7.1),
-  strictly opt-in: `upd_mode` ships as `off` for every device updated to
-  this firmware, so an update never switches on uninvited outbound
-  connections. Factory-fresh devices start on `notify` (search & display
-  only). Modes `auto_webui`/`auto_all` install inside a configurable
-  maintenance window in device-local time, with a synchronized clock and
-  (by default) a quiet CCU session as hard gates; §4.3 postpones with
-  `installBlocked: "no_valid_time"` instead of failing. The scheduler is an
-  hourly `esp_timer` plus one first-check shot (10 min + MAC-derived
-  jitter); all rules are host-tested in
-  `test/host/test_update_schedule_policy.cpp`. A failed search backs off
-  1 h → 2 h → 4 h, then waits the full interval; skipped searches never
-  count as failures, and a manual search satisfies the current cycle.
-- Scheduled one-shot install ("Im Wartungsfenster installieren"): from the
-  install confirmation dialog, exactly the update the last search found can
-  be staged for the next maintenance window instead of installing now —
-  mode-independent, persisted across reboots (7-day expiry), cancellable,
-  visible as `pending` in the status. `POST /api/update/schedule` never
-  accepts a version from the request; the installer re-verifies the
-  manifest at window time.
-- Two-stage updates: firmware first, reboot, then the WebUI — for
-  `auto_all` and for scheduled firmware installs with a pending WebUI
-  update. The NVS marker survives two boots and is discarded on rollback.
-- `GET/POST /api/update/config` (mode, channel, interval 6–168 h, window
-  start/length, idle-only) and a `schedule` block in
-  `GET /api/update/status` (mode, next check estimate, `installBlocked`
-  reason, persisted seen record, pending/stage entries). The persisted
-  channel now also applies to `POST /api/update/check` without a body.
-- Configurable time zone (POSIX TZ string, default `UTC0` = unchanged
-  behaviour) in the settings time tab with presets (UTC, Berlin, London),
-  charset validation and a live wall-clock preview. Applied at boot and
-  immediately on change; the maintenance window runs in this local time.
-  Syslog timestamps deliberately stay UTC.
-- WebUI: third card "Automatisches Update" on the firmware page, pending
-  banner with cancel on both update pages, `installBlocked` hints (clock,
-  window, CCU session, busy) as durable content. Translations de/en/fr/it.
-
-### Changed
-- `webui/compatibility.json` `minFirmwareVersion` raised to `2.3.0`
-  (additive API, `apiVersion` unchanged per RELEASE_VERSIONING).
+- chore: bump versions for v2.3.0-Beta.2 (WebUI 1.1.0)
+- fix(update): schedule endpoint re-checks the target against running versions
+- fix(update): collect the redirect Location via the header event
+- chore(update): drop duplicate webui_internal.h include
+- fix(update): scheduled installs read the persisted channel after reboots
+- fix(update): scheduled installs honor idleOnly=false (live finding)
+- fix(update): compile - header signature and goto scope in redirect loop
+- fix(update): follow release-asset redirects with per-hop allowlist checks
+- chore: update manifests for v2.3.0-Beta.1
 
 ## ✨ Hauptfunktionen
 
@@ -107,8 +59,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.3.0-Beta.1.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.0.7.bin`)
+- **Firmware-Binary** (`firmware_2.3.0-Beta.2.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.1.0.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -149,6 +101,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.0.7`
+- WebUI version: `1.1.0`
 - WebUI API: `1`
 - Minimum firmware: `2.3.0-Beta.1`

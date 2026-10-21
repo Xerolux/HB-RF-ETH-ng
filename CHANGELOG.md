@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0-Beta.2] - 2026-10-21
+
+### Changes
+- chore: bump versions for v2.3.0-Beta.2 (WebUI 1.1.0)
+- fix(update): schedule endpoint re-checks the target against running versions
+- fix(update): collect the redirect Location via the header event
+- chore(update): drop duplicate webui_internal.h include
+- fix(update): scheduled installs read the persisted channel after reboots
+- fix(update): scheduled installs honor idleOnly=false (live finding)
+- fix(update): compile - header signature and goto scope in redirect loop
+- fix(update): follow release-asset redirects with per-hop allowlist checks
+- chore: update manifests for v2.3.0-Beta.1
+
 ## [2.3.0-Beta.1] - 2026-10-21
 
 ### Changes
