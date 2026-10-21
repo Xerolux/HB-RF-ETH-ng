@@ -500,6 +500,17 @@ static void install_task(void *parameter)
         // the policy check in between.
         static constexpr size_t EFFECTIVE_URL_MAX_BYTES = 2048;
         static constexpr int MAX_REDIRECT_HOPS = 5;
+
+        // Response headers are only reachable through the event handler in the
+        // streaming API (esp_http_client_get_header reads the REQUEST header
+        // list). The Location header is collected here, case-insensitively;
+        // with multiple headers the last one wins, matching curl -L.
+        struct redirect_context {
+            char location[EFFECTIVE_URL_MAX_BYTES];
+            bool has_location;
+        };
+        redirect_context redirect_ctx = {};
+
         esp_http_client_handle_t client = NULL;
         int redirect_hops = 0;
         char *effective_url = static_cast<char *>(malloc(EFFECTIVE_URL_MAX_BYTES));
@@ -511,12 +522,23 @@ static void install_task(void *parameter)
 
         for (;;) {
             opened = false;
+            redirect_ctx.has_location = false;
 
             esp_http_client_config_t cfg = {};
             configure_ota_http_client(cfg, effective_url);
             cfg.method     = HTTP_METHOD_GET;
             cfg.timeout_ms = remaining_ms(deadline_ms);
             cfg.is_async   = true;
+            cfg.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
+                if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key != NULL &&
+                    evt->header_value != NULL && strcasecmp(evt->header_key, "Location") == 0) {
+                    auto *ctx = static_cast<redirect_context *>(evt->user_data);
+                    strlcpy(ctx->location, evt->header_value, sizeof(ctx->location));
+                    ctx->has_location = true;
+                }
+                return ESP_OK;
+            };
+            cfg.user_data = &redirect_ctx;
 
             client = esp_http_client_init(&cfg);
             if (!client) {
@@ -563,11 +585,8 @@ static void install_task(void *parameter)
                     finish_with_error("Too many redirects");
                     goto client_done;
                 }
-                // The pointer targets the client's header storage; copy
-                // before the client is torn down.
-                char *location = NULL;
-                if (esp_http_client_get_header(client, "Location", &location) != ESP_OK ||
-                    location == NULL) {
+                const char *location = redirect_ctx.has_location ? redirect_ctx.location : NULL;
+                if (location == NULL || location[0] == '\0') {
                     finish_with_error("Redirect without a Location header");
                     goto client_done;
                 }
