@@ -30,6 +30,7 @@
 #include "esp_log.h"
 #include "monitoring.h"
 #include "security_headers.h"
+#include "semver.h"
 #include "settings.h"
 #include "update_check.h"
 #include "update_install.h"
@@ -572,13 +573,21 @@ static esp_err_t post_update_schedule_handler_func(httpd_req_t *req)
     }
 
     // The version comes from the last search result, never from the request:
-    // the operator schedules exactly what they saw and confirmed.
+    // the operator schedules exactly what they saw and confirmed. The
+    // availability flags are search-time facts - an install that ran since
+    // leaves them stale - so the target is re-checked against what is
+    // actually running right now before the entry is accepted.
     const UpdateCheckStatus check = update_check_get_status();
     const bool firmware_target = strcmp(target, "firmware") == 0;
     const char *version = firmware_target ? check.latestFirmware : check.latestWebui;
-    const bool available =
-        firmware_target ? check.firmwareUpdateAvailable : check.webuiUpdateAvailable;
-    if (!check.everChecked || version[0] == '\0' || !available) {
+    const esp_app_desc_t *app = esp_app_get_description();
+    char running_webui_version[UPDATE_CHECK_VERSION_LEN] = {};
+    webui_storage_get_effective_version(running_webui_version, sizeof(running_webui_version));
+    const char *running = firmware_target ? (app ? app->version : "")
+                                           : running_webui_version;
+    const bool still_newer =
+        version[0] != '\0' && running[0] != '\0' && compareVersions(version, running) > 0;
+    if (!check.everChecked || version[0] == '\0' || !still_newer) {
         httpd_resp_set_status(req, "409 Conflict");
         httpd_resp_set_type(req, "application/json");
         return httpd_resp_sendstr(req, "{\"outcome\":\"no_search_result\"}");
