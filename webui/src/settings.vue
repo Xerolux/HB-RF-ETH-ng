@@ -468,6 +468,31 @@
                   <BFormSelectOption :value="115200">115200</BFormSelectOption>
                 </BFormSelect>
               </div>
+              <div class="form-group mt-4">
+                <label class="form-label">{{ t('settings.timezone') }}</label>
+                <BFormSelect v-model="timezonePreset">
+                  <BFormSelectOption
+                    v-for="preset in timezonePresets"
+                    :key="preset.value"
+                    :value="preset.value"
+                  >{{ preset.label }}</BFormSelectOption>
+                  <BFormSelectOption :value="TIMEZONE_CUSTOM">{{ t('settings.timezoneCustom') }}</BFormSelectOption>
+                </BFormSelect>
+                <BFormInput
+                  v-if="timezonePreset === TIMEZONE_CUSTOM"
+                  type="text"
+                  v-model="timezone"
+                  trim
+                  class="mt-2"
+                  :state="v$.timezone.$error ? false : null"
+                />
+                <BFormInvalidFeedback v-if="v$.timezone.$error">
+                  {{ t('settings.validation.invalidTimezone') }}
+                </BFormInvalidFeedback>
+                <div class="form-text">
+                  {{ t('settings.timezoneHelp') }}<template v-if="timezonePreview"> — {{ t('settings.timezoneNow', { time: timezonePreview }) }}</template>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -780,6 +805,31 @@ const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
 
+// POSIX TZ presets keep the common cases one click away; "custom" exposes the
+// raw string the firmware stores and validates (charset + 64 chars).
+const TIMEZONE_CUSTOM = '__custom__'
+const timezonePresets = [
+  { value: 'UTC0', label: 'UTC', iana: 'UTC' },
+  { value: 'CET-1CEST,M3.5.0,M10.5.0/3', label: 'Europe/Berlin (CET/CEST)', iana: 'Europe/Berlin' },
+  { value: 'GMT0BST,M3.5.0/1,M10.5.0', label: 'Europe/London (GMT/BST)', iana: 'Europe/London' }
+]
+const timezone = ref('UTC0')
+const timezonePreset = computed({
+  get: () => timezonePresets.some(p => p.value === timezone.value) ? timezone.value : TIMEZONE_CUSTOM,
+  set: value => { if (value !== TIMEZONE_CUSTOM) timezone.value = value }
+})
+// Wall-clock preview for the chosen zone. Only presets carry an IANA name the
+// browser Intl database can render; raw POSIX strings have no equivalent.
+const timezonePreview = computed(() => {
+  const preset = timezonePresets.find(p => p.value === timezone.value)
+  if (!preset) return null
+  try {
+    return new Intl.DateTimeFormat(undefined, { timeZone: preset.iana, hour: '2-digit', minute: '2-digit' }).format(new Date())
+  } catch {
+    return null
+  }
+})
+
 // Korrekturauftrag §7: persist + immediately apply the experimental-visibility
 // flag. Stored experimental values are untouched — we only flip the client
 // gate, which the header nav + this tab list read reactively.
@@ -976,6 +1026,13 @@ const ntp_server_validator = value => {
   return /^\d{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535
 }
 
+// Mirrors the firmware's validateTimezone(): POSIX TZ charset, 1..64 chars.
+const timezone_validator = value => {
+  if (typeof value !== 'string' || !value) return false
+  if (value.length > 64) return false
+  return /^[A-Za-z0-9<>+\-:,./]+$/.test(value)
+}
+
 // Custom validator for CCU IP that accepts both IPv4 and IPv6
 const ccuIPValidator = (value) => {
   if (!value || value.trim() === '') return true // Allow empty
@@ -1049,6 +1106,9 @@ const rules = computed(() => ({
     ntp_server_validator,
     maxLength: maxLength(64)
   },
+  timezone: {
+    timezone_validator
+  },
   dcfOffset: {
     required: requiredIf(isDcfActivated),
     numeric
@@ -1070,6 +1130,7 @@ const v$ = useVuelidate(rules, {
   ipv6Dns1,
   ipv6Dns2,
   ntpServer,
+  timezone,
   dcfOffset
 })
 
@@ -1087,6 +1148,7 @@ const buildSettingsPayload = () => ({
   dcfOffset: dcfOffset.value,
   gpsBaudrate: gpsBaudrate.value,
   ntpServer: ntpServer.value,
+  timezone: timezone.value,
   ledBrightness: ledBrightness.value,
   ledPrograms: { ...ledProgramValues.value },
   enableIPv6: enableIPv6.value,
@@ -1132,6 +1194,7 @@ const loadSettings = () => {
   dcfOffset.value = settingsStore.dcfOffset
   gpsBaudrate.value = settingsStore.gpsBaudrate
   ntpServer.value = settingsStore.ntpServer
+  timezone.value = settingsStore.timezone || 'UTC0'
   ledBrightness.value = settingsStore.ledBrightness
 
   // Load LED programs if available
@@ -1249,7 +1312,7 @@ const saveSettingsClick = async () => {
     const validationTabs = [
       ['general', ['adminUsername', 'ccuIP']],
       ['network', ['hostname', 'localIP', 'netmask', 'gateway', 'dns1', 'dns2', 'ipv6Address', 'ipv6PrefixLength', 'ipv6Gateway', 'ipv6Dns1', 'ipv6Dns2']],
-      ['time', ['ntpServer', 'dcfOffset']]
+      ['time', ['ntpServer', 'dcfOffset', 'timezone']]
     ]
     const invalidGroup = validationTabs.find(([, fields]) => fields.some(field => v$.value[field]?.$error))
     if (invalidGroup) activeTab.value = invalidGroup[0]

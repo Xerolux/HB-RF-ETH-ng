@@ -464,6 +464,44 @@ bool validateNtpServer(const char *ntpServer)
     return validateServerAddress(ntpServer, MAX_NTP_SERVER_LENGTH);
 }
 
+bool validateTimezone(const char *timezone)
+{
+    // POSIX TZ strings accepted: std/dst names (letters, <...> quoted form),
+    // signed hour offsets, minutes/seconds after ':', and the M/m transition
+    // rules joined by ','. Reject everything else so a malformed string can
+    // never reach setenv("TZ").
+    if (timezone == NULL || timezone[0] == '\0')
+    {
+        return false;
+    }
+
+    size_t len = strlen(timezone);
+    if (len > 64)
+    {
+        ESP_LOGW(TAG, "Timezone string too long: %zu (max 64)", len);
+        return false;
+    }
+
+    for (size_t i = 0; i < len; i++)
+    {
+        const char c = timezone[i];
+        const bool valid = (c >= 'A' && c <= 'Z') ||
+                           (c >= 'a' && c <= 'z') ||
+                           (c >= '0' && c <= '9') ||
+                           c == '+' || c == '-' ||
+                           c == ':' || c == ',' ||
+                           c == '/' || c == '.' ||
+                           c == '<' || c == '>';
+        if (!valid)
+        {
+            ESP_LOGW(TAG, "Invalid character '%c' in timezone string", c);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool validateCcuAddress(const char *address)
 {
     if (address == NULL || address[0] == '\0')

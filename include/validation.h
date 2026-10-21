@@ -48,6 +48,8 @@ bool validateDcfOffset(int offset);
 bool validateAdminPassword(const char *password);
 // NTP server validation (hostname, IPv4, IPv6, with optional port)
 bool validateNtpServer(const char *ntpServer);
+// POSIX TZ string validation (charset + length guard for setenv("TZ"))
+bool validateTimezone(const char *timezone);
 
 // Port validation
 bool validatePort(int port);

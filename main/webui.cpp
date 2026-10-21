@@ -859,6 +859,7 @@ void add_settings(cJSON *root)
     cJSON_AddNumberToObject(settings, "gpsBaudrate", _settings->getGpsBaudrate());
 
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
+    cJSON_AddStringToObject(settings, "timezone", _settings->getTimezone());
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 
@@ -1066,6 +1067,7 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         cJSON_GetObjectItem(root, "gpsBaudrate"), _settings->getGpsBaudrate());
 
     char *ntpServer = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+    char *timezone = cJSON_GetStringValue(cJSON_GetObjectItem(root, "timezone"));
 
     int ledBrightness = cJSON_GetIntValueSafe(
         cJSON_GetObjectItem(root, "ledBrightness"), _settings->getLEDBrightness());
@@ -1189,6 +1191,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
         return send_json_error(req, "400 Bad Request", "invalid_ntp_server",
                                "ntpServer");
     }
+    if (timezone && !validateTimezone(timezone)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_timezone",
+                               "timezone");
+    }
     if (!validateDcfOffset(dcfOffset)) {
         cJSON_Delete(root);
         return send_json_error(req, "400 Bad Request", "invalid_dcf_offset",
@@ -1305,6 +1312,11 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     _settings->setGpsBaudrate(gpsBaudrate);
     if (ntpServer) {
         _settings->setNtpServer(ntpServer);
+    }
+    if (timezone) {
+        // The setter applies setenv("TZ") + tzset() so local-time consumers
+        // pick up the new zone without a reboot.
+        _settings->setTimezone(timezone);
     }
     _settings->setLEDBrightness(ledBrightness);
 

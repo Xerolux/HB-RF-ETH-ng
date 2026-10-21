@@ -220,7 +220,10 @@ void app_main()
     if (bootWdt)
         esp_task_wdt_reset();
 
-    setenv("TZ", "UTC0", 1);
+    // The zone comes from settings so the maintenance window and other
+    // localtime consumers run in the operator's wall-clock time. Syslog keeps
+    // explicit UTC timestamps (gmtime_r) and is deliberately unaffected.
+    setenv("TZ", settings.getTimezone(), 1);
     tzset();
 
     Rtc *rtc = NULL;

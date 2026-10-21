@@ -55,6 +55,7 @@ typedef struct {
   int32_t dcfOffset;
   int32_t gpsBaudrate;
   char ntpServer[65];
+  char timezone[65];
   int32_t ledBrightness;
   int32_t ledPrograms[7];
   bool enableIPv6;
@@ -100,6 +101,10 @@ private:
   int32_t _gpsBaudrate;
 
   char _ntpServer[65] = {0};
+
+  // POSIX TZ string (e.g. "CET-1CEST,M3.5.0,M10.5.0/3"). "UTC0" keeps the
+  // historic behaviour. localtime_r consumers (maintenance window) honor it.
+  char _timezone[65] = {0};
 
   int32_t _ledBrightness;
   int32_t _ledPrograms[7];
@@ -182,6 +187,9 @@ public:
 
   char *getNtpServer();
   void setNtpServer(const char *ntpServer);
+
+  char *getTimezone();
+  void setTimezone(const char *timezone);
 
   int getLEDBrightness();
   void setLEDBrightness(int brightness);

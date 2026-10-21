@@ -399,6 +399,8 @@ export const useSettingsStore = defineStore('settings', {
     dcfOffset: 0,
     gpsBaudrate: 9600,
     ntpServer: "",
+    // POSIX TZ string; "UTC0" preserves the historic device behaviour.
+    timezone: "UTC0",
     ledBrightness: 100,
     ledPrograms: {
       idle: 1,

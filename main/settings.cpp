@@ -30,6 +30,8 @@
 #include "esp_log.h"
 #include "nvs_storage_lock.h"
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
 Settings::Settings()
 {
@@ -522,6 +524,7 @@ void Settings::resetToSafeDefaultsLocked()
   _dcfOffset = 40000;
   _gpsBaudrate = 9600;
   snprintf(_ntpServer, sizeof(_ntpServer), "%s", "pool.ntp.org");
+  snprintf(_timezone, sizeof(_timezone), "%s", "UTC0");
 
   static const int32_t default_led_programs[7] = {
       1, 5, 6, 4, 10, 4, 5,
@@ -747,6 +750,17 @@ esp_err_t Settings::load()
     strncpy(_ntpServer, "pool.ntp.org", sizeof(_ntpServer) - 1);
   }
 
+  size_t timezoneLength = sizeof(_timezone);
+  if (nvs_get_str(handle, "timezone", _timezone, &timezoneLength) != ESP_OK)
+  {
+    strncpy(_timezone, "UTC0", sizeof(_timezone) - 1);
+  }
+  else if (!validateTimezone(_timezone))
+  {
+    ESP_LOGW(TAG, "Invalid timezone in NVS, restoring UTC0");
+    strncpy(_timezone, "UTC0", sizeof(_timezone) - 1);
+  }
+
   // Initialize default LED programs
   int32_t defaults[7] = {
       1,  // IDLE: ON
@@ -928,6 +942,7 @@ esp_err_t Settings::validateStorageCapacityLocked(
   COUNT_STRING(adminUsername);
   COUNT_STRING(hostname);
   COUNT_STRING(ntpServer);
+  COUNT_STRING(timezone);
   COUNT_STRING(ipv6Mode);
   COUNT_STRING(ipv6Address);
   COUNT_STRING(ipv6Gateway);
@@ -1121,6 +1136,7 @@ esp_err_t Settings::save()
   SAVE_STEP(nvs_set_i32(handle, "dcfOffset", _dcfOffset));
   SAVE_STEP(nvs_set_i32(handle, "gpsBaudrate", _gpsBaudrate));
   SAVE_STEP(nvs_set_str(handle, "ntpServer", _ntpServer));
+  SAVE_STEP(nvs_set_str(handle, "timezone", _timezone));
 
   char key[16];
   for (int i = 0; i < 7; i++) {
@@ -1182,6 +1198,7 @@ void Settings::snapshot(settings_snapshot_t *out)
   SNAPSHOT_COPY(dcfOffset);
   SNAPSHOT_COPY(gpsBaudrate);
   SNAPSHOT_COPY(ntpServer);
+  SNAPSHOT_COPY(timezone);
   SNAPSHOT_COPY(ledBrightness);
   SNAPSHOT_COPY(ledPrograms);
   SNAPSHOT_COPY(enableIPv6);
@@ -1221,6 +1238,7 @@ void Settings::restoreSnapshot(const settings_snapshot_t *snapshot)
   SNAPSHOT_RESTORE(dcfOffset);
   SNAPSHOT_RESTORE(gpsBaudrate);
   SNAPSHOT_RESTORE(ntpServer);
+  SNAPSHOT_RESTORE(timezone);
   SNAPSHOT_RESTORE(ledBrightness);
   SNAPSHOT_RESTORE(ledPrograms);
   SNAPSHOT_RESTORE(enableIPv6);
@@ -1575,6 +1593,33 @@ void Settings::setNtpServer(const char *ntpServer)
   }
   strncpy(_ntpServer, ntpServer, sizeof(_ntpServer) - 1);
   if (_mutex) xSemaphoreGive(_mutex);
+}
+
+char *Settings::getTimezone()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  char *result = _timezone;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setTimezone(const char *timezone)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (!validateTimezone(timezone))
+  {
+    ESP_LOGE(TAG, "Invalid timezone, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  strncpy(_timezone, timezone, sizeof(_timezone) - 1);
+  _timezone[sizeof(_timezone) - 1] = '\0';
+  if (_mutex) xSemaphoreGive(_mutex);
+  // Take effect immediately: every localtime_r consumer (maintenance window,
+  // scheduled installs) must see the new zone without a reboot. UTC-anchored
+  // time(NULL)/settimeofday state is unaffected by the TZ environment.
+  setenv("TZ", _timezone, 1);
+  tzset();
 }
 
 int Settings::getLEDBrightness()

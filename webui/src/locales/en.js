@@ -170,6 +170,10 @@ export default {
     ntpServer: 'NTP Server',
     dcfOffset: 'DCF Offset',
     gpsBaudrate: 'GPS Baudrate',
+    timezone: 'Time zone',
+    timezoneCustom: 'Custom (POSIX TZ string)',
+    timezoneHelp: 'Defines the local wall-clock time the device reasons in (e.g. the maintenance window for automatic updates). Syslog timestamps stay UTC.',
+    timezoneNow: 'current time in this zone: {time}',
 
     // System Settings
     systemSettings: 'System Settings',
@@ -227,6 +231,7 @@ export default {
       invalidNetmask: 'Invalid subnet mask. Its set bits must be contiguous.',
       invalidNetwork: 'The network settings are invalid.',
       invalidNtpServer: 'Invalid NTP server or port.',
+      invalidTimezone: 'Invalid POSIX TZ string (allowed: letters, digits, + - : , / . < >; max. 64 characters).',
       invalidIpv6: 'Invalid IPv6 address',
       invalidIpv6Prefix: 'The IPv6 prefix must be between 1 and 128.',
       invalidIpv6Mode: 'Invalid IPv6 mode.',

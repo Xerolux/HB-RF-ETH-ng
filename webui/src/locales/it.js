@@ -170,6 +170,10 @@ export default {
     ntpServer: 'Server NTP',
     dcfOffset: 'Offset DCF',
     gpsBaudrate: 'Baudrate GPS',
+    timezone: 'Fuso orario',
+    timezoneCustom: 'Personalizzato (stringa TZ POSIX)',
+    timezoneHelp: "Definisce l'ora locale in cui ragiona il dispositivo (es. la finestra di manutenzione per gli aggiornamenti automatici). I timestamp syslog rimangono in UTC.",
+    timezoneNow: 'ora attuale in questo fuso: {time}',
 
     // System Settings
     systemSettings: 'Impostazioni di Sistema',
@@ -227,6 +231,7 @@ export default {
       invalidNetmask: 'Maschera di rete non valida. I bit impostati devono essere contigui.',
       invalidNetwork: 'Le impostazioni di rete non sono valide.',
       invalidNtpServer: 'Server NTP o porta non validi.',
+      invalidTimezone: 'Stringa TZ POSIX non valida (consentiti: lettere, cifre, + - : , / . < >; max 64 caratteri).',
       invalidIpv6: 'Indirizzo IPv6 non valido',
       invalidIpv6Prefix: 'Il prefisso IPv6 deve essere compreso tra 1 e 128.',
       invalidIpv6Mode: 'Modalità IPv6 non valida.',

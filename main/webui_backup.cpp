@@ -561,6 +561,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
                                             webui_settings()->getGpsBaudrate());
 
     char *ntpServer      = cJSON_GetStringValue(cJSON_GetObjectItem(root, "ntpServer"));
+    char *timezone       = cJSON_GetStringValue(cJSON_GetObjectItem(root, "timezone"));
     int ledBrightness    = cJSON_GetIntValueSafe(cJSON_GetObjectItem(root, "ledBrightness"),
                                                  webui_settings()->getLEDBrightness());
     cJSON *ledPrograms   = cJSON_GetObjectItem(root, "ledPrograms");
@@ -647,6 +648,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     if (timesource < TIMESOURCE_NTP || timesource > TIMESOURCE_GPS ||
         !validateDcfOffset(dcfOffset) || !validateGpsBaudrate(gpsBaudrate) ||
         !validateLEDBrightness(ledBrightness) || (ntpServer && !validateNtpServer(ntpServer)) ||
+        (timezone && !validateTimezone(timezone)) ||
         (ccuIP && ccuIP[0] != '\0' && !validateCcuAddress(ccuIP))) {
         cJSON_Delete(root);
         return send_json_error(req, "400 Bad Request", "invalid_backup", "settings");
@@ -782,6 +784,7 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     webui_settings()->setDcfOffset(dcfOffset);
     webui_settings()->setGpsBaudrate(gpsBaudrate);
     if (ntpServer) webui_settings()->setNtpServer(ntpServer);
+    if (timezone) webui_settings()->setTimezone(timezone);
     webui_settings()->setLEDBrightness(ledBrightness);
 
     if (ledPrograms) {
