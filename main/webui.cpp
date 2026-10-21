@@ -1945,8 +1945,9 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    // Reserve capacity for modular diagnostics/theme APIs.
-    config.max_uri_handlers = 44;
+    // Reserve capacity for modular diagnostics/theme APIs and the three
+    // update-config/schedule handlers added by update_api.cpp.
+    config.max_uri_handlers = 48;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = log_stream_close_socket;
     // Increase stack: POST handlers allocate content buffers + config structs
@@ -1978,6 +1979,9 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &get_update_status_handler);
         httpd_register_uri_handler(_httpd_handle, &post_update_check_handler);
         httpd_register_uri_handler(_httpd_handle, &post_update_install_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_update_config_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_update_config_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_update_schedule_handler);
         httpd_register_uri_handler(_httpd_handle, &post_change_password_handler);
         httpd_register_uri_handler(_httpd_handle, &get_monitoring_handler);
         httpd_register_uri_handler(_httpd_handle, &post_monitoring_handler);

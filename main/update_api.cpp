@@ -23,14 +23,18 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "monitoring.h"
 #include "security_headers.h"
+#include "settings.h"
 #include "update_check.h"
 #include "update_install.h"
+#include "update_schedule_policy.h"
+#include "update_scheduler.h"
 #include "webui.h"
 #include "webui_internal.h"
 #include "webui_storage.h"
@@ -38,14 +42,15 @@
 // REST surface of the manual update search and the online installer. The
 // install endpoint takes a target name only - never a URL; the download
 // address comes exclusively from the device manifest
-// (docs/AUTO_UPDATE_PLAN.md rule 7).
+// (docs/AUTO_UPDATE_PLAN.md rule 7). The config and schedule endpoints
+// (below) expose the automatic-update configuration of stages B2/C/D.
 
 static const char *TAG = "WebUI.update";
 
 // Responses are built in one fixed stack buffer. The largest field set is
-// bounded by UpdateCheckStatus plus the install block, so no dynamic JSON
-// assembly is needed.
-static constexpr size_t RESPONSE_BUFFER = 1024;
+// bounded by UpdateCheckStatus plus the install and schedule blocks, so no
+// dynamic JSON assembly is needed.
+static constexpr size_t RESPONSE_BUFFER = 1536;
 static constexpr size_t REQUEST_BUFFER  = 128;
 
 static const char *state_name(update_check_state_t state)
@@ -88,6 +93,50 @@ static void append_escaped(char *dest, size_t size, const char *value)
     dest[out] = '\0';
 }
 
+// The schedule block (stages B2/C/D) is appended additively after the install
+// block so older WebUIs keep parsing the response they know.
+static void build_schedule_block(char *out, size_t size)
+{
+    Settings *settings = webui_settings();
+    const UpdateSchedulerStatus sched = update_scheduler_get_status();
+    const char *blocked              = update_scheduler_install_blocked_reason();
+
+    char pending[96] = "null";
+    if (sched.pendingValid) {
+        snprintf(pending, sizeof(pending), "{\"target\":\"%s\",\"version\":\"%s\"}",
+                 sched.pendingFirmware ? "firmware" : "webui", sched.pendingVersion);
+    }
+    char stage[128] = "null";
+    if (sched.stageValid) {
+        snprintf(stage, sizeof(stage), "{\"firmware\":\"%s\",\"webui\":\"%s\"}",
+                 sched.stageFwVersion, sched.stageUiVersion);
+    }
+    char blocked_json[40] = "null";
+    if (blocked != NULL) {
+        snprintf(blocked_json, sizeof(blocked_json), "\"%s\"", blocked);
+    }
+    long long next_in = 0;
+    if (sched.nextCheckUnix > 0) {
+        const int64_t now = (int64_t)time(NULL);
+        if (sched.nextCheckUnix > now) {
+            next_in = (long long)(sched.nextCheckUnix - now);
+        }
+    }
+
+    snprintf(out, size,
+             "\"schedule\":{\"mode\":\"%s\",\"channel\":\"%s\",\"intervalHours\":%d,"
+             "\"windowStart\":%d,\"windowLength\":%d,\"idleOnly\":%s,"
+             "\"nextCheckIn\":%lld,\"installBlocked\":%s,"
+             "\"lastSeenCheck\":%lld,\"seenFirmware\":\"%s\",\"seenWebui\":\"%s\","
+             "\"pending\":%s,\"stage\":%s}",
+             update_mode_name(settings->getUpdMode()),
+             settings->getUpdChannel() == 1 ? "beta" : "stable",
+             settings->getUpdInterval(), settings->getUpdWinStart(),
+             settings->getUpdWinLen(), settings->getUpdIdleOnly() ? "true" : "false",
+             next_in, blocked_json, static_cast<long long>(sched.lastCheckUnix),
+             sched.seenFirmware, sched.seenWebui, pending, stage);
+}
+
 static esp_err_t send_status(httpd_req_t *req)
 {
     const UpdateCheckStatus status = update_check_get_status();
@@ -116,6 +165,10 @@ static esp_err_t send_status(httpd_req_t *req)
     char install_error[UPDATE_INSTALL_REASON_LEN * 2];
     append_escaped(install_version, sizeof(install_version), install.targetVersion);
     append_escaped(install_error, sizeof(install_error), install.error);
+
+    char schedule_block[512];
+    build_schedule_block(schedule_block, sizeof(schedule_block));
+
     const int written = snprintf(
         body, sizeof(body),
         "{\"state\":\"%s\",\"everChecked\":%s,\"channel\":\"%s\","
@@ -125,7 +178,7 @@ static esp_err_t send_status(httpd_req_t *req)
         "\"firmwareUpdateAvailable\":%s,\"webuiUpdateAvailable\":%s,"
         "\"notesUrl\":\"%s\",\"lastError\":\"%s\",\"lastSkipReason\":\"%s\","
         "\"install\":{\"state\":\"%s\",\"target\":\"%s\",\"progress\":%u,"
-        "\"version\":\"%s\",\"error\":\"%s\"}}",
+        "\"version\":\"%s\",\"error\":\"%s\"},%s}",
         state_name(status.state), status.everChecked ? "true" : "false", status.channel,
         static_cast<long long>(status.lastCheckUnix),
         static_cast<unsigned long>(status.cooldownRemainingSec), app ? app->version : "",
@@ -134,7 +187,8 @@ static esp_err_t send_status(httpd_req_t *req)
         install_state_name(install.state),
         update_install_target_name(install.target) ? update_install_target_name(install.target)
                                                    : "firmware",
-        static_cast<unsigned>(install.progress), install_version, install_error);
+        static_cast<unsigned>(install.progress), install_version, install_error,
+        schedule_block);
 
     if (written < 0 || static_cast<size_t>(written) >= sizeof(body)) {
         ESP_LOGE(TAG, "Update status response did not fit its buffer");
@@ -162,8 +216,12 @@ static esp_err_t post_update_check_handler_func(httpd_req_t *req)
     }
 
     // The channel is the only input, and it is matched against a fixed list
-    // rather than interpolated into the URL as received.
-    char channel[8] = "stable";
+    // rather than interpolated into the URL as received. Without a body the
+    // persisted channel (upd_channel) applies; an explicit body channel
+    // overrides it for this search.
+    Settings *settings = webui_settings();
+    char channel[8];
+    snprintf(channel, sizeof(channel), "%s", settings->getUpdChannel() == 1 ? "beta" : "stable");
     if (req->content_len > 0) {
         char buffer[REQUEST_BUFFER];
         const int length = recv_full_body(req, buffer, sizeof(buffer));
@@ -303,3 +361,238 @@ httpd_uri_t post_update_install_handler = {.uri      = "/api/update/install",
                                            .method   = HTTP_POST,
                                            .handler  = post_update_install_handler_func,
                                            .user_ctx = NULL};
+
+// --- GET/POST /api/update/config (stages B2/C/D) ------------------------------
+//
+// POST (the codebase has no PUT anywhere; every config write is a POST)
+// applies partial updates with the settings.json discipline: validate the
+// complete request first, snapshot, apply, save, roll the snapshot back when
+// the durable write fails.
+
+static int build_config_body(char *body, size_t size)
+{
+    Settings *settings = webui_settings();
+    return snprintf(body, size,
+                    "{\"mode\":\"%s\",\"channel\":\"%s\",\"intervalHours\":%d,"
+                    "\"windowStart\":%d,\"windowLength\":%d,\"idleOnly\":%s}",
+                    update_mode_name(settings->getUpdMode()),
+                    settings->getUpdChannel() == 1 ? "beta" : "stable",
+                    settings->getUpdInterval(), settings->getUpdWinStart(),
+                    settings->getUpdWinLen(), settings->getUpdIdleOnly() ? "true" : "false");
+}
+
+static esp_err_t get_update_config_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+    char body[256];
+    if (build_config_body(body, sizeof(body)) < 0) {
+        return send_json_error(req, "500 Internal Server Error", "response_too_large");
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, body);
+}
+
+static esp_err_t post_update_config_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    Settings *settings = webui_settings();
+    const int mode_current      = settings->getUpdMode();
+    const int channel_current   = settings->getUpdChannel();
+    const int interval_current  = settings->getUpdInterval();
+    const int winstart_current  = settings->getUpdWinStart();
+    const int winlen_current    = settings->getUpdWinLen();
+    const bool idle_current     = settings->getUpdIdleOnly();
+
+    int mode = mode_current, channel = channel_current;
+    int interval = interval_current, winstart = winstart_current, winlen = winlen_current;
+    bool idle = idle_current;
+    bool has_mode = false, has_channel = false;
+
+    if (req->content_len > 0) {
+        if (req->content_len > 256) {
+            return send_json_error(req, "400 Bad Request", "body_too_large");
+        }
+        char buffer[257];
+        const int length = recv_full_body(req, buffer, sizeof(buffer) - 1);
+        if (length < 0) {
+            return send_json_error(req, "400 Bad Request", "invalid_body");
+        }
+        buffer[length < 0 ? 0 : length] = '\0';
+        cJSON *root = cJSON_Parse(buffer);
+        if (!root) {
+            return send_json_error(req, "400 Bad Request", "invalid_body");
+        }
+
+        const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, "mode");
+        if (cJSON_IsString(item) && item->valuestring) {
+            mode = update_mode_from_name(item->valuestring);
+            // Unknown names degrade to "off"; only the literal spelling is
+            // an accepted request (mirrors the backup-restore check).
+            if (mode == UPDATE_MODE_OFF && strcmp(item->valuestring, "off") != 0) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request", "invalid_mode", "mode");
+            }
+            has_mode = true;
+        }
+
+        item = cJSON_GetObjectItemCaseSensitive(root, "channel");
+        if (cJSON_IsString(item) && item->valuestring) {
+            if (!update_channel_name_valid(item->valuestring)) {
+                cJSON_Delete(root);
+                return send_json_error(req, "400 Bad Request", "invalid_channel", "channel");
+            }
+            channel = strcmp(item->valuestring, "beta") == 0 ? 1 : 0;
+            has_channel = true;
+        }
+
+        item = cJSON_GetObjectItemCaseSensitive(root, "intervalHours");
+        if (cJSON_IsNumber(item)) {
+            interval = item->valueint;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(root, "windowStart");
+        if (cJSON_IsNumber(item)) {
+            winstart = item->valueint;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(root, "windowLength");
+        if (cJSON_IsNumber(item)) {
+            winlen = item->valueint;
+        }
+        item = cJSON_GetObjectItemCaseSensitive(root, "idleOnly");
+        if (cJSON_IsBool(item)) {
+            idle = cJSON_IsTrue(item);
+        }
+        cJSON_Delete(root);
+    }
+
+    // Validate the complete effective configuration before touching anything.
+    if (!update_mode_valid(mode) || !update_interval_valid(interval) ||
+        !update_window_start_valid(winstart) || !update_window_len_valid(winlen)) {
+        return send_json_error(req, "400 Bad Request", "invalid_config");
+    }
+
+    // Snapshot → apply → save, rolling the in-RAM state back if the durable
+    // write fails, exactly like POST /settings.json.
+    settings_snapshot_t previous;
+    settings->snapshot(&previous);
+    settings->setUpdMode(mode);
+    settings->setUpdChannel(channel);
+    settings->setUpdInterval(interval);
+    settings->setUpdWinStart(winstart);
+    settings->setUpdWinLen(winlen);
+    settings->setUpdIdleOnly(idle);
+
+    const esp_err_t saved = settings->save();
+    if (saved != ESP_OK) {
+        settings->restoreSnapshot(&previous);
+        const esp_err_t rollback = settings->save();
+        if (rollback != ESP_OK) {
+            ESP_LOGE(TAG, "Could not roll back failed update-config save: %s",
+                     esp_err_to_name(rollback));
+        }
+        return send_json_error(req, "500 Internal Server Error", "save_failed");
+    }
+
+    if (has_mode && mode != mode_current) {
+        ESP_LOGI(TAG, "Update mode changed: %s -> %s", update_mode_name(mode_current),
+                 update_mode_name(mode));
+    }
+    if (has_channel && channel != channel_current) {
+        ESP_LOGI(TAG, "Update channel changed: %s", channel == 1 ? "beta" : "stable");
+    }
+
+    char body[256];
+    build_config_body(body, sizeof(body));
+    httpd_resp_set_status(req, "200 OK");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, body);
+}
+
+httpd_uri_t get_update_config_handler = {.uri      = "/api/update/config",
+                                         .method   = HTTP_GET,
+                                         .handler  = get_update_config_handler_func,
+                                         .user_ctx = NULL};
+
+httpd_uri_t post_update_config_handler = {.uri      = "/api/update/config",
+                                          .method   = HTTP_POST,
+                                          .handler  = post_update_config_handler_func,
+                                          .user_ctx = NULL};
+
+// --- POST /api/update/schedule (one-shot install at the window) ---------------
+
+static esp_err_t post_update_schedule_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK) {
+        return httpd_resp_send_err(req, HTTPD_401_UNAUTHORIZED, NULL);
+    }
+
+    char target[16] = "";
+    bool cancel = false;
+    if (req->content_len > 0) {
+        char buffer[REQUEST_BUFFER];
+        const int length = recv_full_body(req, buffer, sizeof(buffer));
+        if (length < 0) {
+            return send_json_error(req, "400 Bad Request", "invalid_body");
+        }
+        cJSON *root = cJSON_Parse(buffer);
+        if (root) {
+            const cJSON *item = cJSON_GetObjectItemCaseSensitive(root, "target");
+            if (cJSON_IsString(item) && item->valuestring) {
+                snprintf(target, sizeof(target), "%s", item->valuestring);
+            }
+            item = cJSON_GetObjectItemCaseSensitive(root, "cancel");
+            if (cJSON_IsBool(item)) {
+                cancel = cJSON_IsTrue(item);
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    if (cancel) {
+        const bool existed = update_scheduler_clear_pending();
+        httpd_resp_set_status(req, "200 OK");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(
+            req, existed ? "{\"outcome\":\"cancelled\"}" : "{\"outcome\":\"nothing_scheduled\"}");
+    }
+
+    if (strcmp(target, "firmware") != 0 && strcmp(target, "webui") != 0) {
+        return send_json_error(req, "400 Bad Request", "invalid_target", "target");
+    }
+
+    // The version comes from the last search result, never from the request:
+    // the operator schedules exactly what they saw and confirmed.
+    const UpdateCheckStatus check = update_check_get_status();
+    const bool firmware_target = strcmp(target, "firmware") == 0;
+    const char *version = firmware_target ? check.latestFirmware : check.latestWebui;
+    const bool available =
+        firmware_target ? check.firmwareUpdateAvailable : check.webuiUpdateAvailable;
+    if (!check.everChecked || version[0] == '\0' || !available) {
+        httpd_resp_set_status(req, "409 Conflict");
+        httpd_resp_set_type(req, "application/json");
+        return httpd_resp_sendstr(req, "{\"outcome\":\"no_search_result\"}");
+    }
+
+    if (!update_scheduler_set_pending(firmware_target, version)) {
+        return send_json_error(req, "500 Internal Server Error", "schedule_failed");
+    }
+
+    char body[96];
+    snprintf(body, sizeof(body), "{\"outcome\":\"scheduled\",\"target\":\"%s\",\"version\":\"%s\"}",
+             target, version);
+    httpd_resp_set_status(req, "202 Accepted");
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, body);
+}
+
+httpd_uri_t post_update_schedule_handler = {.uri      = "/api/update/schedule",
+                                            .method   = HTTP_POST,
+                                            .handler  = post_update_schedule_handler_func,
+                                            .user_ctx = NULL};

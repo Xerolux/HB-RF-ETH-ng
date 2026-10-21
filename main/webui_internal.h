@@ -123,3 +123,6 @@ extern httpd_uri_t get_ota_status_handler;     // webui_ota.cpp
 extern httpd_uri_t get_update_status_handler;  // update_api.cpp
 extern httpd_uri_t post_update_check_handler;  // update_api.cpp
 extern httpd_uri_t post_update_install_handler; // update_api.cpp
+extern httpd_uri_t get_update_config_handler;  // update_api.cpp
+extern httpd_uri_t post_update_config_handler; // update_api.cpp
+extern httpd_uri_t post_update_schedule_handler; // update_api.cpp
