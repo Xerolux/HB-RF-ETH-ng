@@ -56,6 +56,13 @@ The board has no ESP32 reset button (the mounted push button belongs to
 the radio module). To capture a log from the very first line, start the
 terminal first and then power-cycle the board.
 
+Note that a power-cycle which must actually restart the board unplugs the
+Micro-USB cable as well — USB powers the board in parallel with PoE. While
+the board is unpowered the CH340 disappears from the host, so terminal
+programs may quit with an error (pyserial/miniterm: `device disconnected`)
+and the first one to two seconds of boot output are lost while the port
+re-enumerates. That is expected — reopen the terminal after reconnecting.
+
 Look for error messages, warnings, or crash logs.
 
 ---
@@ -415,6 +422,15 @@ If the device reverts even though it was left powered undisturbed, the new
 application itself reset inside the window; capture the serial log (below)
 to identify the panic.
 
+**Final outcome (issue #461, resolved 2026-10-20):** the migration was then
+verified successfully — the last missing piece was not firmware at all. The
+Micro-USB port powers the board in parallel with PoE, so unplugging only PoE
+while the USB serial cable is attached does **not** power-cycle the device:
+the board keeps running the old firmware and the activated image never
+boots. A real power-cycle unplugs **both** PoE and USB, waits a few seconds,
+and reconnects both. No bootloader update and no intermediate release was
+ever needed.
+
 **Upload and verification:**
 
 The easiest path for a serial install is the **web flasher**:
@@ -451,13 +467,17 @@ upload/preflight/verification failed; an accepted upload alone is never success.
 1. Use `--verify-only` to check the device API independently of browser caching.
 2. Re-run the migration once with the device left completely undisturbed for
    at least 60 seconds after the requested power-cycle. Most reverts are a
-   power-cycle inside the 15-second self-test window.
+   power-cycle inside the 15-second self-test window. The power-cycle must
+   unplug **both** PoE and the Micro-USB cable — with USB attached, the
+   board stays powered and never reboots (see the final outcome note above).
 3. If it reverts again, capture the serial output at **115200 baud** from
    power-on through fallback to the old application, through the board's
    Micro-USB port (see *Serial Console Access* above; no external UART
    adapter is required — a data-capable Micro-USB cable is enough). Reading
-   the log does not require erasing or flashing. Do not power the board from
-   two sources. Record bootloader errors, reset reason and any application
+   the log does not require erasing or flashing. Powering from PoE and USB
+   simultaneously is how serial logging normally runs; just remember that
+   with USB attached, unplugging PoE alone does not power-cycle the board.
+   Record bootloader errors, reset reason and any application
    panic; remove credentials and personal/network identifiers before sharing
    the log. The log distinguishes an application panic inside the window
    from an external reset.

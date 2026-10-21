@@ -212,7 +212,8 @@ def verify_running_firmware(target, expected_version, timeout):
             time.sleep(min(POLL_SECONDS, remaining))
     raise RuntimeError(
         f"migration NOT verified: expected {expected_version}; {last_observation}. "
-        "If still on 1.3.x after a power-cycle, do not keep repeating uploads. "
+        "If still on 1.3.x after a power-cycle (it must unplug BOTH PoE and the "
+        "Micro-USB cable - USB powers the board), do not keep repeating uploads. "
         "Capture the serial boot log (115200 baud) to diagnose boot failure/rollback; "
         "see docs/TROUBLESHOOTING.md. Verification can be retried with --verify-only "
         "without writing flash."
@@ -334,7 +335,9 @@ def main():
                     f"{body.strip() or '<no response body>'}"
                 )
             print("Upload acknowledged. The new firmware has NOT yet been verified running.")
-            print("Now power-cycle the device once (unplug and reconnect the power supply).", flush=True)
+            print("Now power-cycle the device once: unplug ALL power - both PoE AND the\n"
+                  "Micro-USB cable (USB also powers the board) - wait a few seconds,\n"
+                  "then reconnect.", flush=True)
         print(f"Waiting up to {args.wait_seconds}s for firmware {expected_version} "
               f"to remain reachable for {VERIFY_STABLE_SECONDS}s...", flush=True)
         verify_running_firmware(target, expected_version, args.wait_seconds)
