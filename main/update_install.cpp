@@ -43,6 +43,7 @@
 #include "led.h"
 #include "mbedtls/md.h"
 #include "monitoring.h"
+#include "webui_internal.h"
 #include "ota_config.h"
 #include "reset_info.h"
 #include "semver.h"
@@ -858,13 +859,21 @@ update_install_result_t update_install_start(const char *target)
         return UPDATE_INSTALL_INVALID_TARGET;
     }
 
-    // The channel of the last search decides which manifest is installed
-    // from - the administrator searched a channel and clicks install on that
-    // result. Defaults to stable before the first search.
+    // Which manifest the install reads: a search that ran THIS boot names
+    // the channel the operator is looking at; otherwise (typical for a
+    // scheduled install after a reboot - the search status is RAM-only) the
+    // persisted channel setting decides. Falling back to a hard "stable"
+    // instead silently installed from the wrong manifest - found live when a
+    // beta-scheduled WebUI install rejected 1.0.7 as "not newer" because it
+    // had read the stable manifest's 1.0.6.
     const UpdateCheckStatus check = update_check_get_status();
     char channel[8];
-    snprintf(channel, sizeof(channel), "%s",
-             update_check_valid_channel(check.channel) ? check.channel : "stable");
+    if (check.everChecked && update_check_valid_channel(check.channel)) {
+        snprintf(channel, sizeof(channel), "%s", check.channel);
+    } else {
+        snprintf(channel, sizeof(channel), "%s",
+                 webui_settings()->getUpdChannel() == 1 ? "beta" : "stable");
+    }
 
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (install_state_busy(s_status.state)) {
