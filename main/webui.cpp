@@ -61,6 +61,7 @@
 #include "nvs_flash.h"
 #include "ota_config.h"
 #include "semver.h"
+#include "update_schedule_policy.h"
 #include "validation.h"
 #include "log_stream.h"
 #include "pins.h"
@@ -860,6 +861,19 @@ void add_settings(cJSON *root)
 
     cJSON_AddStringToObject(settings, "ntpServer", _settings->getNtpServer());
     cJSON_AddStringToObject(settings, "timezone", _settings->getTimezone());
+
+    // Automatic update configuration. Managed via GET/POST
+    // /api/update/config, but exported here so backups carry it. The POST
+    // /settings.json handler never parses these fields, so a WebUI save
+    // keeps the current values untouched.
+    cJSON_AddStringToObject(settings, "updMode",
+                            update_mode_name(_settings->getUpdMode()));
+    cJSON_AddStringToObject(settings, "updChannel",
+                            _settings->getUpdChannel() == 1 ? "beta" : "stable");
+    cJSON_AddNumberToObject(settings, "updInterval", _settings->getUpdInterval());
+    cJSON_AddNumberToObject(settings, "updWindowStart", _settings->getUpdWinStart());
+    cJSON_AddNumberToObject(settings, "updWindowLength", _settings->getUpdWinLen());
+    cJSON_AddBoolToObject(settings, "updIdleOnly", _settings->getUpdIdleOnly());
 
     cJSON_AddNumberToObject(settings, "ledBrightness", _settings->getLEDBrightness());
 

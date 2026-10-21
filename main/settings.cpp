@@ -23,6 +23,7 @@
 
 #include "settings.h"
 #include "validation.h"
+#include "update_schedule_policy.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "esp_mac.h"
@@ -526,6 +527,13 @@ void Settings::resetToSafeDefaultsLocked()
   snprintf(_ntpServer, sizeof(_ntpServer), "%s", "pool.ntp.org");
   snprintf(_timezone, sizeof(_timezone), "%s", "UTC0");
 
+  _updMode = UPDATE_MODE_OFF;
+  _updChannel = 0;
+  _updInterval = 24;
+  _updWinStart = 3;
+  _updWinLen = 2;
+  _updIdleOnly = true;
+
   static const int32_t default_led_programs[7] = {
       1, 5, 6, 4, 10, 4, 5,
   };
@@ -632,6 +640,11 @@ esp_err_t Settings::load()
   }
 
   bool persist_defaults = false;
+  // True only for factory-fresh NVS (no adminUsername): the first boot after
+  // production flash or factory reset. Later read by the update-mode default
+  // (§11.1). Deliberately separate from persist_defaults, which also fires
+  // for the legacy dns1 migration.
+  bool first_boot_factory_state = false;
   auto fail_auth_load = [&](const char *key, esp_err_t failure) -> esp_err_t {
     ESP_LOGE(TAG, "Could not safely load authentication key '%s': %s", key,
              esp_err_to_name(failure));
@@ -655,6 +668,7 @@ esp_err_t Settings::load()
     if (err == ESP_OK) err = nvs_commit(handle);
     if (err != ESP_OK) return fail_auth_load("adminToken", err);
     persist_defaults = true;
+    first_boot_factory_state = true;
   } else if (err != ESP_OK) {
     return fail_auth_load("adminUsername", err);
   } else if (!valid_stored_admin_username(_adminUsername)) {
@@ -760,6 +774,58 @@ esp_err_t Settings::load()
     ESP_LOGW(TAG, "Invalid timezone in NVS, restoring UTC0");
     strncpy(_timezone, "UTC0", sizeof(_timezone) - 1);
   }
+
+  // Automatic update configuration (AUTO_UPDATE_PLAN §6.1). The mode gets
+  // special treatment: a missing key distinguishes factory-fresh NVS (start
+  // on notify, §11.1) from a device upgraded by a firmware update (stay on
+  // off — the update itself must never enable uninvited connections).
+  // first_boot_factory_state mirrors the missing-adminUsername case captured
+  // above and is NOT the dns1 migration flag.
+  int32_t stored_upd_mode = UPDATE_MODE_OFF;
+  const esp_err_t upd_mode_err = nvs_get_i32(handle, "upd_mode", &stored_upd_mode);
+  if (upd_mode_err == ESP_OK && update_mode_valid(stored_upd_mode))
+  {
+    _updMode = stored_upd_mode;
+  }
+  else if (upd_mode_err == ESP_ERR_NVS_NOT_FOUND)
+  {
+    _updMode = first_boot_factory_state ? UPDATE_MODE_NOTIFY : UPDATE_MODE_OFF;
+  }
+  else
+  {
+    ESP_LOGW(TAG, "Invalid update mode in NVS, restoring off");
+    _updMode = UPDATE_MODE_OFF;
+  }
+
+  GET_INT(handle, "upd_channel", _updChannel, 0);
+  if (_updChannel != 0 && _updChannel != 1)
+  {
+    ESP_LOGW(TAG, "Invalid update channel in NVS, restoring stable");
+    _updChannel = 0;
+  }
+
+  GET_INT(handle, "upd_interval", _updInterval, 24);
+  if (!update_interval_valid(_updInterval))
+  {
+    ESP_LOGW(TAG, "Invalid update interval in NVS, restoring 24h");
+    _updInterval = 24;
+  }
+
+  GET_INT(handle, "upd_win_start", _updWinStart, 3);
+  if (!update_window_start_valid(_updWinStart))
+  {
+    ESP_LOGW(TAG, "Invalid update window start in NVS, restoring 3");
+    _updWinStart = 3;
+  }
+
+  GET_INT(handle, "upd_win_len", _updWinLen, 2);
+  if (!update_window_len_valid(_updWinLen))
+  {
+    ESP_LOGW(TAG, "Invalid update window length in NVS, restoring 2h");
+    _updWinLen = 2;
+  }
+
+  GET_BOOL(handle, "upd_idle_only", _updIdleOnly, true);
 
   // Initialize default LED programs
   int32_t defaults[7] = {
@@ -928,7 +994,8 @@ esp_err_t Settings::validateStorageCapacityLocked(
 {
   // 23 fixed-width keys each consume exactly one NVS entry. Keep this list in
   // sync with save(); strings are added below using their actual lengths.
-  size_t required_entries = 23;
+  // The six upd_* keys (5 ints + 1 bool) extend the same fixed-width set.
+  size_t required_entries = 29;
   esp_err_t err = ESP_OK;
 
 #define COUNT_STRING(member)                                              \
@@ -1137,6 +1204,12 @@ esp_err_t Settings::save()
   SAVE_STEP(nvs_set_i32(handle, "gpsBaudrate", _gpsBaudrate));
   SAVE_STEP(nvs_set_str(handle, "ntpServer", _ntpServer));
   SAVE_STEP(nvs_set_str(handle, "timezone", _timezone));
+  SAVE_STEP(nvs_set_i32(handle, "upd_mode", _updMode));
+  SAVE_STEP(nvs_set_i32(handle, "upd_channel", _updChannel));
+  SAVE_STEP(nvs_set_i32(handle, "upd_interval", _updInterval));
+  SAVE_STEP(nvs_set_i32(handle, "upd_win_start", _updWinStart));
+  SAVE_STEP(nvs_set_i32(handle, "upd_win_len", _updWinLen));
+  SAVE_STEP(nvs_set_i8(handle, "upd_idle_only", _updIdleOnly ? 1 : 0));
 
   char key[16];
   for (int i = 0; i < 7; i++) {
@@ -1199,6 +1272,12 @@ void Settings::snapshot(settings_snapshot_t *out)
   SNAPSHOT_COPY(gpsBaudrate);
   SNAPSHOT_COPY(ntpServer);
   SNAPSHOT_COPY(timezone);
+  SNAPSHOT_COPY(updMode);
+  SNAPSHOT_COPY(updChannel);
+  SNAPSHOT_COPY(updInterval);
+  SNAPSHOT_COPY(updWinStart);
+  SNAPSHOT_COPY(updWinLen);
+  SNAPSHOT_COPY(updIdleOnly);
   SNAPSHOT_COPY(ledBrightness);
   SNAPSHOT_COPY(ledPrograms);
   SNAPSHOT_COPY(enableIPv6);
@@ -1239,6 +1318,12 @@ void Settings::restoreSnapshot(const settings_snapshot_t *snapshot)
   SNAPSHOT_RESTORE(gpsBaudrate);
   SNAPSHOT_RESTORE(ntpServer);
   SNAPSHOT_RESTORE(timezone);
+  SNAPSHOT_RESTORE(updMode);
+  SNAPSHOT_RESTORE(updChannel);
+  SNAPSHOT_RESTORE(updInterval);
+  SNAPSHOT_RESTORE(updWinStart);
+  SNAPSHOT_RESTORE(updWinLen);
+  SNAPSHOT_RESTORE(updIdleOnly);
   SNAPSHOT_RESTORE(ledBrightness);
   SNAPSHOT_RESTORE(ledPrograms);
   SNAPSHOT_RESTORE(enableIPv6);
@@ -1620,6 +1705,126 @@ void Settings::setTimezone(const char *timezone)
   // time(NULL)/settimeofday state is unaffected by the TZ environment.
   setenv("TZ", _timezone, 1);
   tzset();
+}
+
+int Settings::getUpdMode()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _updMode;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdMode(int mode)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (!update_mode_valid(mode))
+  {
+    ESP_LOGE(TAG, "Invalid update mode, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  _updMode = mode;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+int Settings::getUpdChannel()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _updChannel;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdChannel(int channel)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (channel != 0 && channel != 1)
+  {
+    ESP_LOGE(TAG, "Invalid update channel, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  _updChannel = channel;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+int Settings::getUpdInterval()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _updInterval;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdInterval(int hours)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (!update_interval_valid(hours))
+  {
+    ESP_LOGE(TAG, "Invalid update interval, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  _updInterval = hours;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+int Settings::getUpdWinStart()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _updWinStart;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdWinStart(int hour)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (!update_window_start_valid(hour))
+  {
+    ESP_LOGE(TAG, "Invalid update window start, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  _updWinStart = hour;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+int Settings::getUpdWinLen()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  int result = _updWinLen;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdWinLen(int hours)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  if (!update_window_len_valid(hours))
+  {
+    ESP_LOGE(TAG, "Invalid update window length, keeping current value");
+    if (_mutex) xSemaphoreGive(_mutex);
+    return;
+  }
+  _updWinLen = hours;
+  if (_mutex) xSemaphoreGive(_mutex);
+}
+
+bool Settings::getUpdIdleOnly()
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  bool result = _updIdleOnly;
+  if (_mutex) xSemaphoreGive(_mutex);
+  return result;
+}
+
+void Settings::setUpdIdleOnly(bool idleOnly)
+{
+  if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+  _updIdleOnly = idleOnly;
+  if (_mutex) xSemaphoreGive(_mutex);
 }
 
 int Settings::getLEDBrightness()

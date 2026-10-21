@@ -52,6 +52,7 @@
 #include "nvs_flash.h"
 #include "validation.h"
 #include "settings.h"
+#include "update_schedule_policy.h"
 #include "led.h"
 
 // Settings backup export and restore, extracted from webui.cpp.
@@ -577,6 +578,18 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     cJSON *flashPauseItem       = cJSON_GetObjectItem(root, "flashPause");
     cJSON *testDesignItem       = cJSON_GetObjectItem(root, "testDesignEnabled");
 
+    // Automatic update configuration (§6.1). Absent fields keep the device's
+    // current value so older backups restore cleanly.
+    char *updMode              = cJSON_GetStringValue(cJSON_GetObjectItem(root, "updMode"));
+    char *updChannel           = cJSON_GetStringValue(cJSON_GetObjectItem(root, "updChannel"));
+    int updInterval            = cJSON_GetIntValueSafe(cJSON_GetObjectItem(root, "updInterval"),
+                                                       webui_settings()->getUpdInterval());
+    int updWindowStart         = cJSON_GetIntValueSafe(cJSON_GetObjectItem(root, "updWindowStart"),
+                                                       webui_settings()->getUpdWinStart());
+    int updWindowLength        = cJSON_GetIntValueSafe(cJSON_GetObjectItem(root, "updWindowLength"),
+                                                       webui_settings()->getUpdWinLen());
+    cJSON *updIdleOnlyItem     = cJSON_GetObjectItem(root, "updIdleOnly");
+
     // Validate the entire backup and prove NVS capacity before changing any
     // live or persistent setting. A rejected restore must leave the running
     // configuration untouched.
@@ -703,6 +716,30 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
         }
     }
 
+    // Automatic update configuration (§6.1): validate with the same rules the
+    // config endpoint applies. update_mode_from_name degrades anything
+    // unknown to off, so an unknown name is only detectable by comparing
+    // against the literal "off" before accepting the mapping.
+    if (updMode != NULL && update_mode_from_name(updMode) == UPDATE_MODE_OFF &&
+        strcmp(updMode, "off") != 0) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup", "updMode");
+    }
+    if (updChannel != NULL && !update_channel_name_valid(updChannel)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup", "updChannel");
+    }
+    if (!update_interval_valid(updInterval) ||
+        !update_window_start_valid(updWindowStart) ||
+        !update_window_len_valid(updWindowLength)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup", "updWindow");
+    }
+    if (updIdleOnlyItem != NULL && !cJSON_IsBool(updIdleOnlyItem)) {
+        cJSON_Delete(root);
+        return send_json_error(req, "400 Bad Request", "invalid_backup", "updIdleOnly");
+    }
+
     std::unique_ptr<settings_snapshot_t> previous_settings(new (std::nothrow)
                                                                settings_snapshot_t{});
     std::unique_ptr<monitoring_config_t> previous_monitoring;
@@ -811,6 +848,14 @@ esp_err_t post_restore_handler_func(httpd_req_t *req)
     if (ccuIP) webui_settings()->setCCUIP(ccuIP);
     if (systemLogEnabledItem && cJSON_IsBool(systemLogEnabledItem)) {
         webui_settings()->setSystemLogEnabled(cJSON_IsTrue(systemLogEnabledItem));
+    }
+    if (updMode != NULL) webui_settings()->setUpdMode(update_mode_from_name(updMode));
+    if (updChannel != NULL) webui_settings()->setUpdChannel(strcmp(updChannel, "beta") == 0 ? 1 : 0);
+    webui_settings()->setUpdInterval(updInterval);
+    webui_settings()->setUpdWinStart(updWindowStart);
+    webui_settings()->setUpdWinLen(updWindowLength);
+    if (updIdleOnlyItem && cJSON_IsBool(updIdleOnlyItem)) {
+        webui_settings()->setUpdIdleOnly(cJSON_IsTrue(updIdleOnlyItem));
     }
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         webui_settings()->setFlashPause(cJSON_IsTrue(flashPauseItem));

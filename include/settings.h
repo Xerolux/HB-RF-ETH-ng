@@ -56,6 +56,12 @@ typedef struct {
   int32_t gpsBaudrate;
   char ntpServer[65];
   char timezone[65];
+  int32_t updMode;
+  int32_t updChannel;
+  int32_t updInterval;
+  int32_t updWinStart;
+  int32_t updWinLen;
+  bool updIdleOnly;
   int32_t ledBrightness;
   int32_t ledPrograms[7];
   bool enableIPv6;
@@ -105,6 +111,18 @@ private:
   // POSIX TZ string (e.g. "CET-1CEST,M3.5.0,M10.5.0/3"). "UTC0" keeps the
   // historic behaviour. localtime_r consumers (maintenance window) honor it.
   char _timezone[65] = {0};
+
+  // Automatic update configuration (AUTO_UPDATE_PLAN §6.1). Stored as i32
+  // per the settings idiom; ranges are validated against
+  // update_schedule_policy.h. upd_mode defaults to off — a firmware update
+  // must never switch on uninvited outbound connections. Factory-fresh NVS
+  // (no adminUsername) starts on notify instead (§11.1).
+  int32_t _updMode;
+  int32_t _updChannel;   // 0 = stable, 1 = beta
+  int32_t _updInterval;  // hours, 6..168
+  int32_t _updWinStart;  // local-time hour, 0..23
+  int32_t _updWinLen;    // hours, 1..24
+  bool _updIdleOnly;     // require a quiet CCU session for unattended installs
 
   int32_t _ledBrightness;
   int32_t _ledPrograms[7];
@@ -190,6 +208,19 @@ public:
 
   char *getTimezone();
   void setTimezone(const char *timezone);
+
+  int getUpdMode();
+  void setUpdMode(int mode);
+  int getUpdChannel();
+  void setUpdChannel(int channel);
+  int getUpdInterval();
+  void setUpdInterval(int hours);
+  int getUpdWinStart();
+  void setUpdWinStart(int hour);
+  int getUpdWinLen();
+  void setUpdWinLen(int hours);
+  bool getUpdIdleOnly();
+  void setUpdIdleOnly(bool idleOnly);
 
   int getLEDBrightness();
   void setLEDBrightness(int brightness);
