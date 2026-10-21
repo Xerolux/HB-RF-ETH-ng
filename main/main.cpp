@@ -47,6 +47,7 @@
 #include "rawuartudplistener.h"
 #include "update_check.h"
 #include "update_install.h"
+#include "update_scheduler.h"
 #include "webui.h"
 #include "ntpserver.h"
 #include "esp_ota_ops.h"
@@ -348,6 +349,11 @@ void app_main()
     // else - no task, no timer, no network activity until someone asks.
     update_check_init();
     update_install_init();
+    // Scheduled automatic updates (stages B2/C/D): hourly timer plus one
+    // first-check shot 10-70 min out, both in "off" mode inert. Init only
+    // bumps the boot counter, loads the NVS-backed pending/stage state and
+    // arms the timers - the first network activity is the first check.
+    update_scheduler_init(&settings);
 
     // Register data providers for MQTT status topics (Ethernet link/IP,
     // radio module info, system clock / NTP sync state). Must happen before
