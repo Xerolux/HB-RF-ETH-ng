@@ -28,7 +28,7 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
-#include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "nvs.h"
 
 #include "freertos/FreeRTOS.h"
@@ -193,6 +193,27 @@ static bool cache_write_i32(const char *key, int32_t value)
     return commit == ESP_OK;
 }
 
+// The last-check record stores full 64-bit unix seconds; a 32-bit key would
+// silently wrap in 2038 and read back as "never checked".
+static bool cache_read_i64(const char *key, int64_t *out)
+{
+    nvs_handle_t handle = 0;
+    if (!cache_open(&handle)) return false;
+    const esp_err_t err = nvs_get_i64(handle, key, out);
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+static bool cache_write_i64(const char *key, int64_t value)
+{
+    nvs_handle_t handle = 0;
+    if (!cache_open(&handle)) return false;
+    const esp_err_t err = nvs_set_i64(handle, key, value);
+    const esp_err_t commit = err == ESP_OK ? nvs_commit(handle) : err;
+    nvs_close(handle);
+    return commit == ESP_OK;
+}
+
 // --- gate inputs -------------------------------------------------------------
 
 static int64_t now_unix()
@@ -222,7 +243,9 @@ static bool relay_idle()
     return update_schedule_idle_ok(raw_uart_session_active(), rx_age_s);
 }
 
-static bool inside_window_locked()
+// Reads only Settings getters (own mutex) — safe with or without s_lock held,
+// hence no _locked suffix.
+static bool inside_window_now()
 {
     return update_window_contains(local_hour_now(),
                                   s_settings->getUpdWinStart(),
@@ -408,52 +431,19 @@ static void run_scheduled_search_locked(bool first_attempt)
 
     if (!due) return;
 
+    // Only the trigger runs under the module lock - it is non-blocking (it
+    // spawns the check worker). Waiting for the result happens WITHOUT the
+    // lock so /api/update/status (and with it the WebUI polling) never stalls
+    // behind a running scheduled search.
     const update_check_trigger_result_t trigger = update_check_trigger(channel_name());
+    search_outcome_t outcome = SEARCH_TIMED_OUT;
+    bool triggered = false;
+
     switch (trigger) {
-        case UPDATE_CHECK_TRIGGER_ACCEPTED: {
-            const search_outcome_t outcome = wait_for_search_result();
+        case UPDATE_CHECK_TRIGGER_ACCEPTED:
             s_state.hours_accumulated = 0;
-            switch (outcome) {
-                case SEARCH_SUCCEEDED:
-                    s_state.consecutive_failures = 0;
-                    s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
-                    // Persist what was seen so the WebUI can show it right
-                    // after the next reboot, before any fresh search.
-                    {
-                        const UpdateCheckStatus status = update_check_get_status();
-                        strlcpy(s_scheduler_seen_fw, status.latestFirmware,
-                                 sizeof(s_scheduler_seen_fw));
-                        strlcpy(s_scheduler_seen_ui, status.latestWebui,
-                                 sizeof(s_scheduler_seen_ui));
-                        cache_write_str(CACHE_KEY_SEEN_FW, status.latestFirmware);
-                        cache_write_str(CACHE_KEY_SEEN_UI, status.latestWebui);
-                        if (status.lastCheckUnix > 0) {
-                            s_scheduler_last_check = status.lastCheckUnix;
-                            cache_write_i32(CACHE_KEY_CHECK_AT,
-                                            (int32_t)status.lastCheckUnix);
-                        }
-                    }
-                    break;
-                case SEARCH_SKIPPED:
-                    // A skip is not a failure: the gates refused, nothing was
-                    // fetched. Retry at the full interval, no backoff ladder.
-                    s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
-                    break;
-                case SEARCH_FAILED:
-                    s_state.consecutive_failures++;
-                    s_state.next_check_unix = now_unix() +
-                        (int64_t)update_schedule_delay_after_failures(
-                            s_state.consecutive_failures, interval) * 3600;
-                    break;
-                case SEARCH_TIMED_OUT:
-                    // The worker is still running past all deadlines; treat
-                    // as a failure for backoff purposes and let it wind down.
-                    s_state.consecutive_failures++;
-                    s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
-                    break;
-            }
+            triggered = true;
             break;
-        }
         case UPDATE_CHECK_TRIGGER_COOLDOWN:
             // A manual search ran less than 60 s ago; try again next hour.
             s_state.hours_accumulated = 0;
@@ -462,6 +452,53 @@ static void run_scheduled_search_locked(bool first_attempt)
         case UPDATE_CHECK_TRIGGER_BUSY:
         case UPDATE_CHECK_TRIGGER_NO_WORKER:
             // Leave the hour counter untouched so the next tick is due again.
+            break;
+    }
+
+    if (s_lock) xSemaphoreGive(s_lock);
+    if (triggered) {
+        outcome = wait_for_search_result();
+    }
+    if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
+
+    if (!triggered) return;
+
+    switch (outcome) {
+        case SEARCH_SUCCEEDED:
+            s_state.consecutive_failures = 0;
+            s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
+            // Persist what was seen so the WebUI can show it right
+            // after the next reboot, before any fresh search.
+            {
+                const UpdateCheckStatus status = update_check_get_status();
+                strlcpy(s_scheduler_seen_fw, status.latestFirmware,
+                         sizeof(s_scheduler_seen_fw));
+                strlcpy(s_scheduler_seen_ui, status.latestWebui,
+                         sizeof(s_scheduler_seen_ui));
+                cache_write_str(CACHE_KEY_SEEN_FW, status.latestFirmware);
+                cache_write_str(CACHE_KEY_SEEN_UI, status.latestWebui);
+                        if (status.lastCheckUnix > 0) {
+                            s_scheduler_last_check = status.lastCheckUnix;
+                            cache_write_i64(CACHE_KEY_CHECK_AT, status.lastCheckUnix);
+                        }
+            }
+            break;
+        case SEARCH_SKIPPED:
+            // A skip is not a failure: the gates refused, nothing was
+            // fetched. Retry at the full interval, no backoff ladder.
+            s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
+            break;
+        case SEARCH_FAILED:
+            s_state.consecutive_failures++;
+            s_state.next_check_unix = now_unix() +
+                (int64_t)update_schedule_delay_after_failures(
+                    s_state.consecutive_failures, interval) * 3600;
+            break;
+        case SEARCH_TIMED_OUT:
+            // The worker is still running past all deadlines; treat
+            // as a failure for backoff purposes and let it wind down.
+            s_state.consecutive_failures++;
+            s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
             break;
     }
 }
@@ -513,7 +550,7 @@ static void scheduler_tick(tick_source_t source)
     if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
 
     // The install gates read the settings once per tick.
-    in_window = inside_window_locked();
+    in_window = inside_window_now();
     idle = relay_idle();
 
     handle_stage_marker_locked();
@@ -605,8 +642,8 @@ void update_scheduler_init(Settings *settings)
         if (cache_read_str(CACHE_KEY_SEEN_UI, seen, sizeof(seen))) {
             strlcpy(s_scheduler_seen_ui, seen, sizeof(s_scheduler_seen_ui));
         }
-        int32_t check_at = 0;
-        if (cache_read_i32(CACHE_KEY_CHECK_AT, &check_at) && check_at > 0) {
+        int64_t check_at = 0;
+        if (cache_read_i64(CACHE_KEY_CHECK_AT, &check_at) && check_at > 0) {
             s_scheduler_last_check = check_at;
         }
     }
@@ -704,7 +741,7 @@ const char *update_scheduler_install_blocked_reason()
 
     const bool idle = s_settings->getUpdIdleOnly() ? relay_idle() : true;
     const update_install_blocked_t blocked = update_schedule_install_blocked(
-        true, clock_valid(), inside_window_locked(), idle, operation_busy());
+        true, clock_valid(), inside_window_now(), idle, operation_busy());
     return update_install_blocked_name(blocked);
 }
 

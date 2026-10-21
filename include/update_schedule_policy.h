@@ -312,6 +312,10 @@ static inline bool update_stage_parse(const char *value, char *fw_version, size_
     const size_t ui_len = strlen(ui);
     if (fw_len == 0 || ui_len == 0) return false;
     if (fw_len >= fw_size || ui_len >= ui_size) return false;
+    // Extra fields mean the entry was written by a different schema version;
+    // half-parsing it would silently act on a misunderstood value. (fw itself
+    // can never contain a pipe - it ends at the first one.)
+    if (strchr(ui, '|') != NULL) return false;
 
     memcpy(fw_version, fw, fw_len);
     fw_version[fw_len] = '\0';
@@ -385,6 +389,9 @@ static inline bool update_pending_parse(const char *value, bool *firmware_target
     if (sep2 == NULL) return false;
     const size_t ver_len = (size_t)(sep2 - ver);
     if (ver_len == 0 || ver_len >= version_size) return false;
+    // Same schema rule as the stage marker: extra fields mean a different
+    // format, not a longer version string.
+    if (strchr(ver + ver_len + 1, '|') != NULL) return false;
 
     const long long created = strtoll(sep2 + 1, NULL, 10);
     if (created <= 0) return false;

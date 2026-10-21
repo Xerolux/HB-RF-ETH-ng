@@ -1697,13 +1697,17 @@ void Settings::setTimezone(const char *timezone)
     if (_mutex) xSemaphoreGive(_mutex);
     return;
   }
+  char applied[sizeof(_timezone)];
+  strncpy(applied, timezone, sizeof(applied) - 1);
+  applied[sizeof(applied) - 1] = '\0';
   strncpy(_timezone, timezone, sizeof(_timezone) - 1);
   _timezone[sizeof(_timezone) - 1] = '\0';
   if (_mutex) xSemaphoreGive(_mutex);
   // Take effect immediately: every localtime_r consumer (maintenance window,
   // scheduled installs) must see the new zone without a reboot. UTC-anchored
-  // time(NULL)/settimeofday state is unaffected by the TZ environment.
-  setenv("TZ", _timezone, 1);
+  // time(NULL)/settimeofday state is unaffected by the TZ environment. The
+  // local copy keeps setenv away from the shared member buffer.
+  setenv("TZ", applied, 1);
   tzset();
 }
 
