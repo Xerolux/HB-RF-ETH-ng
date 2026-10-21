@@ -300,6 +300,83 @@ paths:
               schema:
                 $ref: '#/components/schemas/UpdateCheckOutcome'
 
+  /api/update/config:
+    get:
+      tags:
+        - Updates
+      summary: Read the automatic-update configuration
+      description: >
+        Returns mode, channel, interval and maintenance window of the scheduled
+        updates. Mode "off" (the default after a firmware update) guarantees no
+        scheduled network activity.
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+        - Updates
+      summary: Change the automatic-update configuration
+      description: >
+        Partial update; absent fields keep their value. The complete effective
+        configuration is validated before anything is applied.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConfig'
+      responses:
+        '200':
+          description: Saved configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateConfig'
+        '400':
+          description: Invalid mode, channel or range violation (invalid_config)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          description: The durable settings write failed and was rolled back
+
+  /api/update/schedule:
+    post:
+      tags:
+        - Updates
+      summary: Schedule one install for the next maintenance window
+      description: >
+        Operator-scheduled one-shot install, independent of the automatic mode.
+        The version always comes from the last successful search, never from
+        the request. The entry survives reboots and expires after 7 days.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target:
+                  type: string
+                  enum: [firmware, webui]
+                cancel:
+                  type: boolean
+                  description: true cancels an existing entry (target is then ignored).
+      responses:
+        '202':
+          description: Scheduled
+        '200':
+          description: Cancelled (outcome cancelled) or nothing was scheduled
+        '400':
+          description: Missing or unknown target (invalid_target)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: No completed search result for the target (no_search_result)
+
   /api/restart:
     post:
       tags:
@@ -388,6 +465,104 @@ components:
           description: >
             Set when the search did not run, for example too little free memory.
             A skip is not a result.
+        install:
+          type: object
+          description: Online installation progress (POST /api/update/install).
+          properties:
+            state:
+              type: string
+              enum: [idle, preparing, downloading, verifying, finalizing, success, error]
+            target:
+              type: string
+              enum: [firmware, webui]
+            progress:
+              type: integer
+              description: 0-100 while downloading.
+            version:
+              type: string
+            error:
+              type: string
+        schedule:
+          type: object
+          description: Automatic-update state (firmware >= 2.3.0).
+          properties:
+            mode:
+              type: string
+              enum: [off, notify, auto_webui, auto_all]
+            channel:
+              type: string
+              enum: [stable, beta]
+            intervalHours:
+              type: integer
+            windowStart:
+              type: integer
+              description: Local-time hour 0-23.
+            windowLength:
+              type: integer
+              description: Hours 1-24; the window wraps midnight.
+            idleOnly:
+              type: boolean
+            nextCheckIn:
+              type: integer
+              description: Estimated seconds until the next scheduled search.
+            installBlocked:
+              type: string
+              nullable: true
+              enum: [no_valid_time, outside_window, session_active, busy]
+              description: Why a wanted install is waiting; null when nothing blocks.
+            lastSeenCheck:
+              type: integer
+              format: int64
+            seenFirmware:
+              type: string
+            seenWebui:
+              type: string
+            pending:
+              type: object
+              nullable: true
+              description: Operator-scheduled one-shot install, else null.
+              properties:
+                target:
+                  type: string
+                  enum: [firmware, webui]
+                version:
+                  type: string
+            stage:
+              type: object
+              nullable: true
+              description: Two-stage update mid-flight, else null.
+              properties:
+                firmware:
+                  type: string
+                webui:
+                  type: string
+
+    UpdateConfig:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [off, notify, auto_webui, auto_all]
+          description: >
+            off ships as the default after a firmware update (no scheduled
+            activity); notify is the factory-fresh default.
+        channel:
+          type: string
+          enum: [stable, beta]
+        intervalHours:
+          type: integer
+          minimum: 6
+          maximum: 168
+        windowStart:
+          type: integer
+          minimum: 0
+          maximum: 23
+        windowLength:
+          type: integer
+          minimum: 1
+          maximum: 24
+        idleOnly:
+          type: boolean
 
     UpdateCheckOutcome:
       type: object

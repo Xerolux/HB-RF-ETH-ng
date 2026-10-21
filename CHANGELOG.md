@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Automatic updates (plan stages B2/C/D in docs/AUTO_UPDATE_PLAN.md §7.1),
+  strictly opt-in: `upd_mode` ships as `off` for every device updated to
+  this firmware, so an update never switches on uninvited outbound
+  connections. Factory-fresh devices start on `notify` (search & display
+  only). Modes `auto_webui`/`auto_all` install inside a configurable
+  maintenance window in device-local time, with a synchronized clock and
+  (by default) a quiet CCU session as hard gates; §4.3 postpones with
+  `installBlocked: "no_valid_time"` instead of failing. The scheduler is an
+  hourly `esp_timer` plus one first-check shot (10 min + MAC-derived
+  jitter); all rules are host-tested in
+  `test/host/test_update_schedule_policy.cpp`. A failed search backs off
+  1 h → 2 h → 4 h, then waits the full interval; skipped searches never
+  count as failures, and a manual search satisfies the current cycle.
+- Scheduled one-shot install ("Im Wartungsfenster installieren"): from the
+  install confirmation dialog, exactly the update the last search found can
+  be staged for the next maintenance window instead of installing now —
+  mode-independent, persisted across reboots (7-day expiry), cancellable,
+  visible as `pending` in the status. `POST /api/update/schedule` never
+  accepts a version from the request; the installer re-verifies the
+  manifest at window time.
+- Two-stage updates: firmware first, reboot, then the WebUI — for
+  `auto_all` and for scheduled firmware installs with a pending WebUI
+  update. The NVS marker survives two boots and is discarded on rollback.
+- `GET/POST /api/update/config` (mode, channel, interval 6–168 h, window
+  start/length, idle-only) and a `schedule` block in
+  `GET /api/update/status` (mode, next check estimate, `installBlocked`
+  reason, persisted seen record, pending/stage entries). The persisted
+  channel now also applies to `POST /api/update/check` without a body.
+- Configurable time zone (POSIX TZ string, default `UTC0` = unchanged
+  behaviour) in the settings time tab with presets (UTC, Berlin, London),
+  charset validation and a live wall-clock preview. Applied at boot and
+  immediately on change; the maintenance window runs in this local time.
+  Syslog timestamps deliberately stay UTC.
+- WebUI: third card "Automatisches Update" on the firmware page, pending
+  banner with cancel on both update pages, `installBlocked` hints (clock,
+  window, CCU session, busy) as durable content. Translations de/en/fr/it.
+
+### Changed
+- `webui/compatibility.json` `minFirmwareVersion` raised to `2.3.0`
+  (additive API, `apiVersion` unchanged per RELEASE_VERSIONING).
+
 ## [2.2.9-Beta.2] - 2026-10-20
 
 ### Changes

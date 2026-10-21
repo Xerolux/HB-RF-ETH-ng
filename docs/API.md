@@ -21,6 +21,7 @@ The HB-RF-ETH firmware provides a RESTful HTTP API for configuration and monitor
 | Event Notifications | 2.3.0 | Webhook / Telegram / Email via `notify` block |
 | WebSocket Live Log | 2.3.0 | `GET /api/log/stream` (WS upgrade, `?token=…`) |
 | Expanded Monitoring Config | 2.3.0 | `GET/POST /api/monitoring` now carries `prometheus`, `syslog`, `notify` blocks |
+| Automatic Updates | 2.3.0 | `GET/POST /api/update/config`, `POST /api/update/schedule`, `schedule` block in `GET /api/update/status` |
 
 ## Authentication
 
@@ -527,13 +528,16 @@ curl -X POST http://192.168.1.100/api/monitoring \
 ## Update Search
 
 The device can look up which firmware and WebUI versions have been published
-and compare them with what is installed. It only reports: there is no endpoint
-here that downloads or installs anything, and no remote trigger. Installation
-remains the manual upload to `POST /ota_update` (firmware) or
-`POST /api/webui/update` (WebUI).
+and compare them with what is installed. The search reports only; installing
+happens through `POST /api/update/install` below or the manual upload to
+`POST /ota_update` (firmware) / `POST /api/webui/update` (WebUI).
 
-The search runs **only on request**. Nothing is scheduled, so an unattended
-device never opens an outbound connection of its own accord.
+By default the search runs **only on request** — the automatic-update mode
+ships as `off`, so an unattended device never opens an outbound connection of
+its own accord. An operator can opt in per device via
+`POST /api/update/config` (modes `notify`, `auto_webui`, `auto_all`); see the
+config endpoint below for what each mode does and which gates protect an
+unattended install.
 
 ### GET /api/update/status
 
@@ -564,6 +568,21 @@ Read the result of the last search. Does not start one.
     "progress": 0,
     "version": "",
     "error": ""
+  },
+  "schedule": {
+    "mode": "off",
+    "channel": "stable",
+    "intervalHours": 24,
+    "windowStart": 3,
+    "windowLength": 2,
+    "idleOnly": true,
+    "nextCheckIn": 0,
+    "installBlocked": null,
+    "lastSeenCheck": 0,
+    "seenFirmware": "",
+    "seenWebui": "",
+    "pending": null,
+    "stage": null
   }
 }
 ```
@@ -592,6 +611,23 @@ The `install` block reports an online installation (`POST /api/update/install`):
 | `version` | Target version once the manifest was validated. |
 | `error` | Reason when `state` is `error`. A failed install never changes what is running; the device stays fully operational without a reboot. |
 
+The `schedule` block reports the automatic-update configuration and its state
+(firmware ≥ 2.3.0; older devices have no block and every client-side default
+applies):
+
+| Field | Meaning |
+|-------|---------|
+| `mode` | `off`, `notify`, `auto_webui` or `auto_all`. `off` guarantees no scheduled network activity. |
+| `channel` | Persisted channel used by scheduled searches and installs (`POST /api/update/check` without a body uses it too). |
+| `intervalHours` | Search interval, 6–168 h. |
+| `windowStart` / `windowLength` | Maintenance window in device local time (see the time zone setting); the window wraps midnight. |
+| `idleOnly` | When `true`, unattended installs wait for a quiet CCU session (no raw-UART client for ≥ 5 minutes). |
+| `nextCheckIn` | Estimated seconds until the next scheduled search (`0` when none is scheduled). Hourly granularity. |
+| `installBlocked` | Why a *wanted* install is waiting: `no_valid_time` (clock unsynchronised — §4.3 postpones, never fails), `outside_window`, `session_active`, `busy`; `null` when nothing is blocked. |
+| `lastSeenCheck` / `seenFirmware` / `seenWebui` | Persisted record of the last successful search, so a fresh boot can display something before the first fetch. |
+| `pending` | `{"target": "firmware"\|"webui", "version": "…"}` when an operator-scheduled one-shot install is staged for the next window, else `null`. Survives reboots, expires after 7 days. |
+| `stage` | `{"firmware": "…", "webui": "…"}` while a two-stage update is mid-flight (firmware installed, WebUI follows after the reboot), else `null`. |
+
 ---
 
 ### POST /api/update/install
@@ -614,7 +650,7 @@ from the device manifest and is re-checked against a host allowlist
 ```
 
 `target` is `"firmware"` or `"webui"`. The manifest channel is the channel of
-the last search (`stable` before the first one).
+the last search (the persisted channel before the first one).
 
 **Response (202 Accepted):**
 ```json
@@ -625,6 +661,114 @@ Other outcomes: `busy` (503, an installation or device operation is already
 running), `invalid_target` (400), `unavailable` (503, the worker could not be
 started). Progress and result arrive through the `install` block of
 `GET /api/update/status`.
+
+---
+
+### GET /api/update/config
+
+Read the automatic-update configuration (all fields also appear in the
+`schedule` block of the status endpoint).
+
+**Authentication:** Required
+
+**Response (200 OK):**
+```json
+{
+  "mode": "off",
+  "channel": "stable",
+  "intervalHours": 24,
+  "windowStart": 3,
+  "windowLength": 2,
+  "idleOnly": true
+}
+```
+
+### POST /api/update/config
+
+Change the automatic-update configuration. Fields are optional; anything
+absent keeps its current value, and the whole effective configuration is
+validated before anything is applied (settings discipline: validate →
+snapshot → apply → save, with rollback on a failed durable write).
+
+**Authentication:** Required
+
+**Request (all fields optional):**
+```json
+{
+  "mode": "auto_webui",
+  "channel": "beta",
+  "intervalHours": 24,
+  "windowStart": 3,
+  "windowLength": 2,
+  "idleOnly": true
+}
+```
+
+| Field | Values |
+|-------|--------|
+| `mode` | `off` (no scheduled activity — default after a firmware update), `notify` (scheduled search only, nothing is ever flashed; default on factory-fresh devices), `auto_webui` (search + install WebUI updates in the window), `auto_all` (search + install firmware, then WebUI after the reboot, in the window). |
+| `channel` | `stable` or `beta`; used by every scheduled search and install. |
+| `intervalHours` | 6–168. |
+| `windowStart` | 0–23 (local hour). |
+| `windowLength` | 1–24 hours. |
+| `idleOnly` | `true`/`false`. |
+
+**Response (200 OK):** the saved configuration (same shape as GET).
+
+Errors: `400 invalid_mode` / `invalid_channel` / `invalid_config` (range
+violation), `500 save_failed`.
+
+What the scheduler does with it: the first search runs 10–70 minutes after
+boot (MAC-derived jitter), then every `intervalHours`; failed searches back
+off 1 h → 2 h → 4 h before waiting a full interval (skips never count as
+failures). In an auto mode, an install starts only when the local clock is
+synchronised, the window is open and (with `idleOnly`) no CCU client has been
+connected for 5 minutes — otherwise `installBlocked` in the status names the
+reason and the manual install remains available at any time.
+
+---
+
+### POST /api/update/schedule
+
+Schedule exactly one install for the next maintenance window — the
+operator-facing "Im Wartungsfenster installieren". Independent of the
+automatic mode (works with `off` and `notify` too). The entry persists across
+reboots and expires after 7 days.
+
+**Authentication:** Required
+
+**Request:**
+```json
+{ "target": "firmware" }
+```
+
+or cancel:
+
+```json
+{ "cancel": true }
+```
+
+The version is **not** part of the request: the device stages exactly the
+version the last successful search reported, so an operator schedules what
+they saw. At window time the installer re-fetches the manifest and re-verifies
+version, host, size and digest — if the manifest meanwhile names a newer
+release, that newer one installs (never a downgrade).
+
+**Response (202 Accepted):**
+```json
+{ "outcome": "scheduled", "target": "firmware", "version": "2.3.0" }
+```
+
+**Response (200 OK):** `{"outcome":"cancelled"}` or
+`{"outcome":"nothing_scheduled"}`.
+
+**Response (409 Conflict):** `{"outcome":"no_search_result"}` — schedule
+requires a completed search that found the target update. Errors: `400
+invalid_target`.
+
+A scheduled firmware install with a pending WebUI update becomes the same
+two-stage transaction an automatic one is: firmware first, reboot, then the
+WebUI (visible as `stage` in the status).
 
 ---
 
@@ -641,8 +785,10 @@ HTTP worker is never held for the duration of a TLS exchange. Poll
 { "channel": "stable" }
 ```
 
-`channel` is `"stable"` (default) or `"beta"`. Any other value is rejected with
-`400` and `invalid_channel`. The channel is not persisted on the device.
+`channel` is `"stable"` or `"beta"`. Any other value is rejected with
+`400` and `invalid_channel`. Without a `channel` the persisted channel from
+`POST /api/update/config` applies; an explicit value overrides it for this
+search (the WebUI keeps the two in sync).
 
 **Response (202 Accepted):**
 ```json

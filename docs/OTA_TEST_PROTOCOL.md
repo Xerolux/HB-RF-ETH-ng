@@ -161,13 +161,92 @@ the start; no relay impact, no watchdog reset.
 - [ ] Press it while a firmware upload is running: skipped with a reason, and
       the upload is unaffected.
 - [ ] Home Assistant: before the first search the four update entities read
-      "unknown", not "off"/"no update". After a search they carry real values.
-- [ ] Restart the device: the search result is gone (it is not persisted) and
-      the card reads "no search has been run yet" rather than showing a stale
-      result.
-- [ ] Over an hour of normal CCU operation without pressing the button: no
-      outbound connection to github.io appears at the uplink (`tcpdump`). The
-      device must never search on its own.
+      "unknown", not "off"/"no". After a search they carry real values.
+- [ ] Restart the device: the seen record survives via NVS
+      (`schedule.seenFirmware`/`seenWebui`/`lastSeenCheck` in
+      `GET /api/update/status`), while `everChecked` resets so the card asks
+      for a fresh search instead of showing a stale result as current.
+- [ ] Over an hour of normal CCU operation without pressing the button and
+      with the automatic mode **off** (the default): no outbound connection
+      to github.io appears at the uplink (`tcpdump`). The device must never
+      search on its own unless a mode was explicitly enabled.
+
+## Automatic updates and scheduled installs (stages B2/C/D)
+
+Preconditions for every item below: firmware ≥ 2.3.0, time zone configured
+(settings, time tab), and `GET /api/update/config` readable. The same heap
+floors as the manual search apply to every scheduled activity.
+
+**Off-mode guarantee — the acceptance criterion that outranks everything
+else.** With `mode: "off"` (the state every device has after updating to
+this firmware), over **48 hours** of normal operation:
+
+- [ ] `tcpdump` at the uplink shows **no** connection to github.io or
+      github.com beyond the operator's own manual searches/installs.
+- [ ] The status `schedule.nextCheckIn` stays `0`.
+
+**Scheduler (mode `notify`):**
+
+- [ ] After a reboot with `notify` enabled, the first search starts 10–70
+      minutes after boot (serial log: "Scheduler ready: … first check in N
+      min"), deterministically per device (same MAC → same delay).
+- [ ] A failed search (uplink unplugged) retries after 1 h, 2 h, 4 h, then
+      waits the full interval; `nextCheckIn` follows the ladder.
+- [ ] A skipped search (low memory while CCU attached) does **not** enter the
+      backoff ladder — it retries at the full interval.
+- [ ] A manual search resets the schedule so the interval restarts from it.
+- [ ] The persisted channel applies: set `beta` via config, reboot, do not
+      press anything — the scheduled search reads `beta.json` (device log).
+
+**Maintenance window and gates (mode `auto_webui`):**
+
+- [ ] Publish/offer a WebUI update; with the window configured to a future
+      hour, nothing installs outside it and `schedule.installBlocked` reads
+      `outside_window`.
+- [ ] Stop the time source (unreachable NTP): `installBlocked` reads
+      `no_valid_time`, the search itself keeps running, a manual install
+      stays possible.
+- [ ] Inside the window with an active CCU session: `installBlocked` reads
+      `session_active`; after the CCU has been disconnected for ≥ 5 minutes
+      the install starts on its own (idle gate on). With `idleOnly: false`
+      it installs despite the session.
+- [ ] The install itself obeys the manual-path rules: SHA-256 checked before
+      activation, monitoring paused during the download, heap floors from
+      §"Update search" respected, no relay impact (serial log clean).
+
+**Two-stage update (mode `auto_all`):**
+
+- [ ] Offer firmware + WebUI together; inside the window the firmware
+      installs and reboots; after the reboot the WebUI installs without a
+      further reboot; `schedule.stage` shows the marker between the two
+      steps and is `null` afterwards.
+- [ ] Force a rollback (power-cycle inside the 15-second self-test window):
+      the old firmware boots and the stale marker is discarded (`stage`
+      `null`, no WebUI install attempted).
+- [ ] Leave the device off for three boots with the marker pending: the
+      marker expires (two-boot rule) and is cleaned from NVS.
+
+**Scheduled one-shot install (geplante Installation):**
+
+- [ ] Search, then "Im Wartungsfenster installieren": the banner shows target
+      and version, `schedule.pending` carries them, and the device reboots
+      survive (entry persists via NVS).
+- [ ] "Abbrechen" clears the entry; nothing installs in the window.
+- [ ] The install runs exactly once at the next window opening, respecting
+      time/idle gates; with a firmware target and a pending WebUI update it
+      runs as the same two-stage transaction as `auto_all`.
+- [ ] An entry older than 7 days expires without installing.
+
+**Configuration hygiene:**
+
+- [ ] `POST /api/update/config` with an out-of-range value (interval 5,
+      windowStart 24, mode "turbo") answers 400 and changes nothing.
+- [ ] A backup taken after configuring restores the update settings
+      (including the mode); a factory reset returns the device to
+      `notify` (factory default) with the `upd_cache` cleared.
+- [ ] A device **upgraded** to this firmware (existing settings) starts with
+      `mode: "off"` without any operator action — verify on the bench by
+      updating from 2.2.9-Beta.2.
 
 ## Long-run acceptance
 

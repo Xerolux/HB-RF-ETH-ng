@@ -384,12 +384,27 @@ static search_outcome_t wait_for_search_result()
     return SEARCH_TIMED_OUT;
 }
 
-static void run_scheduled_search_locked()
+static void run_scheduled_search_locked(bool first_attempt)
 {
     const uint32_t interval = (uint32_t)s_settings->getUpdInterval();
     const uint32_t due_hours =
         update_schedule_delay_after_failures(s_state.consecutive_failures, interval);
-    const bool due = s_state.hours_accumulated >= due_hours;
+
+    bool due = first_attempt || s_state.hours_accumulated >= due_hours;
+
+    // A recent successful search - typically a manual one - satisfies the
+    // cycle: the operator just looked, so the scheduler stands back instead
+    // of fetching again a few minutes later.
+    if (due) {
+        const UpdateCheckStatus check = update_check_get_status();
+        if (check.lastCheckUnix > 0) {
+            const int64_t age = now_unix() - check.lastCheckUnix;
+            if (age >= 0 && age < (int64_t)due_hours * 3600) {
+                due = false;
+                s_state.next_check_unix = check.lastCheckUnix + (int64_t)interval * 3600;
+            }
+        }
+    }
 
     if (!due) return;
 
@@ -509,7 +524,7 @@ static void scheduler_tick(tick_source_t source)
         if (source == TICK_SOURCE_HOURLY) {
             s_state.hours_accumulated++;
         }
-        run_scheduled_search_locked();
+        run_scheduled_search_locked(source == TICK_SOURCE_FIRST);
         run_auto_install_locked(time_valid, in_window, idle);
     }
 

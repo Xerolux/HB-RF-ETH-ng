@@ -1,6 +1,8 @@
 # Plan: Wiedereinführung von Update-Suche und Auto-Update (Firmware + WebUI)
 
-Status: **Entwurf / Planung** — keine Implementierung. Zielversion: ab `2.3.0`.
+Status: **umgesetzt bis Stufe D** (Implementierung auf `main`, Zielrelease 2.3.0;
+Freigabe der Stufen C/D zur Aktivierung erst nach dem Abnahmeprotokoll §8 auf
+echter Hardware — der Code steht hinter `upd_mode=off` dunkel im Feld).
 Bezug: `docs/OTA_TEST_PROTOCOL.md`, `docs/WEBUI_UPDATES.md`, `docs/RELEASE_VERSIONING.md`.
 
 ---
@@ -463,13 +465,41 @@ für den damaligen Rückbau und bleibt in v1 draußen. Eine spätere
 |---|---|---|
 | A ✅ | Serverseite: schlankes Manifest auf Pages + CI-Größenprüfung | **umgesetzt** — siehe §2.3; verbleibende Bestätigung: Abruf über HTTPS nach dem ersten Pages-Deploy |
 | B1 ✅ | Suche **nur auf Knopfdruck** + `/api/update/status` + `/api/update/check` + UI-Karte + lesende MQTT-Sensoren | **umgesetzt** — siehe §3.6; verbleibend: Heap-Messung §8 auf echter Hardware |
-| B2 | 24-h-Timer, Jitter, Backoff, Modus `notify`, persistierter Kanal | #362 im Feld bestätigt **und** B1 unauffällig |
+| B2 ✅ | 24-h-Timer, Jitter, Backoff, Modus `notify`, persistierter Kanal | **umgesetzt** — siehe §7.1; Stunden-Timer als `esp_timer`, Regeln hostgetestet (`update_schedule_policy.h`) |
 | B3 ✅ | Modul 2 als **manuelle** Installation (beide Ziele, Knopfdruck, Changelog vor Install) | **umgesetzt** — siehe §4.6; das Testprotokoll §8 gilt unverändert für die Freigabe der Folge-Stufen |
-| C | Modus `auto_webui` (automatische WebUI-Installation im Wartungsfenster) | Testprotokoll §8 vollständig grün |
-| D | Modul 2 für **Firmware** + Modus `auto_all` mit Wartungsfenster | Stufe C zwei Releases lang stabil |
+| C ✅ | Modus `auto_webui` (automatische WebUI-Installation im Wartungsfenster) | **Code umgesetzt** hinter `upd_mode`; Aktivierung im Feld erst nach §8 grün |
+| D ✅ | Modul 2 für **Firmware** + Modus `auto_all` mit Wartungsfenster | **Code umgesetzt** hinter `upd_mode`; Aktivierung erst wenn Stufe C zwei Releases lang stabil war (§7-Freigabe bleibt bestehen) |
+| B3+ ✅ | **Geplante Installation** (Erweiterung über den Plan hinaus): einmalige Installation genau des gefundenen Updates im nächsten Wartungsfenster, per Dialog-Knopf, NVS-persistent (7-Tage-Verfall), modusunabhängig | **umgesetzt** — `POST /api/update/schedule` |
 
 Jede Stufe ist eigenständig nützlich und einzeln zurücknehmbar. Wenn Stufe D
 Probleme macht, bleiben B und C im Feld.
+
+### 7.1 Umsetzung B2/C/D + Geplante Installation (implementiert)
+
+| Datei | Rolle |
+|---|---|
+| `include/update_schedule_policy.h` | Alle Regeln als reine Funktionen, hostgetestet in `test/host/test_update_schedule_policy.cpp`: Modus/Namen, Intervall-/Fenstergrenzen, First-Check-Jitter (10 min + MAC[5] % 60), Backoff-Leiter (1 h → 2 h → 4 h, dann Vollintervall; skips zählen nie als Fehler), Mitternachts-wandelndes Fenster, Zeit-/Idle-Gates, Install-Entscheidung (Firmware vor WebUI), `installBlocked`-Klassifikation, Zwei-Stufen-Marker (Format/Parse/Gültigkeit, 2-Boot-Verfall, Rollback invalidiert), Pending-Eintrag (7-Tage-Verfall) |
+| `main/update_scheduler.cpp` | Stündlicher `esp_timer` + Einmal-Timer für den ersten Check; Callbacks erzeugen nur den transienten Tick-Task („upd_sched", 3 KiB, Prio 2, Regel 5/6). Tick-Reihenfolge: Zwei-Stufen-Marker → Pending (geplante Installation) → terminierte Suche → Auto-Install aus zwischengespeicherten Ergebnissen. Zustand im bestehenden NVS-Namespace `upd_cache` (Boot-Zähler, Marker, Pending, Seen-Record) |
+| Settings-Kette | `upd_mode`/`upd_channel`/`upd_interval`/`upd_win_start`/`upd_win_len`/`upd_idle_only` als vollwertige Settings (load/save/capacity/snapshot/backup). Default `off`; **Werkszustand** (fehlender `adminUsername` = fabrikneues NVS) startet auf `notify` (§11.1) |
+| `main/update_api.cpp` | `GET/POST /api/update/config` (POST statt PUT — Codebase-Konvention), `POST /api/update/schedule`, `schedule`-Block im Status |
+| WebUI | Dritte Karte „Automatisches Update" auf der Firmware-Seite; Dialog-Knopf „Im Wartungsfenster installieren" auf beiden Update-Seiten; Pending-Banner mit Abbrechen; `installBlocked`-Hinweise; Geräte-Kanal wird Quelle der Wahrheit |
+
+Ergänzungen gegenüber dem Plantext, alle bewusst:
+
+- **Zeitzone:** Das Fenster läuft in Geräte-Ortszeit; dafür gibt es jetzt ein
+  echtes POSIX-TZ-Setting (`timezone`, Default `UTC0` = unverändertes
+  Verhalten), angewandt via `setenv("TZ")` beim Boot und sofort bei jeder
+  Änderung. Syslog-Zeitstempel bleiben bewusst UTC.
+- **Wartungsfenster-Gates für den Zwei-Stufen-Marker:** keine. Die
+  WebUI-Installation nach dem Firmware-Reboot ist die Fortsetzung einer
+  bereits autorisierten Installation und remountet ohne Reboot — Fenster und
+  Idle-Gate würden sie nur blockieren, ohne etwas zu schützen.
+- **Geplante Installation** (über den Plan hinaus, auf Betreiben von Basti):
+  einmalig, modusunabhängig, versioniert nach dem letzten Suchergebnis;
+  Firmware-Planung mit anstehendem WebUI-Update wird zur selben
+  Zwei-Stufen-Transaktion.
+- **Kein neuer Event-ID** für `installBlocked`: Sichtbarkeit über Status-API,
+  Log und WebUI-Hinweis (additiv, keine Drahtformat-Änderung).
 
 ### 3.6 Umsetzung B1 (implementiert)
 
@@ -638,16 +668,10 @@ den betroffenen Abschnitten oben bereits eingearbeitet.
 
 ## 12. Nächster Schritt
 
-**Stufe A ist umgesetzt** (§2.3). Nach dem Merge deployt `pages.yml` die beiden
-Geräte-Manifeste; danach ist zu bestätigen, dass
-
-```
-https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/stable.json
-https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/beta.json
-```
-
-über HTTPS mit Status 200 ausgeliefert werden.
-
-Danach folgt **Stufe B**: `main/update_check.cpp` (Scheduler, Vorbedingungen,
-Manifest-Abruf, SemVer-Vergleich), `/api/update/status`, `/api/update/check` und
-die Anzeige in der Oberfläche — Modus `notify`, noch ohne Installationspfad.
+**Alle Stufen sind implementiert** (A, B1–B3, C, D samt geplanter
+Installation; siehe §7/§7.1). Es folgt die Abnahme nach §8 auf echter
+Hardware — insbesondere der `off`-Modus-Tcpdump-Nachweis, die
+Heap-Schranken, das Fenster-/Idle-Verhalten und der Zwei-Stufen-Marker —
+und danach Version-Bump auf 2.3.0-Beta.1 samt Release über `release.yml`.
+Die Freigabe der Stufen C/D **zur Aktivierung im Feld** bleibt an das
+Protokoll gebunden; der Code selbst steht hinter `upd_mode=off` dunkel.
