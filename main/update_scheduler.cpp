@@ -355,7 +355,13 @@ static void handle_pending_locked(bool time_valid, bool in_window, bool idle)
         return;
     }
 
-    if (!in_window || !time_valid || !idle || operation_busy()) {
+    // Same rule as the automatic path and as install_blocked_reason(): when
+    // the operator lifted the quiet-CCU requirement (idleOnly=false), a
+    // connected CCU session must not hold a scheduled install back either.
+    // First confirmed live on hardware: the status said "nothing blocked"
+    // while this raw gate silently skipped the install.
+    const bool effective_idle = s_settings->getUpdIdleOnly() ? idle : true;
+    if (!in_window || !time_valid || !effective_idle || operation_busy()) {
         // installBlocked in get_status() explains the wait; nothing to do.
         return;
     }
