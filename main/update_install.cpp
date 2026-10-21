@@ -43,7 +43,6 @@
 #include "led.h"
 #include "mbedtls/md.h"
 #include "monitoring.h"
-#include "webui_internal.h"
 #include "ota_config.h"
 #include "reset_info.h"
 #include "semver.h"
