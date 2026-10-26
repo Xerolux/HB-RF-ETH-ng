@@ -263,11 +263,18 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
             }
             else if (data[3] != (endpointConnectionIdentifier & 0xff))
             {
-                // Client has a stale identifier (e.g. after device reboot). Accept the reconnect
-                // by adopting the client's identifier so the CCU can reconnect without restart.
-                // Logged at INFO: this is expected once per boot and semantically safe.
-                ESP_LOGI(TAG, "Received raw-uart reconnect packet with unexpected endpoint identifier %d (expected %d) - adopting client identifier", data[3], endpointConnectionIdentifier);
-                endpointConnectionIdentifier = data[3];
+                // The CCU may retain an endpoint identifier from before this device rebooted.
+                // Advance our own identifier for the new session. If that would reproduce the
+                // stale identifier on the wire (e.g. current=1, stale=3), advance once more so
+                // OpenCCU's driver can detect the new session and restart its RF stack.
+                const int previousIdentifier = endpointConnectionIdentifier & 0xff;
+                endpointConnectionIdentifier += 2;
+                if ((endpointConnectionIdentifier & 0xff) == data[3])
+                {
+                    endpointConnectionIdentifier += 2;
+                }
+                ESP_LOGI(TAG, "Received stale raw-uart endpoint identifier %d (current %d); replying with new identifier %d",
+                         data[3], previousIdentifier, endpointConnectionIdentifier & 0xff);
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
                 atomic_store(&_connectionStarted, false);
             }
