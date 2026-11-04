@@ -68,11 +68,13 @@ jobs:
       - name: Install WebUI dependencies
         run: |
           cd webui
-          npm install
+          npm ci
       - name: Lint WebUI sources
         run: |
           cd webui
           npm run lint
+      - name: Test WebUI update polling
+        run: npm --prefix webui run test:unit
       - name: Check WebUI build
         run: |
           cd webui
@@ -159,7 +161,7 @@ jobs:
       - name: Install WebUI dependencies
         run: |
           cd webui
-          npm install
+          npm ci
       - name: Install Playwright browser
         run: |
           cd webui
@@ -191,7 +193,7 @@ jobs:
       - name: Build WebUI
         run: |
           cd webui
-          npm install
+          npm ci
           npm run build
       - name: Rename WebUI files
         run: python3 rename_webui_files.py

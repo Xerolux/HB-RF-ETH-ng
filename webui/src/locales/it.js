@@ -486,6 +486,7 @@ webuiUpdate: {
     installVerifying: 'Verifica SHA-256…',
     installFinalizing: 'Verificato — riavvio imminente…',
     installFailedTitle: 'Installazione non riuscita',
+    installConnectionLost: "La connessione al dispositivo è stata persa. Lo stato dell’installazione è sconosciuto. Ricarica questa pagina quando il dispositivo è nuovamente raggiungibile.",
     installFailed: 'Installazione online non riuscita:',
     installStartFailed: 'Impossibile avviare l’installazione. Riprova più tardi.',
     installConfirmTitle: 'Installare il firmware {version}?',

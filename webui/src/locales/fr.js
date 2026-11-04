@@ -486,6 +486,7 @@ export default {
     installVerifying: 'Vérification SHA-256…',
     installFinalizing: 'Vérifié — redémarrage imminent…',
     installFailedTitle: 'Échec de l’installation',
+    installConnectionLost: "La connexion à l’appareil a été perdue. L’état de l’installation est inconnu. Rechargez cette page lorsque l’appareil est de nouveau accessible.",
     installFailed: 'L’installation en ligne a échoué :',
     installStartFailed: 'L’installation n’a pas pu être démarrée. Veuillez réessayer plus tard.',
     installConfirmTitle: 'Installer le firmware {version} ?',

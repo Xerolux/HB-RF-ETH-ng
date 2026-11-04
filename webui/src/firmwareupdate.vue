@@ -95,6 +95,9 @@
               </div>
               <p class="muted-text">{{ installStateText }}</p>
             </template>
+            <BAlert v-if="installConnectionLost" variant="warning" :model-value="true">
+              {{ t('firmware.installConnectionLost') }}
+            </BAlert>
             <BAlert v-if="installError" variant="danger" :model-value="true">
               {{ t('firmware.installFailed') }} {{ installError }}
             </BAlert>
@@ -291,6 +294,7 @@ const {
   formatTimestamp,
   startInstall,
   installBusy,
+  installConnectionLost,
   fetchReleaseNotes
 } = useUpdateSearch(t)
 

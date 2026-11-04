@@ -124,9 +124,9 @@ static int64_t s_scheduler_last_check = 0;
 // --- tiny NVS cache helpers (best-effort; a failed write only degrades the
 // next-boot display or makes an entry retry, it never bricks anything) ------
 
-static bool cache_open(nvs_handle_t *handle)
+// The caller owns the reservation until after nvs_close(), including commit.
+static bool cache_open(nvs_handle_t *handle, const NvsStorageLock &lock)
 {
-    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     if (!lock) {
         ESP_LOGW(TAG, "Could not reserve NVS storage for update cache");
         return false;
@@ -141,8 +141,9 @@ static bool cache_open(nvs_handle_t *handle)
 
 static bool cache_read_str(const char *key, char *out, size_t size)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     size_t length = size;
     const esp_err_t err = nvs_get_str(handle, key, out, &length);
     nvs_close(handle);
@@ -151,8 +152,9 @@ static bool cache_read_str(const char *key, char *out, size_t size)
 
 static bool cache_write_str(const char *key, const char *value)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     const esp_err_t err = nvs_set_str(handle, key, value);
     const esp_err_t commit = err == ESP_OK ? nvs_commit(handle) : err;
     nvs_close(handle);
@@ -164,8 +166,9 @@ static bool cache_write_str(const char *key, const char *value)
 
 static void cache_erase(const char *key)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return;
+    if (!cache_open(&handle, lock)) return;
     const esp_err_t err = nvs_erase_key(handle, key);
     const esp_err_t commit = err == ESP_OK ? nvs_commit(handle) : err;
     nvs_close(handle);
@@ -176,8 +179,9 @@ static void cache_erase(const char *key)
 
 static bool cache_read_i32(const char *key, int32_t *out)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     const esp_err_t err = nvs_get_i32(handle, key, out);
     nvs_close(handle);
     return err == ESP_OK;
@@ -185,8 +189,9 @@ static bool cache_read_i32(const char *key, int32_t *out)
 
 static bool cache_write_i32(const char *key, int32_t value)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     const esp_err_t err = nvs_set_i32(handle, key, value);
     const esp_err_t commit = err == ESP_OK ? nvs_commit(handle) : err;
     nvs_close(handle);
@@ -197,8 +202,9 @@ static bool cache_write_i32(const char *key, int32_t value)
 // silently wrap in 2038 and read back as "never checked".
 static bool cache_read_i64(const char *key, int64_t *out)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     const esp_err_t err = nvs_get_i64(handle, key, out);
     nvs_close(handle);
     return err == ESP_OK;
@@ -206,8 +212,9 @@ static bool cache_read_i64(const char *key, int64_t *out)
 
 static bool cache_write_i64(const char *key, int64_t value)
 {
+    NvsStorageLock lock(pdMS_TO_TICKS(1000), "upd_cache");
     nvs_handle_t handle = 0;
-    if (!cache_open(&handle)) return false;
+    if (!cache_open(&handle, lock)) return false;
     const esp_err_t err = nvs_set_i64(handle, key, value);
     const esp_err_t commit = err == ESP_OK ? nvs_commit(handle) : err;
     nvs_close(handle);
@@ -759,9 +766,10 @@ bool update_scheduler_set_pending(bool firmware_target, const char *version)
     }
     if (s_lock) xSemaphoreTake(s_lock, portMAX_DELAY);
     char encoded[UPDATE_PENDING_MAX_BYTES];
-    const bool ok = update_pending_format(encoded, sizeof(encoded), firmware_target,
-                                          version, now_unix());
-    if (ok && cache_write_str(CACHE_KEY_PENDING, encoded)) {
+    const bool ok =
+        update_pending_format(encoded, sizeof(encoded), firmware_target, version, now_unix()) &&
+        cache_write_str(CACHE_KEY_PENDING, encoded);
+    if (ok) {
         strlcpy(s_state.pending, encoded, sizeof(s_state.pending));
     }
     if (s_lock) xSemaphoreGive(s_lock);

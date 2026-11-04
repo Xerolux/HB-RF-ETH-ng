@@ -97,6 +97,7 @@ const cooldownRemaining = ref(0)
 // loaded (or on firmware without the endpoint); the pages keep their controls
 // disabled rather than guessing defaults.
 const updateConfig = ref(null)
+const installConnectionLost = ref(false)
 let pollTimer = null
 let cooldownTimer = null
 
@@ -136,6 +137,7 @@ const loadUpdateStatus = async () => {
     silent: true
   })
   if (response.data) {
+    installConnectionLost.value = false
     // Older firmware has no "install" or "schedule" block; merge with
     // defaults so template access never hits undefined.
     updateStatus.value = {
@@ -184,6 +186,12 @@ const pollInstall = async () => {
   } catch {
     installPollErrors++
   }
+  if (installPollErrors >= INSTALL_POLL_MAX_CONSECUTIVE_ERRORS) {
+    // Keep the last device state: losing contact does not prove the install
+    // failed, and must not enable a second installation request.
+    installConnectionLost.value = true
+    return
+  }
   const state = updateStatus.value.install.state
   if (INSTALL_ACTIVE_STATES.includes(state)) {
     scheduleInstallPoll()
@@ -209,6 +217,7 @@ const startInstall = async target => {
     const outcome = response.data?.outcome || 'unavailable'
     if (outcome === 'accepted') {
       installPollErrors = 0
+      installConnectionLost.value = false
       updateStatus.value = { ...updateStatus.value, install: { ...emptyInstall(), state: 'preparing', target } }
       scheduleInstallPoll()
     }
@@ -411,6 +420,7 @@ export function useUpdateSearch(t) {
     formatTimestamp,
     startInstall,
     installBusy,
+    installConnectionLost,
     fetchReleaseNotes,
     loadUpdateConfig,
     saveUpdateConfig,

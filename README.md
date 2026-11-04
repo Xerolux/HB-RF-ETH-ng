@@ -39,8 +39,8 @@ Hierbei gilt, dass bei einer debmatic oder piVCCU3 Installation immer nur ein Fu
 - Dashboard, Kopfzeile und Browser-Tab zeigen den unter Einstellungen/Netzwerk gesetzten Hostnamen, damit mehrere HB-RF-ETH-ng Geräte sofort unterscheidbar sind.
 - System-Log bleibt nach Aktivierung auch über einen Reboot aktiv; beim Deaktivieren bleibt es nach dem nächsten Start wieder aus.
 - **Monitoring via MQTT** (mit Home Assistant Auto-Discovery, TLS/mTLS, Kommando-Token) und CheckMK
-- Manuelle Firmware-Updates per `.bin`-Datei-Upload in der WebUI (automatische
-  Update-Suche, URL-OTA und MQTT/Home-Assistant-OTA wurden entfernt)
+- Firmware-Updates per lokalem `.bin`-Upload oder geprüftem Online-Download
+  in der WebUI; automatische Suche und Installation sind optional konfigurierbar.
 - ESP-IDF 6.1 Toolchain (native `idf.py` Builds), GCC 15.2 (xtensa-esp-elf)
 
 ### Login nach Update
@@ -85,8 +85,17 @@ python3 rename_webui_files.py
 > Vor jeder Styling-Änderung an der WebUI bitte [`docs/WEBUI_DESIGN_SYSTEM.md`](docs/WEBUI_DESIGN_SYSTEM.md) lesen — die verbindliche Design-Spezifikation (Zwei-Theme-System, Farbpaletten, Tokens).
 
 ### Update- und Release-Hinweise
-- Das Gerät sucht nicht automatisch nach neuen Versionen und installiert keine
-  Firmware aus URLs oder über MQTT/Home Assistant.
+- Automatische Installationen sind standardmäßig ausgeschaltet. Fabrikneue Geräte
+  starten mit Suche und Benachrichtigung (`notify`); bestehende Geräte ohne
+  gespeicherte Update-Auswahl bleiben beim Firmware-Upgrade auf `off`. Eine
+  gespeicherte Auswahl bleibt erhalten. In der WebUI lassen sich
+  Benachrichtigungen, automatische WebUI-Updates oder automatische
+  Firmware- und WebUI-Updates aktivieren. Kanal, Suchintervall, Wartungsfenster
+  und die Beschränkung auf eine inaktive CCU-Verbindung sind konfigurierbar.
+- Online-Installationen verwenden die freigegebenen Release-Manifeste mit
+  Versions-, Host-, Größen- und SHA-256-Prüfung. Einzelne Updates können für
+  das nächste Wartungsfenster geplant werden. MQTT/Home Assistant bietet
+  weiterhin keinen OTA-Befehl.
 - Releases auf GitHub sind die Quelle für Release Notes und Artefakte. Laden Sie
   dort die gewünschte `firmware_*.bin` herunter und installieren Sie sie als
   lokale Datei über die WebUI.
