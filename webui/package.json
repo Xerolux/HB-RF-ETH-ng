@@ -32,7 +32,7 @@
     "eslint": "^10.14.0",
     "eslint-plugin-vue": "^10.11.1",
     "globals": "^17.13.0",
-    "sass": "^1.105.2",
+    "sass": "^1.107.1",
     "vite": "^8.3.4"
   },
   "overrides": {
