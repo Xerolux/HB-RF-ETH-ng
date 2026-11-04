@@ -57,9 +57,11 @@ static int64_t now_unix() { return 1800000000; }
 static bool update_pending_format(char *out, size_t size, bool, const char *v, int64_t) {
     return std::snprintf(out, size, "%s", v) < static_cast<int>(size);
 }
-static size_t strlcpy(char *dst, const char *src, size_t size) {
+// Recent glibc provides strlcpy itself; keep the host shim's symbol distinct.
+static size_t host_strlcpy(char *dst, const char *src, size_t size) {
     std::snprintf(dst, size, "%s", src); return std::strlen(src);
 }
+#define strlcpy host_strlcpy
 '''
         assertions = r'''
 int main() {
@@ -92,9 +94,12 @@ int main() {
             cpp = Path(directory) / "scheduler.cpp"
             binary = Path(directory) / "scheduler.exe"
             cpp.write_text(harness + cache + pending + assertions, encoding="utf-8")
-            subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
-                            str(cpp), "-o", str(binary)], check=True, capture_output=True, text=True)
-            subprocess.run([str(binary)], check=True, capture_output=True, text=True)
+            compiled = subprocess.run(
+                ["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                 str(cpp), "-o", str(binary)], capture_output=True, text=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(binary)], capture_output=True, text=True)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
 
 
 if __name__ == "__main__":
