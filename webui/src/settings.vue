@@ -475,7 +475,9 @@
                     v-for="preset in timezonePresets"
                     :key="preset.value"
                     :value="preset.value"
-                  >{{ preset.label }}</BFormSelectOption>
+                  >
+{{ preset.label }}
+</BFormSelectOption>
                   <BFormSelectOption :value="TIMEZONE_CUSTOM">{{ t('settings.timezoneCustom') }}</BFormSelectOption>
                 </BFormSelect>
                 <BFormInput

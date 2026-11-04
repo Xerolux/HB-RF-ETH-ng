@@ -70,7 +70,7 @@ void update_scheduler_init(Settings *settings);
 UpdateSchedulerStatus update_scheduler_get_status();
 
 // Schedule the one-shot install ("target" resolved from the last search
-// result). Returns false when the version string is missing/oversized.
+// result). Returns false when the version string is missing/oversized or persistence fails.
 bool update_scheduler_set_pending(bool firmware_target, const char *version);
 
 // Cancel the scheduled one-shot install. Returns true when an entry existed.

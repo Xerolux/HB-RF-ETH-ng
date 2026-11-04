@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0-Beta.3] - 2026-11-04
+
+### Fixed
+- Hold the update scheduler's NVS reservation through reads, writes, commits and handle closure.
+- Report failed persistence when scheduling an update instead of falsely confirming success; retain the previous in-memory request.
+- Stop installation status polling after 30 consecutive connection errors and show a localized connection-loss warning without enabling a duplicate installation.
+
+### Changed
+- Include WebUI 1.1.1-Beta.1 (API 1; minimum firmware 2.3.0-Beta.1).
+- Update vulnerable JavaScript dependencies; npm audit reports no known vulnerabilities for the release lockfile. Scope the corrected minimatch override to ESLint tooling.
+- Define Vue compatibility-component prop types/defaults and use explicit ESM build/lint configuration.
+- Use reproducible dependency installs in build/PR/release CI and add deterministic update-polling and NVS-failure regression coverage.
+- Correct the automatic-update documentation, including factory-fresh notify mode and existing-device off defaults.
+
+### Validation
+- Local: 51 browser regressions, 51 Python tests, three Node tests and six C++ host programs passed; WebUI build, translations and lint passed.
+- Physical device/flash testing has not been performed for this beta. Firmware compilation is validated by the ESP-IDF 6.1 CI build before publication.
+
 ## [2.3.0-Beta.2] - 2026-10-21
 
 ### Changes

@@ -486,6 +486,7 @@ export default {
     installVerifying: 'SHA-256 wird verifiziert…',
     installFinalizing: 'Verifiziert – Neustart steht bevor…',
     installFailedTitle: 'Installation fehlgeschlagen',
+    installConnectionLost: "Die Verbindung zum Gerät wurde unterbrochen. Der Installationsstatus ist unbekannt. Lade diese Seite neu, sobald das Gerät wieder erreichbar ist.",
     installFailed: 'Online-Installation fehlgeschlagen:',
     installStartFailed: 'Die Installation konnte nicht gestartet werden. Bitte später erneut versuchen.',
     installConfirmTitle: 'Firmware {version} installieren?',

@@ -5,7 +5,7 @@ const classList = (...values) => values.flat().filter(Boolean)
 
 export const BButton = defineComponent({
   name: 'BButton', inheritAttrs: false,
-  props: { variant: { default: 'secondary' }, size: String, block: Boolean, disabled: Boolean, type: { default: 'button' } },
+  props: { variant: { type: String, default: 'secondary' }, size: { type: String, default: undefined }, block: Boolean, disabled: Boolean, type: { type: String, default: 'button' } },
   emits: ['click'],
   setup(props, { attrs, slots, emit }) {
     return () => h('button', {
@@ -20,7 +20,7 @@ export const BButton = defineComponent({
 
 export const BAlert = defineComponent({
   name: 'BAlert', inheritAttrs: false,
-  props: { variant: { default: 'info' }, modelValue: { default: undefined }, show: { default: true }, dismissible: Boolean, fade: Boolean },
+  props: { variant: { type: String, default: 'info' }, modelValue: { type: Boolean, default: undefined }, show: { type: Boolean, default: true }, dismissible: Boolean, fade: Boolean },
   emits: ['update:modelValue'],
   setup(props, { attrs, slots, emit }) {
     return () => {
@@ -56,7 +56,7 @@ export const BForm = defineComponent({
 
 export const BFormGroup = defineComponent({
   name: 'BFormGroup', inheritAttrs: false,
-  props: { label: String, labelFor: String },
+  props: { label: { type: String, default: undefined }, labelFor: { type: String, default: undefined } },
   setup(props, { attrs, slots }) {
     return () => h('div', { ...attrs, class: classList('mb-3', attrs.class) }, [
       props.label ? h('label', { class: 'form-label', for: props.labelFor }, props.label) : null,
@@ -78,8 +78,8 @@ const normalizeValue = (value, modifiers = {}) => {
 export const BFormInput = defineComponent({
   name: 'BFormInput', inheritAttrs: false,
   props: {
-    modelValue: [String, Number], modelModifiers: { default: () => ({}) },
-    state: { default: null }, size: String, type: { default: 'text' }, disabled: Boolean
+    modelValue: { type: [String, Number], default: undefined }, modelModifiers: { type: Object, default: () => ({}) },
+    state: { type: Boolean, default: null }, size: { type: String, default: undefined }, type: { type: String, default: 'text' }, disabled: Boolean
   },
   emits: ['update:modelValue', 'input', 'change', 'blur', 'keyup'],
   setup(props, { attrs, emit }) {
@@ -107,7 +107,7 @@ export const BFormInvalidFeedback = defineComponent({
 
 export const BFormSelect = defineComponent({
   name: 'BFormSelect', inheritAttrs: false,
-  props: { modelValue: [String, Number, Boolean], modelModifiers: { default: () => ({}) }, options: { type: Array, default: () => [] }, size: String, disabled: Boolean },
+  props: { modelValue: { type: [String, Number, Boolean], default: undefined }, modelModifiers: { type: Object, default: () => ({}) }, options: { type: Array, default: () => [] }, size: { type: String, default: undefined }, disabled: Boolean },
   emits: ['update:modelValue', 'change'],
   setup(props, { attrs, slots, emit }) {
     const optionNode = option => {
@@ -130,7 +130,7 @@ export const BFormSelect = defineComponent({
 
 export const BFormSelectOption = defineComponent({
   name: 'BFormSelectOption', inheritAttrs: false,
-  props: { value: [String, Number, Boolean], disabled: Boolean },
+  props: { value: { type: [String, Number, Boolean], default: undefined }, disabled: Boolean },
   setup(props, { attrs, slots }) {
     return () => h('option', { ...attrs, value: props.value, disabled: props.disabled }, slots.default?.())
   }
@@ -139,10 +139,10 @@ export const BFormSelectOption = defineComponent({
 export const BModal = defineComponent({
   name: 'BModal', inheritAttrs: false,
   props: {
-    modelValue: Boolean, title: String, size: String, centered: Boolean, scrollable: Boolean,
-    hideHeader: Boolean, hideFooter: Boolean, contentClass: [String, Array, Object],
-    headerClass: [String, Array, Object], bodyClass: [String, Array, Object],
-    footerClass: [String, Array, Object], titleClass: [String, Array, Object],
+    modelValue: Boolean, title: { type: String, default: undefined }, size: { type: String, default: undefined }, centered: Boolean, scrollable: Boolean,
+    hideHeader: Boolean, hideFooter: Boolean, contentClass: { type: [String, Array, Object], default: undefined },
+    headerClass: { type: [String, Array, Object], default: undefined }, bodyClass: { type: [String, Array, Object], default: undefined },
+    footerClass: { type: [String, Array, Object], default: undefined }, titleClass: { type: [String, Array, Object], default: undefined },
     // Footer-button props (bootstrap-compatible). When hideFooter is false and
     // no default footer slot is supplied, BModal renders a default OK / Cancel
     // pair so every dismissible modal has a visible close affordance — fixes

@@ -26,7 +26,7 @@ jobs:
       - name: Build New Design WebUI
         run: |
           cd webui
-          npm install
+          npm ci
           npm run build
 
       - name: Prepare embedded and standalone WebUI assets

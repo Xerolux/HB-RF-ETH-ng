@@ -30,7 +30,7 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.es2021,
-        // Injected by Vite's `define` at build time (see vite.config.js).
+        // Injected by Vite's `define` at build time (see vite.config.mjs).
         __WEBUI_VERSION__: 'readonly',
         __WEBUI_API_VERSION__: 'readonly',
       },
@@ -75,8 +75,13 @@ export default [
     },
   },
   {
+    // This compatibility module intentionally exports a family of tiny primitives.
+    files: ['src/components/BootstrapLite.js'],
+    rules: { 'vue/one-component-per-file': 'off' },
+  },
+  {
     // Node-side tooling and Playwright specs run outside the browser.
-    files: ['*.config.js', 'tests/**/*.js'],
+    files: ['*.config.{js,mjs}', 'tests/**/*.{js,mjs}'],
     languageOptions: {
       globals: {
         ...globals.node,
