@@ -7,22 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0-Beta.1] - 2026-11-11
+
 ### Added
-- Network watchdog witness check: before a gateway-unreachable restart, the connected CCU (same subnet, no gateway involved) is probed. If it answers, the outage is router-side and the restart is deferred instead of needlessly dropping the CCU session.
-- Crash transcript notification: when the previous boot ended in a panic, the configured channels (webhook/Telegram/email) receive an event with the first transcript line instead of waiting for a manual `/api/crash_log` read. New filterable event bit in the monitoring UI (all four languages).
-- `hbrfeth_udp_stale_reconnect_total` Prometheus counter and `status/raw_uart_stale_reconnects` MQTT topic: how often CCUs hit the stale-identifier recovery path (#480).
-- Release assets now include `ota_data_initial.bin`, completing the serial flash set for esptool users (requested in #483 discussion).
+- **mDNS**: the device announces itself as `<hostname>.local` (plus `_http._tcp`), so the WebUI is reachable by name; the WebFlasher links straight to it after a successful flash.
+- **Event journal**: reboot-surviving history of CCU/link/crash/watchdog events (NVS mirror), served by `GET /api/events` and shown on the diagnostics page ("Letzte Ereignisse").
+- **`GET /api/health`**: minimal unauthenticated liveness document for uptime monitors.
+- **Runtime log levels**: `GET/POST /api/loglevel` raises one module's verbosity until the next restart; surfaced as a card on the system-log page (field debugging without a reflash).
+- **Scheduled maintenance restart**: opt-in weekly restart (day + time) with boot-loop protection; settings card included. New reset reason `Scheduled Restart`.
+- **Network watchdog witness**: before a gateway-unreachable restart the connected CCU (same subnet) is probed; a responding witness defers the restart and is journaled + counted (`hbrfeth_net_witness_deferred_total`).
+- Home Assistant discovery sensor `raw_uart_stale_reconnects` for the #480 recovery path.
+- OpenAPI drift check in CI: a new route without documentation fails the build (legacy routes carry an explicit allowlist).
+- Visual regression tests: 12 screenshot baselines (6 routes × light/dark) fail CI on layout drift.
+- **Home Assistant integration** (separate repo [hb-rf-eth-hass](https://github.com/Xerolux/hb-rf-eth-hass), beta): device with sensors, connectivity entities and a one-click firmware update entity.
 
 ### Changed
+- Include WebUI 1.2.0-Beta.1 (event journal card, log-level card, restart schedule, OTA header chip, crash-transcript notification toggle).
+- `docs/openapi.yaml`: documented `/api/health`, `/api/events`, `/api/loglevel`; corrected the `login.json` schema (username + password).
+
+### Fixed
+- Network watchdog: probe the connected CCU (same subnet, no gateway involved) before restarting on gateway-unreachable. A responding witness proves MAC/PHY/lwIP are alive and the outage is router-side, so the restart - and with it the CCU session drop - is deferred.
+- New `EVENT_CRASH_TRANSCRIPT` notification (bit 11): when the previous boot ended in a panic, configured channels receive the first transcript line instead of waiting for a manual `/api/crash_log` read.
+- `hbrfeth_udp_stale_reconnect_total` Prometheus counter and `status/raw_uart_stale_reconnects` MQTT topic (#480 field telemetry).
 - Update checks fetch the manifest with a cache-busting `?fetch=` counter: freshly published releases are visible immediately instead of after the ~10 minute GitHub Pages CDN window.
 - `HTTP_CLIENT` EAGAIN retry warnings (dozens per TLS artifact download, all benign) are silenced; errors stay visible.
-- WebFlasher: image downloads retry transient failures up to three times, the release catalog shows its newest entry date (with a stale-catalog warning after 21 days), and the manual mode documents the esptool flash layout including `ota_data_initial.bin`.
+- WebFlasher: image downloads retry transient failures up to three times, the release catalog shows its newest entry date (with a stale-catalog warning after 21 days), and the manual mode documents the esptool flash layout including `ota_data_initial.bin` (now also a release asset).
 - Release workflows rebase their metadata commit onto the live `main` head before pushing, so a concurrent push can no longer fail a release.
 - Dependabot patch/minor bumps with green CI merge automatically (`auto-merge.yml`); majors stay manual.
+- WebUI: OTA progress chip in the header visible from every page; monitoring password fields wrapped in forms (Chrome DOM hint); return-based router guard; zero-console E2E guard for every route.
 
-### WebUI
-- OTA progress chip in the header: an online installation started anywhere (this browser, another client, or the automatic schedule) is visible from every page and links to the updates view.
-- New zero-console E2E guard: every route must load without a single browser console error or warning.
+### Validation
+- Local: 74 browser tests (53 regressions + 9 zero-console + 12 visual baselines), 51 Python tests, six C++ host programs; WebUI build, translations, OpenAPI drift check and ESP-IDF build passed.
 
 ## [WebUI 1.1.1-Beta.2] - 2026-11-11
 - Wrap the monitoring page's password fields in forms; Chrome logged a verbose DOM hint for every password input outside a form, and Enter could trigger implicit submissions.
