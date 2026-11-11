@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0-Beta.4] - 2026-11-11
+
+### Changes
+- docs(changelog): curate 2.3.0-Beta.3 release notes
+- chore(deps): refresh webui lockfile to latest within-range versions
+- chore(deps): bump crate-ci/typos to v1.52.2 and refresh IDF managed components
+- chore(deps)(deps-dev): bump sass from 1.105.2 to 1.108.1 in /webui (#489)
+- chore(deps)(deps): bump vue-i18n from 11.4.14 to 11.4.18 in /webui (#486)
+- chore(deps)(deps-dev): bump vite from 8.3.4 to 8.3.6 in /webui (#488)
+- chore(deps)(deps-dev): bump globals from 17.13.0 to 17.14.0 in /webui (#487)
+- chore(deps)(deps): bump vue from 3.5.43 to 3.5.45 in /webui (#484)
+- chore(ci)(deps): bump crate-ci/typos from 1.51.1 to 1.52.0 (#485)
+- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action from 24.2.0 to 25.0.0 (#481)
+- fix(flasher): declare imageCache map used by fetchBinary (#490)
+- fix(raw-uart): return a distinct ID for stale reconnects (#480)
+- chore: update manifests for v2.3.0-Beta.3
+
 ## [2.3.0-Beta.3] - 2026-11-11
 
 ### Fixed

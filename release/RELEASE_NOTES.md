@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.3.0-Beta.2
+# 🚀 HB-RF-ETH-ng v2.3.0-Beta.4
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,18 +11,22 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.3.0-Beta.2?
+## 🆕 Was ist neu in v2.3.0-Beta.4?
 
 ### Changes
-- chore: bump versions for v2.3.0-Beta.2 (WebUI 1.1.0)
-- fix(update): schedule endpoint re-checks the target against running versions
-- fix(update): collect the redirect Location via the header event
-- chore(update): drop duplicate webui_internal.h include
-- fix(update): scheduled installs read the persisted channel after reboots
-- fix(update): scheduled installs honor idleOnly=false (live finding)
-- fix(update): compile - header signature and goto scope in redirect loop
-- fix(update): follow release-asset redirects with per-hop allowlist checks
-- chore: update manifests for v2.3.0-Beta.1
+- docs(changelog): curate 2.3.0-Beta.3 release notes
+- chore(deps): refresh webui lockfile to latest within-range versions
+- chore(deps): bump crate-ci/typos to v1.52.2 and refresh IDF managed components
+- chore(deps)(deps-dev): bump sass from 1.105.2 to 1.108.1 in /webui (#489)
+- chore(deps)(deps): bump vue-i18n from 11.4.14 to 11.4.18 in /webui (#486)
+- chore(deps)(deps-dev): bump vite from 8.3.4 to 8.3.6 in /webui (#488)
+- chore(deps)(deps-dev): bump globals from 17.13.0 to 17.14.0 in /webui (#487)
+- chore(deps)(deps): bump vue from 3.5.43 to 3.5.45 in /webui (#484)
+- chore(ci)(deps): bump crate-ci/typos from 1.51.1 to 1.52.0 (#485)
+- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action from 24.2.0 to 25.0.0 (#481)
+- fix(flasher): declare imageCache map used by fetchBinary (#490)
+- fix(raw-uart): return a distinct ID for stale reconnects (#480)
+- chore: update manifests for v2.3.0-Beta.3
 
 ## ✨ Hauptfunktionen
 
@@ -59,8 +63,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.3.0-Beta.2.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.1.0.bin`)
+- **Firmware-Binary** (`firmware_2.3.0-Beta.4.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.1.1-Beta.1.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -101,6 +105,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.1.0`
+- WebUI version: `1.1.1-Beta.1`
 - WebUI API: `1`
 - Minimum firmware: `2.3.0-Beta.1`
