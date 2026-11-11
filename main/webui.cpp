@@ -1756,37 +1756,39 @@ esp_err_t get_events_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // Lazily persist entries recorded while the notification worker is off.
-    event_journal_flush();
-
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
 
-    std::string out;
-    out.reserve(512 + event_journal_count() * 160);
-    out += "{\"count\":";
-    out += std::to_string(event_journal_count());
-    out += ",\"events\":[";
-    for (size_t i = 0; i < event_journal_count(); i++)
-    {
-        const event_journal_entry_t *e = event_journal_entry(i);
-        if (!e) break;
-        if (i) out += ",";
-        out += "{\"time\":";
-        out += std::to_string((unsigned long long)e->epoch);
-        out += ",\"type\":\"";
-        out += event_journal_name(e->event_id);
-        out += "\",\"detail\":\"";
-        for (const char *p = e->detail; p && *p; p++)
-        {
-            if (*p == '"' || *p == '\\') { out += '\\'; out += *p; }
-            else if ((unsigned char)*p >= ' ') out += *p;
+    // Stream bounded rows rather than allocating the complete history on the
+    // fragmented HTTP heap. At most 320 bytes plus one entry live on the stack.
+    const size_t count = event_journal_count();
+    char row[320];
+    int length = snprintf(row, sizeof(row), "{\"count\":%u,\"events\":[", (unsigned)count);
+    if (length < 0 || (size_t)length >= sizeof(row) ||
+        httpd_resp_send_chunk(req, row, length) != ESP_OK)
+        return ESP_FAIL;
+    for (size_t i = 0; i < count; i++) {
+        event_journal_entry_t entry;
+        if (!event_journal_copy(i, &entry)) return ESP_FAIL;
+        length = snprintf(row, sizeof(row), "%s{\"time\":%llu,\"type\":\"%s\",\"detail\":\"",
+                          i ? "," : "", (unsigned long long)entry.epoch,
+                          event_journal_name(entry.event_id));
+        if (length < 0 || (size_t)length >= sizeof(row)) return ESP_FAIL;
+        size_t used = (size_t)length;
+        for (const char *p = entry.detail; *p; p++) {
+            if (used + 4 >= sizeof(row)) return ESP_FAIL;
+            if (*p == '"' || *p == '\\') {
+                row[used++] = '\\';
+                row[used++] = *p;
+            } else if ((unsigned char)*p >= ' ')
+                row[used++] = *p;
         }
-        out += "\"}";
+        row[used++] = '"';
+        row[used++] = '}';
+        if (httpd_resp_send_chunk(req, row, used) != ESP_OK) return ESP_FAIL;
     }
-    out += "]}";
-    httpd_resp_send(req, out.c_str(), out.length());
-    return ESP_OK;
+    if (httpd_resp_send_chunk(req, "]}", 2) != ESP_OK) return ESP_FAIL;
+    return httpd_resp_send_chunk(req, NULL, 0);
 }
 
 httpd_uri_t get_events_handler = {

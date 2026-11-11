@@ -197,6 +197,10 @@ paths:
         Newest-first ring of recent device events (CCU connects, link drops,
         crashes, deferred watchdog restarts, scheduled restarts). Mirror is
         persisted in NVS and survives reboots. Firmware >= 2.4.0.
+        From 2.4.0-Beta.5 the RAM ring holds at most 24 events and only the
+        latest eight are mirrored to NVS (fewer if storage is tight). The
+        diagnostic mirror keeps settings headroom and retries storage failures
+        after five minutes. GET only reads the RAM history.
       responses:
         '200':
           description: Journal contents

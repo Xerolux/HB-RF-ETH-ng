@@ -17,6 +17,27 @@ This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng fi
 
 ---
 
+## Journal storage and update-search memory (2.4.0-Beta.5)
+
+`EVENT_JOURNAL ... NVS_NOT_ENOUGH_SPACE` refers to flash storage, while
+`Too little free memory` during an update search refers to runtime RAM.
+A factory reset is not the remedy for either condition.
+
+Beta.5 releases the completed startup task's 6 KiB stack and reduces the
+journal's permanent RAM ring from 40 to 24 entries (1792 bytes saved). The
+NVS mirror keeps the newest eight full-detail entries (at most 896 bytes),
+or fewer when necessary to retain a settings-storage reserve. Existing
+histories are loaded with bounded heap storage and shortened on persistence.
+Only an oversized legacy `journal/ring` diagnostic key may be reclaimed;
+settings, credentials and certificates are not erased. After an NVS failure,
+the in-memory history remains available and persistence retries after five
+minutes. Only the mirrored entries survive a restart.
+
+The journal API streams bounded rows and performs no flash writes on reads.
+The TLS update-search memory thresholds remain unchanged. After updating,
+verify the running firmware version, steady-state free heap, a successful
+update search, and that journal persistence no longer reports capacity errors.
+
 ## General Troubleshooting
 
 ### First Steps

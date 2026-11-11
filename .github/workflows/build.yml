@@ -106,6 +106,14 @@ jobs:
             -o build/host-tests/test_update_schedule_policy
           build/host-tests/test_update_schedule_policy
 
+      - name: Test bounded event journal and NVS recovery
+        run: |
+          mkdir -p build/host-tests
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -pthread \
+            -Itest/host/journal_stubs -Itest/host/stubs -Iinclude \
+            test/host/test_event_journal.cpp -o build/host-tests/test_event_journal
+          timeout 30 build/host-tests/test_event_journal
+
       - name: Test stability and storage policies
         run: python3 -m unittest discover -s test/host -p 'test_*policy.py'
 

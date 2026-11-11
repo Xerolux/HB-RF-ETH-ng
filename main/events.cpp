@@ -996,7 +996,8 @@ bool events_is_running(void) { return s_running.load(); }
 void events_emit(Event event, const char *detail)
 {
     // Journal first, unconditionally: the history must record events even
-    // while the notification worker is stopped. RAM-only, never blocks.
+    // while the notification worker is stopped. Only the short RAM-ring lock
+    // is taken here; persistence never holds it during flash I/O.
     event_journal_add((uint8_t)event, detail);
 
     if (!s_queue) return;

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- (system) Release the finished main task and its 6144-byte stack after boot; long-lived services retain static/heap lifetime. This restores update-search RAM headroom without relaxing TLS admission limits.
+- (diag) Bound the event journal to 24 full-detail RAM entries and at most eight persisted entries (896 bytes). Load legacy 40-entry histories with a bounded temporary heap allocation instead of a 4480-byte startup stack buffer, retaining the newest entries.
+- (diag) Serialize journal producers and shared NVS writes, retain a settings-space reserve, adapt retention to available NVS capacity and reclaim only an oversized legacy journal key if needed. Storage failures back off for five minutes. User settings, credentials, certificates and partition layout are preserved.
+- (diag) Stream journal API responses one bounded row at a time instead of allocating the entire history; read requests no longer trigger flash writes. Events added during persistence remain pending for the next flush.
+
 ### Changed
 - WebUI update center: installed/available version comparison, explicit status-load failure and retry, channel-aware comparison and install controls, shared accessible preparation/download/verification/activation progress, and readable escaped release notes loaded on demand and released on close. Uses the existing device APIs without new dependencies or firmware buffers.
 - Dashboard: bounded 60-sample CPU/memory session history in the browser, pause/resume/manual refresh with stale-data feedback, shortcuts and reduced-motion-aware transitions.

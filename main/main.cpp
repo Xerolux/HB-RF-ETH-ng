@@ -152,7 +152,7 @@ void app_main()
 
     // All long-lived service objects are function-local statics instead of
     // stack locals: they must outlive app_main's active phase (the task is
-    // suspended at the end, never returns) and keeping them in the frame
+    // deleted after boot) and keeping them in the frame
     // pushed the main task close to its stack limit, which caused a silent
     // boot hang via stack overflow into adjacent heap allocations.
     static Settings settings;
@@ -438,10 +438,11 @@ void app_main()
 
     ESP_LOGI(TAG, "All services started.");
 
-    // Boot finished - stop watching the main task, it stays suspended from
-    // here on and would otherwise trip the WDT.
+    // Boot finished. ESP-IDF deletes the main task when app_main returns,
+    // releasing its 6144-byte stack and TCB instead of retaining an idle task.
+    // Every service above has static/heap lifetime; none depends on this frame.
     if (bootWdt)
         esp_task_wdt_delete(NULL);
 
-    vTaskSuspend(NULL);
+    return;
 }
