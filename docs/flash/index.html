@@ -169,6 +169,7 @@
             <input type="file" id="manualBootloader" accept=".bin">
             <label class="field-label" for="manualPartitions" data-i18n="manualPtLabel">Partitionstabelle (partitions.bin, optional)</label>
             <input type="file" id="manualPartitions" accept=".bin">
+            <div class="file-status muted" data-i18n="manualEsptoolHint"></div>
         </div>
 
         <label class="field-label" data-i18n="profileLabel">Installationsart</label>
@@ -261,6 +262,9 @@ const I18N = {
         manualFwLabel: "Firmware-Datei (firmware_*.bin)",
         manualBlLabel: "Bootloader (bootloader.bin, optional)",
         manualPtLabel: "Partitionstabelle (partitions.bin, optional)",
+        manualEsptoolHint: "Esptool per Konsole: bootloader.bin @ 0x1000, partitions.bin @ 0x8000, ota_data_initial.bin @ 0xd000 (aus den Release-Assets) und firmware_*.bin @ 0x10000.",
+        catalogInfo: "Release-Katalog Stand: {date}",
+        catalogStale: "⚠ Release-Katalog offenbar veraltet (Stand {date}) – Seite neu laden oder lokale Dateien verwenden.",
         profileLabel: "Installationsart",
         profileFullTitle: "Komplettinstallation",
         profileFullHint: "Bootloader, Partitionstabelle und Firmware. Für frisch bestückte Platinen, Neuanfang oder Reparatur. Einstellungen (Netzwerk, Passwort) bleiben erhalten.",
@@ -324,6 +328,9 @@ const I18N = {
         manualFwLabel: "Firmware file (firmware_*.bin)",
         manualBlLabel: "Bootloader (bootloader.bin, optional)",
         manualPtLabel: "Partition table (partitions.bin, optional)",
+        manualEsptoolHint: "Esptool via console: bootloader.bin @ 0x1000, partitions.bin @ 0x8000, ota_data_initial.bin @ 0xd000 (from the release assets) and firmware_*.bin @ 0x10000.",
+        catalogInfo: "Release catalog as of: {date}",
+        catalogStale: "⚠ Release catalog looks stale (as of {date}) – reload the page or use local files.",
         profileLabel: "Installation type",
         profileFullTitle: "Full installation",
         profileFullHint: "Bootloader, partition table and firmware. For freshly assembled boards, fresh starts or repair. Settings (network, password) are preserved.",
@@ -516,6 +523,15 @@ function currentEntry() {
     return null;
 }
 
+function catalogInfoText() {
+    if (!flashIndex || flashIndex.length === 0) return "";
+    const newest = flashIndex[0];
+    const date = (newest.date || "").slice(0, 10);
+    if (!date) return "";
+    const ageDays = (Date.now() - new Date(date + "T00:00:00Z").getTime()) / 86400000;
+    return t(ageDays > 21 ? "catalogStale" : "catalogInfo", { date });
+}
+
 function renderReleases() {
     const sel = $("releaseSelect");
     const meta = $("releaseMeta");
@@ -535,6 +551,7 @@ function renderReleases() {
             o.textContent = toEntry(r).label;
             sel.appendChild(o);
         }
+        meta.textContent = catalogInfoText();
         return;
     }
     const r = channel() === "stable" ? stableEntry() : betaEntry();
@@ -548,6 +565,7 @@ function renderReleases() {
     o.value = r.tag;
     o.textContent = toEntry(r).label;
     sel.appendChild(o);
+    meta.textContent = catalogInfoText();
 }
 
 function channel() { return $("channelSelect").value; }
@@ -557,12 +575,23 @@ const imageCache = new Map();
 
 async function fetchBinary(url) {
     if (imageCache.has(url)) return imageCache.get(url);
-    const r = await fetch(url);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const buf = await r.arrayBuffer();
-    const data = new Uint8Array(buf);
-    imageCache.set(url, data);
-    return data;
+    // Transient CDN hiccups must not abort a 15-minute flashing session:
+    // retry up to three times with linear backoff before surfacing the error.
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const r = await fetch(url, { cache: "no-store" });
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const buf = await r.arrayBuffer();
+            const data = new Uint8Array(buf);
+            imageCache.set(url, data);
+            return data;
+        } catch (e) {
+            lastErr = e;
+            if (attempt < 2) await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+        }
+    }
+    throw lastErr;
 }
 
 async function parseShaSums(url) {
