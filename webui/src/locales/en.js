@@ -1,4 +1,21 @@
 export default {
+  events: {
+    ccu_connected: 'CCU connected',
+    ccu_disconnected: 'CCU disconnected',
+    crash_transcript: 'Crash transcript',
+    eth_link_down: 'Ethernet link down',
+    eth_link_up: 'Ethernet link up',
+    factory_reset: 'Factory reset',
+    low_heap: 'Low heap',
+    mqtt_disconnected: 'MQTT disconnected',
+    mqtt_reconnected: 'MQTT reconnected',
+    net_witness_deferred: 'Router outage (watchdog deferred)',
+    restart: 'Restart',
+    rf_module_detected: 'Radio module detected',
+    rf_module_lost: 'Radio module lost',
+    scheduled_restart: 'Scheduled restart',
+    test: 'Test',
+  },
   // Common
   common: {
     enabled: 'Enabled',
@@ -187,6 +204,12 @@ export default {
     ledBrightness: 'LED Brightness',
     ledPrograms: 'LED Programs',
     ledProgramsHelp: 'Customize the LED behavior for different system states.',
+  restartSchedule: {
+    title: 'Scheduled maintenance restart (weekly)',
+    help: 'A restart interrupts the CCU relay for about 45 seconds. Time follows the device timezone.',
+    day0: 'Sunday', day1: 'Monday', day2: 'Tuesday', day3: 'Wednesday',
+    day4: 'Thursday', day5: 'Friday', day6: 'Saturday'
+  },
     language: 'Language',
 
     // Messages
@@ -316,6 +339,12 @@ export default {
     uartModuleResets: 'Module resets total',
     uartNote: 'Buffer overflows, discarded bytes, line errors or send errors other than zero mean radio traffic was lost inside this firmware. The CCU then repeats the transmission, which raises the duty cycle and eventually makes a device appear faulty. If you see it, please post a screenshot in issue #447.',
     uartResetNote: 'Line errors shortly after a module reset (breaks within 10 s, parity and framing errors within 0.5 s) are counted under “After module reset” and are not a finding: the module is coming back up and no frame is in flight. What matters is the number of module resets requested by the CCU. A CCU start issues three to five; if the figure keeps climbing in steady state, the CCU keeps re-opening the link, and every reset takes the module off the air for seconds — the cause is then on the CCU, not on this board. Every reset is in the system log with timestamp and requester. The “Reset peak values” button also clears the counters on this card; the frame totals are kept.',
+  journalKicker: 'History',
+  journalHeading: 'Recent events',
+  journalHelp: 'Survives reboots: connection, watchdog and crash events of the last weeks.',
+  journalRefresh: 'Refresh',
+  journalUnsupported: 'This firmware does not provide the event journal yet (2.4.0+).',
+  journalEmpty: 'No events recorded yet.',
     interpretHint: 'How to read this: if “Dropped” and the delay counters are zero and peak occupancy is low, the relay is working cleanly and a reported device fault has another cause. If occupancy approaches capacity, or delays above 100 ms appear, the relay path is implicated.',
   },
   sysinfo: {
@@ -829,6 +858,11 @@ export default {
     levelWarning: 'Warning',
     levelInfo: 'Info',
     levelDebug: 'Debug',
+  logLevelLabel: 'Log level (temporary):',
+  logLevelApply: 'Apply',
+  logLevelHint: 'Sets the verbosity of one firmware module until the next restart — field debugging without a reflash.',
+  logLevelApplied: '{tag} → {level} applied',
+  logLevelFailed: 'Rejected (firmware older than 2.4.0?).',
     noMatches: 'No matching log lines',
     copiedVisible: 'Visible log copied',
     copiedLine: 'Log line copied',

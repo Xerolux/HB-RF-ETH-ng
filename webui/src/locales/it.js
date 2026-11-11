@@ -1,4 +1,21 @@
 export default {
+  events: {
+    ccu_connected: 'CCU connesso',
+    ccu_disconnected: 'CCU disconnesso',
+    crash_transcript: 'Trascrizione del crash',
+    eth_link_down: 'Collegamento Ethernet perso',
+    eth_link_up: 'Collegamento Ethernet attivo',
+    factory_reset: 'Ripristino di fabbrica',
+    low_heap: 'Memoria scarsa',
+    mqtt_disconnected: 'MQTT disconnesso',
+    mqtt_reconnected: 'MQTT riconnesso',
+    net_witness_deferred: 'Guasto router (watchdog in attesa)',
+    restart: 'Riavvio',
+    rf_module_detected: 'Modulo radio rilevato',
+    rf_module_lost: 'Modulo radio perso',
+    scheduled_restart: 'Riavvio pianificato',
+    test: 'Test',
+  },
   // Common
   common: {
     enabled: 'Abilitato',
@@ -187,6 +204,12 @@ export default {
     ledBrightness: 'Luminosità LED',
     ledPrograms: 'Programmi LED',
     ledProgramsHelp: 'Personalizza il comportamento dei LED per i diversi stati del sistema.',
+  restartSchedule: {
+    title: 'Riavvio di manutenzione pianificato (settimanale)',
+    help: 'Un riavvio interrompe il relè CCU per circa 45 secondi. Orario secondo il fuso orario del dispositivo.',
+    day0: 'Domenica', day1: 'Lunedì', day2: 'Martedì', day3: 'Mercoledì',
+    day4: 'Giovedì', day5: 'Venerdì', day6: 'Sabato'
+  },
     language: 'Lingua',
 
     // Messages
@@ -316,6 +339,12 @@ export default {
     uartModuleResets: 'Reset del modulo totali',
     uartNote: 'Overflow del buffer, byte scartati, errori di linea o errori di invio diversi da zero significano che traffico radio è andato perso in questo firmware. La CCU ripete la trasmissione, il duty cycle sale e prima o poi un dispositivo risulta guasto. In tal caso pubblicare uno screenshot nella issue #447.',
     uartResetNote: 'Gli errori di linea subito dopo un reset del modulo (segnali di break entro 10 s, errori di parità e framing entro 0,5 s) vengono contati sotto «Dopo reset del modulo» e non sono un’anomalia: il modulo si sta riavviando e nessun frame è in transito. Ciò che conta è il numero di reset del modulo richiesti dalla CCU. Un avvio della CCU ne genera da tre a cinque; se il valore continua a salire durante il normale funzionamento, la CCU riapre continuamente il collegamento e ogni reset toglie il modulo dalla radio per alcuni secondi — la causa è allora sulla CCU, non su questa scheda. Ogni reset è nel log di sistema con orario e origine. Il pulsante «Azzera i massimi» azzera anche i contatori di questa scheda; i totali dei frame restano.',
+  journalKicker: 'Cronologia',
+  journalHeading: 'Eventi recenti',
+  journalHelp: 'Sopravvive ai riavvii: connessioni, watchdog e arresti anomali delle ultime settimane.',
+  journalRefresh: 'Aggiorna',
+  journalUnsupported: 'Questo firmware non fornisce ancora il registro eventi (2.4.0+).',
+  journalEmpty: 'Nessun evento registrato.',
     interpretHint: 'Come leggerlo: se «Scartati» e i contatori di ritardo sono a zero e l’occupazione è bassa, il relè funziona correttamente e un guasto segnalato ha un’altra causa. Se l’occupazione si avvicina alla capacità o compaiono ritardi oltre 100 ms, la causa è nel relè.',
   },
   sysinfo: {
@@ -830,6 +859,11 @@ webuiUpdate: {
     levelWarning: 'Avviso',
     levelInfo: 'Info',
     levelDebug: 'Debug',
+  logLevelLabel: 'Livello di log (temporaneo):',
+  logLevelApply: 'Applica',
+  logLevelHint: 'Imposta la verbosità di un modulo fino al prossimo riavvio — debug senza reflash.',
+  logLevelApplied: '{tag} → {level} applicato',
+  logLevelFailed: 'Rifiutato (firmware precedente a 2.4.0?).',
     noMatches: 'Nessuna riga corrispondente',
     copiedVisible: 'Log visibile copiato',
     copiedLine: 'Riga copiata',

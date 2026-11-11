@@ -164,6 +164,38 @@
                   <small>{{ t('settings.ledProgramsHelp') }}</small>
                 </div>
               </div>
+
+              <!-- Opt-in weekly maintenance restart. Off by default and
+                   clearly marked: an automatic restart interrupts the CCU
+                   relay for ~45 seconds. -->
+              <div class="form-group mt-4">
+                <div class="form-check form-switch">
+                  <input
+                    id="restartScheduleEnabled"
+                    class="form-check-input"
+                    type="checkbox"
+                    v-model="restartScheduleEnabled"
+                  />
+                  <label class="form-check-label fw-bold" for="restartScheduleEnabled">
+                    {{ t('settings.restartSchedule.title') }}
+                  </label>
+                </div>
+                <div v-if="restartScheduleEnabled" class="restart-schedule-row mt-2">
+                  <BFormSelect
+                    v-model="restartScheduleDay"
+                    :options="restartScheduleDayOptions"
+                    size="sm"
+                  />
+                  <input
+                    type="time"
+                    class="form-control form-control-sm restart-schedule-time"
+                    v-model="restartScheduleTime"
+                  />
+                </div>
+                <div class="form-text mt-2">
+                  <small>{{ t('settings.restartSchedule.help') }}</small>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -807,6 +839,17 @@ const gpsBaudrate = ref(9600)
 const ntpServer = ref('')
 const ledBrightness = ref(100)
 
+// Opt-in weekly maintenance restart (firmware >= 2.4.0). Older firmware
+// simply ignores the extra fields; the toggle loads as false.
+const restartScheduleEnabled = ref(false)
+const restartScheduleDay = ref(0)
+const restartScheduleTime = ref('03:30')
+const restartScheduleDayOptions = computed(() =>
+  Array.from({ length: 7 }, (_, i) => ({ value: i, text: t(`settings.restartSchedule.day${i}`) }))
+)
+const restartScheduleHour = () => Number((restartScheduleTime.value.split(':')[0] || '3'))
+const restartScheduleMinute = () => Number((restartScheduleTime.value.split(':')[1] || 30))
+
 // POSIX TZ presets keep the common cases one click away; "custom" exposes the
 // raw string the firmware stores and validates (charset + 64 chars).
 const TIMEZONE_CUSTOM = '__custom__'
@@ -1153,6 +1196,10 @@ const buildSettingsPayload = () => ({
   timezone: timezone.value,
   ledBrightness: ledBrightness.value,
   ledPrograms: { ...ledProgramValues.value },
+  restartScheduleEnabled: restartScheduleEnabled.value,
+  restartScheduleDay: restartScheduleDay.value,
+  restartScheduleHour: restartScheduleHour(),
+  restartScheduleMinute: restartScheduleMinute(),
   enableIPv6: enableIPv6.value,
   ipv6Mode: ipv6Mode.value,
   ipv6Address: ipv6Address.value,
@@ -1198,6 +1245,13 @@ const loadSettings = () => {
   ntpServer.value = settingsStore.ntpServer
   timezone.value = settingsStore.timezone || 'UTC0'
   ledBrightness.value = settingsStore.ledBrightness
+
+  // Maintenance restart schedule (absent on older firmware -> defaults)
+  restartScheduleEnabled.value = !!settingsStore.restartScheduleEnabled
+  restartScheduleDay.value = Number(settingsStore.restartScheduleDay ?? 0)
+  const hh = String(Number(settingsStore.restartScheduleHour ?? 3)).padStart(2, '0')
+  const mm = String(Number(settingsStore.restartScheduleMinute ?? 30)).padStart(2, '0')
+  restartScheduleTime.value = `${hh}:${mm}`
 
   // Load LED programs if available
   if (settingsStore.ledPrograms !== undefined) {

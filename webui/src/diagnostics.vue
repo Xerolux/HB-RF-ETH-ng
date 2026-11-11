@@ -212,6 +212,38 @@
       </div>
     </section>
 
+    <!-- Reboot-surviving event journal (firmware >= 2.4.0). Older firmware
+         omits the endpoint; the card degrades to a short hint. -->
+    <section class="stat-card">
+      <div class="card-header">
+        <div class="header-icon bg-info-light text-info"><AppIcon name="activity" /></div>
+        <div class="header-text">
+          <span class="kicker">{{ t('diagnostics.journalKicker') }}</span>
+          <h2>{{ t('diagnostics.journalHeading') }}</h2>
+          <p>{{ t('diagnostics.journalHelp') }}</p>
+        </div>
+        <button class="tool-btn" type="button" :disabled="journalLoading" @click="loadJournal">
+          <AppIcon name="refresh" />
+          {{ t('diagnostics.journalRefresh') }}
+        </button>
+      </div>
+      <div class="card-body">
+        <BAlert v-if="journalUnsupported" variant="info" :model-value="true">
+          {{ t('diagnostics.journalUnsupported') }}
+        </BAlert>
+        <template v-else>
+          <p v-if="!journal.length" class="muted-text">{{ t('diagnostics.journalEmpty') }}</p>
+          <ul v-else class="journal-list">
+            <li v-for="(e, i) in journal" :key="i" class="journal-entry">
+              <span class="journal-time">{{ formatJournalTime(e.time) }}</span>
+              <span class="journal-type" :data-kind="e.type">{{ journalLabel(e.type) }}</span>
+              <span v-if="e.detail" class="journal-detail">{{ e.detail }}</span>
+            </li>
+          </ul>
+        </template>
+      </div>
+    </section>
+
     <section class="stat-card">
       <div class="card-body">
         <p class="muted-text">{{ t('diagnostics.interpretHint') }}</p>
@@ -404,10 +436,48 @@ const handleVisibilityChange = () => {
   }
 }
 
+// ---- Event journal (firmware >= 2.4.0) ---------------------------------
+// The journal lives on the device and survives reboots; a manual refresh is
+// enough (events are rare), so no timer competes with the counter polling.
+const journal = ref([])
+const journalLoading = ref(false)
+const journalUnsupported = ref(false)
+
+const JOURNAL_LOAD = async () => {
+  journalLoading.value = true
+  try {
+    const { data } = await axios.get('/api/events')
+    journal.value = Array.isArray(data.events) ? data.events : []
+    journalUnsupported.value = false
+  } catch (e) {
+    // 404 = firmware without the endpoint; anything else keeps old entries.
+    if (e?.response?.status === 404) journalUnsupported.value = true
+  } finally {
+    journalLoading.value = false
+  }
+}
+const loadJournal = () => { JOURNAL_LOAD() }
+
+const formatJournalTime = (epoch) => {
+  if (!epoch) return '—'
+  return new Date(epoch * 1000).toLocaleString([], {
+    year: '2-digit', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  })
+}
+
+// Unknown event types (newer firmware) fall back to the raw wire name.
+const journalLabel = (type) => {
+  const key = 'events.' + type
+  const localized = t(key)
+  return localized === key ? type : localized
+}
+
 onMounted(() => {
   load()
   timer = setInterval(load, REFRESH_MS)
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  loadJournal()
 })
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer)
@@ -435,4 +505,19 @@ onBeforeUnmount(() => {
 .chip-idle { color:var(--color-text-secondary); }
 .actions { display:flex; flex-wrap:wrap; gap:var(--space-3); margin-top:var(--space-4); }
 .muted-text { color:var(--color-text-secondary); margin-top:var(--space-4); }
+
+/* Event journal */
+.journal-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.journal-entry { display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; padding:6px 10px; border-radius:var(--radius-md,8px); background:var(--color-surface-2, rgba(0,0,0,.04)); font-size:.9rem; }
+.journal-time { color:var(--color-text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.journal-type { font-weight:600; white-space:nowrap; }
+.journal-type[data-kind='ccu_disconnected'],
+.journal-type[data-kind='eth_link_down'],
+.journal-type[data-kind='rf_module_lost'],
+.journal-type[data-kind='low_heap'],
+.journal-type[data-kind='crash_transcript'] { color:var(--color-danger, #c0392b); }
+.journal-type[data-kind='ccu_connected'],
+.journal-type[data-kind='eth_link_up'],
+.journal-type[data-kind='rf_module_detected'] { color:var(--color-success, #1e8e3e); }
+.journal-detail { color:var(--color-text-secondary); word-break:break-word; }
 </style>

@@ -71,6 +71,27 @@
         </select>
       </div>
 
+      <!-- Temporary per-tag log verbosity (firmware >= 2.4.0). RAM-only on
+           the device: a restart resets every override, by design. -->
+      <div class="loglevel-card">
+        <div class="loglevel-row">
+          <span class="loglevel-label">{{ t('systemlog.logLevelLabel') }}</span>
+          <select v-model="logLevelTag" class="loglevel-select" :disabled="logLevelTags.length === 0">
+            <option v-for="tag in logLevelTags" :key="tag.tag" :value="tag.tag">
+              {{ tag.tag }} ({{ tag.level }})
+            </option>
+          </select>
+          <select v-model="logLevelValue" class="loglevel-select">
+            <option v-for="lvl in ['DEFAULT','ERROR','WARN','INFO','DEBUG','VERBOSE']" :key="lvl" :value="lvl">{{ lvl }}</option>
+          </select>
+          <button class="tool-btn" type="button" :disabled="!logLevelTag || logLevelBusy" @click="applyLogLevel">
+            {{ t('systemlog.logLevelApply') }}
+          </button>
+        </div>
+        <p class="loglevel-hint">{{ t('systemlog.logLevelHint') }}</p>
+        <p v-if="logLevelFeedback" class="loglevel-feedback" :class="{ err: logLevelError }">{{ logLevelFeedback }}</p>
+      </div>
+
       <div class="card-body p-0">
         <div v-if="logEnabled" ref="logContainer" class="log-container" @scroll="onScroll">
           <div v-if="filteredEntries.length" class="log-list">
@@ -138,6 +159,41 @@ const paused = ref(false)
 const offset = ref(0)
 const searchQuery = ref('')
 const levelFilter = ref('all')
+
+// ---- Temporary per-tag log verbosity (firmware >= 2.4.0) ----------------
+const logLevelTags = ref([])
+const logLevelTag = ref('')
+const logLevelValue = ref('DEBUG')
+const logLevelBusy = ref(false)
+const logLevelFeedback = ref('')
+const logLevelError = ref(false)
+
+const loadLogLevels = async () => {
+  try {
+    const { data } = await axios.get('/api/loglevel')
+    logLevelTags.value = Array.isArray(data.tags) ? data.tags : []
+    if (!logLevelTag.value && logLevelTags.value.length) logLevelTag.value = logLevelTags.value[0].tag
+  } catch {
+    // Older firmware: the card stays empty and disabled.
+    logLevelTags.value = []
+  }
+}
+
+const applyLogLevel = async () => {
+  if (!logLevelTag.value) return
+  logLevelBusy.value = true
+  logLevelError.value = false
+  try {
+    await axios.post('/api/loglevel', { tag: logLevelTag.value, level: logLevelValue.value })
+    logLevelFeedback.value = t('systemlog.logLevelApplied', { tag: logLevelTag.value, level: logLevelValue.value })
+    await loadLogLevels()
+  } catch {
+    logLevelError.value = true
+    logLevelFeedback.value = t('systemlog.logLevelFailed')
+  } finally {
+    logLevelBusy.value = false
+  }
+}
 const newEntriesCount = ref(0)
 // Last-crash tail recovered from NVS after a watchdog/panic restart.
 // Empty when no snapshot was stored (normal reboot, first boot, etc.).
@@ -574,6 +630,7 @@ const clearLog = () => {
 onMounted(async () => {
   // Ask the device whether the in-memory log buffer is active. Once enabled,
   // the device persists that choice and restores capture after a reboot.
+  loadLogLevels()
   try {
     const response = await axios.get('/api/log/status', { silent: true })
     if (!mounted) return
@@ -713,6 +770,38 @@ onUnmounted(() => {
   gap: var(--space-3);
   flex-wrap: wrap;
   min-width: 0;
+}
+
+/* Temporary log-verbosity card */
+.loglevel-card {
+  padding: 0 var(--spacing-lg) var(--spacing-md);
+}
+.loglevel-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.loglevel-row select.loglevel-select {
+  /* Mirror .level-filter so the card does not fork the design system. */
+  flex: 0 0 auto;
+}
+.loglevel-label {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.loglevel-hint {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+.loglevel-feedback {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-success);
+}
+.loglevel-feedback.err {
+  color: var(--color-danger);
 }
 
 .search-field {

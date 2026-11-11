@@ -1,4 +1,21 @@
 export default {
+  events: {
+    ccu_connected: 'CCU connecté',
+    ccu_disconnected: 'CCU déconnecté',
+    crash_transcript: 'Transcription du crash',
+    eth_link_down: 'Lien Ethernet perdu',
+    eth_link_up: 'Lien Ethernet rétabli',
+    factory_reset: 'Réinitialisation usine',
+    low_heap: 'Mémoire faible',
+    mqtt_disconnected: 'MQTT déconnecté',
+    mqtt_reconnected: 'MQTT reconnecté',
+    net_witness_deferred: 'Panne du routeur (watchdog en attente)',
+    restart: 'Redémarrage',
+    rf_module_detected: 'Module radio détecté',
+    rf_module_lost: 'Module radio perdu',
+    scheduled_restart: 'Redémarrage planifié',
+    test: 'Test',
+  },
   // Common
   common: {
     enabled: 'Activé',
@@ -187,6 +204,12 @@ export default {
     ledBrightness: 'Luminosité LED',
     ledPrograms: 'Programmes LED',
     ledProgramsHelp: 'Personnalisez le comportement des LED pour différents états du système.',
+  restartSchedule: {
+    title: 'Redémarrage d’entretien planifié (hebdomadaire)',
+    help: 'Un redémarrage interrompt le relais CCU pendant environ 45 secondes. Heure selon le fuseau de l’appareil.',
+    day0: 'Dimanche', day1: 'Lundi', day2: 'Mardi', day3: 'Mercredi',
+    day4: 'Jeudi', day5: 'Vendredi', day6: 'Samedi'
+  },
     language: 'Langue',
 
     // Messages
@@ -316,6 +339,12 @@ export default {
     uartModuleResets: 'Réinitialisations du module (total)',
     uartNote: 'Des débordements de tampon, des octets rejetés, des erreurs de ligne ou des erreurs d’envoi non nuls signifient que du trafic radio a été perdu dans ce micrologiciel. La CCU réémet alors, ce qui augmente le duty cycle et finit par faire apparaître un appareil comme défectueux. Le cas échéant, publiez une capture dans le ticket #447.',
     uartResetNote: 'Les erreurs de ligne survenant juste après une réinitialisation du module (signaux break dans les 10 s, erreurs de parité et de trame dans les 0,5 s) sont comptées sous « Après réinitialisation du module » et ne constituent pas une anomalie : le module redémarre et aucune trame n’est en cours. Ce qui compte, c’est le nombre de réinitialisations demandées par la CCU. Un démarrage de la CCU en déclenche trois à cinq ; si la valeur continue d’augmenter en fonctionnement normal, la CCU rouvre sans cesse la liaison, et chaque réinitialisation coupe le module de la radio pendant quelques secondes — la cause est alors côté CCU, pas sur cette carte. Chaque réinitialisation figure dans le journal système avec horodatage et origine. Le bouton « Réinitialiser les maxima » remet aussi à zéro les compteurs de cette carte ; les totaux de trames sont conservés.',
+  journalKicker: 'Historique',
+  journalHeading: 'Événements récents',
+  journalHelp: 'Survit aux redémarrages : connexions, watchdog et plantages des dernières semaines.',
+  journalRefresh: 'Actualiser',
+  journalUnsupported: 'Cette version de firmware ne fournit pas encore le journal (2.4.0+).',
+  journalEmpty: 'Aucun événement enregistré.',
     interpretHint: 'Lecture : si « Perdues » et les compteurs de retard sont à zéro et l’occupation faible, le relais fonctionne correctement et un défaut signalé a une autre cause. Si l’occupation approche la capacité ou que des retards dépassent 100 ms, le relais est en cause.',
   },
   sysinfo: {
@@ -830,6 +859,11 @@ export default {
     levelWarning: 'Avertissement',
     levelInfo: 'Info',
     levelDebug: 'Debug',
+  logLevelLabel: 'Niveau de log (temporaire) :',
+  logLevelApply: 'Appliquer',
+  logLevelHint: 'Définit la verbosité d’un module jusqu’au prochain redémarrage — débogage sans reflash.',
+  logLevelApplied: '{tag} → {level} appliqué',
+  logLevelFailed: 'Refusé (firmware antérieure à 2.4.0 ?).',
     noMatches: 'Aucune ligne correspondante',
     copiedVisible: 'Journal visible copié',
     copiedLine: 'Ligne copiée',

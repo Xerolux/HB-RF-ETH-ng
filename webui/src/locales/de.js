@@ -1,4 +1,21 @@
 export default {
+  events: {
+    ccu_connected: 'CCU verbunden',
+    ccu_disconnected: 'CCU getrennt',
+    crash_transcript: 'Absturz-Transcript',
+    eth_link_down: 'Ethernet-Link weg',
+    eth_link_up: 'Ethernet-Link da',
+    factory_reset: 'Werksreset',
+    low_heap: 'Wenig Speicher',
+    mqtt_disconnected: 'MQTT getrennt',
+    mqtt_reconnected: 'MQTT wieder verbunden',
+    net_witness_deferred: 'Router-Ausfall (Watchdog wartet)',
+    restart: 'Neustart',
+    rf_module_detected: 'Funkmodul erkannt',
+    rf_module_lost: 'Funkmodul verloren',
+    scheduled_restart: 'Geplanter Neustart',
+    test: 'Test',
+  },
   // Common
   common: {
     enabled: 'Aktiviert',
@@ -187,6 +204,12 @@ export default {
     ledBrightness: 'LED Helligkeit',
     ledPrograms: 'LED Programme',
     ledProgramsHelp: 'Passen Sie das LED-Verhalten für verschiedene Systemzustände an.',
+  restartSchedule: {
+    title: 'Geplanter Wartungs-Neustart (wöchentlich)',
+    help: 'Ein Neustart unterbricht die CCU-Verbindung für ca. 45 Sekunden. Uhrzeit gilt in der Gerätezeitzone.',
+    day0: 'Sonntag', day1: 'Montag', day2: 'Dienstag', day3: 'Mittwoch',
+    day4: 'Donnerstag', day5: 'Freitag', day6: 'Samstag'
+  },
     language: 'Sprache',
 
     // Messages
@@ -316,6 +339,12 @@ export default {
     uartModuleResets: 'Modul-Resets gesamt',
     uartNote: 'Pufferüberläufe, verworfene Bytes, Leitungsfehler und Sendefehler ungleich null bedeuten: Funkverkehr ist in dieser Firmware verloren gegangen. Die CCU wiederholt die Sendung dann, was den Duty Cycle erhöht und ein Gerät irgendwann als gestört erscheinen lässt. Bitte in diesem Fall einen Screenshot im Issue #447 posten.',
     uartResetNote: 'Leitungsfehler kurz nach einem Modul-Reset (Break-Signale bis 10 s, Paritäts- und Framing-Fehler bis 0,5 s danach) werden unter „Nach Modul-Reset“ gezählt und sind kein Befund: Das Modul kommt gerade wieder hoch, es ist kein Frame unterwegs. Entscheidend ist die Zahl der Modul-Resets durch die CCU. Ein CCU-Start löst drei bis fünf aus; steigt der Wert im laufenden Betrieb weiter, öffnet die CCU die Verbindung immer wieder neu, und jeder Reset nimmt das Modul für Sekunden vom Funk — die Ursache liegt dann auf der CCU, nicht auf dieser Platine. Jeder Reset steht mit Zeitstempel und Auslöser im System-Log. Der Knopf „Höchstwerte zurücksetzen“ setzt auch die Zähler dieser Karte auf null; die Frame-Zähler bleiben erhalten.',
+  journalKicker: 'Chronik',
+  journalHeading: 'Letzte Ereignisse',
+  journalHelp: 'Übersteht Neustarts: Verbindungs-, Watchdog- und Absturzereignisse der letzten Wochen.',
+  journalRefresh: 'Aktualisieren',
+  journalUnsupported: 'Diese Firmware unterstützt noch kein Ereignis-Journal (ab 2.4.0).',
+  journalEmpty: 'Noch keine Ereignisse aufgezeichnet.',
     interpretHint: 'Zur Einordnung: Sind „Verworfen“ und die Verzögerungszähler null und die maximale Belegung niedrig, arbeitet das Relay sauber — eine gemeldete Gerätestörung hat dann eine andere Ursache. Nähert sich die Belegung der Kapazität oder steigen die Verzögerungen über 100 ms, liegt es am Relay-Pfad.',
   },
   sysinfo: {
@@ -830,6 +859,11 @@ export default {
     levelWarning: 'Warnung',
     levelInfo: 'Info',
     levelDebug: 'Debug',
+  logLevelLabel: 'Log-Stufe (temporär):',
+  logLevelApply: 'Anwenden',
+  logLevelHint: 'Setzt die Stufe eines Firmware-Moduls bis zum nächsten Neustart – ideal für Feld-Debugging, ohne neu zu flashen.',
+  logLevelApplied: '{tag} → {level} übernommen',
+  logLevelFailed: 'Änderung abgelehnt (Firmware älter als 2.4.0?).',
     noMatches: 'Keine passenden Logzeilen',
     copiedVisible: 'Sichtbares Log kopiert',
     copiedLine: 'Logzeile kopiert',
