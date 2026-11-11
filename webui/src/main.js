@@ -147,33 +147,29 @@ axios.interceptors.response.use(
   }
 )
 
-// Router guard
-router.beforeEach((to, from, next) => {
+// Router guard (return-based: `next()` is deprecated since vue-router 4)
+router.beforeEach((to) => {
   const loginStore = useLoginStore()
 
   if (loginStore.isLoggedIn && loginStore.checkActivity()) {
-    next({
+    return {
       path: '/login',
       query: { redirect: to.fullPath }
-    })
-    return
+    }
   }
 
   if (to.matched.some(r => r.meta.requiresAuth)) {
     if (!loginStore.isLoggedIn) {
-      next({
+      return {
         path: '/login',
         query: { redirect: to.fullPath }
-      })
-      return
+      }
     }
 
     if (!loginStore.passwordChanged && to.path !== '/change-password') {
-      next({ path: '/change-password' })
-      return
+      return { path: '/change-password' }
     }
   }
-  next()
 })
 
 // Lightweight Bootstrap-compatible Vue components
