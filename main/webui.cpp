@@ -609,6 +609,33 @@ httpd_uri_t post_password_reset_complete_handler = {
     .handler = post_password_reset_complete_handler_func,
     .user_ctx = NULL};
 
+// Escape JSON through fixed scratch space; never allocate an escaped copy.
+// CR is ignored and other controls retain the crash-log API's existing rules.
+static esp_err_t send_json_string_chunks(httpd_req_t *req, const char *text, size_t length)
+{
+    char chunk[128];
+    size_t used = 0;
+    for (size_t i = 0; i < length; i++) {
+        const unsigned char c = (unsigned char)text[i];
+        if (used + 2 > sizeof(chunk)) {
+            if (httpd_resp_send_chunk(req, chunk, used) != ESP_OK) return ESP_FAIL;
+            used = 0;
+        }
+        if (c == '\\' || c == '"') {
+            chunk[used++] = '\\';
+            chunk[used++] = c;
+        } else if (c == '\n') {
+            chunk[used++] = '\\';
+            chunk[used++] = 'n';
+        } else if (c == '\t') {
+            chunk[used++] = '\\';
+            chunk[used++] = 't';
+        } else if (c >= 0x20)
+            chunk[used++] = c;
+    }
+    return used ? httpd_resp_send_chunk(req, chunk, used) : ESP_OK;
+}
+
 esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);
@@ -715,36 +742,18 @@ esp_err_t get_sysinfo_json_handler_func(httpd_req_t *req)
     // are legal in JSON strings; only escape quotes and backslashes (defensive
     // — task names are bounded ASCII).
     //
-    // Sized from the string rather than a fixed bound: the list is sorted
-    // danger-first, so a fixed buffer silently drops the over-provisioned
-    // tasks at the tail, which are exactly the ones worth reclaiming stack
-    // from. Falls back to a truncated-but-valid chunk if the allocation
-    // fails, so a low-heap device still answers /sysinfo.json.
+    // Dynamic task enumeration formats into its own snapshot workspace.
     {
-        std::string stacks = _sysInfo->getTaskStackInfo();
-        const size_t prefix_len = sizeof(",\"taskStacks\":\"") - 1;
-        // Worst case every character needs an escape, plus the closing quote
-        // and the NUL.
-        const size_t stack_buf_size = prefix_len + stacks.size() * 2 + 2;
-        char *stack_buf             = (char *)malloc(stack_buf_size);
-        if (stack_buf) {
-            size_t pos   = 0;
-            stack_buf[0] = 0;
-            pos += snprintf(stack_buf + pos, stack_buf_size - pos, ",\"taskStacks\":\"");
-            for (const char *p = stacks.c_str(); *p && pos + 4 < stack_buf_size; p++) {
-                if (*p == '"' || *p == '\\') {
-                    stack_buf[pos++] = '\\';
-                }
-                stack_buf[pos++] = *p;
-            }
-            stack_buf[pos++] = '"';
-            stack_buf[pos]   = 0;
-            httpd_resp_send_chunk(req, stack_buf, pos);
-            free(stack_buf);
-        } else {
-            static const char empty[] = ",\"taskStacks\":\"alloc-failed\"";
-            httpd_resp_send_chunk(req, empty, sizeof(empty) - 1);
-        }
+        static const char prefix[] = ",\"taskStacks\":\"";
+        if (httpd_resp_send_chunk(req, prefix, sizeof(prefix) - 1) != ESP_OK) return ESP_FAIL;
+        if (!_sysInfo->writeTaskStackInfo(
+                [](void *context, const char *text, size_t length) {
+                    return send_json_string_chunks(static_cast<httpd_req_t *>(context), text,
+                                                   length) == ESP_OK;
+                },
+                req))
+            return ESP_FAIL;
+        if (httpd_resp_send_chunk(req, "\"", 1) != ESP_OK) return ESP_FAIL;
     }
 
     // Close sysInfo and root
@@ -1671,29 +1680,12 @@ esp_err_t get_crash_log_handler_func(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // JSON-escape the tail. It is plain text from the log ring buffer, so
-    // backslash and double-quote must be escaped and control chars dropped.
-    std::string esc;
-    esc.reserve(tail.size() + 16);
-    for (char c : tail) {
-        switch (c) {
-            case '\\': esc += "\\\\"; break;
-            case '"':  esc += "\\\""; break;
-            case '\r': break;  // ignore
-            case '\n': esc += "\\n"; break;
-            case '\t': esc += "\\t"; break;
-            default:
-                if ((unsigned char)c < 0x20) break;  // drop other ctrl
-                esc += c;
-        }
-    }
-
-    std::string body;
-    body.reserve(esc.size() + 32);
-    body += "{\"available\":true,\"tail\":\"";
-    body += esc;
-    body += "\"}";
-    httpd_resp_send(req, body.data(), (ssize_t)body.size());
+    static const char prefix[] = "{\"available\":true,\"tail\":\"";
+    if (httpd_resp_send_chunk(req, prefix, sizeof(prefix) - 1) != ESP_OK ||
+        send_json_string_chunks(req, tail.data(), tail.size()) != ESP_OK ||
+        httpd_resp_send_chunk(req, "\"}", 2) != ESP_OK ||
+        httpd_resp_send_chunk(req, NULL, 0) != ESP_OK)
+        return ESP_FAIL;
 
     // Best-effort erase: the snapshot has now been delivered to the UI; we
     // do not want it to reappear on every reload.

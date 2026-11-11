@@ -339,56 +339,33 @@ const char* SysInfo::getResetReason()
 
 std::string SysInfo::getTaskStackInfo()
 {
-    // Build a compact "name=hwm_bytes" list sorted by HWM ascending.
-    // The high-water mark (uxTaskGetStackHighWaterMark) is the minimum free
-    // stack ever observed for a task — small values flag tasks close to
-    // overflow, large values flag over-provisioned stacks that waste heap.
-    //
-    // Both halves of that sentence have to survive into the output. The list
-    // is sorted danger-first, so a buffer that overflows drops precisely the
-    // over-provisioned tasks — the ones worth reclaiming stack from. With
-    // ~86 KB of the ESP32's RAM sitting in task stacks that is the single
-    // largest reclaimable block on the device, so the buffer is sized from
-    // the actual task count instead of a fixed guess.
-    //
-    // uxTaskGetSystemState needs CONFIG_FREERTOS_USE_TRACE_FACILITY (set in
-    // sdkconfig.defaults). It returns 0 — not a partial list — when the array
-    // is too small, so the count comes from FreeRTOS rather than an estimate:
-    // a fixed 32-entry bound turned every reading into "no-tasks" as soon as
-    // enough services were enabled to cross it.
+    std::string result;
+    writeTaskStackInfo(
+        [](void *context, const char *text, size_t length) {
+            static_cast<std::string *>(context)->assign(text, length);
+            return true;
+        },
+        &result);
+    return result;
+}
+
+bool SysInfo::writeTaskStackInfo(TaskStackWriter writer, void *context)
+{
+    if (!writer) return false;
     const size_t task_count = (size_t)uxTaskGetNumberOfTasks();
-    if (task_count == 0) {
-        return "no-tasks";
-    }
-    // Headroom for tasks created between the count and the snapshot.
+    if (task_count == 0) return writer(context, "no-tasks", sizeof("no-tasks") - 1);
+    if (task_count > SIZE_MAX / sizeof(TaskStatus_t) - 8)
+        return writer(context, "alloc-failed", sizeof("alloc-failed") - 1);
     const size_t max_tasks = task_count + 8;
+    TaskStatus_t *tasks    = (TaskStatus_t *)malloc(sizeof(*tasks) * max_tasks);
+    if (!tasks) return writer(context, "alloc-failed", sizeof("alloc-failed") - 1);
 
-    // "name=12345 " — CONFIG_FREERTOS_MAX_TASK_NAME_LEN is 16, the mark is at
-    // most five digits, plus '=' and the separator.
-    const size_t per_task = CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 8;
-    const size_t out_size = max_tasks * per_task + 8;
-
-    char *out = (char *)malloc(out_size);
-    if (!out) {
-        return "alloc-failed";
-    }
-
-    TaskStatus_t *tasks = (TaskStatus_t *)malloc(sizeof(TaskStatus_t) * max_tasks);
-    if (!tasks) {
-        free(out);
-        return "alloc-failed";
-    }
-
-    UBaseType_t n = uxTaskGetSystemState(tasks, max_tasks, NULL);
+    const UBaseType_t n = uxTaskGetSystemState(tasks, max_tasks, NULL);
     if (n == 0) {
         free(tasks);
-        free(out);
-        return "no-tasks";
+        return writer(context, "no-tasks", sizeof("no-tasks") - 1);
     }
-
-    // Sort ascending by usStackHighWaterMark. The smaller this value, the
-    // closer the task got to overflow, so a truncated diagnostic still shows
-    // the most dangerous tasks first.
+    // Sort before compacting: no fixed task limit drops large configurations.
     for (UBaseType_t i = 1; i < n; i++) {
         TaskStatus_t key = tasks[i];
         UBaseType_t j = i;
@@ -399,34 +376,31 @@ std::string SysInfo::getTaskStackInfo()
         tasks[j] = key;
     }
 
-    size_t pos = 0;
-    out[0] = 0;
+    // Each formatted row is smaller than the status record it replaces.
+    // A local record/row is read completely before its bytes are overwritten;
+    // unprocessed records remain intact. Owned text is ready before any sink
+    // can block (HTTP I/O must never retain pointers into live task names).
+    constexpr size_t ROW_BYTES = CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 12;
+    static_assert(ROW_BYTES <= sizeof(TaskStatus_t), "Task rows must fit the snapshot workspace");
+    char row[ROW_BYTES];
+    char *text  = reinterpret_cast<char *>(tasks);
+    size_t used = 0;
     for (UBaseType_t i = 0; i < n; i++) {
-        // Skip the idle tasks — their hwm is not actionable and would just
-        // waste the limited buffer budget.
-        if (strcmp(tasks[i].pcTaskName, "IDLE0") == 0 ||
-            strcmp(tasks[i].pcTaskName, "IDLE1") == 0) {
-            continue;
+        const TaskStatus_t task = tasks[i];
+        const char *name        = task.pcTaskName ? task.pcTaskName : "unknown";
+        if (strcmp(name, "IDLE0") == 0 || strcmp(name, "IDLE1") == 0) continue;
+        // ESP-IDF reports high-water marks in BYTES, never multiply by words.
+        const unsigned hwm_bytes = (unsigned)task.usStackHighWaterMark;
+        const int length         = snprintf(row, sizeof(row), "%s%.*s=%u", used ? " " : "",
+                                            CONFIG_FREERTOS_MAX_TASK_NAME_LEN - 1, name, hwm_bytes);
+        if (length < 0 || (size_t)length >= sizeof(row)) {
+            free(tasks);
+            return writer(context, "alloc-failed", sizeof("alloc-failed") - 1);
         }
-        // ESP-IDF's FreeRTOS port reports usStackHighWaterMark in bytes (unlike
-        // upstream FreeRTOS, whose public documentation traditionally uses
-        // words). Multiplying again would make every diagnostic four times too
-        // large on ESP32 and could hide a genuinely tight task stack.
-        unsigned hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;
-        int written        = snprintf(out + pos, out_size - pos, "%s%s=%u", pos > 0 ? " " : "",
-                                      tasks[i].pcTaskName, hwm_bytes);
-        if (written <= 0 || (size_t)written >= out_size - pos) {
-            // Should not happen now that the buffer is sized from the task
-            // count, but keep the marker so a miscalculation is visible in
-            // the output rather than silently cutting the list short.
-            snprintf(out + pos, out_size - pos, "...");
-            break;
-        }
-        pos += (size_t)written;
+        memcpy(text + used, row, length);
+        used += (size_t)length;
     }
-
+    const bool ok = writer(context, text, used);
     free(tasks);
-    std::string result(out);
-    free(out);
-    return result;
+    return ok;
 }

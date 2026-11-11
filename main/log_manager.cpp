@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <cstdlib>
+#include <memory>
 
 static const char *TAG = "LogManager";
 
@@ -426,6 +427,26 @@ size_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,
     return count;
 }
 
+size_t LogManager::readTail(char *destination, size_t maximum_length)
+{
+    if (!destination || maximum_length == 0 || !_mutex) return 0;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(20)) != pdTRUE) return 0;
+    size_t count = 0;
+    if (log_buffer && log_buffer_size > 0) {
+        const uint64_t available = total_written - ring_start_offset;
+        count = available < log_buffer_size ? (size_t)available : log_buffer_size;
+        if (count > maximum_length) count = maximum_length;
+        if (count > 0) {
+            const size_t start = (total_written - count) % log_buffer_size;
+            const size_t first = count < log_buffer_size - start ? count : log_buffer_size - start;
+            memcpy(destination, log_buffer + start, first);
+            if (first < count) memcpy(destination + first, log_buffer, count - first);
+        }
+    }
+    xSemaphoreGive(_mutex);
+    return count;
+}
+
 uint64_t LogManager::getTotalWritten() const {
     uint64_t result = 0;
     if (_mutex && xSemaphoreTake(_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -463,49 +484,31 @@ size_t LogManager::getBufferedBytes() const {
 static const char *CRASH_TAIL_NVS_NS  = "reset_info";
 static const char *CRASH_TAIL_NVS_KEY = "clog";   // 4 chars, within NVS limit
 
-bool LogManager::saveCrashTailNvs(const char *tag) {
-    // Pull a tail of the ring buffer. getLogContent() already caps the
-    // returned size by the largest free block, so this is safe to call from
-    // the low-heap path that triggered the watchdog.
-    std::string tail = instance().getLogContent(0);
-    if (tail.empty()) {
-        // No ring buffer active — nothing to persist, but not an error.
-        return false;
-    }
+bool LogManager::saveCrashTailNvs(const char *tag)
+{
+    // Allocate only the bounded tail plus its tag. No full-ring string, substr
+    // or second blob copy on the low-memory protective-restart path.
+    const size_t available    = getBufferedBytes();
+    const size_t maximum_tail = available < CRASH_TAIL_MAX ? available : CRASH_TAIL_MAX;
+    if (maximum_tail == 0) return false;
+    const char *tag_text       = tag ? tag : "crash";
+    const size_t tag_length    = strnlen(tag_text, 23);
+    const size_t header_length = tag_length + 3; // '[' + tag + '] '
+    std::unique_ptr<char, decltype(&free)> blob((char *)malloc(header_length + maximum_tail + 1),
+                                                &free);
+    if (!blob) return false;
+    snprintf(blob.get(), header_length + 1, "[%.*s] ", (int)tag_length, tag_text);
+    const size_t count = readTail(blob.get() + header_length, maximum_tail);
+    if (count == 0) return false;
 
-    // Trim to the last CRASH_TAIL_MAX bytes (the most recent lines), because
-    // that is what reveals *why* the device is restarting.
-    if (tail.size() > CRASH_TAIL_MAX) {
-        tail = tail.substr(tail.size() - CRASH_TAIL_MAX);
-    }
-
-    // Prefix with a short tag + newline so the WebUI can show context.
-    // strncpy avoids -Wformat-truncation (which snprintf would trigger
-    // because tag is an unknown-length parameter) while still bounding the
-    // copy. Manual NUL termination covers the truncation case.
-    const char *tag_src = tag ? tag : "crash";
-    char tag_short[24];
-    strncpy(tag_short, tag_src, sizeof(tag_short) - 1);
-    tag_short[sizeof(tag_short) - 1] = '\0';
-    char header[48];
-    snprintf(header, sizeof(header), "[%s] ", tag_short);
-    std::string blob;
-    blob.reserve(strlen(header) + tail.size() + 1);
-    blob.append(header);
-    blob.append(tail);
-
-    // This path runs immediately before a protective restart. Never let a
-    // concurrent configuration transaction turn best-effort diagnostics into
-    // an unbounded wait which prevents that restart.
+    // Best-effort diagnostics must not hold up the protective restart.
     NvsStorageLock storage_lock(pdMS_TO_TICKS(20), "log.save_crash_tail");
     if (!storage_lock) return false;
-
     nvs_handle_t h;
     if (nvs_open(CRASH_TAIL_NVS_NS, NVS_READWRITE, &h) != ESP_OK) return false;
-    esp_err_t err = nvs_set_blob(h, CRASH_TAIL_NVS_KEY, blob.data(), blob.size());
+    esp_err_t err = nvs_set_blob(h, CRASH_TAIL_NVS_KEY, blob.get(), header_length + count);
     if (err == ESP_OK) err = nvs_commit(h);
     nvs_close(h);
-
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "saveCrashTailNvs: failed (%s)", esp_err_to_name(err));
         return false;

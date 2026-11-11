@@ -177,6 +177,9 @@ jobs:
       - name: Test stability and storage policies
         run: python3 -m unittest discover -s test/host -p 'test_*policy.py'
 
+      - name: Check diagnostic buffer memory safety
+        run: DIAGNOSTICS_SANITIZE=1 python3 -m unittest discover -s test/host -p test_diagnostic_buffers_policy.py
+
       - name: Read and validate WebUI release metadata
         id: webui
         env:

@@ -53,6 +53,10 @@ public:
     size_t readChunk(uint64_t *absolute_offset, char *destination,
                      size_t maximum_length);
 
+    // Copy the latest bytes atomically under the ring lock, without allocating.
+    // Lock contention is bounded to 20 ms for protective-restart diagnostics.
+    size_t readTail(char *destination, size_t maximum_length);
+
     uint64_t getTotalWritten() const;
 
     /** Current allocated ring-buffer capacity in bytes. */

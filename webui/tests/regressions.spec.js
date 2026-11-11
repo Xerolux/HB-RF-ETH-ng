@@ -867,8 +867,8 @@ test('stack and NVS diagnostics report the whole picture, not a truncated prefix
   const mqttSource = await readFile('../main/mqtt_handler.cpp', 'utf8')
 
   const stackInfo = sysinfoSource.slice(
-    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()'),
-    sysinfoSource.indexOf('std::string SysInfo::getTaskStackInfo()') + 3000
+    sysinfoSource.indexOf('bool SysInfo::writeTaskStackInfo('),
+    sysinfoSource.indexOf('bool SysInfo::writeTaskStackInfo(') + 3000
   )
 
   // uxTaskGetSystemState returns 0 rather than a partial list when the array
@@ -889,14 +889,16 @@ test('stack and NVS diagnostics report the whole picture, not a truncated prefix
 
   // The list is sorted danger-first, so a fixed output buffer drops exactly
   // the over-provisioned tasks — the ones worth reclaiming stack from.
-  expect(stackInfo).toContain('CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 8')
+  expect(stackInfo).toContain('CONFIG_FREERTOS_MAX_TASK_NAME_LEN + 12')
   expect(stackInfo).not.toContain('char out[512]')
 
   // Same defect one layer up: /sysinfo.json escaped the string into a fixed
   // 640-byte buffer.
   expect(webuiSource).not.toContain('char stack_buf[640]')
-  expect(webuiSource).toContain('stacks.size() * 2')
-  expect(webuiSource).toContain('taskStacks\\":\\"alloc-failed')
+  expect(webuiSource).not.toContain('stacks.size() * 2')
+  expect(webuiSource).toContain('send_json_string_chunks')
+  expect(webuiSource).toContain('writeTaskStackInfo')
+  expect(stackInfo).toContain('alloc-failed')
 
   // NVS occupancy is exported: exhausting the 16 KiB partition presents as
   // settings that will not save, with no obvious error.

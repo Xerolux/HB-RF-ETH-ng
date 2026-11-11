@@ -17,6 +17,20 @@ This guide helps you diagnose and resolve common issues with the HB-RF-ETH-ng fi
 
 ---
 
+## Diagnostic buffer memory (2.4.0-Beta.6)
+
+Task diagnostics use a per-request snapshot workspace and stream their HTTP
+JSON through a 128-byte scratch buffer. All tasks remain visible, sorted by
+remaining stack space, and the task stack sizes themselves are unchanged.
+MQTT retains the existing diagnostic text format.
+
+The protective-restart log snapshot copies only the most recent 1024 bytes
+from the ring, with its tag, into one allocation of at most 1051 bytes. It
+returns safely if memory or the storage lock is unavailable. Full panic
+transcripts remain complete. Their HTTP download no longer makes escaped
+and response-body copies; a failed download leaves the NVS snapshot available
+for retry. These changes reduce temporary memory peaks, not permanent buffers.
+
 ## Journal storage and update-search memory (2.4.0-Beta.5)
 
 `EVENT_JOURNAL ... NVS_NOT_ENOUGH_SPACE` refers to flash storage, while

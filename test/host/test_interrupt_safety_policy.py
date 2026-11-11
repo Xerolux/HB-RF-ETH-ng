@@ -300,9 +300,9 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         # WebUI/MQTT callers can't tear each other's read (see
         # SysInfo::getBoardRevisionString()'s doc comment in sysinfo.h for the
         # data-race this replaced).
-        task_stack = sysinfo[sysinfo.index("std::string SysInfo::getTaskStackInfo()") :]
-        self.assertIn(
-            "hwm_bytes = (unsigned)tasks[i].usStackHighWaterMark;", task_stack
+        task_stack = sysinfo[sysinfo.index("bool SysInfo::writeTaskStackInfo(") :]
+        self.assertRegex(
+            task_stack, r"hwm_bytes\s*=\s*\(unsigned\)task.usStackHighWaterMark;"
         )
         self.assertNotIn("sizeof(StackType_t)", task_stack)
 

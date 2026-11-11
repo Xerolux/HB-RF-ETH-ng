@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -57,15 +58,12 @@ public:
     uint64_t getUptimeSeconds();
     const char* getResetReason();
 
-    // Compact diagnostic summary of all FreeRTOS tasks: name + stack
-    // high-water mark (bytes remaining) for each, sorted smallest-first so
-    // tasks closest to stack exhaustion remain visible if output truncates.
-    // Returned by value (see getBoardRevisionString() above for why — same
-    // concurrent WebUI/MQTT caller race applied here too). Exposed
-    // via /sysinfo.json (taskStacks) and MQTT status/task_stacks so that
-    // under- and over-provisioned task stacks can be spotted from a remote
-    // support request without needing serial access. Cheap to call (transient
-    // ~2 KB scratch for uxTaskGetSystemState), but not free — callers
-    // should not poll it more often than once per second.
+    // Dynamic, danger-first task diagnostics; concurrent callers own their
+    // snapshot. The writer path uses one malloc-checked workspace, no complete
+    // output-string or JSON-escape allocation. Sink data is valid only during
+    // the call. Returning false from the sink aborts output and frees scratch.
+    using TaskStackWriter = bool (*)(void *context, const char *text, size_t length);
+    bool writeTaskStackInfo(TaskStackWriter writer, void *context);
+    // MQTT compatibility wrapper; HTTP uses the writer directly.
     std::string getTaskStackInfo();
 };

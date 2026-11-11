@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- (diag) Task-stack diagnostics use a single checked, per-call workspace for enumeration, sorting and compact output. HTTP streams escaped text in 128-byte chunks instead of allocating output and escape copies; MQTT keeps its existing string payload. Task stack allocations and diagnostic coverage remain unchanged.
+- (diag) Protective-restart crash snapshots copy only the newest 1024 ring-buffer bytes under a bounded lock into one checked allocation (at most 1051 bytes including tag). No full-log copy, substring allocation or second blob is needed.
+- (diag) Crash-log HTTP responses stream JSON without escaped/body copies and keep the persisted snapshot when transmission fails. Complete panic transcripts retain their full contents and existing format.
+
 ## [2.4.0-Beta.5] - 2026-11-11
 
 ### Changes
