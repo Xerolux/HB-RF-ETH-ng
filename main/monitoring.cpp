@@ -52,7 +52,9 @@
 #include "systemclock.h"
 #include "reset_info.h"
 #include "crash_blackbox.h"
+#include "event_journal.h"
 #include "panic_transcript.h"
+#include "metrics.h"
 #include "ping_service.h"
 #include "rawuartudplistener.h"
 #include "esp_heap_caps.h"
@@ -1279,6 +1281,42 @@ static constexpr size_t HEAP_WATCHDOG_CRITICAL_BYTES = 20 * 1024;
 static constexpr int HEAP_WATCHDOG_CONSECUTIVE_HITS = 8;     // ~8 * 60s = 8 min sustained
 static constexpr TickType_t HEAP_WATCHDOG_INTERVAL_TICKS = pdMS_TO_TICKS(60000);
 
+// Opt-in weekly maintenance restart, local time. Guards against boot loops:
+// - a 6-day re-arm window persisted in NVS (rsLastRun): a device booting
+//   inside the schedule minute never restarts twice for the same slot;
+// - a 10-minute fresh-boot grace period so a start during the window runs.
+static void check_scheduled_restart(void)
+{
+    if (g_settings == NULL || !g_settings->getRestartScheduleEnabled()) return;
+
+    const time_t now = time(NULL);
+    if (now < 1600000000) return; // clock unsynced; local time meaningless
+    if ((int64_t)now - g_settings->getRestartScheduleLastRun() < 6LL * 86400) return;
+
+    const uint32_t uptime_s =
+        (uint32_t)((uint64_t)xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
+    if (uptime_s < 600) return;
+
+    struct tm tmnow;
+    localtime_r(&now, &tmnow);
+    if (tmnow.tm_wday != (int)g_settings->getRestartScheduleDay()) return;
+    if (tmnow.tm_hour != (int)g_settings->getRestartScheduleHour()) return;
+    if (tmnow.tm_min != (int)g_settings->getRestartScheduleMinute()) return;
+
+    char detail[64];
+    snprintf(detail, sizeof(detail), "weekly schedule %02u:%02u",
+             (unsigned)g_settings->getRestartScheduleHour(),
+             (unsigned)g_settings->getRestartScheduleMinute());
+    event_journal_add(EVENT_JOURNAL_SCHEDULED_RESTART, detail);
+    event_journal_flush();
+    g_settings->setRestartScheduleLastRun((int64_t)now);
+    g_settings->save();
+    ESP_LOGI(TAG, "Executing scheduled maintenance restart (%s)", detail);
+    ResetInfo::storeResetReason(RESET_REASON_SCHEDULED, detail);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    esp_restart();
+}
+
 // Network wedge self-healing (issue #362): field units can end up with a
 // fully dead network stack - not even pingable - while the scheduler keeps
 // running, so no hardware watchdog fires and the device hangs until someone
@@ -1293,6 +1331,13 @@ static constexpr TickType_t HEAP_WATCHDOG_INTERVAL_TICKS = pdMS_TO_TICKS(60000);
 // the probe too; the resulting single restart is harmless because the relay
 // is dead during that window anyway.
 static constexpr int NET_WATCHDOG_THRESHOLD_CYCLES = 5;      // ~5 * 60s = 5 min
+
+// Router-side outages confirmed by a reachable CCU witness: the network
+// watchdog deferred a restart because the local stack was proven healthy.
+// Rising values mean router reboots that older firmware answered with an
+// unnecessary device restart (and CCU session drop).
+static MetricsCounter g_witness_deferred("hbrfeth_net_witness_deferred_total",
+                                         "Gateway-unreachable restarts deferred because the CCU witness answered");
 // How long a bound CCU session may go without ANY received datagram before
 // the tcpip receive path is declared dead (keepalive cadence is 1 s, the
 // worker's own timeout is 10 s - 90 s leaves generous margin for CCU
@@ -1310,6 +1355,13 @@ static void heap_watchdog_task(void *pvParameters)
     for (;;)
     {
         vTaskDelay(HEAP_WATCHDOG_INTERVAL_TICKS);
+
+        // Lazy journal persistence: entries recorded while the notification
+        // worker is stopped (or right before a crash) become durable here.
+        event_journal_flush();
+
+        // Opt-in weekly maintenance restart, evaluated on the same 60 s grid.
+        check_scheduled_restart();
 
         // Skip checks during an active firmware/OTA write: flash erase +
         // buffer allocations routinely push free heap below the threshold,
@@ -1492,6 +1544,12 @@ static void heap_watchdog_task(void *pvParameters)
                             if (net_fail_streak == NET_WATCHDOG_THRESHOLD_CYCLES ||
                                 net_fail_streak % (NET_WATCHDOG_THRESHOLD_CYCLES * 5) == 0)
                             {
+                                char journal_detail[96];
+                                snprintf(journal_detail, sizeof(journal_detail),
+                                         "gw %s unreachable, witness %s answers (streak %d)",
+                                         gw_str, witness_str, net_fail_streak);
+                                event_journal_add(EVENT_JOURNAL_WITNESS_DEFERRED, journal_detail);
+                                g_witness_deferred.inc();
                                 ESP_LOGW(TAG,
                                          "Network watchdog: gateway %s unreachable but CCU witness %s answers"
                                          " - router-side outage, deferring restart (streak %d)",

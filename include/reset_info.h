@@ -35,6 +35,7 @@ typedef enum {
     RESET_REASON_SYSTEM_ERROR = 5,   // System error/panic
     RESET_REASON_BROWNOUT = 6,       // Power brownout
     RESET_REASON_WATCHDOG = 7,       // Watchdog reset
+    RESET_REASON_SCHEDULED = 8,      // Opt-in weekly maintenance restart
     RESET_REASON_UNKNOWN = 255
 } reset_reason_type_t;
 

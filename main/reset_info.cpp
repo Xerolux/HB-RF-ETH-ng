@@ -65,6 +65,8 @@ static const char* get_reason_text(reset_reason_type_t reason) {
             return "Spannungsabfall erkannt";
         case RESET_REASON_WATCHDOG:
             return "Watchdog Reset";
+        case RESET_REASON_SCHEDULED:
+            return "Scheduled Restart";
         case RESET_REASON_UNKNOWN:
         default:
             return "Unbekannter Grund";

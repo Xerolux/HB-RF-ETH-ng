@@ -551,6 +551,11 @@ void Settings::resetToSafeDefaultsLocked()
 
   _systemLogEnabled = false;
   _flashPause = true;
+  _restartScheduleEnabled = false;
+  _restartScheduleDay = 0;
+  _restartScheduleHour = 3;
+  _restartScheduleMinute = 30;
+  _restartScheduleLastRun = 0;
   _testDesignEnabled = true;
 }
 
@@ -894,6 +899,16 @@ esp_err_t Settings::load()
   _flashPause = true;
   _testDesignEnabled = true;
 
+  // Weekly maintenance restart (opt-in). Key width limit: 15 chars.
+  {
+    int8_t i8 = 0;
+    if (nvs_get_i8(handle, "rsEnabled", &i8) == ESP_OK) _restartScheduleEnabled = i8 != 0;
+    if (nvs_get_i8(handle, "rsDay", &i8) == ESP_OK && i8 >= 0 && i8 <= 6) _restartScheduleDay = (uint8_t)i8;
+    if (nvs_get_i8(handle, "rsHour", &i8) == ESP_OK && i8 >= 0 && i8 <= 23) _restartScheduleHour = (uint8_t)i8;
+    if (nvs_get_i8(handle, "rsMinute", &i8) == ESP_OK && i8 >= 0 && i8 <= 59) _restartScheduleMinute = (uint8_t)i8;
+    nvs_get_i64(handle, "rsLastRun", &_restartScheduleLastRun);
+  }
+
   // One-time purge of the removed supporter-key/CRL feature. Older firmware
   // versions stored the supporter key string and a CRL cache in this
   // namespace; the feature is gone, so delete any leftover keys so nothing
@@ -1228,6 +1243,11 @@ esp_err_t Settings::save()
   SAVE_STEP(nvs_set_str(handle, "ccuIP", _ccuIP));
   SAVE_STEP(nvs_set_i8(handle, "sysLogEnabled", _systemLogEnabled ? 1 : 0));
   SAVE_STEP(nvs_set_i8(handle, "flashPause", _flashPause ? 1 : 0));
+  SAVE_STEP(nvs_set_i8(handle, "rsEnabled", _restartScheduleEnabled ? 1 : 0));
+  SAVE_STEP(nvs_set_i8(handle, "rsDay", (int8_t)_restartScheduleDay));
+  SAVE_STEP(nvs_set_i8(handle, "rsHour", (int8_t)_restartScheduleHour));
+  SAVE_STEP(nvs_set_i8(handle, "rsMinute", (int8_t)_restartScheduleMinute));
+  SAVE_STEP(nvs_set_i64(handle, "rsLastRun", _restartScheduleLastRun));
   SAVE_STEP(nvs_set_i8(handle, "testDesign", _testDesignEnabled ? 1 : 0));
   if (preserve_admin_token) {
     SAVE_STEP(nvs_set_str(handle, "adminToken", admin_token));
@@ -2048,6 +2068,26 @@ void Settings::setFlashPause(bool enabled)
   (void)enabled;
   _flashPause = true;
 }
+
+bool Settings::getRestartScheduleEnabled() { return _restartScheduleEnabled; }
+void Settings::setRestartScheduleEnabled(bool enabled) { _restartScheduleEnabled = enabled; }
+uint8_t Settings::getRestartScheduleDay() { return _restartScheduleDay; }
+void Settings::setRestartScheduleDay(uint8_t day)
+{
+  _restartScheduleDay = day > 6 ? 6 : day;
+}
+uint8_t Settings::getRestartScheduleHour() { return _restartScheduleHour; }
+void Settings::setRestartScheduleHour(uint8_t hour)
+{
+  _restartScheduleHour = hour > 23 ? 23 : hour;
+}
+uint8_t Settings::getRestartScheduleMinute() { return _restartScheduleMinute; }
+void Settings::setRestartScheduleMinute(uint8_t minute)
+{
+  _restartScheduleMinute = minute > 59 ? 59 : minute;
+}
+int64_t Settings::getRestartScheduleLastRun() { return _restartScheduleLastRun; }
+void Settings::setRestartScheduleLastRun(int64_t unixTime) { _restartScheduleLastRun = unixTime; }
 
 bool Settings::getTestDesignEnabled()
 {

@@ -143,6 +143,15 @@ private:
   // Extend Ethernet drop during restart to >30s so the CCU watchdog triggers.
   bool _flashPause;
 
+  // Opt-in weekly maintenance restart, local time. day: 0=Sunday..6=Saturday.
+  bool _restartScheduleEnabled;
+  uint8_t _restartScheduleDay;
+  uint8_t _restartScheduleHour;
+  uint8_t _restartScheduleMinute;
+  // Unix time of the last executed scheduled restart; the 6-day re-arm guard
+  // prevents a boot loop when the device happens to reboot inside the window.
+  int64_t _restartScheduleLastRun;
+
   // Experimental WebUI layout. Persisted on the device so the selection
   // survives device restarts and browser reloads after login.
   bool _testDesignEnabled;
@@ -248,6 +257,17 @@ public:
 
   bool getFlashPause();
   void setFlashPause(bool enabled);
+
+  bool getRestartScheduleEnabled();
+  void setRestartScheduleEnabled(bool enabled);
+  uint8_t getRestartScheduleDay();
+  void setRestartScheduleDay(uint8_t day);          // 0=Sunday .. 6=Saturday
+  uint8_t getRestartScheduleHour();
+  void setRestartScheduleHour(uint8_t hour);
+  uint8_t getRestartScheduleMinute();
+  void setRestartScheduleMinute(uint8_t minute);
+  int64_t getRestartScheduleLastRun();
+  void setRestartScheduleLastRun(int64_t unixTime); // persisted boot-loop guard
 
   bool getTestDesignEnabled();
   void setTestDesignEnabled(bool enabled);

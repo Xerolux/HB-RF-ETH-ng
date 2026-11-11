@@ -1021,6 +1021,11 @@ void mqtt_handler_publish_ha_discovery(void)
                    NULL, NULL, "diagnostic", "mdi:timer-sand");
     publish_config("sensor", "ccu_dropped_frames", "CCU Dropped Frames", NULL, "total_increasing",
                    NULL, NULL, "diagnostic", "mdi:package-variant-remove");
+    // Stale-identifier reconnects — how often CCUs hit the recovery path
+    // of the distinct-endpoint-id fix (#480). Rising values mean CCU or
+    // gateway reboots that previously caused silent RF-stack stalls.
+    publish_config("sensor", "raw_uart_stale_reconnects", "CCU Stale Reconnects", NULL,
+                   "total_increasing", NULL, NULL, "diagnostic", "mdi:counter");
     // NVS fill level — a full partition presents as "settings will not save".
     publish_config("sensor", "nvs_usage", "NVS Usage", NULL, "measurement", "%", NULL, "diagnostic",
                    "mdi:database-settings");
