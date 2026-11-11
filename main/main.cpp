@@ -56,6 +56,8 @@
 #include "metrics.h"
 #include "events.h"
 #include "reset_info.h"
+#include "event_journal.h"
+#include "mdns.h"
 #include "crash_blackbox.h"
 #include "panic_transcript.h"
 #include "system_reset.h"
@@ -312,6 +314,10 @@ void app_main()
     // Initialize reset info system
     ResetInfo::init();
 
+    // Event journal: loads the reboot-surviving history backed by NVS.
+    // Must run before any subsystem emits an event.
+    event_journal_init();
+
     // Surface the reset reason at boot. getResetDetails() is the canonical
     // one-shot entry point: it auto-classifies unexplained reboots (panic,
     // watchdog, brownout) when no subsystem had a chance to tag them, reads
@@ -381,6 +387,30 @@ void app_main()
 
     static WebUI webUI(&settings, &statusLED, &sysInfo, &ethernet, &rawUartUdpLister, &radioModuleConnector, &radioModuleDetector);
     webUI.start();
+
+    // Announce the device via mDNS so the WebUI is reachable as
+    // <hostname>.local without knowing the IP. The hostname is lowercased:
+    // mDNS names must not contain uppercase letters.
+    {
+        char mdns_name[64] = {0};
+        const char *hostname = settings.getHostname();
+        size_t n = 0;
+        for (const char *p = hostname; p && *p && n < sizeof(mdns_name) - 1; p++)
+        {
+            mdns_name[n++] = (*p >= 'A' && *p <= 'Z') ? (char)(*p - 'A' + 'a') : *p;
+        }
+        if (mdns_init() == ESP_OK)
+        {
+            mdns_hostname_set(mdns_name);
+            mdns_instance_name_set(hostname);
+            mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+            ESP_LOGI(TAG, "mDNS: announcing %s.local (_http._tcp)", mdns_name);
+        }
+        else
+        {
+            ESP_LOGW(TAG, "mDNS init failed; device reachable by IP only");
+        }
+    }
 
     // If system logging was enabled in settings but the ring buffer could not
     // be allocated during early boot (heap was too tight — typically because
