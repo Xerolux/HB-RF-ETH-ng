@@ -7,8 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### WebUI 1.1.1-Beta.2
+### Added
+- Network watchdog witness check: before a gateway-unreachable restart, the connected CCU (same subnet, no gateway involved) is probed. If it answers, the outage is router-side and the restart is deferred instead of needlessly dropping the CCU session.
+- Crash transcript notification: when the previous boot ended in a panic, the configured channels (webhook/Telegram/email) receive an event with the first transcript line instead of waiting for a manual `/api/crash_log` read. New filterable event bit in the monitoring UI (all four languages).
+- `hbrfeth_udp_stale_reconnect_total` Prometheus counter and `status/raw_uart_stale_reconnects` MQTT topic: how often CCUs hit the stale-identifier recovery path (#480).
+- Release assets now include `ota_data_initial.bin`, completing the serial flash set for esptool users (requested in #483 discussion).
+
+### Changed
+- Update checks fetch the manifest with a cache-busting `?fetch=` counter: freshly published releases are visible immediately instead of after the ~10 minute GitHub Pages CDN window.
+- `HTTP_CLIENT` EAGAIN retry warnings (dozens per TLS artifact download, all benign) are silenced; errors stay visible.
+- WebFlasher: image downloads retry transient failures up to three times, the release catalog shows its newest entry date (with a stale-catalog warning after 21 days), and the manual mode documents the esptool flash layout including `ota_data_initial.bin`.
+- Release workflows rebase their metadata commit onto the live `main` head before pushing, so a concurrent push can no longer fail a release.
+- Dependabot patch/minor bumps with green CI merge automatically (`auto-merge.yml`); majors stay manual.
+
+### WebUI
+- OTA progress chip in the header: an online installation started anywhere (this browser, another client, or the automatic schedule) is visible from every page and links to the updates view.
+- New zero-console E2E guard: every route must load without a single browser console error or warning.
+
+## [WebUI 1.1.1-Beta.2] - 2026-11-11
 - Wrap the monitoring page's password fields in forms; Chrome logged a verbose DOM hint for every password input outside a form, and Enter could trigger implicit submissions.
+- Use the return-based router guard navigation form (`next()` is deprecated).
 - Correct the `login.json` request schema in the API documentation (username and password).
 
 ## [2.3.1] - 2026-11-11
