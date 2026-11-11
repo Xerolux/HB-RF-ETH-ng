@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.4.0-Beta.3
+# 🚀 HB-RF-ETH-ng v2.4.0-Beta.4
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,10 +11,10 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.4.0-Beta.3?
+## 🆕 Was ist neu in v2.4.0-Beta.4?
 
 ### Fixed
-- heap_watchdog task stack raised to 8192 bytes: Beta.2's 6144 left only ~56 bytes of high-water headroom once `localtime_r()` and the journal's NVS flush stacked up on the task — one unlucky frame away from the next overflow.
+- Root cause of the repeated `heap_watchdog` stack overflows (Beta.1/2/3): the event-journal flush staged its ~4.5 KB NVS blob in a stack array inside the task. The buffer is heap-allocated now (allocation failure defers the flush), the task stack stays at 8192 bytes as defensive headroom. Beta.3's OTA rollback to Beta.2 worked exactly as designed.
 
 ## ✨ Hauptfunktionen
 
@@ -51,7 +51,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.4.0-Beta.3.bin`)
+- **Firmware-Binary** (`firmware_2.4.0-Beta.4.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.2.0-Beta.1.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
