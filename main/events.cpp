@@ -22,6 +22,7 @@
  */
 
 #include "events.h"
+#include "event_journal.h"
 #include "monitoring.h"
 #include "crash_blackbox.h"
 #include "settings.h"
@@ -793,7 +794,12 @@ static void events_task(void *)
         ESP_LOGI(TAG, "event worker started");
         while (s_running.load(std::memory_order_acquire)) {
             EventEntry e;
-            if (xQueueReceive(s_queue, &e, pdMS_TO_TICKS(500)) != pdTRUE) continue;
+            if (xQueueReceive(s_queue, &e, pdMS_TO_TICKS(500)) != pdTRUE) {
+                // Idle poll: a cheap moment to persist pending journal entries
+                // (e.g. events recorded while delivery was deferred).
+                event_journal_flush();
+                continue;
+            }
             if (!s_running.load(std::memory_order_acquire)) break;
 
             // Defer notification delivery while a manual firmware upload is in
@@ -862,6 +868,9 @@ static void events_task(void *)
 
             if (any_ok) g_sent_total.inc();
             else        g_failed_total.inc();
+
+            // Delivery finished; make the journal entry durable.
+            event_journal_flush();
         }
         ESP_LOGI(TAG, "event worker stopped");
         SemaphoreHandle_t lifecycle = events_lifecycle_mutex();
@@ -986,6 +995,10 @@ bool events_is_running(void) { return s_running.load(); }
 
 void events_emit(Event event, const char *detail)
 {
+    // Journal first, unconditionally: the history must record events even
+    // while the notification worker is stopped. RAM-only, never blocks.
+    event_journal_add((uint8_t)event, detail);
+
     if (!s_queue) return;
     if (!s_running.load()) return;
 
