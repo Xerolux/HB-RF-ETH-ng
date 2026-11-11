@@ -81,6 +81,8 @@ jobs:
           npm run build
       - name: Validate translations and German fallback
         run: node scripts/check-translations.mjs
+      - name: Validate OpenAPI against firmware routes
+        run: python3 scripts/check_openapi_drift.py
       - name: Check for console.log statements
         run: |
           cd webui

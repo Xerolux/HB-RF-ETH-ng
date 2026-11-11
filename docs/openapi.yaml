@@ -61,6 +61,9 @@ paths:
               required:
                 - password
               properties:
+                username:
+                  type: string
+                  example: admin
                 password:
                   type: string
                   example: admin
@@ -152,6 +155,126 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/health:
+    get:
+      tags:
+        - System
+      summary: Liveness document for external uptime monitors
+      description: >-
+        Minimal, unauthenticated status for uptime monitors (Uptime Kuma and
+        friends). Deliberately free of sensitive fields: no serials, no IP
+        addresses.
+      security: []
+      responses:
+        '200':
+          description: Device is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hostname:
+                    type: string
+                  version:
+                    type: string
+                    example: 2.4.0-Beta.1
+                  uptimeSeconds:
+                    type: integer
+                  freeHeap:
+                    type: integer
+                  ethernetConnected:
+                    type: boolean
+                  ccuConnected:
+                    type: boolean
+
+  /api/events:
+    get:
+      tags:
+        - System
+      summary: Reboot-surviving event journal
+      description: >-
+        Newest-first ring of recent device events (CCU connects, link drops,
+        crashes, deferred watchdog restarts, scheduled restarts). Mirror is
+        persisted in NVS and survives reboots. Firmware >= 2.4.0.
+      responses:
+        '200':
+          description: Journal contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        time:
+                          type: integer
+                          description: Unix seconds; 0 while the clock was unsynced
+                        type:
+                          type: string
+                          example: ccu_connected
+                        detail:
+                          type: string
+
+  /api/loglevel:
+    get:
+      tags:
+        - System
+      summary: Query adjustable log tags and their current level
+      description: Firmware >= 2.4.0. Overrides are RAM-only and reset on boot.
+      responses:
+        '200':
+          description: Tag list with effective levels
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tag:
+                          type: string
+                          example: RawUartUdpListener
+                        level:
+                          type: string
+                          enum: [NONE, ERROR, WARN, INFO, DEBUG, VERBOSE]
+    post:
+      tags:
+        - System
+      summary: Temporarily change one tag's log level
+      description: >-
+        Applies until the next restart. "DEFAULT" (or "INFO") restores the
+        boot-time level. Unknown tags or levels are rejected with 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tag
+                - level
+              properties:
+                tag:
+                  type: string
+                  example: RawUartUdpListener
+                level:
+                  type: string
+                  enum: [DEFAULT, NONE, ERROR, WARN, INFO, DEBUG, VERBOSE]
+                  example: DEBUG
+      responses:
+        '200':
+          description: Level applied
+        '400':
+          description: Unknown tag or level
 
   /api/monitoring:
     get:
