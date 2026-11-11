@@ -1,24 +1,24 @@
 {
-  "version": "2.4.0-Beta.2",
+  "version": "2.4.0-Beta.3",
   "channel": "beta",
   "isPrerelease": true,
-  "publishedAt": "2026-11-11T16:30:24Z",
-  "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.0-Beta.2/firmware_2.4.0-Beta.2.bin",
-  "sha256": "05965139d3141f57dd092128a41395ecfb8908881505ca24ae2cb26911f80e44",
+  "publishedAt": "2026-11-11T16:40:24Z",
+  "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.0-Beta.3/firmware_2.4.0-Beta.3.bin",
+  "sha256": "1f5a4032a5869b56c13e10e8e622ce33b8ce0b21aee29762f7235cd1e2680c6d",
   "size": 1371744,
-  "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.2",
-  "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.2",
+  "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.3",
+  "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.3",
   "webui": {
     "version": "1.2.0-Beta.1",
     "design": "newdesign",
     "apiVersion": 1,
     "minFirmwareVersion": "2.3.0-Beta.1",
-    "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.0-Beta.2/webui_1.2.0-Beta.1.bin",
-    "sha256": "0b93fcc324f66319402f87c9a0e4b1152dc8774aaff99bf75977ad0a12396d64",
+    "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.0-Beta.3/webui_1.2.0-Beta.1.bin",
+    "sha256": "896a48db3a06335da3fc1bcfafb84852b1c164baf92b75624ee7de6d0c79fec0",
     "size": 327680,
     "partition": "spiffs",
     "format": 1,
-    "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.2",
-    "publishedAt": "2026-11-11T16:30:24Z"
+    "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.0-Beta.3",
+    "publishedAt": "2026-11-11T16:40:24Z"
   }
 }
