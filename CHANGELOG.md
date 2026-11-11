@@ -9,33 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.0-Beta.4] - 2026-11-11
 
-### Changes
-- docs(changelog): curate 2.3.0-Beta.3 release notes
-- chore(deps): refresh webui lockfile to latest within-range versions
-- chore(deps): bump crate-ci/typos to v1.52.2 and refresh IDF managed components
-- chore(deps)(deps-dev): bump sass from 1.105.2 to 1.108.1 in /webui (#489)
-- chore(deps)(deps): bump vue-i18n from 11.4.14 to 11.4.18 in /webui (#486)
-- chore(deps)(deps-dev): bump vite from 8.3.4 to 8.3.6 in /webui (#488)
-- chore(deps)(deps-dev): bump globals from 17.13.0 to 17.14.0 in /webui (#487)
-- chore(deps)(deps): bump vue from 3.5.43 to 3.5.45 in /webui (#484)
-- chore(ci)(deps): bump crate-ci/typos from 1.51.1 to 1.52.0 (#485)
-- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action from 24.2.0 to 25.0.0 (#481)
-- fix(flasher): declare imageCache map used by fetchBinary (#490)
-- fix(raw-uart): return a distinct ID for stale reconnects (#480)
-- chore: update manifests for v2.3.0-Beta.3
+### Fixed
+- Return a distinct endpoint identifier for stale raw-uart reconnects so the OpenCCU 1.26 driver detects the new session, sets `session_lost` and restarts its RF stack instead of silently resuming (#480).
+- Declare the WebFlasher's image cache: download-based installs failed with "Download fehlgeschlagen (imageCache is not defined)" since the flasher launched; only manual file selection worked (#490, fixes #483).
 
-## [2.3.0-Beta.3] - 2026-11-11
+### Changed
+- Refresh managed ESP-IDF components within their ranges (espressif/lan87xx 1.1.0, espressif/mqtt) and webui/CI dependencies (vue 3.5.45, vue-i18n 11.4.18, vite 8.3.8, sass 1.108.2, globals 17.14.0, eslint 10.14.0, eslint-plugin-vue 10.12.1, vue-router 5.5.0, axios 1.21.1, @playwright/test 1.65.0, crate-ci/typos 1.52.2); merged dependabot bumps #481, #484–#489.
+
+## [2.3.0-Beta.3] - 2026-11-04
 
 ### Fixed
 - Hold the update scheduler's NVS reservation through reads, writes, commits and handle closure.
 - Report failed persistence when scheduling an update instead of falsely confirming success; retain the previous in-memory request.
 - Stop installation status polling after 30 consecutive connection errors and show a localized connection-loss warning without enabling a duplicate installation.
-- Return a distinct endpoint identifier for stale raw-uart reconnects so the OpenCCU 1.26 driver detects the new session, sets `session_lost` and restarts its RF stack instead of silently resuming (#480).
-- Declare the WebFlasher's image cache: download-based installs failed with "Download fehlgeschlagen (imageCache is not defined)" since the flasher launched; only manual file selection worked (#490, fixes #483).
 
 ### Changed
 - Include WebUI 1.1.1-Beta.1 (API 1; minimum firmware 2.3.0-Beta.1).
-- Refresh managed ESP-IDF components within their ranges (espressif/lan87xx 1.1.0, espressif/mqtt) and webui/CI dependencies (vue 3.5.45, vue-i18n 11.4.18, vite 8.3.8, sass 1.108.2, globals 17.14.0, eslint 10.14.0, eslint-plugin-vue 10.12.1, vue-router 5.5.0, axios 1.21.1, @playwright/test 1.65.0, crate-ci/typos 1.52.2).
 - Update vulnerable JavaScript dependencies; npm audit reports no known vulnerabilities for the release lockfile. Scope the corrected minimatch override to ESLint tooling.
 - Define Vue compatibility-component prop types/defaults and use explicit ESM build/lint configuration.
 - Use reproducible dependency installs in build/PR/release CI and add deterministic update-polling and NVS-failure regression coverage.
