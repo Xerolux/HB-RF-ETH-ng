@@ -106,6 +106,7 @@
 
       <Transition name="expand">
         <div v-if="mqttConfig.enabled" class="card-body">
+          <form class="mb-0" @submit.prevent>
           <div class="row g-3">
             <div class="col-md-8">
               <label class="form-label">{{ t('monitoring.mqtt.server') }}</label>
@@ -308,6 +309,7 @@
               </div>
             </div>
           </div>
+          </form>
         </div>
       </Transition>
     </div>
@@ -410,6 +412,7 @@
       </div>
       <Transition name="expand">
         <div v-if="notifyConfig.enabled" class="card-body">
+          <form class="mb-0" @submit.prevent>
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">{{ t('monitoring.notify.channels') }}</label>
@@ -546,6 +549,7 @@
               </div>
             </div>
           </div>
+          </form>
         </div>
       </Transition>
     </div>

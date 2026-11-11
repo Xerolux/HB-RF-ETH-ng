@@ -32,6 +32,7 @@ Authenticate with the device and obtain an access token.
 **Request:**
 ```json
 {
+  "username": "string",
   "password": "string"
 }
 ```
@@ -55,7 +56,7 @@ Authenticate with the device and obtain an access token.
 ```bash
 curl -X POST http://192.168.1.100/login.json \
   -H "Content-Type: application/json" \
-  -d '{"password":"admin"}'
+  -d '{"username":"admin","password":"admin"}'
 ```
 
 ---
