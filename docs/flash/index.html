@@ -228,6 +228,7 @@
     <section class="step-card success-card" id="successCard">
         <h2 data-i18n="successTitle">✓ Flashen abgeschlossen</h2>
         <p data-i18n="successText">Die Firmware wurde übertragen und das Gerät startet neu. Jetzt Schritt 4 oben beachten – insbesondere die 60 Sekunden Ruhe nach dem Start.</p>
+        <p id="successDeviceLink" class="hidden"></p>
     </section>
 </main>
 
@@ -281,6 +282,7 @@ const I18N = {
         after3: "Danach die Weboberfläche öffnen und unter <span class=\"mono\">System</span> die installierte Version prüfen.",
         successTitle: "✓ Flashen abgeschlossen",
         successText: "Die Firmware wurde übertragen und das Gerät startet neu. Jetzt Schritt 4 oben beachten – insbesondere die 60 Sekunden Ruhe nach dem Start.",
+        openDevice: "Gerät öffnen: {url} (ca. 60&nbsp;s nach dem Start warten)."
         footerMain: "Web-Flasher für HB-RF-ETH-ng · Nutzt <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) von Espressif und die Web Serial API.",
         footerCredits: "Basierend auf der HB-RF-ETH-Hardware und -Firmware von Alexander Reinert.",
         // dynamic
@@ -347,6 +349,7 @@ const I18N = {
         after3: "Then open the web UI and check the installed version under <span class=\"mono\">System</span>.",
         successTitle: "✓ Flashing complete",
         successText: "The firmware has been transferred and the device is restarting. Now follow step 4 above – especially the 60 seconds of rest after boot.",
+        openDevice: "Open the device: {url} (wait ~60&nbsp;s after boot).",
         footerMain: "Web flasher for HB-RF-ETH-ng · Uses <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) by Espressif and the Web Serial API.",
         footerCredits: "Based on the HB-RF-ETH hardware and firmware by Alexander Reinert.",
         loading: "Loading versions…",
@@ -571,6 +574,30 @@ function renderReleases() {
 function channel() { return $("channelSelect").value; }
 function profile() { return document.querySelector("input[name=profile]:checked").value; }
 
+// After a successful flash, link straight to the device's WebUI via mDNS.
+// The default hostname is HB-RF-ETH-<last 3 MAC bytes uppercase> (see
+// settings.cpp), announced as <hostname-lowercase>.local by the firmware.
+// esptool-js exposes the MAC as mac_addr() on the loader instance.
+async function fillSuccessDeviceLink() {
+    const box = $("successDeviceLink");
+    box.classList.add("hidden");
+    try {
+        if (!connectedMac || connectedMac.length < 6) return;
+        const suffix = connectedMac.slice(-6).match(/.{2}/g).join("");
+        const url = "http://hb-rf-eth-" + suffix.toLowerCase() + ".local/";
+        box.innerHTML = "";
+        const a = document.createElement("a");
+        a.href = url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = t("openDevice", { url });
+        box.appendChild(a);
+        box.classList.remove("hidden");
+    } catch {
+        // Older esptool-js without mac_addr(): the success card stays as-is.
+    }
+}
+
 const imageCache = new Map();
 
 async function fetchBinary(url) {
@@ -642,6 +669,7 @@ async function loadImages() {
 
 // ---------------------------------------------------------------- connect & flash
 let esploader = null, transport = null;
+let connectedMac = null;
 
 async function connect() {
     showError("");
@@ -673,6 +701,10 @@ async function connect() {
             return;
         }
         setStatus("connectStatus", t("connectedChip", { chip: chipName }), "ok");
+        try {
+            const raw = typeof esploader.mac_addr === "function" ? await esploader.mac_addr() : null;
+            connectedMac = raw ? String(raw).replace(/[^0-9a-fA-F]/g, "").toUpperCase() : null;
+        } catch { connectedMac = null; }
         $("flashButton").disabled = false;
     } catch (e) {
         esploader = null; transport = null;
@@ -756,6 +788,7 @@ async function flash() {
         });
         await esploader.after();
         setStatus("imageStatus", t("flashDone"), "ok");
+        await fillSuccessDeviceLink();
         $("successCard").style.display = "block";
         $("successCard").scrollIntoView({ behavior: "smooth" });
     } catch (e) {
