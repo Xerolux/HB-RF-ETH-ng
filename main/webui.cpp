@@ -45,6 +45,7 @@
 #include "monitoring_api.h"
 #include "monitoring.h"
 #include "events.h"
+#include "event_journal.h"
 #include "rate_limiter.h"
 #include "security_headers.h"
 #include "secure_utils.h"
@@ -900,6 +901,10 @@ void add_settings(cJSON *root)
     cJSON_AddBoolToObject(settings, "systemLogEnabled", _settings->getSystemLogEnabled());
     cJSON_AddBoolToObject(settings, "flashPause", _settings->getFlashPause());
     cJSON_AddBoolToObject(settings, "testDesignEnabled", _settings->getTestDesignEnabled());
+    cJSON_AddBoolToObject(settings, "restartScheduleEnabled", _settings->getRestartScheduleEnabled());
+    cJSON_AddNumberToObject(settings, "restartScheduleDay", _settings->getRestartScheduleDay());
+    cJSON_AddNumberToObject(settings, "restartScheduleHour", _settings->getRestartScheduleHour());
+    cJSON_AddNumberToObject(settings, "restartScheduleMinute", _settings->getRestartScheduleMinute());
 }
 
 esp_err_t get_settings_json_handler_func(httpd_req_t *req)
@@ -1383,6 +1388,22 @@ esp_err_t post_settings_json_handler_func(httpd_req_t *req)
     if (flashPauseItem && cJSON_IsBool(flashPauseItem)) {
         _settings->setFlashPause(cJSON_IsTrue(flashPauseItem));
     }
+    cJSON *rsEnabledItem = cJSON_GetObjectItem(root, "restartScheduleEnabled");
+    if (rsEnabledItem && cJSON_IsBool(rsEnabledItem)) {
+        _settings->setRestartScheduleEnabled(cJSON_IsTrue(rsEnabledItem));
+    }
+    cJSON *rsDayItem = cJSON_GetObjectItem(root, "restartScheduleDay");
+    if (rsDayItem && cJSON_IsNumber(rsDayItem)) {
+        _settings->setRestartScheduleDay((uint8_t)cJSON_GetNumberValue(rsDayItem));
+    }
+    cJSON *rsHourItem = cJSON_GetObjectItem(root, "restartScheduleHour");
+    if (rsHourItem && cJSON_IsNumber(rsHourItem)) {
+        _settings->setRestartScheduleHour((uint8_t)cJSON_GetNumberValue(rsHourItem));
+    }
+    cJSON *rsMinuteItem = cJSON_GetObjectItem(root, "restartScheduleMinute");
+    if (rsMinuteItem && cJSON_IsNumber(rsMinuteItem)) {
+        _settings->setRestartScheduleMinute((uint8_t)cJSON_GetNumberValue(rsMinuteItem));
+    }
     cJSON *testDesignItem = cJSON_GetObjectItem(root, "testDesignEnabled");
     if (testDesignItem && cJSON_IsBool(testDesignItem)) {
         _settings->setTestDesignEnabled(cJSON_IsTrue(testDesignItem));
@@ -1694,6 +1715,236 @@ httpd_uri_t get_crash_log_handler = {
     .handler = get_crash_log_handler_func,
     .user_ctx = NULL};
 
+// /api/health — minimal, unauthenticated liveness document for external
+// uptime monitors (Uptime Kuma & friends). Deliberately free of anything
+// sensitive: no serials, no IPs, no identifiers beyond the hostname.
+esp_err_t get_health_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+
+    char body[320];
+    snprintf(body, sizeof(body),
+             "{\"hostname\":\"%s\",\"version\":\"%s\",\"uptimeSeconds\":%llu,"
+             "\"freeHeap\":%u,\"ethernetConnected\":%s,\"ccuConnected\":%s}",
+             _settings ? _settings->getHostname() : "",
+             _sysInfo ? _sysInfo->getCurrentVersion() : "",
+             _sysInfo ? (unsigned long long)_sysInfo->getUptimeSeconds() : 0ULL,
+             (unsigned)esp_get_free_heap_size(),
+             (_ethernet && _ethernet->isConnected()) ? "true" : "false",
+             (_rawUartUdpListener &&
+              _rawUartUdpListener->getConnectedRemoteAddress().addr != 0) ? "true" : "false");
+    httpd_resp_sendstr(req, body);
+    return ESP_OK;
+}
+
+httpd_uri_t get_health_handler = {
+    .uri = "/api/health",
+    .method = HTTP_GET,
+    .handler = get_health_handler_func,
+    .user_ctx = NULL};
+
+// /api/events — the reboot-surviving event journal, newest first.
+esp_err_t get_events_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    // Lazily persist entries recorded while the notification worker is off.
+    event_journal_flush();
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+
+    std::string out;
+    out.reserve(512 + event_journal_count() * 160);
+    out += "{\"count\":";
+    out += std::to_string(event_journal_count());
+    out += ",\"events\":[";
+    for (size_t i = 0; i < event_journal_count(); i++)
+    {
+        const event_journal_entry_t *e = event_journal_entry(i);
+        if (!e) break;
+        if (i) out += ",";
+        out += "{\"time\":";
+        out += std::to_string((unsigned long long)e->epoch);
+        out += ",\"type\":\"";
+        out += event_journal_name(e->event_id);
+        out += "\",\"detail\":\"";
+        for (const char *p = e->detail; p && *p; p++)
+        {
+            if (*p == '"' || *p == '\\') { out += '\\'; out += *p; }
+            else if ((unsigned char)*p >= ' ') out += *p;
+        }
+        out += "\"}";
+    }
+    out += "]}";
+    httpd_resp_send(req, out.c_str(), out.length());
+    return ESP_OK;
+}
+
+httpd_uri_t get_events_handler = {
+    .uri = "/api/events",
+    .method = HTTP_GET,
+    .handler = get_events_handler_func,
+    .user_ctx = NULL};
+
+// /api/loglevel — temporary per-tag log verbosity for field debugging.
+// Overrides live in RAM only and reset on the next boot; "DEFAULT" restores
+// the boot-time INFO level. This is the "why is nothing in the log" answer
+// without a reflash.
+static const char *const LOG_LEVEL_TAGS[] = {
+    "DCF", "Ethernet", "LogManager", "MONITORING", "MQTT", "NtpServer",
+    "PanicLog", "PingService", "PushButtonHandler", "RTC",
+    "RadioModuleConnector", "RateLimiter", "RawUartUdpListener", "ResetInfo",
+    "Settings", "SysInfo", "SystemClock", "SystemReset", "UpdateCheck",
+    "UpdateInstall", "UpdateScheduler", "WebUI", "events", "log_stream",
+    "syslog", NULL};
+
+static const char *level_name(esp_log_level_t level)
+{
+    switch (level)
+    {
+    case ESP_LOG_NONE: return "NONE";
+    case ESP_LOG_ERROR: return "ERROR";
+    case ESP_LOG_WARN: return "WARN";
+    case ESP_LOG_INFO: return "INFO";
+    case ESP_LOG_DEBUG: return "DEBUG";
+    case ESP_LOG_VERBOSE: return "VERBOSE";
+    default: return "INFO";
+    }
+}
+
+// Effective overrides tracked in RAM so the UI can show which tags were
+// raised away from the boot default. ESP_LOG_NONE is 0, so the array is
+// lazily initialised to INFO instead of relying on zero-init.
+static esp_log_level_t s_loglevel_overrides[sizeof(LOG_LEVEL_TAGS) / sizeof(LOG_LEVEL_TAGS[0])];
+static bool s_loglevel_overrides_ready = false;
+
+static void loglevel_overrides_ensure_init(void)
+{
+    if (s_loglevel_overrides_ready) return;
+    for (size_t i = 0; LOG_LEVEL_TAGS[i]; i++)
+        s_loglevel_overrides[i] = ESP_LOG_INFO;
+    s_loglevel_overrides_ready = true;
+}
+
+static bool set_log_level(const char *tag, const char *level)
+{
+    esp_log_level_t lvl;
+    if (!strcmp(level, "DEFAULT") || !strcmp(level, "INFO")) lvl = ESP_LOG_INFO;
+    else if (!strcmp(level, "ERROR")) lvl = ESP_LOG_ERROR;
+    else if (!strcmp(level, "WARN")) lvl = ESP_LOG_WARN;
+    else if (!strcmp(level, "DEBUG")) lvl = ESP_LOG_DEBUG;
+    else if (!strcmp(level, "VERBOSE")) lvl = ESP_LOG_VERBOSE;
+    else if (!strcmp(level, "NONE")) lvl = ESP_LOG_NONE;
+    else return false;
+
+    esp_log_level_set(tag, lvl);
+    loglevel_overrides_ensure_init();
+    for (size_t i = 0; LOG_LEVEL_TAGS[i]; i++)
+    {
+        if (!strcmp(LOG_LEVEL_TAGS[i], tag)) { s_loglevel_overrides[i] = lvl; break; }
+    }
+    ESP_LOGI(TAG, "Log level for %s set to %s (RAM override, resets on boot)", tag, level);
+    return true;
+}
+
+esp_err_t get_loglevel_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+
+    loglevel_overrides_ensure_init();
+    std::string out = "{\"tags\":[";
+    for (size_t i = 0; LOG_LEVEL_TAGS[i]; i++)
+    {
+        if (i) out += ",";
+        out += "{\"tag\":\"";
+        out += LOG_LEVEL_TAGS[i];
+        out += "\",\"level\":\"";
+        out += level_name(s_loglevel_overrides[i]);
+        out += "\"}";
+    }
+    out += "]}";
+    httpd_resp_send(req, out.c_str(), out.length());
+    return ESP_OK;
+}
+
+esp_err_t post_loglevel_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+    if (validate_auth(req) != ESP_OK)
+    {
+        httpd_resp_set_status(req, "401 Not authorized");
+        httpd_resp_sendstr(req, "401 Not authorized");
+        return ESP_OK;
+    }
+
+    char body[160];
+    const int len = recv_full_body(req, body, sizeof(body));
+    if (len <= 0)
+    {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_body\"}");
+        return ESP_OK;
+    }
+    body[len < (int)sizeof(body) ? len : (int)sizeof(body) - 1] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    if (!root)
+    {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_json\"}");
+        return ESP_OK;
+    }
+    const char *tag = cJSON_GetStringValue(cJSON_GetObjectItem(root, "tag"));
+    const char *level = cJSON_GetStringValue(cJSON_GetObjectItem(root, "level"));
+    bool tag_known = false;
+    if (tag && level)
+    {
+        for (size_t i = 0; LOG_LEVEL_TAGS[i]; i++)
+            if (!strcmp(LOG_LEVEL_TAGS[i], tag)) { tag_known = true; break; }
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    if (!tag_known || !set_log_level(tag, level))
+    {
+        cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_tag_or_level\"}");
+        return ESP_OK;
+    }
+    cJSON_Delete(root);
+    httpd_resp_sendstr(req, "{\"outcome\":\"applied\"}");
+    return ESP_OK;
+}
+
+httpd_uri_t get_loglevel_handler = {
+    .uri = "/api/loglevel",
+    .method = HTTP_GET,
+    .handler = get_loglevel_handler_func,
+    .user_ctx = NULL};
+
+httpd_uri_t post_loglevel_handler = {
+    .uri = "/api/loglevel",
+    .method = HTTP_POST,
+    .handler = post_loglevel_handler_func,
+    .user_ctx = NULL};
+
 static void emit_log_enable_snapshot()
 {
     ESP_LOGI(TAG, "System log capture enabled via WebUI");
@@ -1997,6 +2248,11 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &post_log_disable_handler);
         httpd_register_uri_handler(_httpd_handle, &get_log_download_handler);
         httpd_register_uri_handler(_httpd_handle, &get_crash_log_handler);
+
+        httpd_register_uri_handler(_httpd_handle, &get_health_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_events_handler);
+        httpd_register_uri_handler(_httpd_handle, &get_loglevel_handler);
+        httpd_register_uri_handler(_httpd_handle, &post_loglevel_handler);
 
         // With uri_match_wildcard the first matching registration wins, so
         // every exact route must be registered BEFORE the "/*" SPA catch-all
