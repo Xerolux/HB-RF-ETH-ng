@@ -1,7 +1,9 @@
-# 🚀 HB-RF-ETH-ng v2.3.1
+# 🚀 HB-RF-ETH-ng v2.4.0-Beta.1
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
+
+> ⚠️ **Pre-Release** - Testversion, Nutzung auf eigene Gefahr.
 
 ## 📋 Überblick
 
@@ -9,19 +11,37 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.3.1?
+## 🆕 Was ist neu in v2.4.0-Beta.1?
 
-First stable release of the 2.3.x line. It promotes 2.3.0-Beta.4 after
-validation on a physical device (OTA install, reboot and CCU reconnect).
-
-### Fixed
-- Update scheduler: hold the NVS reservation through reads, writes and commits; report failed persistence instead of falsely confirming success; stop install status polling after 30 connection errors with a localized warning.
-- Raw-uart: stale reconnects now get a distinct endpoint identifier so the OpenCCU 1.26 driver detects the new session, sets `session_lost` and recovers its RF stack (#480).
-- WebFlasher: download-based installs work again; they failed with "imageCache is not defined" since the flasher launched (#490, fixes #483).
+### Added
+- **mDNS**: the device announces itself as `<hostname>.local` (plus `_http._tcp`), so the WebUI is reachable by name; the WebFlasher links straight to it after a successful flash.
+- **Event journal**: reboot-surviving history of CCU/link/crash/watchdog events (NVS mirror), served by `GET /api/events` and shown on the diagnostics page ("Letzte Ereignisse").
+- **`GET /api/health`**: minimal unauthenticated liveness document for uptime monitors.
+- **Runtime log levels**: `GET/POST /api/loglevel` raises one module's verbosity until the next restart; surfaced as a card on the system-log page (field debugging without a reflash).
+- **Scheduled maintenance restart**: opt-in weekly restart (day + time) with boot-loop protection; settings card included. New reset reason `Scheduled Restart`.
+- **Network watchdog witness**: before a gateway-unreachable restart the connected CCU (same subnet) is probed; a responding witness defers the restart and is journaled + counted (`hbrfeth_net_witness_deferred_total`).
+- Home Assistant discovery sensor `raw_uart_stale_reconnects` for the #480 recovery path.
+- OpenAPI drift check in CI: a new route without documentation fails the build (legacy routes carry an explicit allowlist).
+- Visual regression tests: 12 screenshot baselines (6 routes × light/dark) fail CI on layout drift.
+- **Home Assistant integration** (separate repo [hb-rf-eth-hass](https://github.com/Xerolux/hb-rf-eth-hass), beta): device with sensors, connectivity entities and a one-click firmware update entity.
 
 ### Changed
-- WebUI 1.1.1-Beta.1 (API 1; minimum firmware 2.3.0-Beta.1).
-- Dependency refresh: espressif/lan87xx 1.1.0, espressif/mqtt, vue 3.5.45, vue-i18n 11.4.18, vite 8.3.8, sass 1.108.2 and other webui/CI updates (#481, #484–#489).
+- Include WebUI 1.2.0-Beta.1 (event journal card, log-level card, restart schedule, OTA header chip, crash-transcript notification toggle).
+- `docs/openapi.yaml`: documented `/api/health`, `/api/events`, `/api/loglevel`; corrected the `login.json` schema (username + password).
+
+### Fixed
+- Network watchdog: probe the connected CCU (same subnet, no gateway involved) before restarting on gateway-unreachable. A responding witness proves MAC/PHY/lwIP are alive and the outage is router-side, so the restart - and with it the CCU session drop - is deferred.
+- New `EVENT_CRASH_TRANSCRIPT` notification (bit 11): when the previous boot ended in a panic, configured channels receive the first transcript line instead of waiting for a manual `/api/crash_log` read.
+- `hbrfeth_udp_stale_reconnect_total` Prometheus counter and `status/raw_uart_stale_reconnects` MQTT topic (#480 field telemetry).
+- Update checks fetch the manifest with a cache-busting `?fetch=` counter: freshly published releases are visible immediately instead of after the ~10 minute GitHub Pages CDN window.
+- `HTTP_CLIENT` EAGAIN retry warnings (dozens per TLS artifact download, all benign) are silenced; errors stay visible.
+- WebFlasher: image downloads retry transient failures up to three times, the release catalog shows its newest entry date (with a stale-catalog warning after 21 days), and the manual mode documents the esptool flash layout including `ota_data_initial.bin` (now also a release asset).
+- Release workflows rebase their metadata commit onto the live `main` head before pushing, so a concurrent push can no longer fail a release.
+- Dependabot patch/minor bumps with green CI merge automatically (`auto-merge.yml`); majors stay manual.
+- WebUI: OTA progress chip in the header visible from every page; monitoring password fields wrapped in forms (Chrome DOM hint); return-based router guard; zero-console E2E guard for every route.
+
+### Validation
+- Local: 74 browser tests (53 regressions + 9 zero-console + 12 visual baselines), 51 Python tests, six C++ host programs; WebUI build, translations, OpenAPI drift check and ESP-IDF build passed.
 
 ## ✨ Hauptfunktionen
 
@@ -58,8 +78,8 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.3.1.bin`)
-- **Kompatibles WebUI-Binary** (`webui_1.1.1-Beta.1.bin`)
+- **Firmware-Binary** (`firmware_2.4.0-Beta.1.bin`)
+- **Kompatibles WebUI-Binary** (`webui_1.2.0-Beta.1.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
 - **SHA256-Prüfsummen** (`SHA256SUMS.txt`)
@@ -100,6 +120,6 @@ Die modernisierte Fork wird von [Xerolux](https://github.com/Xerolux) gewartet.*
 
 ## Included WebUI
 
-- WebUI version: `1.1.1-Beta.1`
+- WebUI version: `1.2.0-Beta.1`
 - WebUI API: `1`
 - Minimum firmware: `2.3.0-Beta.1`
