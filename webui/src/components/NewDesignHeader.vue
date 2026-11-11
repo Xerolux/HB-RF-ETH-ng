@@ -92,6 +92,10 @@
         </span>
         <span class="top-separator"></span>
         <span>{{ t('sysinfo.uptime') }}: <strong>{{ uptimeShort }}</strong></span>
+        <router-link v-if="otaChip" to="/updates/firmware" class="ota-chip" :data-state="otaChip.state">
+          <AppIcon name="download" />
+          <span>{{ otaChipLabel }}</span>
+        </router-link>
         <span class="clock-chip"><AppIcon name="clock" /> {{ currentTime }}</span>
       </div>
 
@@ -224,6 +228,7 @@ import { useHeaderNavigation } from '../composables/useHeaderNavigation.js'
 import { safeLocal } from '../composables/useSafeStorage'
 import { setBodyScrollLock } from '../composables/useBodyScrollLock'
 import { useDismissable } from '../composables/useDismissable'
+import { useUpdateSearch } from '../composables/useUpdateSearch'
 import BrandLogo from './BrandLogo.vue'
 
 const { t, locale } = useI18n()
@@ -252,6 +257,26 @@ const currentLocale = computed(() => locale.value)
 const deviceName = computed(() => sysInfoStore.hostname || 'HB-RF-ETH-ng')
 const { visibleNavGroups } = useHeaderNavigation(t, loginStore)
 const currentTime = computed(() => now.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+
+// OTA progress chip: an online installation started anywhere (this browser,
+// another client, or the automatic schedule) becomes visible from every page.
+// The update pages poll once per second during an install; this light poll
+// only has to catch installs that started elsewhere, so 8 s is enough.
+const { updateStatus: headerUpdateStatus, loadUpdateStatus: loadHeaderUpdateStatus } = useUpdateSearch(t)
+let otaPollTimer = null
+const otaChip = computed(() => {
+  const install = headerUpdateStatus.value?.install
+  if (!install || !install.state || install.state === 'idle') return null
+  return install
+})
+const otaChipLabel = computed(() => {
+  const i = otaChip.value
+  if (!i) return ''
+  if (i.state === 'downloading') return `OTA ${Math.min(100, Math.max(0, i.progress || 0))}%`
+  const key = `header.otaState.${i.state}`
+  const localized = t(key)
+  return localized === key ? `OTA ${i.state}` : localized
+})
 const uptimeShort = computed(() => {
   const seconds = sysInfoStore.uptimeSeconds || 0
   const days = Math.floor(seconds / 86400)
@@ -322,6 +347,15 @@ onMounted(async () => {
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 30000)
+
+  if (loginStore.isLoggedIn) {
+    // One fetch + slow poll; errors are silently ignored - a device reboot
+    // (firmware install) must not spam the console from the header.
+    loadHeaderUpdateStatus().catch(() => {})
+    otaPollTimer = setInterval(() => {
+      loadHeaderUpdateStatus().catch(() => {})
+    }, 8000)
+  }
 })
 
 onUnmounted(() => {
@@ -330,6 +364,9 @@ onUnmounted(() => {
   disableLocaleDismiss()
   if (clockTimer) {
     clearInterval(clockTimer)
+  }
+  if (otaPollTimer) {
+    clearInterval(otaPollTimer)
   }
 })
 </script>
@@ -756,6 +793,28 @@ onUnmounted(() => {
   align-items: center;
   gap: 7px;
   color: var(--color-text);
+}
+
+/* OTA progress chip: links to the updates page, colour reflects the phase. */
+.ota-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--color-primary-contrast, #fff);
+  background: var(--color-primary, #f26a3d);
+}
+
+.ota-chip[data-state='error'] {
+  background: var(--color-danger, #c0392b);
+}
+
+.ota-chip[data-state='success'] {
+  background: var(--color-success, #1e8e3e);
 }
 
 .clock-chip .app-icon {
