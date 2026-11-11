@@ -152,12 +152,19 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m "chore: bump WebUI version to $VERSION"
           fi
-          git tag -a "$TAG" -m "WebUI release $TAG"
           # main may have advanced while this workflow built. Rebase the
           # metadata commit on the live head before pushing so a concurrent
           # push cannot fail the release.
           git fetch origin main
-          git rebase origin/main
+          # The build intentionally leaves generated assets/notes modified.
+          # Preserve them while rebasing only the metadata commit.
+          git rebase --autostash origin/main
+          if [ -n "$(git diff --name-only --diff-filter=U)" ]; then
+            echo "Generated release files conflicted while restoring the build" >&2
+            exit 1
+          fi
+          # Tag the rebased commit so the published source matches main.
+          git tag -a "$TAG" -m "WebUI release $TAG"
           git push origin HEAD:main
           git push origin "$TAG"
 
