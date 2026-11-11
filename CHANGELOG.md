@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0-Beta.2] - 2026-11-11
+
+### Fixed
+- Stack overflow in the `heap_watchdog` task (panic ~60 s after boot on 2.4.0-Beta.1): the schedule check's `localtime_r()` plus its frames exceeded the 4 KB task stack that had under 2 kB of headroom left. The `struct tm` and detail buffer are now static (the function runs only on that task) and the task stack grows to 6144 bytes. Found live by the new crash-transcript journal on the first device running 2.4.0-Beta.1.
+
 ## [2.4.0-Beta.1] - 2026-11-11
 
 ### Added

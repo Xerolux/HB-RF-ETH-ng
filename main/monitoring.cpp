@@ -1297,13 +1297,17 @@ static void check_scheduled_restart(void)
         (uint32_t)((uint64_t)xTaskGetTickCount() * portTICK_PERIOD_MS / 1000ULL);
     if (uptime_s < 600) return;
 
-    struct tm tmnow;
+    // Static because this runs only on the heap_watchdog task and its frames
+    // (struct tm + detail buffer) are what overflowed the 4 KB stack in
+    // 2.4.0-Beta.1: localtime_r() alone needs a substantial chunk, and the
+    // task's high-water mark left less than 2 kB before this feature.
+    static struct tm tmnow;
+    static char detail[64];
     localtime_r(&now, &tmnow);
     if (tmnow.tm_wday != (int)g_settings->getRestartScheduleDay()) return;
     if (tmnow.tm_hour != (int)g_settings->getRestartScheduleHour()) return;
     if (tmnow.tm_min != (int)g_settings->getRestartScheduleMinute()) return;
 
-    char detail[64];
     snprintf(detail, sizeof(detail), "weekly schedule %02u:%02u",
              (unsigned)g_settings->getRestartScheduleHour(),
              (unsigned)g_settings->getRestartScheduleMinute());
@@ -1860,7 +1864,11 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
 
     // Heap watchdog runs regardless of monitoring config - it's a safety
     // net for the whole firmware, not a monitoring feature.
-    BaseType_t wd_ret = xTaskCreate(heap_watchdog_task, "heap_watchdog", 4096, NULL, 2, NULL);
+    // 6144 bytes: 4096 left under 2 kB of headroom (taskStacks) and the
+    // 2.4.0-Beta.1 schedule check overflowed it on its first localtime_r()
+    // call. The static frames in check_scheduled_restart() removed the big
+    // consumers; the extra headroom keeps future additions safe.
+    BaseType_t wd_ret = xTaskCreate(heap_watchdog_task, "heap_watchdog", 6144, NULL, 2, NULL);
     if (wd_ret != pdPASS) {
         ESP_LOGW(TAG, "Failed to start heap watchdog task");
     }
