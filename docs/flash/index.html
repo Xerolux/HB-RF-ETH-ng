@@ -553,6 +553,8 @@ function renderReleases() {
 function channel() { return $("channelSelect").value; }
 function profile() { return document.querySelector("input[name=profile]:checked").value; }
 
+const imageCache = new Map();
+
 async function fetchBinary(url) {
     if (imageCache.has(url)) return imageCache.get(url);
     const r = await fetch(url);
