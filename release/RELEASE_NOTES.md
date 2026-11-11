@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.4.0-Beta.5
+# 🚀 HB-RF-ETH-ng v2.4.0-Beta.6
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,26 +11,16 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.4.0-Beta.5?
+## 🆕 Was ist neu in v2.4.0-Beta.6?
 
 ### Changes
-- test(release): verify bounded journal recovery before firmware publishing
-- fix(firmware): bound journal storage and release startup RAM
-- chore: update WebUI manifest for webui-v1.2.0-Beta.2
+- fix(diagnostics): bound crash-tail capture and stream diagnostic output
+- chore: update manifests for v2.4.0-Beta.5
 
 ### Fixed
-- (system) Release the finished main task and its 6144-byte stack after boot; long-lived services retain static/heap lifetime. This restores update-search RAM headroom without relaxing TLS admission limits.
-- (diag) Bound the event journal to 24 full-detail RAM entries and at most eight persisted entries (896 bytes). Load legacy 40-entry histories with a bounded temporary heap allocation instead of a 4480-byte startup stack buffer, retaining the newest entries.
-- (diag) Serialize journal producers and shared NVS writes, retain a settings-space reserve, adapt retention to available NVS capacity and reclaim only an oversized legacy journal key if needed. Storage failures back off for five minutes. User settings, credentials, certificates and partition layout are preserved.
-- (diag) Stream journal API responses one bounded row at a time instead of allocating the entire history; read requests no longer trigger flash writes. Events added during persistence remain pending for the next flush.
-
-### Changed
-- WebUI update center: installed/available version comparison, explicit status-load failure and retry, channel-aware comparison and install controls, shared accessible preparation/download/verification/activation progress, and readable escaped release notes loaded on demand and released on close. Uses the existing device APIs without new dependencies or firmware buffers.
-- Dashboard: bounded 60-sample CPU/memory session history in the browser, pause/resume/manual refresh with stale-data feedback, shortcuts and reduced-motion-aware transitions.
-
-### Fixed
-- WebUI update status requests share an in-flight request; installation tracking resumes when opening an active update and stops after leaving, including pending responses.
-- OTA header chip uses the existing translated phase labels and links to the target being installed.
+- (diag) Task-stack diagnostics use a single checked, per-call workspace for enumeration, sorting and compact output. HTTP streams escaped text in 128-byte chunks instead of allocating output and escape copies; MQTT keeps its existing string payload. Task stack allocations and diagnostic coverage remain unchanged.
+- (diag) Protective-restart crash snapshots copy only the newest 1024 ring-buffer bytes under a bounded lock into one checked allocation (at most 1051 bytes including tag). No full-log copy, substring allocation or second blob is needed.
+- (diag) Crash-log HTTP responses stream JSON without escaped/body copies and keep the persisted snapshot when transmission fails. Complete panic transcripts retain their full contents and existing format.
 
 ## ✨ Hauptfunktionen
 
@@ -67,7 +57,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.4.0-Beta.5.bin`)
+- **Firmware-Binary** (`firmware_2.4.0-Beta.6.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.2.0-Beta.2.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
