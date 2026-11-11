@@ -20,7 +20,7 @@
     "axios": "^1.20.0",
     "bootstrap": "^5.3.8",
     "pinia": "^4.1.0",
-    "vue": "^3.5.43",
+    "vue": "^3.5.45",
     "vue-i18n": "^11.4.18",
     "vue-router": "^5.4.0"
   },
@@ -31,9 +31,9 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
     "eslint-plugin-vue": "^10.11.1",
-    "globals": "^17.13.0",
+    "globals": "^17.14.0",
     "sass": "^1.105.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.6"
   },
   "overrides": {
     "eslint": {
