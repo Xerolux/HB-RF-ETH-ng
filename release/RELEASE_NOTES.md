@@ -1,9 +1,7 @@
-# 🚀 HB-RF-ETH-ng v2.3.0-Beta.4
+# 🚀 HB-RF-ETH-ng v2.3.1
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
-
-> ⚠️ **Pre-Release** - Testversion, Nutzung auf eigene Gefahr.
 
 ## 📋 Überblick
 
@@ -11,22 +9,19 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.3.0-Beta.4?
+## 🆕 Was ist neu in v2.3.1?
 
-### Changes
-- docs(changelog): curate 2.3.0-Beta.3 release notes
-- chore(deps): refresh webui lockfile to latest within-range versions
-- chore(deps): bump crate-ci/typos to v1.52.2 and refresh IDF managed components
-- chore(deps)(deps-dev): bump sass from 1.105.2 to 1.108.1 in /webui (#489)
-- chore(deps)(deps): bump vue-i18n from 11.4.14 to 11.4.18 in /webui (#486)
-- chore(deps)(deps-dev): bump vite from 8.3.4 to 8.3.6 in /webui (#488)
-- chore(deps)(deps-dev): bump globals from 17.13.0 to 17.14.0 in /webui (#487)
-- chore(deps)(deps): bump vue from 3.5.43 to 3.5.45 in /webui (#484)
-- chore(ci)(deps): bump crate-ci/typos from 1.51.1 to 1.52.0 (#485)
-- chore(ci)(deps): bump DavidAnson/markdownlint-cli2-action from 24.2.0 to 25.0.0 (#481)
-- fix(flasher): declare imageCache map used by fetchBinary (#490)
-- fix(raw-uart): return a distinct ID for stale reconnects (#480)
-- chore: update manifests for v2.3.0-Beta.3
+First stable release of the 2.3.x line. It promotes 2.3.0-Beta.4 after
+validation on a physical device (OTA install, reboot and CCU reconnect).
+
+### Fixed
+- Update scheduler: hold the NVS reservation through reads, writes and commits; report failed persistence instead of falsely confirming success; stop install status polling after 30 connection errors with a localized warning.
+- Raw-uart: stale reconnects now get a distinct endpoint identifier so the OpenCCU 1.26 driver detects the new session, sets `session_lost` and recovers its RF stack (#480).
+- WebFlasher: download-based installs work again; they failed with "imageCache is not defined" since the flasher launched (#490, fixes #483).
+
+### Changed
+- WebUI 1.1.1-Beta.1 (API 1; minimum firmware 2.3.0-Beta.1).
+- Dependency refresh: espressif/lan87xx 1.1.0, espressif/mqtt, vue 3.5.45, vue-i18n 11.4.18, vite 8.3.8, sass 1.108.2 and other webui/CI updates (#481, #484–#489).
 
 ## ✨ Hauptfunktionen
 
@@ -63,7 +58,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.3.0-Beta.4.bin`)
+- **Firmware-Binary** (`firmware_2.3.1.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.1.1-Beta.1.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)
