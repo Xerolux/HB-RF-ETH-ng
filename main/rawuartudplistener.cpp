@@ -48,6 +48,12 @@ static MetricsCounter g_keepalives("hbrfeth_udp_keepalive_total",
                                    "Keepalive probes sent");
 static MetricsCounter g_rx_drops("hbrfeth_udp_drop_total",
                                  "Received UDP frames dropped (queue full / parse error)");
+// Stale identifier reconnects: the CCU kept an endpoint identifier from a
+// previous session (e.g. across a gateway reboot) and the reply carried a
+// fresh value (#480). Field telemetry for how often CCUs hit the recovery
+// path.
+static MetricsCounter g_stale_reconnects("hbrfeth_udp_stale_reconnect_total",
+                                         "Reconnects answered with a fresh endpoint identifier (stale CCU session)");
 
 // Module->CCU losses. Until now both were invisible: a failed pbuf_alloc()
 // only wrote a log line, and the err_t from _udp_sendto() was discarded
@@ -98,6 +104,22 @@ static std::atomic<uint32_t> g_last_tcpip_rx_ms{0};
 static RawUartUdpListener *s_listener_instance = nullptr;
 
 uint32_t raw_uart_last_tcpip_rx_ms(void) { return g_last_tcpip_rx_ms.load(std::memory_order_relaxed); }
+
+// Stale-identifier reconnect counter for MQTT status publishing; the
+// Prometheus endpoint reads the registry directly.
+uint64_t raw_uart_stale_reconnects(void) { return g_stale_reconnects.get(); }
+
+bool raw_uart_remote_ip_str(char *buf, size_t len)
+{
+    if (!buf || len == 0) return false;
+    buf[0] = '\0';
+    if (s_listener_instance == nullptr || !s_listener_instance->sessionActive())
+        return false;
+    const ip4_addr_t addr = s_listener_instance->getConnectedRemoteAddress();
+    if (addr.addr == 0 || addr.addr == IPADDR_ANY) return false;
+    ip4addr_ntoa_r(&addr, buf, len);
+    return true;
+}
 
 bool raw_uart_session_active(void)
 {
@@ -275,6 +297,7 @@ bool RawUartUdpListener::handlePacket(pbuf *pb, ip4_addr_t addr, uint16_t port)
                 }
                 ESP_LOGI(TAG, "Received stale raw-uart endpoint identifier %d (current %d); replying with new identifier %d",
                          data[3], previousIdentifier, endpointConnectionIdentifier & 0xff);
+                g_stale_reconnects.inc();
                 atomic_store(&_endpointConnectionIdentifier, endpointConnectionIdentifier);
                 atomic_store(&_connectionStarted, false);
             }

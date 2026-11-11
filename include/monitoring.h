@@ -101,11 +101,12 @@ typedef struct {
 #define NOTIFY_EVENT_CCU_CONNECTED     (1u << 8)
 #define NOTIFY_EVENT_CCU_DISCONNECTED  (1u << 9)
 #define NOTIFY_EVENT_LOW_HEAP          (1u << 10)
+#define NOTIFY_EVENT_CRASH_TRANSCRIPT  (1u << 11)
 
 // Every currently defined event. This is the factory default and also what a
 // device upgrading from a firmware without the mask keeps, because the NVS
 // loader leaves the field untouched when its key is missing.
-#define NOTIFY_EVENT_ALL ((uint16_t)0x07FFu)
+#define NOTIFY_EVENT_ALL ((uint16_t)0x0FFFu)
 
 // Event notification configuration (Phase C/D). Multi-channel: any subset of
 // webhook / telegram / email can be enabled via the `channels` bitmask, and

@@ -116,6 +116,16 @@ uint32_t raw_uart_last_tcpip_rx_ms(void);
 // expected, not a fault.
 bool raw_uart_session_active(void);
 
+// Total reconnects answered with a fresh endpoint identifier because the
+// CCU presented a stale one (recovery path of #480). Backs the
+// status/raw_uart_stale_reconnects MQTT topic; Prometheus reads the
+// registry directly.
+uint64_t raw_uart_stale_reconnects(void);
+
+// Copy the connected CCU's IPv4 address (same subnet, no gateway involved)
+// into buf. Returns false when no session is bound or the address is unset.
+bool raw_uart_remote_ip_str(char *buf, size_t len);
+
 // Clear the high-water marks so an operator can observe a fresh window after
 // changing something, instead of reading a mark set days earlier. The
 // bucket counters are monotonic and deliberately not reset.

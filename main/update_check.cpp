@@ -30,6 +30,8 @@
 #include <string.h>
 #include <time.h>
 
+#include <atomic>
+
 #include "cJSON.h"
 #include "crash_blackbox.h"
 #include "esp_app_desc.h"
@@ -64,7 +66,15 @@ static constexpr int NET_MUTEX_WAIT_MS      = 5000;
 static constexpr int64_t COOLDOWN_US = 60 * 1000000LL;
 
 static constexpr const char *MANIFEST_URL_FORMAT =
-    "https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/%s.json";
+    "https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/%s.json?fetch=%u";
+
+// GitHub Pages serves the manifest with a ~10 minute CDN cache. A freshly
+// published release would stay invisible for that window - during the
+// 2.3.1 rollout a device still saw the previous stable. The monotonic
+// fetch counter makes every request a unique cache key, so each update
+// check reads the live document. The manifest is ~1 KB and checks are
+// user-triggered or 24 h scheduled; losing the cache costs nothing.
+static std::atomic<uint32_t> s_manifest_fetch_seq{0};
 
 static SemaphoreHandle_t s_lock   = NULL;
 static UpdateCheckStatus s_status = {};
@@ -426,7 +436,8 @@ static void update_check_task(void *parameter)
         crash_blackbox_net_op_begin("update_check");
 
         char url[160];
-        snprintf(url, sizeof(url), MANIFEST_URL_FORMAT, args->channel);
+        snprintf(url, sizeof(url), MANIFEST_URL_FORMAT, args->channel,
+                 (unsigned)s_manifest_fetch_seq.fetch_add(1));
 
         // +1 for the terminator, +1 so an oversized body is detectable.
         char *body = static_cast<char *>(malloc(MANIFEST_MAX_BYTES + 2));
@@ -552,6 +563,7 @@ int update_check_fetch_manifest(const char *channel, char *buffer, size_t buffer
     }
 
     char url[160];
-    snprintf(url, sizeof(url), MANIFEST_URL_FORMAT, channel);
+    snprintf(url, sizeof(url), MANIFEST_URL_FORMAT, channel,
+             (unsigned)s_manifest_fetch_seq.fetch_add(1));
     return fetch_manifest(url, buffer, buffer_size, error, error_size);
 }

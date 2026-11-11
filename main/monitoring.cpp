@@ -52,6 +52,7 @@
 #include "systemclock.h"
 #include "reset_info.h"
 #include "crash_blackbox.h"
+#include "panic_transcript.h"
 #include "ping_service.h"
 #include "rawuartudplistener.h"
 #include "esp_heap_caps.h"
@@ -1467,19 +1468,56 @@ static void heap_watchdog_task(void *pvParameters)
                     if (net_ever_alive &&
                         net_fail_streak >= NET_WATCHDOG_THRESHOLD_CYCLES)
                     {
-                        crash_blackbox_snapshot_now((uint32_t)low_heap_streak);
-                        // Keep in sync with last_diag_buffer[96] in reset_info.cpp.
-                        char diag[80];
-                        snprintf(diag, sizeof(diag),
-                                 "net watchdog: gw %s unreachable %d min, link up, free=%u",
-                                 gw_str, net_fail_streak,
-                                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
-                        ESP_LOGE(TAG, "Network stack dead for %d consecutive checks - restarting (%s)",
-                                 net_fail_streak, diag);
-                        LogManager::instance().saveCrashTailNvs("net_watchdog");
-                        ResetInfo::storeResetReason(RESET_REASON_WATCHDOG, diag);
-                        vTaskDelay(pdMS_TO_TICKS(200));
-                        esp_restart();
+                        // Witness check: the CCU sits on the same subnet, so
+                        // reaching it never involves the gateway. If it still
+                        // answers while the gateway does not, the local MAC,
+                        // PHY and lwIP are alive and the outage is on the
+                        // router side. Restarting this device could not heal
+                        // it and would needlessly drop the CCU session
+                        // (observed as a router reboot window in the field).
+                        char witness_str[IP4ADDR_STRLEN_MAX];
+                        bool witness_available =
+                            raw_uart_session_active() &&
+                            raw_uart_remote_ip_str(witness_str, sizeof(witness_str));
+                        bool witness_alive =
+                            witness_available &&
+                            ping_service_ping(witness_str, NET_WATCHDOG_PING_TIMEOUT_MS) >= 0;
+
+                        if (witness_alive)
+                        {
+                            // Router-side outage. Keep counting (the streak
+                            // feeds the recovery log) but stay up while the
+                            // witness confirms the local stack is healthy.
+                            // Log once per threshold window, not per cycle.
+                            if (net_fail_streak == NET_WATCHDOG_THRESHOLD_CYCLES ||
+                                net_fail_streak % (NET_WATCHDOG_THRESHOLD_CYCLES * 5) == 0)
+                            {
+                                ESP_LOGW(TAG,
+                                         "Network watchdog: gateway %s unreachable but CCU witness %s answers"
+                                         " - router-side outage, deferring restart (streak %d)",
+                                         gw_str, witness_str, net_fail_streak);
+                            }
+                        }
+                        else
+                        {
+                            crash_blackbox_snapshot_now((uint32_t)low_heap_streak);
+                            // storeResetReason keeps ~240 chars; the extra
+                            // witness suffix documents that a same-subnet
+                            // peer was probed and stayed silent too.
+                            char diag[128];
+                            snprintf(diag, sizeof(diag),
+                                     "net watchdog: gw %s unreachable %d min, link up, free=%u%s%s",
+                                     gw_str, net_fail_streak,
+                                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                                     witness_available ? ", witness " : "",
+                                     witness_available ? witness_str : "");
+                            ESP_LOGE(TAG, "Network stack dead for %d consecutive checks - restarting (%s)",
+                                     net_fail_streak, diag);
+                            LogManager::instance().saveCrashTailNvs("net_watchdog");
+                            ResetInfo::storeResetReason(RESET_REASON_WATCHDOG, diag);
+                            vTaskDelay(pdMS_TO_TICKS(200));
+                            esp_restart();
+                        }
                     }
                 }
                 else
@@ -1735,6 +1773,26 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
     events_init();
     if (current_config.notify.enabled) {
         events_start(&current_config.notify);
+    }
+
+    // Crash notification (#491 follow-up): if the previous boot ended in a
+    // panic, tell the configured channels immediately instead of waiting for
+    // a manual /api/crash_log read. The full transcript stays in the crash
+    // tail; the event carries the first transcript line as a teaser.
+    {
+        size_t transcript_len = 0, transcript_total = 0;
+        const char *transcript = panic_transcript_get(&transcript_len, &transcript_total);
+        if (transcript && transcript_len > 0) {
+            char first_line[72] = {0};
+            const char *nl = (const char *)memchr(transcript, '\n', transcript_len);
+            size_t first_len = nl ? (size_t)(nl - transcript) : transcript_len;
+            if (first_len >= sizeof(first_line)) first_len = sizeof(first_line) - 1;
+            memcpy(first_line, transcript, first_len);
+            char detail[128];
+            snprintf(detail, sizeof(detail), "Panic before reboot (%u B): %s",
+                     (unsigned)transcript_total, first_line);
+            events_emit(EVENT_CRASH_TRANSCRIPT, detail);
+        }
     }
 
     // MQTT must not connect before the Ethernet netif owns an IPv4 address.

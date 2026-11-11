@@ -50,6 +50,7 @@ typedef enum : uint8_t {
     EVENT_CCU_CONNECTED      = 11,
     EVENT_CCU_DISCONNECTED   = 12,
     EVENT_LOW_HEAP           = 13,
+    EVENT_CRASH_TRANSCRIPT   = 14, // previous boot ended in a panic; transcript latched
     EVENT_TEST               = 254, // emitted by the diagnostic endpoint
 } Event;
 

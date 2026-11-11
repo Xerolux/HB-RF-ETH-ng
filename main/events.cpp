@@ -326,6 +326,8 @@ uint16_t events_mask_bit(Event e)
             return NOTIFY_EVENT_CCU_DISCONNECTED;
         case EVENT_LOW_HEAP:
             return NOTIFY_EVENT_LOW_HEAP;
+        case EVENT_CRASH_TRANSCRIPT:
+            return NOTIFY_EVENT_CRASH_TRANSCRIPT;
         // EVENT_TEST and anything unknown are not filterable. Returning 0
         // makes the worker deliver them unconditionally, which is what the
         // diagnostic button depends on.

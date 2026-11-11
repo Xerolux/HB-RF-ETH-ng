@@ -638,6 +638,7 @@ void mqtt_handler_publish_status(void)
     PUBLISH_DOUBLE("status/cpu_usage", sysInfo->getCpuUsage(), 1);
     PUBLISH_DOUBLE("status/memory_usage", sysInfo->getMemoryUsage(), 1);
     PUBLISH_UINT64("status/uptime", sysInfo->getUptimeSeconds());
+    PUBLISH_UINT64("status/raw_uart_stale_reconnects", raw_uart_stale_reconnects());
 
     // Uptime formatted
     {
