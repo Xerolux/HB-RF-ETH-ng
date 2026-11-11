@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0-Beta.5] - 2026-11-11
+
+### Changes
+- test(release): verify bounded journal recovery before firmware publishing
+- fix(firmware): bound journal storage and release startup RAM
+- chore: update WebUI manifest for webui-v1.2.0-Beta.2
+
 ### Fixed
 - (system) Release the finished main task and its 6144-byte stack after boot; long-lived services retain static/heap lifetime. This restores update-search RAM headroom without relaxing TLS admission limits.
 - (diag) Bound the event journal to 24 full-detail RAM entries and at most eight persisted entries (896 bytes). Load legacy 40-entry histories with a bounded temporary heap allocation instead of a 4480-byte startup stack buffer, retaining the newest entries.
