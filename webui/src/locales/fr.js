@@ -1,4 +1,35 @@
 export default {
+  updateCenter: {
+    "comparison": "Comparaison des versions",
+    "availableVersion": "Version disponible",
+    "loadError": "Impossible de charger le statut. Les données peuvent être périmées.",
+    "retry": "Réessayer",
+    "searchHint": "Recherchez les mises à jour pour connaître la version disponible sur le canal sélectionné.",
+    "updateReady": "Mise à jour disponible – consultez les modifications avant installation.",
+    "current": "À jour lors de la dernière recherche réussie.",
+    "installation": "Installation",
+    "prepare": "Préparer",
+    "download": "Télécharger",
+    "verify": "Vérifier",
+    "activate": "Activer",
+    "firmwareFinish": "Après vérification, l’appareil redémarre et interrompt brièvement la connexion.",
+    "webuiFinish": "Après activation, rechargez la page pour ouvrir la nouvelle interface."
+},
+  dashboard: {
+    "history": "Historique de session",
+    "historyHint": "60 dernières mesures · toutes les 5 secondes · cet onglet uniquement",
+    "collecting": "Collecte des mesures …",
+    "live": "En direct · toutes les 5 s",
+    "paused": "En pause",
+    "failed": "Échec de mise à jour · données périmées",
+    "pause": "Pause",
+    "resume": "Reprendre",
+    "refresh": "Actualiser",
+    "shortcuts": "Accès rapide",
+    "diagnosticsHint": "Vérifier la connexion radio et les erreurs",
+    "logHint": "Consulter les événements",
+    "updatesHint": "Gérer le firmware et la WebUI"
+},
   events: {
     ccu_connected: 'CCU connecté',
     ccu_disconnected: 'CCU déconnecté',

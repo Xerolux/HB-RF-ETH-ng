@@ -92,7 +92,7 @@
         </span>
         <span class="top-separator"></span>
         <span>{{ t('sysinfo.uptime') }}: <strong>{{ uptimeShort }}</strong></span>
-        <router-link v-if="otaChip" to="/updates/firmware" class="ota-chip" :data-state="otaChip.state">
+        <router-link v-if="otaChip" :to="otaChip.target === 'webui' ? '/updates/webui' : '/updates/firmware'" class="ota-chip" :data-state="otaChip.state">
           <AppIcon name="download" />
           <span>{{ otaChipLabel }}</span>
         </router-link>
@@ -231,7 +231,7 @@ import { useDismissable } from '../composables/useDismissable'
 import { useUpdateSearch } from '../composables/useUpdateSearch'
 import BrandLogo from './BrandLogo.vue'
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const router = useRouter()
 const loginStore = useLoginStore()
 const themeStore = useThemeStore()
@@ -273,9 +273,8 @@ const otaChipLabel = computed(() => {
   const i = otaChip.value
   if (!i) return ''
   if (i.state === 'downloading') return `OTA ${Math.min(100, Math.max(0, i.progress || 0))}%`
-  const key = `header.otaState.${i.state}`
-  const localized = t(key)
-  return localized === key ? `OTA ${i.state}` : localized
+  const key = `nav.otaState.${i.state}`
+  return te(key) ? t(key) : `OTA ${i.state}`
 })
 const uptimeShort = computed(() => {
   const seconds = sysInfoStore.uptimeSeconds || 0

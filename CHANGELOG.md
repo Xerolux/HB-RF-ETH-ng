@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- WebUI update center: installed/available version comparison, explicit status-load failure and retry, channel-aware comparison and install controls, shared accessible preparation/download/verification/activation progress, and readable escaped release notes loaded on demand and released on close. Uses the existing device APIs without new dependencies or firmware buffers.
+- Dashboard: bounded 60-sample CPU/memory session history in the browser, pause/resume/manual refresh with stale-data feedback, shortcuts and reduced-motion-aware transitions.
+
+### Fixed
+- WebUI update status requests share an in-flight request; installation tracking resumes when opening an active update and stops after leaving, including pending responses.
+- OTA header chip uses the existing translated phase labels and links to the target being installed.
+
 ## [2.4.0-Beta.4] - 2026-11-11
 
 ### Fixed

@@ -1756,15 +1756,14 @@ test('a cooldown names the seconds until the next attempt', async ({ page }) => 
 })
 
 test('the update search reports its result durably, not only as a toast', async ({ page }) => {
-  let statusCalls = 0
   await page.route('**/api/update/status**', route => {
-    statusCalls += 1
-    // First load: nothing known yet. After the check was triggered the device
+    // Before the check: nothing known yet. After it was triggered the device
     // reports a real finding.
-    const body = statusCalls === 1
+    const body = !checkBody
       ? idleUpdateStatus()
       : idleUpdateStatus({
           everChecked: true,
+          channel: 'beta',
           lastCheck: 1789012345,
           latestFirmware: '2.3.0',
           latestWebui: '1.0.0',

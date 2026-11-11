@@ -1,4 +1,35 @@
 export default {
+  updateCenter: {
+    "comparison": "Confronto versioni",
+    "availableVersion": "Versione disponibile",
+    "loadError": "Impossibile caricare lo stato. I dati potrebbero essere obsoleti.",
+    "retry": "Riprova",
+    "searchHint": "Cerca aggiornamenti per vedere la versione disponibile nel canale selezionato.",
+    "updateReady": "Aggiornamento disponibile – consulta le modifiche prima di installare.",
+    "current": "Aggiornato all’ultima ricerca riuscita.",
+    "installation": "Installazione",
+    "prepare": "Prepara",
+    "download": "Scarica",
+    "verify": "Verifica",
+    "activate": "Attiva",
+    "firmwareFinish": "Dopo la verifica il dispositivo si riavvia, interrompendo brevemente la connessione.",
+    "webuiFinish": "Dopo l’attivazione ricarica la pagina per aprire la nuova interfaccia."
+},
+  dashboard: {
+    "history": "Cronologia della sessione",
+    "historyHint": "Ultimi 60 campioni · ogni 5 secondi · solo questa scheda",
+    "collecting": "Raccolta dei campioni …",
+    "live": "Live · ogni 5 s",
+    "paused": "In pausa",
+    "failed": "Aggiornamento fallito · dati obsoleti",
+    "pause": "Pausa",
+    "resume": "Riprendi",
+    "refresh": "Aggiorna",
+    "shortcuts": "Accesso rapido",
+    "diagnosticsHint": "Verifica connessione radio ed errori",
+    "logHint": "Consulta gli eventi",
+    "updatesHint": "Gestisci firmware e WebUI"
+},
   events: {
     ccu_connected: 'CCU connesso',
     ccu_disconnected: 'CCU disconnesso',

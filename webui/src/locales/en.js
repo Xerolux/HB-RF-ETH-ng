@@ -1,4 +1,35 @@
 export default {
+  updateCenter: {
+    "comparison": "Version comparison",
+    "availableVersion": "Available version",
+    "loadError": "Could not load status. Displayed data may be out of date.",
+    "retry": "Retry",
+    "searchHint": "Search for updates to see the available version for the selected channel.",
+    "updateReady": "Update available – review changes before installing.",
+    "current": "Up to date at the last successful check.",
+    "installation": "Installation",
+    "prepare": "Prepare",
+    "download": "Download",
+    "verify": "Verify",
+    "activate": "Activate",
+    "firmwareFinish": "After verification the device restarts, briefly interrupting the connection.",
+    "webuiFinish": "After activation reload the page to open the new interface."
+},
+  dashboard: {
+    "history": "Session history",
+    "historyHint": "Last 60 samples · every 5 seconds · this tab only",
+    "collecting": "Collecting samples …",
+    "live": "Live · every 5 s",
+    "paused": "Paused",
+    "failed": "Refresh failed · data is stale",
+    "pause": "Pause",
+    "resume": "Resume",
+    "refresh": "Refresh",
+    "shortcuts": "Quick access",
+    "diagnosticsHint": "Inspect radio connection and errors",
+    "logHint": "Review device events",
+    "updatesHint": "Manage firmware and WebUI"
+},
   events: {
     ccu_connected: 'CCU connected',
     ccu_disconnected: 'CCU disconnected',

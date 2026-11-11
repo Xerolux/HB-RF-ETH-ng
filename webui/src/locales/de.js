@@ -1,4 +1,35 @@
 export default {
+  updateCenter: {
+    "comparison": "Versionsvergleich",
+    "availableVersion": "Verfügbare Version",
+    "loadError": "Status konnte nicht geladen werden. Angezeigte Daten können veraltet sein.",
+    "retry": "Erneut versuchen",
+    "searchHint": "Eine Updatesuche zeigt die verfügbare Version für den gewählten Kanal.",
+    "updateReady": "Update verfügbar – Änderungen vor der Installation prüfen.",
+    "current": "Auf dem Stand der letzten erfolgreichen Suche.",
+    "installation": "Installation",
+    "prepare": "Vorbereiten",
+    "download": "Laden",
+    "verify": "Prüfen",
+    "activate": "Aktivieren",
+    "firmwareFinish": "Nach dem Prüfen startet das Gerät neu. Die Verbindung wird dabei kurz unterbrochen.",
+    "webuiFinish": "Nach der Aktivierung die Seite neu laden, um die neue Oberfläche zu öffnen."
+},
+  dashboard: {
+    "history": "Sitzungsverlauf",
+    "historyHint": "Letzte 60 Messpunkte · alle 5 Sekunden · nur in diesem Tab",
+    "collecting": "Sammle Messwerte …",
+    "live": "Live · alle 5 s",
+    "paused": "Pausiert",
+    "failed": "Aktualisierung fehlgeschlagen · Daten veraltet",
+    "pause": "Pause",
+    "resume": "Fortsetzen",
+    "refresh": "Aktualisieren",
+    "shortcuts": "Schnellzugriffe",
+    "diagnosticsHint": "Funkverbindung und Fehler prüfen",
+    "logHint": "Ereignisse nachvollziehen",
+    "updatesHint": "Firmware und WebUI verwalten"
+},
   events: {
     ccu_connected: 'CCU verbunden',
     ccu_disconnected: 'CCU getrennt',

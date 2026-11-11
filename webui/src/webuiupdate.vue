@@ -33,6 +33,8 @@
       </article>
     </section>
 
+    <UpdateOverview target="webui" :installed="installedVersion" />
+
     <div class="content-grid">
       <section class="update-card">
         <div class="card-header">
@@ -79,7 +81,7 @@
           <BAlert v-if="searchMessage.text" :variant="searchMessage.variant" :model-value="true">
             {{ searchMessage.text }}
           </BAlert>
-          <p v-if="!searchMessage.text" class="muted-text">{{ t('firmware.neverChecked') }}</p>
+
 
           <p v-if="updateStatus.lastCheck" class="muted-text">
             {{ t('firmware.lastCheck') }}: {{ formatTimestamp(updateStatus.lastCheck) }}
@@ -106,13 +108,10 @@
                but the browser needs a reload to pick up the new assets. -->
           <div v-if="updateStatus.webuiUpdateAvailable || webuiInstallVisible || webuiInstallDone" class="install-panel">
             <BButton v-if="!installBusy && !webuiInstallDone" variant="primary" class="action-btn"
-                     :disabled="checking || installStarting" @click="openInstallConfirm">
+                     :disabled="checking || installStarting || statusLoadError || channel !== updateStatus.channel" @click="openInstallConfirm">
               <AppIcon name="download" /> {{ t('firmware.installNow') }}
             </BButton>
-            <div v-if="installBusy" class="progress-panel">
-              <div class="progress-copy"><span>{{ installStateText }}</span><strong>{{ installProgressPct }}%</strong></div>
-              <div class="track"><span :style="{ width: installProgressPct + '%' }"></span></div>
-            </div>
+            <InstallProgress v-if="installBusy" :install="updateStatus.install" />
             <BAlert v-if="installConnectionLost" variant="warning" :model-value="true">
               {{ t('firmware.installConnectionLost') }}
             </BAlert>
@@ -180,7 +179,7 @@
           <div class="changelog-box">
             <h4>{{ t('firmware.installChangelogTitle') }}</h4>
             <p v-if="notesLoading" class="muted-text">{{ t('firmware.installChangelogLoading') }}</p>
-            <pre v-else-if="releaseNotes" class="changelog-text">{{ releaseNotes }}</pre>
+            <ReleaseNotes v-else-if="releaseNotes" :text="releaseNotes" />
             <p v-else class="muted-text">
               {{ t('firmware.installChangelogMissing') }}
               <a :href="updateStatus.notesUrl" target="_blank" rel="noopener noreferrer">{{ t('firmware.releaseNotes') }}</a>
@@ -209,6 +208,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from './stores.js'
+import UpdateOverview from './components/UpdateOverview.vue'
+import InstallProgress from './components/InstallProgress.vue'
+import ReleaseNotes from './components/ReleaseNotes.vue'
 import { useUpdateSearch } from './composables/useUpdateSearch'
 
 const { t } = useI18n()
@@ -217,11 +219,13 @@ const { t } = useI18n()
 const {
   channel,
   checking,
+  statusLoadError,
   updateStatus,
   triggerMessage,
   resultMessage,
   checkForUpdates,
   loadUpdateStatus,
+  resumeInstallPolling,
   scheduleInstall,
   cancelScheduledInstall,
   stopPolling,
@@ -292,32 +296,24 @@ const showInstallConfirm = ref(false)
 const installStarting = ref(false)
 const notesLoading = ref(false)
 const releaseNotes = ref('')
+watch(showInstallConfirm, visible => { if (!visible) releaseNotes.value = '' })
 
 const webuiInstall = computed(() => (
   updateStatus.value.install.target === 'webui'
     ? updateStatus.value.install
     : { state: 'idle', progress: 0, error: '' }
 ))
-const installProgressPct = computed(() => webuiInstall.value.progress || 0)
 const installError = computed(() => webuiInstall.value.error || '')
 const webuiInstallVisible = computed(() =>
   ['preparing', 'downloading', 'verifying', 'error'].includes(webuiInstall.value.state))
 const webuiInstallDone = computed(() => webuiInstall.value.state === 'success')
 
-const installStateText = computed(() => {
-  switch (webuiInstall.value.state) {
-    case 'preparing': return t('firmware.installPreparing')
-    case 'downloading': return t('firmware.installDownloading')
-    case 'verifying': return t('firmware.installVerifying')
-    default: return ''
-  }
-})
-
 const openInstallConfirm = async () => {
   showInstallConfirm.value = true
   releaseNotes.value = ''
   notesLoading.value = true
-  releaseNotes.value = await fetchReleaseNotes(updateStatus.value.latestWebui) || ''
+  const notes = await fetchReleaseNotes(updateStatus.value.latestWebui)
+  if (showInstallConfirm.value) releaseNotes.value = notes || ''
   notesLoading.value = false
 }
 
@@ -351,7 +347,8 @@ watch(() => updateStatus.value.install.state, state => {
   }
 })
 
-onBeforeUnmount(stopPolling)
+let pageMounted = true
+onBeforeUnmount(() => { pageMounted = false; stopPolling() })
 
 const WEBUI_API_VERSION = typeof __WEBUI_API_VERSION__ !== 'undefined' ? __WEBUI_API_VERSION__ : 1
 const EMBEDDED_WEBUI_VERSION = typeof __WEBUI_VERSION__ !== 'undefined' ? __WEBUI_VERSION__ : ''
@@ -487,7 +484,7 @@ const installManual = async () => {
 onMounted(async () => {
   await refreshCachedStatus()
   // Show whatever the device already knows, without starting a search.
-  try { await loadUpdateStatus() } catch { /* Karte zeigt dann "noch keine Suche". */ }
+  try { await loadUpdateStatus(); if (pageMounted) resumeInstallPolling() } catch { /* Shared overview displays the load failure. */ }
 })
 </script>
 
@@ -529,6 +526,5 @@ onMounted(async () => {
 .modal-card h4 { margin:0 0 var(--space-2); font-size:var(--fs-md); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; }
 .changelog-box { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-3); background:var(--color-bg-alt); }
-.changelog-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono); font-size:var(--fs-xs); max-height:40vh; overflow-y:auto; }
 @media(max-width:900px){ .status-grid,.content-grid { grid-template-columns:1fr; } }
 </style>

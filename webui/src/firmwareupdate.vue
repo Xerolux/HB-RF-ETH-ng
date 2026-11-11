@@ -11,6 +11,8 @@
       </div>
     </section>
 
+    <UpdateOverview target="firmware" :installed="sysInfoStore.currentVersion" />
+
     <div class="content-grid">
       <section class="update-card">
         <div class="card-header">
@@ -59,7 +61,7 @@
           <BAlert v-if="checkMessage.text" :variant="checkMessage.variant" :model-value="true">
             {{ checkMessage.text }}
           </BAlert>
-          <p v-if="!checkMessage.text" class="muted-text">{{ t('firmware.neverChecked') }}</p>
+
 
           <p v-if="updateStatus.lastCheck" class="muted-text">
             {{ t('firmware.lastCheck') }}: {{ formatTimestamp(updateStatus.lastCheck) }}
@@ -85,16 +87,10 @@
                its own manifest, verifies SHA-256 and reboots to activate. -->
           <div v-if="updateStatus.firmwareUpdateAvailable || installPanelVisible" class="install-panel">
             <BButton v-if="!installBusy" variant="primary" class="action-btn"
-                     :disabled="checking || installStarting" @click="openInstallConfirm">
+                     :disabled="checking || installStarting || statusLoadError || channel !== updateStatus.channel" @click="openInstallConfirm">
               <AppIcon name="download" /> {{ t('firmware.installNow') }}
             </BButton>
-            <template v-else>
-              <div class="progress-container">
-                <div class="progress-bar"><div class="progress-value" :style="{ width: installProgressPct + '%' }"></div></div>
-                <span class="progress-label">{{ installProgressPct }}%</span>
-              </div>
-              <p class="muted-text">{{ installStateText }}</p>
-            </template>
+            <InstallProgress v-else :install="updateStatus.install" />
             <BAlert v-if="installConnectionLost" variant="warning" :model-value="true">
               {{ t('firmware.installConnectionLost') }}
             </BAlert>
@@ -234,7 +230,7 @@
           <div class="changelog-box">
             <h4>{{ t('firmware.installChangelogTitle') }}</h4>
             <p v-if="notesLoading" class="muted-text">{{ t('firmware.installChangelogLoading') }}</p>
-            <pre v-else-if="releaseNotes" class="changelog-text">{{ releaseNotes }}</pre>
+            <ReleaseNotes v-else-if="releaseNotes" :text="releaseNotes" />
             <p v-else class="muted-text">
               {{ t('firmware.installChangelogMissing') }}
               <a :href="updateStatus.notesUrl" target="_blank" rel="noopener noreferrer">{{ t('firmware.releaseNotes') }}</a>
@@ -262,6 +258,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFirmwareUpdateStore, useRestartUiStore, useSysInfoStore, useUiStore, FLASH_PAUSE_SECONDS } from './stores.js'
+import UpdateOverview from './components/UpdateOverview.vue'
+import InstallProgress from './components/InstallProgress.vue'
+import ReleaseNotes from './components/ReleaseNotes.vue'
 import { useUpdateSearch } from './composables/useUpdateSearch'
 
 const WEBUI_IMAGE_SIZE = 0x50000
@@ -280,12 +279,14 @@ const uiStore = useUiStore()
 const {
   channel,
   checking,
+  statusLoadError,
   updateStatus,
   updateConfig,
   triggerMessage,
   resultMessage,
   checkForUpdates,
   loadUpdateStatus,
+  resumeInstallPolling,
   loadUpdateConfig,
   saveUpdateConfig,
   scheduleInstall,
@@ -425,30 +426,21 @@ const showInstallConfirm = ref(false)
 const installStarting = ref(false)
 const notesLoading = ref(false)
 const releaseNotes = ref('')
+watch(showInstallConfirm, visible => { if (!visible) releaseNotes.value = '' })
 
 const firmwareInstall = computed(() => (
   updateStatus.value.install.target === 'firmware' ? updateStatus.value.install : { state: 'idle', progress: 0, error: '' }
 ))
-const installProgressPct = computed(() => firmwareInstall.value.progress || 0)
 const installError = computed(() => firmwareInstall.value.error || '')
 const installPanelVisible = computed(() =>
   ['downloading', 'verifying', 'preparing', 'finalizing', 'error'].includes(firmwareInstall.value.state))
-
-const installStateText = computed(() => {
-  switch (firmwareInstall.value.state) {
-    case 'preparing': return t('firmware.installPreparing')
-    case 'downloading': return t('firmware.installDownloading')
-    case 'verifying': return t('firmware.installVerifying')
-    case 'finalizing': return t('firmware.installFinalizing')
-    default: return ''
-  }
-})
 
 const openInstallConfirm = async () => {
   showInstallConfirm.value = true
   releaseNotes.value = ''
   notesLoading.value = true
-  releaseNotes.value = await fetchReleaseNotes(updateStatus.value.latestFirmware) || ''
+  const notes = await fetchReleaseNotes(updateStatus.value.latestFirmware)
+  if (showInstallConfirm.value) releaseNotes.value = notes || ''
   notesLoading.value = false
 }
 
@@ -513,7 +505,8 @@ watch(() => updateStatus.value.install.state, state => {
   }
 })
 
-onBeforeUnmount(stopPolling)
+let pageMounted = true
+onBeforeUnmount(() => { pageMounted = false; stopPolling() })
 
 const file = ref(null)
 const fileInput = ref(null)
@@ -602,7 +595,7 @@ const uploadFirmware = async () => {
 onMounted(async () => {
   try { await sysInfoStore.update() } catch { /* Anzeige bleibt mit Platzhalter nutzbar. */ }
   // Show whatever the device already knows, without starting a search.
-  try { await loadUpdateStatus() } catch { /* Karte zeigt dann "noch keine Suche". */ }
+  try { await loadUpdateStatus(); if (pageMounted) resumeInstallPolling() } catch { /* Shared overview displays the load failure. */ }
   // Load the automatic-update configuration (no search request is triggered;
   // firmware without the endpoint leaves the card in its unavailable state).
   await loadUpdateConfig()
@@ -650,6 +643,5 @@ onMounted(async () => {
 .modal-card h4 { margin:0 0 var(--space-2); font-size:var(--fs-md); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; }
 .changelog-box { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:var(--space-3); background:var(--color-bg-alt); }
-.changelog-text { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-mono); font-size:var(--fs-xs); max-height:40vh; overflow-y:auto; }
 @media(max-width:900px){ .content-grid { grid-template-columns:1fr; } }
 </style>

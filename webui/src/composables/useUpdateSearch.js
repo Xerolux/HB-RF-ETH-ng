@@ -98,6 +98,11 @@ const cooldownRemaining = ref(0)
 // disabled rather than guessing defaults.
 const updateConfig = ref(null)
 const installConnectionLost = ref(false)
+const statusLoading = ref(false)
+const statusLoadError = ref(false)
+const statusLoaded = ref(false)
+let statusRequest = null
+let pollingEpoch = 0
 let pollTimer = null
 let cooldownTimer = null
 
@@ -119,6 +124,7 @@ const setCooldown = seconds => {
 }
 
 const stopPolling = () => {
+  pollingEpoch++
   if (pollTimer) {
     clearTimeout(pollTimer)
     pollTimer = null
@@ -131,28 +137,44 @@ const stopPolling = () => {
   checking.value = false
 }
 
-const loadUpdateStatus = async () => {
-  const response = await axios.get(`/api/update/status?t=${Date.now()}`, {
-    timeout: 8000,
-    silent: true
-  })
-  if (response.data) {
-    installConnectionLost.value = false
-    // Older firmware has no "install" or "schedule" block; merge with
-    // defaults so template access never hits undefined.
-    updateStatus.value = {
-      ...emptyStatus(),
-      ...response.data,
-      install: { ...emptyInstall(), ...(response.data.install || {}) },
-      schedule: { ...emptySchedule(), ...(response.data.schedule || {}) }
+// Concurrent consumers reuse one request; no additional device-side work.
+const loadUpdateStatus = () => {
+  if (statusRequest) return statusRequest
+  statusLoading.value = true
+  statusRequest = (async () => {
+    try {
+      const response = await axios.get(`/api/update/status?t=${Date.now()}`, {
+        timeout: 8000,
+        silent: true
+      })
+      if (response.data) {
+        installConnectionLost.value = false
+        statusLoaded.value = true
+        statusLoadError.value = false
+        // Older firmware has no "install" or "schedule" block; merge with
+        // defaults so template access never hits undefined.
+        updateStatus.value = {
+          ...emptyStatus(),
+          ...response.data,
+          install: { ...emptyInstall(), ...(response.data.install || {}) },
+          schedule: { ...emptySchedule(), ...(response.data.schedule || {}) }
+        }
+        // Entering the page while a cooldown is active (firmware that reports it):
+        // adopt the device's remaining seconds instead of guessing.
+        if (response.data.cooldownRemainingSec > 0 && cooldownRemaining.value === 0) {
+          setCooldown(response.data.cooldownRemainingSec)
+        }
+      }
+      return response.data
+    } catch (error) {
+      statusLoadError.value = true
+      throw error
+    } finally {
+      statusLoading.value = false
+      statusRequest = null
     }
-    // Entering the page while a cooldown is active (firmware that reports it):
-    // adopt the device's remaining seconds instead of guessing.
-    if (response.data.cooldownRemainingSec > 0 && cooldownRemaining.value === 0) {
-      setCooldown(response.data.cooldownRemainingSec)
-    }
-  }
-  return response.data
+  })()
+  return statusRequest
 }
 
 // ---------------------------------------------------------------------------
@@ -175,10 +197,11 @@ const stopInstallPolling = () => {
 
 const scheduleInstallPoll = () => {
   if (installPollTimer) return
-  installPollTimer = setTimeout(pollInstall, INSTALL_POLL_INTERVAL_MS)
+  const epoch = pollingEpoch
+  installPollTimer = setTimeout(() => pollInstall(epoch), INSTALL_POLL_INTERVAL_MS)
 }
 
-const pollInstall = async () => {
+const pollInstall = async epoch => {
   installPollTimer = null
   try {
     await loadUpdateStatus()
@@ -186,6 +209,7 @@ const pollInstall = async () => {
   } catch {
     installPollErrors++
   }
+  if (epoch !== pollingEpoch) return
   if (installPollErrors >= INSTALL_POLL_MAX_CONSECUTIVE_ERRORS) {
     // Keep the last device state: losing contact does not prove the install
     // failed, and must not enable a second installation request.
@@ -316,6 +340,7 @@ const cancelScheduledInstall = async () => {
 
 const checkForUpdates = async () => {
   if (checking.value) return
+  const epoch = pollingEpoch
   checking.value = true
   triggerOutcome.value = ''
   safeLocal.set(CHANNEL_STORAGE_KEY, channel.value)
@@ -326,6 +351,7 @@ const checkForUpdates = async () => {
       { channel: channel.value },
       { timeout: 8000, silent: true }
     )
+    if (epoch !== pollingEpoch) return
     const outcome = response.data?.outcome || 'accepted'
     if (outcome !== 'accepted') {
       // Refused before any network activity: no result is coming, so there is
@@ -353,6 +379,7 @@ const checkForUpdates = async () => {
   // outcome is polled rather than awaited on the request.
   const deadline = Date.now() + POLL_TIMEOUT_MS
   const poll = async () => {
+    if (epoch !== pollingEpoch) return
     let status = null
     try {
       status = await loadUpdateStatus()
@@ -360,6 +387,7 @@ const checkForUpdates = async () => {
       // A transient read failure is not a failed search; keep polling until the
       // deadline and let the device's own state have the last word.
     }
+    if (epoch !== pollingEpoch) return
     if ((status && status.state !== 'running') || Date.now() >= deadline) {
       checking.value = false
       return
@@ -395,6 +423,7 @@ export function useUpdateSearch(t) {
   // page-specific wording for the two success cases.
   const resultMessage = describe => computed(() => {
     const status = updateStatus.value
+    if (checking.value || statusLoadError.value || status.channel !== channel.value) return { variant: '', text: '' }
     if (status.lastSkipReason) {
       return { variant: 'warning', text: t('firmware.checkSkipped', { reason: localizeSkipReason(status.lastSkipReason, t) }) }
     }
@@ -408,6 +437,15 @@ export function useUpdateSearch(t) {
   return {
     channel,
     checking,
+    statusLoading,
+    statusLoadError,
+    statusLoaded,
+    resumeInstallPolling: () => {
+      if (INSTALL_ACTIVE_STATES.includes(updateStatus.value.install.state) && !installPollTimer) {
+        installPollErrors = 0
+        scheduleInstallPoll()
+      }
+    },
     updateStatus,
     updateConfig,
     triggerOutcome,

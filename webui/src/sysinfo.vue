@@ -22,6 +22,14 @@
       </div>
     </section>
 
+    <div class="dashboard-toolbar" role="status">
+      <span :class="{ 'text-danger': refreshFailed }"><span class="freshness-dot" :class="{ stale: refreshFailed || paused }"></span>{{ refreshFailed ? t('dashboard.failed') : paused ? t('dashboard.paused') : t('dashboard.live') }}<span v-if="lastRefresh"> · {{ lastRefresh.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span></span>
+      <div class="dashboard-controls">
+        <button class="btn btn-sm btn-secondary" :aria-pressed="paused" @click="togglePolling"><AppIcon :name="paused ? 'refresh' : 'time'" /> {{ paused ? t('dashboard.resume') : t('dashboard.pause') }}</button>
+        <button class="btn btn-sm btn-secondary" :disabled="refreshing" @click="refresh"><AppIcon name="refresh" :class="{ 'refresh-spin': refreshing }" /> {{ t('dashboard.refresh') }}</button>
+      </div>
+    </div>
+
     <div v-if="isLoading" class="stats-grid compact">
       <div v-for="index in 6" :key="index" class="card-glass skeleton-block skeleton"></div>
     </div>
@@ -86,6 +94,10 @@
         </article>
       </section>
 
+      <DashboardActivity :samples="samples" />
+      <nav v-if="loginStore.isLoggedIn" class="quick-actions" :aria-label="t('dashboard.shortcuts')">
+        <RouterLink v-for="item in shortcuts" :key="item.to" :to="item.to" class="card-glass quick-action"><span class="icon-badge soft"><AppIcon :name="item.icon" /></span><div><strong>{{ t(item.title) }}</strong><p>{{ t(item.description) }}</p></div><AppIcon name="arrowRight" /></RouterLink>
+      </nav>
       <section class="info-grid">
         <article class="card-glass card-hover">
           <div class="card-section-title">
@@ -250,13 +262,45 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSysInfoStore, useUiStore, useLoginStore } from './stores.js'
+import DashboardActivity from './components/DashboardActivity.vue'
 import { copyToClipboard } from './composables/useClipboard'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const sysInfoStore = useSysInfoStore()
 const uiStore = useUiStore()
 const loginStore = useLoginStore()
 const isLoading = ref(true)
+const refreshing = ref(false)
+const refreshFailed = ref(false)
+const paused = ref(false)
+const lastRefresh = ref(null)
+const samples = ref([])
+const shortcuts = [
+  { to: '/diagnostics', icon: 'radio', title: 'nav.diagnostics', description: 'dashboard.diagnosticsHint' },
+  { to: '/systemlog', icon: 'logs', title: 'nav.systemlog', description: 'dashboard.logHint' },
+  { to: '/updates/firmware', icon: 'firmware', title: 'nav.updates', description: 'dashboard.updatesHint' }
+]
+const refresh = async () => {
+  if (refreshing.value || !mounted) return
+  refreshing.value = true
+  try {
+    await sysInfoStore.update()
+    if (!mounted) return
+    lastRefresh.value = new Date()
+    refreshFailed.value = false
+    samples.value = [...samples.value, { time: Date.now(), cpu: Number(sysInfoStore.cpuUsage), memory: Number(sysInfoStore.memoryUsage) }].slice(-60)
+  } catch {
+    if (mounted) refreshFailed.value = true
+  } finally {
+    refreshing.value = false
+    isLoading.value = false
+  }
+}
+const togglePolling = () => {
+  paused.value = !paused.value
+  if (paused.value) stopPolling()
+  else startPolling()
+}
 
 const ethernetStatus = computed(() => {
   if (!sysInfoStore.ethernetConnected) return t('sysinfo.disconnected')
@@ -305,25 +349,12 @@ let mounted = true
 let pollStarting = false
 
 const startPolling = async () => {
-  // pollStarting is set synchronously before the await below: two rapid
-  // visibility flips (e.g. iOS lock/unlock) would both pass an
-  // updateTimer-only guard while the first caller is still awaiting, and the
-  // second interval assignment would orphan the first — an interval that
-  // keeps polling after unmount for the rest of the session.
-  if (updateTimer || pollStarting) return
+  if (updateTimer || pollStarting || paused.value || document.hidden) return
   pollStarting = true
-  try {
-    await sysInfoStore.update()
-  } catch (e) {
-    console.warn('System info poll failed:', e.response?.status || e.message)
-  } finally {
-    isLoading.value = false
-    pollStarting = false
-  }
-  if (!mounted || updateTimer) return
-  updateTimer = setInterval(() => {
-    sysInfoStore.update().catch(() => { /* logged in the store; avoid unhandled rejection per tick */ })
-  }, 5000)
+  await refresh()
+  pollStarting = false
+  if (!mounted || updateTimer || paused.value || document.hidden) return
+  updateTimer = setInterval(refresh, 5000)
 }
 
 const stopPolling = () => {

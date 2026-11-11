@@ -76,3 +76,37 @@ test('a recovered status read clears the lost-connection warning', async () => {
   await f.api.loadUpdateStatus()
   assert.equal(f.api.installConnectionLost.value, false)
 })
+
+test('concurrent status consumers share one request and load flags recover', async () => {
+  const f = fixture()
+  const first = f.api.loadUpdateStatus()
+  assert.equal(f.api.statusLoading.value, true)
+  assert.strictEqual(f.api.loadUpdateStatus(), first)
+  await assert.rejects(first)
+  assert.equal(f.api.statusLoading.value, false)
+  assert.equal(f.api.statusLoadError.value, true)
+  assert.equal(f.api.statusLoaded.value, false)
+  f.online()
+  await f.api.loadUpdateStatus()
+  assert.equal(f.api.statusLoadError.value, false)
+  assert.equal(f.api.statusLoaded.value, true)
+})
+
+test('an active installation resumes with a single timer', async () => {
+  const f = fixture()
+  f.api.resumeInstallPolling()
+  f.api.resumeInstallPolling()
+  assert.equal(f.timers.size, 1)
+  f.api.stopPolling()
+  assert.equal(f.timers.size, 0)
+})
+
+test('leaving during an in-flight install poll does not restart polling', async () => {
+  const f = fixture()
+  f.online()
+  f.api.resumeInstallPolling()
+  const pending = f.tick()
+  f.api.stopPolling()
+  await pending
+  assert.equal(f.timers.size, 0)
+})
