@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### WebUI 1.1.1-Beta.2
+- Wrap the monitoring page's password fields in forms; Chrome logged a verbose DOM hint for every password input outside a form, and Enter could trigger implicit submissions.
+- Correct the `login.json` request schema in the API documentation (username and password).
+
 ## [2.3.1] - 2026-11-11
 
 First stable release of the 2.3.x line. It promotes 2.3.0-Beta.4 after
