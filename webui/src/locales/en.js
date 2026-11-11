@@ -47,6 +47,13 @@ export default {
     login: 'Login',
     logout: 'Logout',
     toggleTheme: 'Toggle theme',
+    otaState: {
+      preparing: 'OTA preparing…',
+      verifying: 'OTA verifying…',
+      finalizing: 'OTA finalizing…',
+      success: 'OTA finished',
+      error: 'OTA failed'
+    },
     language: 'Language',
     mainMenu: 'Main menu',
     groupOverview: 'Overview',
@@ -690,6 +697,7 @@ export default {
       eventCcuConnected: 'CCU connected',
       eventCcuDisconnected: 'CCU disconnected',
       eventLowHeap: 'Low free memory',
+      eventCrashTranscript: 'Crash during previous boot (transcript available)',
       webhookSection: 'Webhook',
       webhookUrl: 'URL',
       webhookSecret: 'Secret',

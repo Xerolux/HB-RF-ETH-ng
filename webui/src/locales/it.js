@@ -47,6 +47,13 @@ export default {
     login: 'Accedi',
     logout: 'Esci',
     toggleTheme: 'Cambia tema',
+    otaState: {
+      preparing: 'OTA in preparazione…',
+      verifying: 'OTA in verifica…',
+      finalizing: 'OTA in finalizzazione…',
+      success: 'OTA completato',
+      error: 'OTA non riuscito'
+    },
     language: 'Lingua',
     mainMenu: 'Menu principale',
     groupOverview: 'Panoramica',
@@ -691,6 +698,7 @@ webuiUpdate: {
       eventCcuConnected: 'CCU connessa',
       eventCcuDisconnected: 'CCU disconnessa',
       eventLowHeap: 'Memoria libera insufficiente',
+      eventCrashTranscript: 'Arresto anomalo all’avvio precedente (trascrizione disponibile)',
       webhookSection: 'Webhook',
       webhookUrl: 'URL',
       webhookSecret: 'Secret',

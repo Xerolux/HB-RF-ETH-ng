@@ -611,7 +611,8 @@ const NOTIFY_EVENTS = [
   { bit: 1 << 7,  label: 'monitoring.notify.eventRestart' },
   { bit: 1 << 8,  label: 'monitoring.notify.eventCcuConnected' },
   { bit: 1 << 9,  label: 'monitoring.notify.eventCcuDisconnected' },
-  { bit: 1 << 10, label: 'monitoring.notify.eventLowHeap' }
+  { bit: 1 << 10, label: 'monitoring.notify.eventLowHeap' },
+  { bit: 1 << 11, label: 'monitoring.notify.eventCrashTranscript' }
 ]
 
 const availableNotifyEvents = computed(() =>

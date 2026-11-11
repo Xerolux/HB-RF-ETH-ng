@@ -47,6 +47,13 @@ export default {
     login: 'Anmelden',
     logout: 'Abmelden',
     toggleTheme: 'Design wechseln',
+    otaState: {
+      preparing: 'OTA wird vorbereitet…',
+      verifying: 'OTA wird geprüft…',
+      finalizing: 'OTA wird abgeschlossen…',
+      success: 'OTA abgeschlossen',
+      error: 'OTA fehlgeschlagen'
+    },
     language: 'Sprache',
     mainMenu: 'Hauptmenü',
     groupOverview: 'Übersicht',
@@ -691,6 +698,7 @@ export default {
       eventCcuConnected: 'CCU verbunden',
       eventCcuDisconnected: 'CCU getrennt',
       eventLowHeap: 'Wenig freier Speicher',
+      eventCrashTranscript: 'Absturz beim letzten Start (Transcript verfügbar)',
       webhookSection: 'Webhook',
       webhookUrl: 'URL',
       webhookSecret: 'Secret',
