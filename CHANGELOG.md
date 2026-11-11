@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-11-11
+
+First stable release of the 2.3.x line. It promotes 2.3.0-Beta.4 after
+validation on a physical device (OTA install, reboot and CCU reconnect).
+
+### Fixed
+- Update scheduler: hold the NVS reservation through reads, writes and commits; report failed persistence instead of falsely confirming success; stop install status polling after 30 connection errors with a localized warning.
+- Raw-uart: stale reconnects now get a distinct endpoint identifier so the OpenCCU 1.26 driver detects the new session, sets `session_lost` and recovers its RF stack (#480).
+- WebFlasher: download-based installs work again; they failed with "imageCache is not defined" since the flasher launched (#490, fixes #483).
+
+### Changed
+- WebUI 1.1.1-Beta.1 (API 1; minimum firmware 2.3.0-Beta.1).
+- Dependency refresh: espressif/lan87xx 1.1.0, espressif/mqtt, vue 3.5.45, vue-i18n 11.4.18, vite 8.3.8, sass 1.108.2 and other webui/CI updates (#481, #484–#489).
+
 ## [2.3.0-Beta.4] - 2026-11-11
 
 ### Fixed
