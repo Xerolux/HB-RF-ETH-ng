@@ -120,8 +120,20 @@ void event_journal_flush(void)
     xSemaphoreTake(s_mutex, portMAX_DELAY);
     if (!s_dirty) { xSemaphoreGive(s_mutex); return; }
 
-    event_journal_entry_t tmp[EVENT_JOURNAL_CAPACITY];
+    // The staging buffer is ~4.5 KB (40 entries). It MUST NOT live on the
+    // caller's stack: flush() runs on the heap_watchdog task, and the array
+    // on its stack is what overflowed that task twice (2.4.0-Beta.2/3,
+    // caught live by the crash transcript). Heap-allocate instead; on
+    // allocation failure the dirty flag stays set and the next flush retries.
     const size_t n = s_count;
+    event_journal_entry_t *tmp =
+        (event_journal_entry_t *)malloc(n * sizeof(event_journal_entry_t));
+    if (!tmp)
+    {
+        xSemaphoreGive(s_mutex);
+        ESP_LOGW(TAG, "Journal flush deferred: no heap for the staging buffer");
+        return;
+    }
     // Copy newest-first into oldest-first blob order.
     for (size_t i = 0; i < n; i++)
         tmp[i] = s_ring[n - 1 - i];
@@ -134,6 +146,7 @@ void event_journal_flush(void)
         if (err == ESP_OK) err = nvs_commit(handle);
         nvs_close(handle);
     }
+    free(tmp);
     if (err == ESP_OK) s_dirty = false;
     else ESP_LOGW(TAG, "Journal persist failed: %s", esp_err_to_name(err));
     xSemaphoreGive(s_mutex);

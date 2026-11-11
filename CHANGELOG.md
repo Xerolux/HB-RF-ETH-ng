@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0-Beta.4] - 2026-11-11
+
+### Fixed
+- Root cause of the repeated `heap_watchdog` stack overflows (Beta.1/2/3): the event-journal flush staged its ~4.5 KB NVS blob in a stack array inside the task. The buffer is heap-allocated now (allocation failure defers the flush), the task stack stays at 8192 bytes as defensive headroom. Beta.3's OTA rollback to Beta.2 worked exactly as designed.
+
 ## [2.4.0-Beta.3] - 2026-11-11
 
 ### Fixed
