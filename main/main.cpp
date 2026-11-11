@@ -349,6 +349,10 @@ void app_main()
     // else - no task, no timer, no network activity until someone asks.
     update_check_init();
     update_install_init();
+    // esp_http_client logs a WARN for every EAGAIN (errno 11) retry while
+    // streaming release artifacts over TLS - dozens per download, all benign.
+    // Errors still surface; only the retry noise is silenced.
+    esp_log_level_set("HTTP_CLIENT", ESP_LOG_ERROR);
     // Scheduled automatic updates (stages B2/C/D): hourly timer plus one
     // first-check shot 10-70 min out, both in "off" mode inert. Init only
     // bumps the boot counter, loads the NVS-backed pending/stage state and
