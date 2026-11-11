@@ -153,6 +153,11 @@ jobs:
             git commit -m "chore: bump WebUI version to $VERSION"
           fi
           git tag -a "$TAG" -m "WebUI release $TAG"
+          # main may have advanced while this workflow built. Rebase the
+          # metadata commit on the live head before pushing so a concurrent
+          # push cannot fail the release.
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
           git push origin "$TAG"
 

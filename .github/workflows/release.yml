@@ -259,6 +259,12 @@ jobs:
           if [ -f build/partition_table/partition-table.bin ]; then
             cp build/partition_table/partition-table.bin release/partitions.bin
           fi
+          # Complete the esptool flash set: users flashing manually over
+          # serial need the initial OTA partition marker at 0xd000
+          # (requested in #483 discussion).
+          if [ -f build/ota_data_initial.bin ]; then
+            cp build/ota_data_initial.bin release/ota_data_initial.bin
+          fi
           cp version.txt release/firmware-version.txt
           cp webui/compatibility.json release/webui-compatibility.json
           printf '%s\n' "$WEBUI_VERSION" > release/webui-version.txt
@@ -303,6 +309,11 @@ jobs:
             git commit -m "chore: bump firmware version to $VERSION"
           fi
           git tag -a "$TAG" -m "Firmware release $TAG"
+          # main may have advanced while this workflow built (today: a
+          # concurrent docs push raced this step and failed the release).
+          # Rebase the metadata commit on the live head before pushing.
+          git fetch origin main
+          git rebase origin/main
           git push origin HEAD:main
           git push origin "$TAG"
 
@@ -317,6 +328,7 @@ jobs:
             release/webui_*.bin
             release/bootloader.bin
             release/partitions.bin
+            release/ota_data_initial.bin
             release/SHA256SUMS.txt
             release/firmware-version.txt
             release/webui-version.txt

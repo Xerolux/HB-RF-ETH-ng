@@ -1,0 +1,44 @@
+name: Dependabot auto-merge
+
+# Green patch/minor dependency bumps merge themselves; majors stay manual.
+# Lockfile-touching npm bumps serialize naturally: as soon as one merges,
+# the others conflict and Dependabot rebases them on its next cycle.
+
+on:
+  pull_request_target:
+    branches: [main]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number || github.event.check_suite.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    # check_suite events fire for every completed run on every branch; only
+    # proceed for the pull request's own head sha.
+    if: >
+      github.actor == 'dependabot[bot]' &&
+      (github.event_name == 'pull_request_target' ||
+       github.event.check_suite.head_sha == github.event.pull_request.head.sha)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          skip-commit-verification: true
+
+      - name: Enable auto-merge for patch and minor updates
+        if: >
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
