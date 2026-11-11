@@ -1864,11 +1864,12 @@ esp_err_t monitoring_init(const monitoring_config_t *config, SysInfo* sysInfo)
 
     // Heap watchdog runs regardless of monitoring config - it's a safety
     // net for the whole firmware, not a monitoring feature.
-    // 6144 bytes: 4096 left under 2 kB of headroom (taskStacks) and the
-    // 2.4.0-Beta.1 schedule check overflowed it on its first localtime_r()
-    // call. The static frames in check_scheduled_restart() removed the big
-    // consumers; the extra headroom keeps future additions safe.
-    BaseType_t wd_ret = xTaskCreate(heap_watchdog_task, "heap_watchdog", 6144, NULL, 2, NULL);
+    // 8192 bytes: the 2.4.0-Beta.1 schedule check overflowed the old 4 KB
+    // stack; 6144 (Beta.2) left only ~56 bytes of high-water headroom once
+    // localtime_r() and the journal NVS flush stack on this task. 8 KB
+    // restores a comfortable margin (task has service priority, no
+    // latency-critical work).
+    BaseType_t wd_ret = xTaskCreate(heap_watchdog_task, "heap_watchdog", 8192, NULL, 2, NULL);
     if (wd_ret != pdPASS) {
         ESP_LOGW(TAG, "Failed to start heap watchdog task");
     }

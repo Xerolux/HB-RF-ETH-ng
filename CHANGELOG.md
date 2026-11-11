@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0-Beta.3] - 2026-11-11
+
+### Fixed
+- heap_watchdog task stack raised to 8192 bytes: Beta.2's 6144 left only ~56 bytes of high-water headroom once `localtime_r()` and the journal's NVS flush stacked up on the task — one unlucky frame away from the next overflow.
+
 ## [2.4.0-Beta.2] - 2026-11-11
 
 ### Fixed
