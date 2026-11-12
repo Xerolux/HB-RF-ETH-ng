@@ -49,6 +49,16 @@ void mqtt_handler_publish_status(void);
 // Used for transient events such as command rejection and service failures.
 void mqtt_handler_publish_event(const char *subtopic, const char *payload);
 
+// Publish one retained payload (QoS configurable). Safe to call from any
+// task; returns -1 when the client is not connected to the broker. Used by
+// the settings-state and discovery publishers in mqtt_commands.cpp.
+int mqtt_handler_publish_retained(const char *topic, const char *payload, int qos);
+
+// Snapshot of the active MQTT configuration. Only meaningful on the ESP-MQTT
+// event task (command dispatch) - the same task that already reads the
+// struct directly - or while the client lifecycle is otherwise quiescent.
+const mqtt_config_t *mqtt_handler_current_config(void);
+
 // Publish the FreeRTOS task stack high-water marks under
 // <prefix>/status/task_stacks (retained). Called periodically by the publish
 // task; safe to call from elsewhere but not on the hot 5 s status cycle.

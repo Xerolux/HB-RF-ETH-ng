@@ -345,7 +345,7 @@ auf. Generiert aus `main/mqtt_handler.cpp` (Stand v2.2.0-Beta.7).
 └── command/   (Subscriber-Seite) – Steuerkommandos an das Gerät
 
 <ha_prefix>/                      Standard: "homeassistant"
-└── {sensor|binary_sensor|button}/hb-rf-eth-<serial>/<obj_id>/config
+└── {sensor|binary_sensor|switch|number|select|text|button|update}/hb-rf-eth-<serial>/<obj_id>/config
                                   – HA Auto-Discovery Configs (retained, QoS 1)
 ```
 
@@ -420,6 +420,11 @@ sind punktuelle Benachrichtigungen für Automatisierungen (HA, Node-RED, …).
 |-------|---------|----------|
 | `event/restart` | `requested` | Gerät restartet via MQTT-Kommando (vor dem tatsächlichen Reboot) |
 | `event/command_rejected` | `rejected cmd=<name> reason=invalid_token` | Kommando mit falschem/fehendem Token empfangen |
+| `event/command_note` | z.B. `hostname: restart required` | Bestätigter Befehl mit Hinweis (z.B. dass ein Neustart nötig ist) |
+| `event/update_check` | `stable` oder `beta` | Update-Suche über `command/update_check` wurde gestartet |
+| `event/update_install` | `firmware` oder `webui` | Installation über `command/update_install_*` wurde gestartet |
+| `event/relay_stats_reset` | `ok` | Relay-/UART-Statistik-Zähler wurden zurückgesetzt |
+| `event/monitoring_test` | `target=notify ok=true code=...` | Ergebnis eines via `command/test_notify` gestarteten Selbsttests |
 
 ---
 
@@ -429,23 +434,96 @@ Das Gerät abonniert `<prefix>/command/#` (QoS 1) **nur**, wenn `commandEnabled`
 ODER `haDiscoveryEnabled` aktiv ist. Ohne diese Flags wird kein Kommando
 angenommen – auch nicht mit korrektem Token.
 
+Stage-1 „Alles per Home Assistant": Neben dem Neustart sind seit v2.4.0 alle
+routinekonfigurationen und Update-Aktionen per MQTT steuerbar. Ziel ist, dass
+die WebUI nach der Ersteinrichtung (IP, Passwort, Broker) für den Alltag nicht
+mehr gebraucht wird.
+
+#### Aktionen (Payload = Token, für HA-Buttons/Update-Entities)
+
 | Command-Topic | Aktion | Vorbedingung |
 |---------------|--------|--------------|
 | `command/restart` | Gerät neustarten (Reset-Grund `USER_RESTART`) | `commandEnabled` |
+| `command/update_check` | Update-Suche starten (nutzt den konfigurierten Kanal) | `commandEnabled` |
+| `command/update_install_firmware` | Online-Installation der Firmware (Manifest + SHA-256) | `commandEnabled` |
+| `command/update_install_webui` | Online-Installation der WebUI (Manifest + SHA-256) | `commandEnabled` |
+| `command/reset_relay_stats` | Relay-Latenz-/UART-Fehlerzähler zurücksetzen | `commandEnabled` |
+| `command/test_notify` | Test-Benachrichtigung senden (Ergebnis via `event/monitoring_test`) | `commandEnabled` |
 
-Werkreset, Update-Suche und Firmware-Installation werden nicht als
-MQTT-Kommandos angeboten. Firmware wird nur als lokale Datei in der WebUI
-installiert.
+#### Einstellungen (Payload = JSON, siehe unten)
+
+| Command-Topic | Typ | Wertebereich / Optionen |
+|---------------|-----|------------------------|
+| `command/led_brightness` | number | 0–100 (%) |
+| `command/led_program_<state>` | select | `off, on, blink, blink_inv, blink_fast, blink_slow, blink_2x, blink_3x, breathing, heartbeat, strobe` — `<state>`: `idle, ccu_disconnected, ccu_connected, update_available, error, booting, update_in_progress` |
+| `command/system_log_enabled` | switch | `true` / `false` |
+| `command/restart_schedule_enabled` | switch | `true` / `false` |
+| `command/restart_schedule_day` | select | `sun, mon, tue, wed, thu, fri, sat` |
+| `command/restart_schedule_hour` | number | 0–23 |
+| `command/restart_schedule_minute` | number | 0–59 |
+| `command/hostname` | text | gültiger Hostname; **wirkt erst nach Neustart** |
+| `command/ccu_ip` | text | IPv4/IPv6/Hostname oder leer |
+| `command/ntp_server` | text | Hostname/IP, optional mit Port |
+| `command/timezone` | text | POSIX-TZ-String (z.B. `CET-1CEST,M3.5.0,M10.5.0/3`) |
+| `command/update_mode` | select | `off, notify, auto_webui, auto_all` |
+| `command/update_channel` | select | `stable, beta` |
+| `command/update_interval_hours` | number | 6–168 |
+| `command/update_window_start` | number | 0–23 |
+| `command/update_window_length` | number | 1–24 |
+| `command/update_idle_only` | switch | `true` / `false` |
+| `command/syslog_enabled` | switch | `true` / `false` |
+| `command/syslog_server` | text | Hostname/IP, optional mit Port |
+| `command/syslog_port` | number | 1–65535 |
+| `command/syslog_transport` | select | `udp, tcp, tls` |
+| `command/syslog_min_severity` | select | `EMERG, ALERT, CRIT, ERR, WARNING, NOTICE, INFO, DEBUG` |
+| `command/checkmk_enabled` | switch | `true` / `false` |
+| `command/checkmk_port` | number | 1–65535 |
+| `command/prometheus_enabled` | switch | `true` / `false` |
+| `command/prometheus_port` | number | 1–65535 |
+| `command/notify_enabled` | switch | `true` / `false` |
+| `command/notify_cooldown_seconds` | number | 0–86400 |
+| `command/log_level` | text | `TAG:LEVEL` (z.B. `MQTT:DEBUG`); RAM-Override bis zum Neustart |
+
+**Bewusst NICHT per MQTT steuerbar** (Security-Politik, siehe unten):
+Werkreset, Netzwerk-/IPv4-/IPv6-Konfiguration (Fehlkonfiguration würde auch HA
+den Zugang zum Gerät kosten), MQTT-Broker-Einstellungen selbst (Server, User,
+Passwort, TLS-Material, Token, Discovery-Flags) sowie alle Zugangsdaten
+(Telegram-/SMTP-/Webhook-Credentials). Dafür bleibt die WebUI bzw. `/recovery`.
 
 #### Payload-Regeln
 
-- **Ohne Token (`command_token == ""`):** Payload wird ignoriert, jedes Publish
-  auf das Topic löst die Aktion aus. **Broker-seitige ACL zwingend erforderlich.**
-- **Mit Token:** Payload muss Byte-genau dem konfigurierten `command_token`
-  entsprechen (8–63 Zeichen, Zeichensatz `A–Z a–z 0–9 - _ .`). Andernfalls wird
-  das Kommando verworfen und `event/command_rejected` gepublished.
-- Bei gesetztem Token wird der Token als `payload_press` in die
-  HA-Discovery-Config geschrieben, so dass der Neustart-Button funktioniert.
+Es gibt zwei Formen:
+
+1. **Aktionen** (`restart`, `update_check`, `update_install_*`,
+   `reset_relay_stats`, `test_notify`): Der Payload muss Byte-genau dem
+   konfigurierten Token entsprechen — genau das senden die HA-Buttons
+   (`payload_press`) bzw. Update-Entities (`payload_install`).
+2. **Einstellungen** (alle `<name>`-Kommandos mit Wert): JSON-Objekt
+
+   ```json
+   {"token":"<command_token>","value":"<neuer Wert>"}
+   ```
+
+   HA setzt das automatisch über `command_template` — der Wert selbst wird
+   als String, Zahl oder Bool akzeptiert (`"50"`, `50`, `true`, …).
+
+- **Ohne Token (`command_token == ""`):** Token-Feld wird nicht geprüft, bei
+  Aktionen wird jeder Payload akzeptiert. **Broker-seitige ACL zwingend
+  erforderlich.**
+- **Mit Token:** falsches/fehlendes Token → Kommando verworfen und
+  `event/command_rejected` gepublished.
+- Bei gesetztem Token wird der Token in die HA-Discovery-Configs geschrieben
+  (`payload_press`, `payload_install`, `command_template`), damit alle
+  Entities in HA ohne weitere Konfiguration funktionieren.
+
+#### Settings-Zustände (`<prefix>/status/settings/<key>`)
+
+Jede steuerbare Einstellung spiegelt ihren aktuellen Wert als **retained**
+Topic unter `status/settings/<command-name>` wider (z.B.
+`status/settings/led_brightness` → `75`).HA-Entities binden darauf ihre
+`state_topic`s. Veröffentlicht bei Broker-Connect, nach jedem akzeptierten
+MQTT-Kommando und alle ~6 Minuten (damit WebUI-seitige Änderungen
+nachziehen).
 
 ---
 
@@ -489,18 +567,56 @@ Alle haben `entity_category: "diagnostic"`.
 
 #### Buttons (`button/`)
 
-| Object ID | Name | Class | Command | Icon |
-|-----------|------|-------|---------|------|
-| `restart` | Restart | restart | `command/restart` | `mdi:restart` |
+| Object ID | Name | Command | Icon |
+|-----------|------|---------|------|
+| `restart` | Restart | `command/restart` | `mdi:restart` |
+| `update_check` | Check Update | `command/update_check` | `mdi:magnify` |
+| `reset_relay_stats` | Reset Relay Stats | `command/reset_relay_stats` | `mdi:counter` |
+| `test_notify` | Test Notification | `command/test_notify` | `mdi:send-outline` |
 
 Buttons werden **nur gepublished, wenn `commandEnabled = true`**. Ansonsten
 sieht HA keinen klickbaren Button.
 
-`entity_category: "config"`. `payload_press` entspricht dem Token (oder dem
-Kommando-String, wenn kein Token gesetzt ist).
+`entity_category` Restart/config-Buttons bzw. `diagnostic` für Diagnose-Aktionen.
+`payload_press` entspricht dem Token (oder dem Kommando-String, wenn kein Token
+gesetzt ist).
 
-Frühere Update-/OTA-Sensoren, der Check-Button und die installierbare
-MQTT-Update-Entität werden über leere retained Discovery-Nachrichten entfernt.
+#### Update-Entities (`update/`)
+
+| Object ID | Name | State Topic | Install Command |
+|-----------|------|-------------|-----------------|
+| `firmware_update` | Firmware | `status/update_firmware` | `command/update_install_firmware` |
+| `webui_update` | WebUI | `status/update_webui` | `command/update_install_webui` |
+
+Native HA-Update-Karten mit Install-Button (`device_class: firmware`).
+Der State-Topic liefert `installed_version`, `latest_version`, `title`,
+`release_url` und während einer Installation `in_progress` (mit Prozentwert
+in der Download-Phase). `payload_install` entspricht dem Token.
+
+Vor der ersten Update-Suche zeigt `latest_version` den installierten Stand
+(„up to date") — erst `Check Update` (Button oder Auto-Update-Modus ≥ notify)
+holt die echten Release-Versionen.
+
+#### Schalter (`switch/`), Zahlen (`number/`), Auswahlen (`select/`), Text (`text/`)
+
+Alle steuerbaren Einstellungen aus der Command-Tabelle (Abschnitt 3) werden
+als passende HA-Entities announced — Schalter als `switch`, Ports/Fenster als
+`number`, Enum-artige Werte (LED-Programme, Wochentage, Transport, Kanal,
+Modus, Schwelle) als `select`, Freitext-Felder (Syslog-Server, Hostname,
+CCU-Adresse, NTP-Server, Zeitzone) als `text`. Object ID = Command-Name
+(z.B. Object `syslog_enabled` ↔ `command/syslog_enabled`).
+
+- `entity_category: "config"`
+- State-Topic: `status/settings/<object_id>` (retained)
+- Ohne Token sendet HA den Wert direkt (`{{ value }}`), mit Token als
+  JSON-Objekt `{"token":"...","value":"..."}` via `command_template`
+
+Diese Entities werden ebenfalls **nur bei `commandEnabled = true`** angelegt.
+
+Frühere Update-/OTA-Sensoren und der alte Check-Button werden über leere
+retained Discovery-Nachrichten entfernt; die neue `update/firmware_update`-Entität
+wird auf demselben Topic mit neuem Vertrag überschrieben (Stage-1-Policy:
+Installation per MQTT erlaubt, Werkreset weiterhin ausgeschlossen).
 
 
 ---
@@ -553,6 +669,20 @@ mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/restart" -m ""
 
 ```bash
 mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/restart" -m "my-shared-secret-123"
+```
+
+#### Einstellung per Kommando ändern (JSON-Form)
+
+```bash
+mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/led_brightness" \
+  -m '{"token":"my-shared-secret-123","value":"75"}'
+```
+
+#### Update-Installation anstoßen
+
+```bash
+mosquitto_pub -h <broker-ip> -t "hb-rf-eth/command/update_install_firmware" \
+  -m "my-shared-secret-123"
 ```
 
 ### Beispiel-HA-Dashboard

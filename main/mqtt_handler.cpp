@@ -22,6 +22,7 @@
  */
 
 #include "mqtt_handler.h"
+#include "mqtt_commands.h"
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "update_check.h"
@@ -221,6 +222,14 @@ static void handle_mqtt_command(const char* command, const char* payload, int pa
 {
     ESP_LOGI(TAG, "Received MQTT command: %s (payload %d bytes)", command, payload_len);
 
+    // Stage-1 HA control surface: settings, monitoring toggles and update
+    // actions. These carry JSON payloads ({"token":...,"value":...}) and do
+    // their own authentication, so they must run before the legacy plain
+    // token byte-compare below.
+    if (mqtt_commands_try_handle(command, payload, payload_len)) {
+        return;
+    }
+
     if (!command_token_ok(payload, payload_len)) {
         ESP_LOGW(TAG, "Command %s rejected: missing/invalid token", command);
         char msg[96];
@@ -395,6 +404,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         if (current_mqtt_config.ha_discovery_enabled) {
             mqtt_handler_publish_ha_discovery();
         }
+        // Initial retained state topics for the controllable settings and
+        // update entities so HA has current values alongside the discovery
+        // configs.
+        mqtt_commands_publish_states(&current_mqtt_config);
         break;
     case MQTT_EVENT_DISCONNECTED:
         mqtt_release_tls_gate_if_held();
@@ -463,6 +476,13 @@ void mqtt_publish_task(void *pvParameters)
         // post-update drift when the user files a bug.
         if (publish_cycle % 6 == 0) {
             mqtt_handler_publish_task_stacks();
+            // Settings states converge slowly too: MQTT commands republish
+            // immediately; this cycle only catches up WebUI-side edits.
+            mqtt_commands_publish_states(&current_mqtt_config);
+        } else {
+            // Update entity states ride every cycle so "in_progress"
+            // install progress tracks the installer at ~60 s resolution.
+            mqtt_commands_publish_update_states(&current_mqtt_config);
         }
 
         // 60 s base cadence (was 10 s): each cycle publishes ~30 retained
@@ -525,6 +545,19 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload)
     snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic);
     // Non-retained, QoS 0: events are transient by definition.
     mqtt_publish_connected(topic, payload, 0, 0, 0);
+}
+
+int mqtt_handler_publish_retained(const char *topic, const char *payload, int qos)
+{
+    if (topic == NULL || payload == NULL) {
+        return -1;
+    }
+    return mqtt_publish_connected(topic, payload, 0, qos, 1);
+}
+
+const mqtt_config_t *mqtt_handler_current_config(void)
+{
+    return &current_mqtt_config;
 }
 
 // Publish the FreeRTOS task stack high-water marks as a single retained string.
@@ -1130,7 +1163,20 @@ void mqtt_handler_publish_ha_discovery(void)
     // Remove destructive/retired entities retained by older firmware.
     remove_config("button", "factory_reset");
     remove_config("button", "check_update");
-    remove_config("update", "firmware_update");
+    // Policy change (stage-1 HA control): update installation IS exposed to
+    // Home Assistant again - as native update entities with token-gated
+    // install commands (see mqtt_commands_publish_discovery below, which
+    // re-creates update/firmware_update on the same topic with the new
+    // contract - retained overwrite, no removal flicker). Factory reset
+    // deliberately remains unreachable via MQTT: a misfiring automation
+    // must never wipe the device; it stays bound to the WebUI, /recovery
+    // and the physical button.
+
+    // Stage-1 controllable entities (switches, numbers, selects, texts,
+    // action buttons, update entities incl. install). Reuses the device
+    // block above; publishes nothing when commands are disabled.
+    mqtt_commands_publish_discovery(&current_mqtt_config,
+                                    sysInfo->getSerialNumber(), device);
 
     cJSON_Delete(device);
 }
