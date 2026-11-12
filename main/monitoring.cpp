@@ -1391,6 +1391,33 @@ static void heap_watchdog_task(void *pvParameters)
                                   (uint32_t)min_ever, (uint32_t)internal_free,
                                   secs, (uint32_t)low_heap_streak);
         }
+        // ---- Heap corruption tripwire (issue #491) ----
+        // esp_http_server strdups every registered URI template onto the
+        // heap, and httpd_uri_match_wildcard() dereferences those pointers
+        // on every request; the parsed request URI also lives in a heap
+        // scratch buffer. A single out-of-bounds write in ANY task there-
+        // fore detonates in the URI matcher (or any other permanent heap
+        // resident) long after the corrupting write - exactly the irrepro-
+        // ducible LoadProhibited shape reported against the web server.
+        // Walking the heap under the region locks here turns silent
+        // corruption into a localized, diagnosable restart; the check
+        // prints the damaged ranges to the serial console first.
+        if (!heap_caps_check_integrity_all(true))
+        {
+            crash_blackbox_snapshot_now((uint32_t)low_heap_streak);
+            // Keep in sync with last_diag_buffer[96] in reset_info.cpp.
+            char diag[80];
+            snprintf(diag, sizeof(diag),
+                     "heap corruption: free=%u largest=%u",
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_DEFAULT),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT));
+            ESP_LOGE(TAG, "Heap integrity check failed - restarting (%s)", diag);
+            LogManager::instance().saveCrashTailNvs("heap_corrupt");
+            ResetInfo::storeResetReason(RESET_REASON_WATCHDOG, diag);
+            vTaskDelay(pdMS_TO_TICKS(200));
+            esp_restart();
+        }
+
         if (free_heap < HEAP_WATCHDOG_CRITICAL_BYTES)
         {
             low_heap_streak++;

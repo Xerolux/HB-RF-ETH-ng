@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+- feat(firmware): heap corruption tripwire in the heap watchdog (issue #491). A failing `heap_caps_check_integrity_all()` check now saves the crash tail, records a diagnostic reset reason and restarts instead of letting corruption detonate later as an unrelated panic.
+
 ## [2.4.0-Beta.6] - 2026-11-11
 
 ### Changes
