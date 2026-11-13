@@ -725,26 +725,40 @@ static bool apply_monitoring_field(const mqtt_config_t *cfg, const char *command
                                    bool (*edit)(monitoring_config_t *, const char *value),
                                    const command_payload_t *p)
 {
-    monitoring_config_t config;
-    if (monitoring_get_config(&config) != ESP_OK) {
+    // monitoring_config_t is ~6.7 KiB (TLS PEM buffers) - it must NEVER live
+    // on a task stack here. The REST handler heap-allocates it for the same
+    // reason; the MQTT command worker (6 KiB) would survive a stack copy,
+    // but the margin is not worth it.
+    monitoring_config_t *config =
+        (monitoring_config_t *)calloc(1, sizeof(monitoring_config_t));
+    if (config == NULL) {
+        reject(command, "no_memory");
+        return true;
+    }
+    if (monitoring_get_config(config) != ESP_OK) {
+        free(config);
         reject(command, "config_unavailable");
         return true;
     }
-    if (!edit(&config, p->value)) {
+    if (!edit(config, p->value)) {
+        free(config);
         reject(command, "invalid_value");
         return true;
     }
     monitoring_cmd_ctx_t *ctx =
         (monitoring_cmd_ctx_t *)calloc(1, sizeof(monitoring_cmd_ctx_t));
     if (ctx == NULL) {
+        free(config);
         reject(command, "no_memory");
         return true;
     }
     snprintf(ctx->topic_prefix, sizeof(ctx->topic_prefix), "%s", cfg->topic_prefix);
-    if (monitoring_schedule_update_config(&config, monitoring_cmd_done, ctx) != ESP_OK) {
+    // monitoring_schedule_update_config copies the config into its job.
+    if (monitoring_schedule_update_config(config, monitoring_cmd_done, ctx) != ESP_OK) {
         free(ctx);
         reject(command, "schedule_failed");
     }
+    free(config);
     return true;
 }
 
@@ -1213,40 +1227,44 @@ void mqtt_commands_publish_settings_states(const char *topic_prefix)
 
 void mqtt_commands_publish_monitoring_states(const char *topic_prefix)
 {
-    monitoring_config_t config;
-    if (monitoring_get_config(&config) != ESP_OK) {
+    // ~6.7 KiB config (TLS PEM buffers): heap-only, see apply_monitoring_field.
+    monitoring_config_t *config =
+        (monitoring_config_t *)calloc(1, sizeof(monitoring_config_t));
+    if (config == NULL || monitoring_get_config(config) != ESP_OK) {
+        free(config);
         return;
     }
 
     char buf[80];
     publish_setting(topic_prefix, "syslog_enabled",
-                    config.syslog.enabled ? "true" : "false");
-    publish_setting(topic_prefix, "syslog_server", config.syslog.server);
-    snprintf(buf, sizeof(buf), "%u", (unsigned)config.syslog.port);
+                    config->syslog.enabled ? "true" : "false");
+    publish_setting(topic_prefix, "syslog_server", config->syslog.server);
+    snprintf(buf, sizeof(buf), "%u", (unsigned)config->syslog.port);
     publish_setting(topic_prefix, "syslog_port", buf);
     publish_setting(topic_prefix, "syslog_transport",
-                    config.syslog.transport <= 2
-                        ? SYSLOG_TRANSPORT_NAMES[config.syslog.transport]
+                    config->syslog.transport <= 2
+                        ? SYSLOG_TRANSPORT_NAMES[config->syslog.transport]
                         : "udp");
     publish_setting(topic_prefix, "syslog_min_severity",
-                    config.syslog.min_severity <= 7
-                        ? LOG_SEVERITY_NAMES[config.syslog.min_severity]
+                    config->syslog.min_severity <= 7
+                        ? LOG_SEVERITY_NAMES[config->syslog.min_severity]
                         : "INFO");
 
     publish_setting(topic_prefix, "checkmk_enabled",
-                    config.checkmk.enabled ? "true" : "false");
-    snprintf(buf, sizeof(buf), "%u", (unsigned)config.checkmk.port);
+                    config->checkmk.enabled ? "true" : "false");
+    snprintf(buf, sizeof(buf), "%u", (unsigned)config->checkmk.port);
     publish_setting(topic_prefix, "checkmk_port", buf);
 
     publish_setting(topic_prefix, "prometheus_enabled",
-                    config.prometheus.enabled ? "true" : "false");
-    snprintf(buf, sizeof(buf), "%u", (unsigned)config.prometheus.port);
+                    config->prometheus.enabled ? "true" : "false");
+    snprintf(buf, sizeof(buf), "%u", (unsigned)config->prometheus.port);
     publish_setting(topic_prefix, "prometheus_port", buf);
 
     publish_setting(topic_prefix, "notify_enabled",
-                    config.notify.enabled ? "true" : "false");
-    snprintf(buf, sizeof(buf), "%u", (unsigned)config.notify.cooldown_seconds);
+                    config->notify.enabled ? "true" : "false");
+    snprintf(buf, sizeof(buf), "%u", (unsigned)config->notify.cooldown_seconds);
     publish_setting(topic_prefix, "notify_cooldown_seconds", buf);
+    free(config);
 }
 
 void mqtt_commands_publish_states(const mqtt_config_t *cfg)
@@ -1537,16 +1555,19 @@ static void publish_action_button(const mqtt_config_t *cfg, const char *serial,
 
 static void publish_update_entity(const mqtt_config_t *cfg, const char *serial,
                                   const cJSON *device, const char *key,
-                                  const char *title, const char *command,
-                                  const char *icon)
+                                  const char *state_key, const char *title,
+                                  const char *command, const char *icon)
 {
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "name", title);
     cJSON_AddStringToObject(root, "title", title);
 
+    // key is the discovery object id ("firmware_update"), state_key the
+    // state topic suffix ("firmware") - publish_update_state() writes
+    // <prefix>/status/update_<state_key>.
     char state_topic[192];
     snprintf(state_topic, sizeof(state_topic), "%s/status/update_%s",
-             cfg->topic_prefix, key);
+             cfg->topic_prefix, state_key);
     cJSON_AddStringToObject(root, "state_topic", state_topic);
 
     char command_topic[192];
@@ -1674,8 +1695,8 @@ void mqtt_commands_publish_discovery(const mqtt_config_t *cfg, const char *seria
                           "mdi:send-outline");
 
     // --- Update entities (native HA update card with Install) -------------
-    publish_update_entity(cfg, serial, device, "firmware_update", "Firmware",
-                          "update_install_firmware", "mdi:chip");
-    publish_update_entity(cfg, serial, device, "webui_update", "WebUI",
+    publish_update_entity(cfg, serial, device, "firmware_update", "firmware",
+                          "Firmware", "update_install_firmware", "mdi:chip");
+    publish_update_entity(cfg, serial, device, "webui_update", "webui", "WebUI",
                           "update_install_webui", "mdi:web");
 }

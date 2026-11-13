@@ -35,6 +35,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <atomic>
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -149,7 +150,12 @@ static void publish_journal_snapshot(const mqtt_config_t *cfg)
 
 static void publish_log_tail(const mqtt_config_t *cfg)
 {
-    char tail[MQTT_DIAG_TAIL_MAX + 1] = {0};
+    // 1 KiB tail buffer: heap, never task stack - this publisher may run on
+    // the 2.3 KiB ESP event-loop task via the journal listener chain.
+    char *tail = (char *)calloc(1, MQTT_DIAG_TAIL_MAX + 1);
+    if (tail == NULL) {
+        return;
+    }
     size_t bytes = 0;
     const bool enabled = LogManager::instance().isEnabled();
     if (enabled) {
@@ -162,6 +168,7 @@ static void publish_log_tail(const mqtt_config_t *cfg)
     cJSON_AddNumberToObject(root, "bytes",
                             (double)LogManager::instance().getBufferedBytes());
     cJSON_AddStringToObject(root, "tail", tail);
+    free(tail);
 
     char *json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -198,6 +205,30 @@ static void publish_crash_state(const mqtt_config_t *cfg)
     snprintf(topic, sizeof(topic), "%s/status/crash_log", cfg->topic_prefix);
     mqtt_handler_publish_retained(topic, json, 0);
     free(json);
+}
+
+// Journal snapshot refresh request from the listener. The listener may run
+// on any emitting task (often the 2.3 KiB ESP event-loop task), so it only
+// publishes the small event payload itself and defers the larger snapshot
+// to the mqtt_publish task.
+static std::atomic<bool> s_journal_dirty{false};
+
+void mqtt_diagnostics_note_journal_change(void)
+{
+    s_journal_dirty.store(true, std::memory_order_release);
+}
+
+bool mqtt_diagnostics_consume_journal_change(void)
+{
+    return s_journal_dirty.exchange(false, std::memory_order_acq_rel);
+}
+
+void mqtt_diagnostics_publish_journal_snapshot(const mqtt_config_t *cfg)
+{
+    if (cfg == NULL) {
+        return;
+    }
+    publish_journal_snapshot(cfg);
 }
 
 void mqtt_diagnostics_publish_states(const mqtt_config_t *cfg)
@@ -238,11 +269,10 @@ void mqtt_diagnostics_on_journal_event(const event_journal_entry_t *entry)
     mqtt_handler_publish_event("event/device_events", json);
     free(json);
 
-    // Refresh the history attributes immediately so a dashboard watching the
-    // journal shows the new entry without waiting for the slow cycle.
-    if (cfg != NULL) {
-        publish_journal_snapshot(cfg);
-    }
+    // Defer the history refresh to the publish task (stack discipline); it
+    // lands within the ~5 s status subdivision.
+    mqtt_diagnostics_note_journal_change();
+    (void)cfg;
 }
 
 bool mqtt_diagnostics_clear_crash_log(void)

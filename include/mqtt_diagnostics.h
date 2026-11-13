@@ -67,6 +67,22 @@ void mqtt_diagnostics_publish_states(const mqtt_config_t *cfg);
 void mqtt_diagnostics_on_journal_event(const event_journal_entry_t *entry);
 
 /**
+ * @brief Publish only the journal history state topic.
+ *
+ * Used by the mqtt_publish task after the listener noted a change (see
+ * mqtt_diagnostics_note_journal_change) so dashboards converge within the
+ * ~5 s status subdivision without stack pressure on emitting tasks.
+ */
+void mqtt_diagnostics_publish_journal_snapshot(const mqtt_config_t *cfg);
+
+/**
+ * @brief Listener-side flag: a journal change wants a snapshot refresh on
+ *        the mqtt_publish task (mqtt_diagnostics_consume_journal_change).
+ */
+void mqtt_diagnostics_note_journal_change(void);
+bool mqtt_diagnostics_consume_journal_change(void);
+
+/**
  * @brief Erase the persisted crash tail (the "clog" NVS slot in the
  *        reset_info namespace), mirroring the WebUI read-and-forget rule.
  *
