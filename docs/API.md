@@ -23,6 +23,7 @@ The HB-RF-ETH firmware provides a RESTful HTTP API for configuration and monitor
 | Expanded Monitoring Config | 2.3.0 | `GET/POST /api/monitoring` now carries `prometheus`, `syslog`, `notify` blocks |
 | Automatic Updates | 2.3.0 | `GET/POST /api/update/config`, `POST /api/update/schedule`, `schedule` block in `GET /api/update/status` |
 | MQTT Control Surface (Stage 1) | 2.4.0 | Settings, monitoring toggles and update actions via `<prefix>/command/*`; native HA `update`/`switch`/`number`/`select`/`text` entities — see [WIKI.md, MQTT-API-Referenz](WIKI.md) |
+| MQTT Diagnostics (Stage 2) | 2.4.0 | HA event entity (`event/device_events`), journal/log-tail/crash-tail sensors, radio-UART metric entities, `clear_crash_log` command |
 
 The MQTT command surface mirrors the validated write paths of this REST API
 (same validators, same persistence); it does not add HTTP endpoints.

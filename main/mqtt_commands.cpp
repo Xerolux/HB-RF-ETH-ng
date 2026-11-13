@@ -40,6 +40,7 @@
 
 #include "mqtt_handler.h"
 #include "monitoring.h"
+#include "mqtt_diagnostics.h"
 #include "settings.h"
 #include "validation.h"
 #include "led.h"
@@ -970,6 +971,19 @@ static bool cmd_test_notify(const mqtt_config_t *cfg)
     return true;
 }
 
+static bool cmd_clear_crash_log(const mqtt_config_t *cfg)
+{
+    if (mqtt_diagnostics_clear_crash_log()) {
+        // Refresh the crash state topics so the HA sensor flips back to
+        // "none" without waiting for the slow cycle.
+        mqtt_diagnostics_publish_states(cfg);
+        mqtt_handler_publish_event("event/crash_log_cleared", "ok");
+    } else {
+        reject("clear_crash_log", "erase_failed");
+    }
+    return true;
+}
+
 static bool cmd_log_level(const mqtt_config_t *cfg, const command_payload_t *p)
 {
     (void)cfg; // RAM-only override, nothing to republish
@@ -1040,6 +1054,14 @@ bool mqtt_commands_try_handle(const char *command, const char *payload, int payl
             return true;
         }
         return cmd_test_notify(cfg);
+    }
+    if (!strcmp(command, "clear_crash_log")) {
+        const mqtt_config_t *cfg = mqtt_handler_current_config();
+        command_payload_t p;
+        if (!command_payload_decode(cfg, command, payload, payload_len, false, &p)) {
+            return true;
+        }
+        return cmd_clear_crash_log(cfg);
     }
     if (!strcmp(command, "log_level")) {
         const mqtt_config_t *cfg = mqtt_handler_current_config();

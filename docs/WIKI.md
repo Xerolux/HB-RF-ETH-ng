@@ -425,6 +425,8 @@ sind punktuelle Benachrichtigungen für Automatisierungen (HA, Node-RED, …).
 | `event/update_install` | `firmware` oder `webui` | Installation über `command/update_install_*` wurde gestartet |
 | `event/relay_stats_reset` | `ok` | Relay-/UART-Statistik-Zähler wurden zurückgesetzt |
 | `event/monitoring_test` | `target=notify ok=true code=...` | Ergebnis eines via `command/test_notify` gestarteten Selbsttests |
+| `event/device_events` | `{"event_type":"ccu_connected","time":1731...,"detail":"..."}` | Jedes journallisierte Ereignis live als HA-Event-Entity-Payload (nicht retained; Extra-Keys werden Attribute) |
+| `event/crash_log_cleared` | `ok` | Crash-Tail wurde über `command/clear_crash_log` gelöscht |
 
 ---
 
@@ -449,6 +451,7 @@ mehr gebraucht wird.
 | `command/update_install_webui` | Online-Installation der WebUI (Manifest + SHA-256) | `commandEnabled` |
 | `command/reset_relay_stats` | Relay-Latenz-/UART-Fehlerzähler zurücksetzen | `commandEnabled` |
 | `command/test_notify` | Test-Benachrichtigung senden (Ergebnis via `event/monitoring_test`) | `commandEnabled` |
+| `command/clear_crash_log` | Gespeicherten Crash-Tail löschen (Ergebnis via `event/crash_log_cleared`) | `commandEnabled` |
 
 #### Einstellungen (Payload = JSON, siehe unten)
 
@@ -617,6 +620,25 @@ Frühere Update-/OTA-Sensoren und der alte Check-Button werden über leere
 retained Discovery-Nachrichten entfernt; die neue `update/firmware_update`-Entität
 wird auf demselben Topic mit neuem Vertrag überschrieben (Stage-1-Policy:
 Installation per MQTT erlaubt, Werkreset weiterhin ausgeschlossen).
+
+#### Diagnose-Entities (Stage 2)
+
+| Component | Object ID | Name | Quelle |
+|-----------|-----------|------|--------|
+| `event` | `device_events` | Device Events | `event/device_events` — löst HA-Trigger je `event_type` aus (`eth_link_down`, `rf_module_lost`, `ccu_connected`, `restart`, `low_heap`, `crash_transcript`, `scheduled_restart`, …) |
+| `sensor` | `event_journal` | Event Journal | `status/event_journal` — Zustand = Anzahl Einträge, Attribute = die 10 neuesten Einträge (Zeit, Event, Detail) |
+| `sensor` | `log_tail` | System Log Tail | `status/log_tail` — Zustand = gepufferte Bytes (`-1` wenn Capture aus), Attribute = letzte ~1 KiB Log |
+| `sensor` | `crash_log` | Crash Tail | `status/crash_log` — Zustand `available`/`none`, Attribute = Transkript des letzten Panics |
+| `binary_sensor` | `crash_log_available` | Crash Tail Available | wie oben, als Binärsensor für Automatisierungen |
+| `button` | `clear_crash_log` | Clear Crash Tail | `command/clear_crash_log` (nur bei `commandEnabled`) |
+| `sensor` | `min_free_heap` | Minimum Free Heap | `status/min_free_heap` (bisher nur Topic, jetzt mit Entity) |
+| `sensor` | `radio_uart_overflows` u. 5 weitere | Radio UART Statistik | `status/radio_uart_*` — Overflows, verlorene Bytes, Zeilenfehler, Reset-Line-Events, TX-Fehler, RX-Backlog-Max |
+
+Diagnose-Zustände (Journal/Log/Crash) werden bei Broker-Connect, nach jedem
+Event bzw. Löschen und alle ~6 Minuten aktualisiert; die `radio_uart_*`- und
+`min_free_heap`-Sensoren laufen im normalen 60-s-Status-Zyklus mit. Der
+Crash-Tail wird beim MQTT-Publish **nicht** konsumiert — er bleibt sichtbar,
+bis er über den Button, die WebUI oder `/recovery` gelöscht wird.
 
 
 ---

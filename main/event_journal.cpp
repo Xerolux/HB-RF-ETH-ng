@@ -38,6 +38,10 @@ static event_journal_entry_t s_ring[EVENT_JOURNAL_CAPACITY];
 static size_t s_count           = 0;
 static bool s_dirty             = false;
 static uint32_t s_generation    = 0;
+
+// Registered by the MQTT subsystem (stage-2 diagnostics); NULL until then.
+// Written once during init before the journal can emit, read afterwards.
+static event_journal_listener_t s_listener = NULL;
 static int64_t s_retry_after_us = 0;
 static StaticSemaphore_t s_mutex_storage;
 static SemaphoreHandle_t s_mutex = NULL;
@@ -145,7 +149,19 @@ void event_journal_add(uint8_t event_id, const char *detail)
     }
     s_dirty = true;
     s_generation++;
+    // Private copy: the listener may call journal read APIs itself, which
+    // would otherwise re-enter the ring while we still hold the lock.
+    event_journal_entry_t published = *e;
     xSemaphoreGive(s_mutex);
+
+    if (s_listener) {
+        s_listener(&published);
+    }
+}
+
+void event_journal_set_listener(event_journal_listener_t listener)
+{
+    s_listener = listener;
 }
 
 static esp_err_t persist_snapshot(nvs_handle_t handle, const event_journal_entry_t *entries,

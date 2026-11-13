@@ -23,6 +23,7 @@
 
 #include "mqtt_handler.h"
 #include "mqtt_commands.h"
+#include "mqtt_diagnostics.h"
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "update_check.h"
@@ -408,6 +409,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         // update entities so HA has current values alongside the discovery
         // configs.
         mqtt_commands_publish_states(&current_mqtt_config);
+        mqtt_diagnostics_publish_states(&current_mqtt_config);
         break;
     case MQTT_EVENT_DISCONNECTED:
         mqtt_release_tls_gate_if_held();
@@ -479,6 +481,10 @@ void mqtt_publish_task(void *pvParameters)
             // Settings states converge slowly too: MQTT commands republish
             // immediately; this cycle only catches up WebUI-side edits.
             mqtt_commands_publish_states(&current_mqtt_config);
+            // Journal history / log tail / crash tail share the same slow
+            // cadence; live events themselves are published immediately by
+            // the journal listener.
+            mqtt_diagnostics_publish_states(&current_mqtt_config);
         } else {
             // Update entity states ride every cycle so "in_progress"
             // install progress tracks the installer at ~60 s resolution.
@@ -1178,11 +1184,21 @@ void mqtt_handler_publish_ha_discovery(void)
     mqtt_commands_publish_discovery(&current_mqtt_config,
                                     sysInfo->getSerialNumber(), device);
 
+    // Stage-2 diagnostic entities (event entity, journal/log/crash sensors,
+    // radio-UART metrics, clear-crash-log button).
+    mqtt_diagnostics_publish_discovery(&current_mqtt_config,
+                                       sysInfo->getSerialNumber(), device);
+
     cJSON_Delete(device);
 }
 
 esp_err_t mqtt_handler_init(void)
 {
+    // Stage-2 diagnostics: every journalled event becomes a live HA event
+    // entity payload. Registered once here; publish calls are no-ops while
+    // the broker is not connected.
+    event_journal_set_listener(mqtt_diagnostics_on_journal_event);
+
     if (mqtt_lifecycle_mutex == NULL) {
         mqtt_lifecycle_mutex =
             xSemaphoreCreateMutexStatic(&mqtt_lifecycle_mutex_buffer);

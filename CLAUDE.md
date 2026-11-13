@@ -194,6 +194,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
 | `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`) |
 | `mqtt_commands.cpp` | Stage-1 "HA full control" MQTT surface: settings/monitoring/update commands, retained `status/settings/*` topics and the switch/number/select/text/button/update discovery entities; token-gated, factory reset deliberately excluded |
+| `mqtt_diagnostics.cpp` | Stage-2 "Diagnose ohne WebUI" MQTT surface: HA event entity fed by the event-journal listener, journal/log-tail/crash-tail sensors, radio-UART metrics discovery, clear-crash-log command |
 | `monitoring_api.cpp` | REST endpoints for monitoring config |
 | `ntpclient.cpp` | NTP time sync client |
 | `ntpserver.cpp` | NTP server for downstream clients |
