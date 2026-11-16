@@ -1850,6 +1850,25 @@ static bool set_log_level(const char *tag, const char *level)
     return true;
 }
 
+// Shared entry point for non-HTTP callers (MQTT command surface): unknown
+// tags are rejected so a typo cannot silently override the wrong subsystem.
+bool webui_apply_log_level_override(const char *tag, const char *level)
+{
+    if (tag == NULL || level == NULL || tag[0] == '\0' || level[0] == '\0') {
+        return false;
+    }
+    bool known = false;
+    for (size_t i = 0; LOG_LEVEL_TAGS[i]; i++)
+    {
+        if (!strcmp(LOG_LEVEL_TAGS[i], tag)) { known = true; break; }
+    }
+    if (!known) {
+        ESP_LOGW(TAG, "Rejected log level override for unknown tag %s", tag);
+        return false;
+    }
+    return set_log_level(tag, level);
+}
+
 esp_err_t get_loglevel_handler_func(httpd_req_t *req)
 {
     add_security_headers(req);

@@ -53,6 +53,12 @@ public:
 esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
                                         const httpd_uri_t *uri_handler);
 
+// Apply a temporary per-tag log verbosity override ("ERROR", "WARN", "INFO",
+// "DEBUG", "VERBOSE", "NONE", "DEFAULT") from outside the HTTP layer - used
+// by the MQTT command surface so both transports share the RAM-override
+// state the WebUI displays. Returns false for an unknown tag or level.
+bool webui_apply_log_level_override(const char *tag, const char *level);
+
 // Keep the existing large webui.cpp untouched while allowing the separate WWW
 // layer to intercept its route registrations. Other translation units can opt
 // out by defining HB_WEBUI_BYPASS_REGISTER_WRAPPER before including this file.

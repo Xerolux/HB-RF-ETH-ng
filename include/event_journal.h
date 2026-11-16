@@ -57,6 +57,14 @@ bool event_journal_copy(size_t index, event_journal_entry_t *entry);
 // Stable, wire-format name for an event id ("ccu_connected", ...).
 const char *event_journal_name(uint8_t event_id);
 
+// Optional synchronous listener invoked after every appended entry (outside
+// the ring lock, with a private copy of the entry). Registered by the MQTT
+// subsystem so live diagnostics do not need to poll the journal. The
+// callback runs on the emitting task and must never block; keep the
+// processing bounded (single publish, no flash I/O).
+typedef void (*event_journal_listener_t)(const event_journal_entry_t *entry);
+void event_journal_set_listener(event_journal_listener_t listener);
+
 #ifdef __cplusplus
 }
 #endif
