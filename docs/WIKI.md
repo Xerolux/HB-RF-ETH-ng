@@ -29,7 +29,7 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
   * Non-blocking UDP-Queue (32 Einträge) für zuverlässige Paketverarbeitung
   * Intelligentes Keep-Alive mit 10s Timeout und sofortiger Antwort
   * Sichere Disconnect-Erkennung ohne Race Conditions
-* MDNS Server um Platine im Netzwerk bekannt zu machen
+* MDNS Server um Platine im Netzwerk bekannt zu machen, inklusive dediziertem `_hb-rf-eth._tcp`-Service für die automatische Erkennung in Home Assistant
 * Netzwerkeinstellungen per DHCP oder statisch konfigurierbar
 * **IPv6 Support** (Auto-Konfiguration oder statisch)
 
@@ -314,6 +314,26 @@ Die HB-RF-ETH-ng Firmware bietet eine nahtlose Integration in Home Assistant via
 3. **Home Assistant Konfiguration:**
    - In Home Assistant werden automatisch alle Geräte gefunden
    - Keine manuelle Konfiguration erforderlich!
+
+### Automatische Erkennung im Netzwerk (mDNS/Zeroconf)
+
+Neben dem generischen `_http._tcp`-Service kündigt die Firmware einen dedizierten **`_hb-rf-eth._tcp`**-Service (Port 80) an. Der enthält als TXT-Records:
+
+| TXT-Record | Inhalt |
+|------------|--------|
+| `serial` | Geräteseriennummer (z.B. `A446B8`) |
+| `version` | Firmware-Version |
+| `board` | Platintyp |
+
+Home Assistants Zeroconf-Router ignoriert generische `_http._tcp`-Ankündigungen. Der dedizierte Service ermöglicht es Integrationen (z.B. `hb-rf-eth-hass`), Gateways im Netzwerk automatisch zu finden und den Config-Flow vorzubelegen — der Benutzer muss nur noch die WebUI-Zugangsdaten eingeben.
+
+Prüfen am Rechner im gleichen Netzwerk:
+
+```bash
+avahi-browse -rt _hb-rf-eth._tcp
+```
+
+> **Hinweis:** Der Zeroconf-Service erleichtert nur das Auffinden und Einrichten des Geräts. Die eigentliche Kommunikation mit Home Assistant läuft über MQTT (Auto-Discovery), wie in dieser Sektion beschrieben.
 
 ### Verbindungseinstellungen (Gerät → Broker)
 
