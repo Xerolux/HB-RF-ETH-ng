@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1-Beta.1] - 2026-11-16
+
+### Changes
+- merge: feature/ha-mqtt-stage1-control — HA control surface (stage 1+2), zeroconf service, stack fixes
+- docs: changelog entries and wiki mDNS section for the stage-1/2 release
+- chore(deps)(deps): bump vue-i18n from 11.4.18 to 11.4.19 in /webui (#495)
+- chore(deps)(deps-dev): bump @vitejs/plugin-vue in /webui (#494)
+- chore(deps)(deps): bump bootstrap from 5.3.8 to 5.3.9 in /webui (#493)
+- chore: bump firmware version to 2.4.1-Alpha.1
+- feat(mdns): announce dedicated _hb-rf-eth._tcp service for HA discovery
+- fix(mqtt): boot crash - stack overflow on the 2.3 KiB event-loop task
+- feat(mqtt): stage-2 diagnostics surface - events, journal, log and crash tail in HA
+- feat(mqtt): stage-1 Home Assistant full control surface
+- feat(firmware): heap corruption tripwire in the heap watchdog
+- chore: update manifests for v2.4.0-Beta.6
+
 ### Changes
 - feat(mqtt): stage-1 Home Assistant full control surface — token-gated MQTT command layer (`main/mqtt_commands.cpp`) so every routine operation can be driven from Home Assistant after initial setup: LED brightness and per-state programs, log capture, maintenance restart schedule, hostname, CCU address, NTP server and timezone, the full auto-update configuration (mode/channel/interval/window/idleOnly), monitoring toggles incl. syslog/CheckMK/Prometheus/notify settings, native HA update entities for firmware and WebUI (check + install), `reset_relay_stats`, `test_notify` and a RAM `log_level` override. Retained settings states are published on connect, after accepted commands and on a slow cycle so WebUI edits converge. Factory reset, network/IPv4/IPv6 config, MQTT broker settings and credentials remain MQTT-unreachable by design.
 - feat(mqtt): stage-2 diagnostics surface — incident diagnosis without the WebUI: live journalled device events as HA event trigger, the reboot-surviving event journal (10 newest entries), the system-log tail and the crash tail (non-destructive) become HA entities over MQTT, plus a token-gated `clear_crash_log` command sharing the WebUI endpoint's NVS slot and lock discipline. Discovery now also announces `min_free_heap` and the six `radio_uart_*` metrics.
