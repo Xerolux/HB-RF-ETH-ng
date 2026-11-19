@@ -469,11 +469,15 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
         // before the heap watchdog restarts the device.
         APPEND_CHECKMK("<<<local:sep(0)>>>\n");
         if (g_sysInfo) {
+            // Checkmk shows the text as the service summary; the metric value
+            // itself only appears in the details, so repeat it in the text.
+            const double cpu = g_sysInfo->getCpuUsage();
             APPEND_CHECKMK("P \"CPU utilization\" util=%.1f;%u;%u;0;100 "
-                           "Both cores, from FreeRTOS run-time statistics\n",
-                           g_sysInfo->getCpuUsage(),
+                           "Total CPU: %.1f%% (both cores, FreeRTOS run-time statistics)\n",
+                           cpu,
                            (unsigned)CHECKMK_CPU_WARN_PERCENT,
-                           (unsigned)CHECKMK_CPU_CRIT_PERCENT);
+                           (unsigned)CHECKMK_CPU_CRIT_PERCENT,
+                           cpu);
         }
         {
             const size_t heap_total = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
