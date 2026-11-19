@@ -96,6 +96,18 @@ update_check_trigger_result_t update_check_trigger(const char *channel);
 /** Snapshot of the current state. Safe to call from any task. */
 UpdateCheckStatus update_check_get_status();
 
+/**
+ * @brief True when the most recent skip was the heap admission gate refusing
+ *        the fetch (see updatecheck_heap_policy.h).
+ *
+ * The scheduler retries this case hourly instead of after the full interval:
+ * heap pressure is transient (worker releases settle, traffic comes and
+ * goes) and the refused fetch never reached the network, so the retry is
+ * free while a full-interval wait would keep the device blind to a
+ * published release for a whole day.
+ */
+bool update_check_last_skip_was_memory(void);
+
 /** True when `channel` is one this firmware knows how to fetch. */
 bool update_check_valid_channel(const char *channel);
 

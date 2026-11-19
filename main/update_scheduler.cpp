@@ -498,8 +498,21 @@ static void run_scheduled_search_locked(bool first_attempt)
             break;
         case SEARCH_SKIPPED:
             // A skip is not a failure: the gates refused, nothing was
-            // fetched. Retry at the full interval, no backoff ladder.
-            s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
+            // fetched. The general case retries at the full interval, no
+            // backoff ladder. The memory gate is the exception: heap
+            // pressure is transient (monitoring releases settle, traffic
+            // comes and goes) and the refused fetch never touched the
+            // network, so an hourly retry is free and keeps one fragmented
+            // nightly tick from hiding a published update for a whole day
+            // (live finding: a scheduled check skipped at free=55 KB /
+            // largest block=20 KB while a manual fetch on the same device
+            // succeeded minutes later).
+            if (update_check_last_skip_was_memory()) {
+                s_state.hours_accumulated = 0;
+                s_state.next_check_unix   = now_unix() + 3600;
+            } else {
+                s_state.next_check_unix = now_unix() + (int64_t)interval * 3600;
+            }
             break;
         case SEARCH_FAILED:
             s_state.consecutive_failures++;

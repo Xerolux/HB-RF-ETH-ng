@@ -65,6 +65,22 @@ static constexpr int NET_MUTEX_WAIT_MS      = 5000;
 // Repeated presses must not turn into repeated TLS handshakes.
 static constexpr int64_t COOLDOWN_US = 60 * 1000000LL;
 
+// Post-release settle window for the heap admission gate. The monitoring
+// workers acknowledge monitoring_pause_for_ota() before their TLS sessions
+// and lwIP buffers are actually back on the heap, so a single re-measured
+// sample can still see the fragmented "before" state (live finding: a
+// scheduled check refused at free=55 KB / largest block=20 KB while the
+// same device admitted a manual fetch minutes later). The gate keeps
+// sampling for this window before a refusal becomes final.
+static constexpr int RELEASE_SETTLE_WINDOW_MS = 2000;
+static constexpr int RELEASE_SETTLE_STEP_MS   = 250;
+
+// The scheduler retries a memory-gated skip hourly instead of after the full
+// interval (heap pressure is transient and the refused fetch never reached
+// the network), so the reason must be recognisable outside this file without
+// coupling the caller to the exact wording.
+static constexpr const char *SKIP_LOW_MEMORY = "Too little free memory";
+
 static constexpr const char *MANIFEST_URL_FORMAT =
     "https://xerolux.github.io/HB-RF-ETH-ng/updates/v1/%s.json?fetch=%u";
 
@@ -357,6 +373,7 @@ static void update_check_task(void *parameter)
     uint32_t released_mask              = 0;
     bool monitoring_released            = false; // decision input: release phase done
     bool we_own_release                 = false; // cleanup owns monitoring_resume_after_ota
+    uint32_t settle_waited_ms           = 0;     // post-release sampling budget
 
     // A firmware or WebUI image is being written: that operation owns the
     // flash and the network budget, and a manifest is never worth disturbing it.
@@ -388,18 +405,31 @@ static void update_check_task(void *parameter)
             if (monitoring_released) {
                 ESP_LOGI(TAG,
                          "Update fetch admitted after releasing monitoring workers "
-                         "(free=%u KB, largest block=%u KB)",
+                         "(free=%u KB, largest block=%u KB, settled after %u ms)",
                          static_cast<unsigned>(free_bytes / 1024),
-                         static_cast<unsigned>(largest / 1024));
+                         static_cast<unsigned>(largest / 1024),
+                         static_cast<unsigned>(settle_waited_ms));
             }
             break;
         }
         if (decision == UPDATE_CHECK_HEAP_REFUSE) {
+            // REFUSE is only reachable after the release phase, and the heap
+            // needs a moment before the asynchronously freed TLS sessions and
+            // lwIP buffers show up in the measurements. Sample the settle
+            // window before the refusal becomes final; the extra ~2 s run in
+            // this short-lived worker and cost nothing on the network.
+            if (settle_waited_ms < (uint32_t)RELEASE_SETTLE_WINDOW_MS) {
+                settle_waited_ms += RELEASE_SETTLE_STEP_MS;
+                vTaskDelay(pdMS_TO_TICKS(RELEASE_SETTLE_STEP_MS));
+                continue;
+            }
             char reason[UPDATE_CHECK_REASON_LEN];
             snprintf(reason, sizeof(reason),
-                     "Too little free memory (free=%u KB, largest block=%u KB)",
+                     "%s (free=%u KB, largest block=%u KB%s)",
+                     SKIP_LOW_MEMORY,
                      static_cast<unsigned>(free_bytes / 1024),
-                     static_cast<unsigned>(largest / 1024));
+                     static_cast<unsigned>(largest / 1024),
+                     monitoring_released ? ", after worker release" : "");
             finish_with_skip(reason);
             goto cleanup;
         }
@@ -421,7 +451,8 @@ static void update_check_task(void *parameter)
         // Both successful outcomes mean the workers are stopped and the
         // decision must not ask for another release.
         monitoring_released = true;
-        vTaskDelay(pdMS_TO_TICKS(200));
+        settle_waited_ms    = RELEASE_SETTLE_STEP_MS;
+        vTaskDelay(pdMS_TO_TICKS(RELEASE_SETTLE_STEP_MS));
     }
 
     // One outbound TLS session at a time, device-wide. Waiting rather than
@@ -547,6 +578,17 @@ UpdateCheckStatus update_check_get_status()
     }
     xSemaphoreGive(s_lock);
     return copy;
+}
+
+bool update_check_last_skip_was_memory(void)
+{
+    bool matched = false;
+    if (s_lock && xSemaphoreTake(s_lock, pdMS_TO_TICKS(50)) == pdTRUE) {
+        matched = strncmp(s_status.lastSkipReason, SKIP_LOW_MEMORY,
+                          strlen(SKIP_LOW_MEMORY)) == 0;
+        xSemaphoreGive(s_lock);
+    }
+    return matched;
 }
 
 int update_check_fetch_manifest(const char *channel, char *buffer, size_t buffer_size,
