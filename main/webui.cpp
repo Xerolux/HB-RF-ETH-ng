@@ -101,6 +101,54 @@ EMBED_HANDLER("/favicon.ico", favicon_ico_gz, "image/x-icon", "gzip")
 EMBED_HANDLER("/manifest.webmanifest", manifest_webmanifest_gz, "application/manifest+json", "gzip")
 EMBED_HANDLER("/icon-256.png", icon_256_png_gz, "image/png", "gzip")
 
+// Legacy /esp/* paths (system.htm, firmware.htm, ...) belonged to the original
+// HB-RF-ETH firmware and are still requested by old browser tabs and by CCU
+// installations that embed the gateway UI through their /esp reverse proxy
+// (observed: a tab polling POST /esp/system.htm?action=UpdateUI once a minute).
+// This firmware serves a SPA instead, so those requests match no route and the
+// CCU proxy turned the resulting 404 into one HTTP 500 per minute in its logs.
+// Answer the legacy paths with a permanent redirect to the WebUI root:
+// browsers follow it (a POST is retried as GET) and old bookmarks keep working.
+static esp_err_t legacy_esp_redirect_handler_func(httpd_req_t *req)
+{
+    add_security_headers(req);
+
+    // Legacy UpdateUI polls POST a form body; drain it so the keep-alive
+    // connection can be reused instead of being aborted mid-body.
+    if (req->content_len > 0)
+    {
+        char discard[64];
+        size_t remaining = (size_t)req->content_len;
+        while (remaining > 0)
+        {
+            int n = httpd_req_recv(req, discard,
+                                   remaining < sizeof(discard) ? remaining : sizeof(discard));
+            if (n <= 0)
+                break;
+            remaining -= (size_t)n;
+        }
+    }
+
+    httpd_resp_set_status(req, "301 Moved Permanently");
+    httpd_resp_set_hdr(req, "Location", "/");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, "The legacy /esp/ pages no longer exist. The WebUI is available at /.");
+    return ESP_OK;
+}
+
+static httpd_uri_t legacy_esp_redirect_get_handler = {
+    .uri = "/esp/*",
+    .method = HTTP_GET,
+    .handler = legacy_esp_redirect_handler_func,
+    .user_ctx = NULL};
+
+static httpd_uri_t legacy_esp_redirect_post_handler = {
+    .uri = "/esp/*",
+    .method = HTTP_POST,
+    .handler = legacy_esp_redirect_handler_func,
+    .user_ctx = NULL};
+
 static Settings *_settings;
 static LED *_statusLED;
 static SysInfo *_sysInfo;
@@ -2209,9 +2257,11 @@ void WebUI::start()
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.lru_purge_enable = true;
-    // Reserve capacity for modular diagnostics/theme APIs and the three
-    // update-config/schedule handlers added by update_api.cpp.
-    config.max_uri_handlers = 48;
+    // Reserve capacity for modular diagnostics/theme APIs, the update-config
+    // handlers, the two /api/webui storage endpoints (registered on the first
+    // wrapped call) and the legacy /esp/* redirect pair. Count before raising
+    // anything else: WebUI::start() registers 50 routes in total.
+    config.max_uri_handlers = 56;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = log_stream_close_socket;
     // Increase stack: POST handlers allocate content buffers + config structs
@@ -2277,6 +2327,10 @@ void WebUI::start()
         // PWA assets
         httpd_register_uri_handler(_httpd_handle, &manifest_webmanifest_gz_handler);
         httpd_register_uri_handler(_httpd_handle, &icon_256_png_gz_handler);
+        // Legacy /esp/* redirect — must be registered before the SPA
+        // catch-all below, otherwise "/*" would swallow it.
+        httpd_register_uri_handler(_httpd_handle, &legacy_esp_redirect_get_handler);
+        httpd_register_uri_handler(_httpd_handle, &legacy_esp_redirect_post_handler);
         // SPA catch-all last.
         httpd_register_uri_handler(_httpd_handle, &index_html_gz_handler);
     }
