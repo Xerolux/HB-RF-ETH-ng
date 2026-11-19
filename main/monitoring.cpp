@@ -305,11 +305,13 @@ SysInfo* monitoring_get_sysinfo(void) {
 
 // Levels for the Checkmk local checks emitted by the agent below. The heap
 // levels deliberately sit above the heap watchdog's restart threshold
-// (HEAP_WATCHDOG_CRITICAL_BYTES = 20 KB) so monitoring warns first.
+// (HEAP_WATCHDOG_CRITICAL_BYTES = 20 KB) so monitoring warns first, and
+// below the steady-state free heap of 2.4.x (~38 KB on a running device,
+// ~32 KB lowest since boot) so a healthy device stays OK.
 static constexpr unsigned CHECKMK_CPU_WARN_PERCENT = 80;
 static constexpr unsigned CHECKMK_CPU_CRIT_PERCENT = 90;
-static constexpr size_t CHECKMK_HEAP_FREE_WARN_BYTES = 40 * 1024;
-static constexpr size_t CHECKMK_HEAP_FREE_CRIT_BYTES = 24 * 1024;
+static constexpr size_t CHECKMK_HEAP_FREE_WARN_BYTES = 28 * 1024;
+static constexpr size_t CHECKMK_HEAP_FREE_CRIT_BYTES = 22 * 1024;
 static constexpr size_t CHECKMK_HEAP_BLOCK_WARN_BYTES = 16 * 1024;
 static constexpr size_t CHECKMK_HEAP_BLOCK_CRIT_BYTES = 8 * 1024;
 
