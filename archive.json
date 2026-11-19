@@ -1,7 +1,37 @@
 {
   "schema": 1,
-  "updatedAt": "2026-11-16T08:49:22Z",
+  "updatedAt": "2026-11-19T10:10:12Z",
   "releases": [
+    {
+      "version": "2.4.1-Beta.2",
+      "channel": "beta",
+      "isPrerelease": true,
+      "publishedAt": "2026-11-19T10:10:12Z",
+      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.1-Beta.2/firmware_2.4.1-Beta.2.bin",
+      "sha256": "7cc97a20f69715aea0a20a1298e5ab4e370a81a2fc524fd8314a964495c6ab3b",
+      "size": 1395056,
+      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.1-Beta.2",
+      "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.1-Beta.2",
+      "webui": {
+        "version": "1.2.0-Beta.2",
+        "design": "newdesign",
+        "apiVersion": 1,
+        "minFirmwareVersion": "2.3.0-Beta.1",
+        "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.1-Beta.2/webui_1.2.0-Beta.2.bin",
+        "sha256": "f5eec33926851e6cdb72d8a66ff2d7c626806c0bc681d91a763ee7969134761e",
+        "size": 327680,
+        "partition": "spiffs",
+        "format": 1,
+        "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.1-Beta.2",
+        "publishedAt": "2026-11-19T10:10:12Z"
+      },
+      "tagName": "v2.4.1-Beta.2",
+      "name": "HB-RF-ETH-ng v2.4.1-Beta.2",
+      "prerelease": true,
+      "assetName": "firmware_2.4.1-Beta.2.bin",
+      "webuiAssetName": "webui_1.2.0-Beta.2.bin",
+      "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.4.1-Beta.2 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) > \u26a0\ufe0f **Pre-Release** - Testversion, Nutzung auf eig\u2026"
+    },
     {
       "version": "2.4.1-Beta.1",
       "channel": "beta",
@@ -1443,35 +1473,6 @@
       "assetName": "firmware_2.2.5-Beta.14.bin",
       "webuiAssetName": "webui_1.0.0-Beta.12.bin",
       "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.2.5-Beta.14 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) > \u26a0\ufe0f **Pre-Release** - Testversion, Nutzung auf ei\u2026"
-    },
-    {
-      "version": "2.2.5-Beta.13",
-      "channel": "beta",
-      "isPrerelease": true,
-      "publishedAt": "2026-07-24T11:51:07Z",
-      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.13/firmware_2.2.5-Beta.13.bin",
-      "sha256": "aafcd97b6e27a9d4326ecbe8fcba553656bb52c03371b679d16ca1789e988a88",
-      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.13",
-      "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.13",
-      "webui": {
-        "version": "1.0.0-Beta.11",
-        "design": "newdesign",
-        "apiVersion": 1,
-        "minFirmwareVersion": "2.2.5-Beta.1",
-        "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.13/webui_1.0.0-Beta.11.bin",
-        "sha256": "ef1dcb04ce866b06fa2dd5a43c148aa622eb8b8b6163de0ca65dcb6621272106",
-        "size": 327680,
-        "partition": "spiffs",
-        "format": 1,
-        "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.13",
-        "publishedAt": "2026-07-24T11:51:07Z"
-      },
-      "tagName": "v2.2.5-Beta.13",
-      "name": "HB-RF-ETH-ng v2.2.5-Beta.13",
-      "prerelease": true,
-      "assetName": "firmware_2.2.5-Beta.13.bin",
-      "webuiAssetName": "webui_1.0.0-Beta.11.bin",
-      "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.2.5-Beta.13 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) > \u26a0\ufe0f **Pre-Release** - Testversion, Nutzung auf ei\u2026"
     }
   ]
 }
