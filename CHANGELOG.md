@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1-Beta.2] - 2026-11-19
+
+### Changes
+- fix(webui,log): legacy /esp redirect and line-aligned log exports
+- chore: update manifests for v2.4.1-Beta.1
+
 ### Fixed
 - fix(webui): legacy `/esp/*` paths (old firmware pages still polled once a minute by stale browser tabs and CCU `/esp` reverse-proxy embeddings via `POST /esp/system.htm?action=UpdateUI`) now answer with a 301 redirect to the WebUI root instead of an unmatched route whose 404 the CCU proxy reported as recurring HTTP 500 log spam; `max_uri_handlers` raised accordingly
 - fix(log): system-log snapshot and download now start at a line boundary when older ring-buffer content was overwritten — no more garbled first line (e.g. `mI (678) ...` missing its ANSI colour escape) in exported logs
