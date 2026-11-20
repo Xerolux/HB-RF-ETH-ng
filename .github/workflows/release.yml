@@ -283,18 +283,9 @@ jobs:
       - name: Generate release notes
         run: |
           FIRMWARE_VERSION="${{ steps.firmware.outputs.VERSION }}"
+          notes="docs/release-notes/firmware-${FIRMWARE_VERSION}.md"
+          test -s "$notes" || { printf 'Missing release notes: %s\n' "$notes" >&2; exit 1; }
           python generate_release_notes.py "$FIRMWARE_VERSION" release/RELEASE_NOTES.md
-          if [ -f "docs/release-notes/firmware-${FIRMWARE_VERSION}.md" ]; then
-            exit 0
-          fi
-          cat >> release/RELEASE_NOTES.md <<'EOF'
-
-          ## Included WebUI
-
-          - WebUI version: `${{ steps.webui.outputs.VERSION }}`
-          - WebUI API: `${{ steps.webui.outputs.API_VERSION }}`
-          - Minimum firmware: `${{ steps.webui.outputs.MIN_FIRMWARE }}`
-          EOF
 
       - name: Create checksums
         run: |
