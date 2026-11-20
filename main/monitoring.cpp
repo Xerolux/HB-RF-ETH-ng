@@ -310,10 +310,10 @@ SysInfo* monitoring_get_sysinfo(void) {
 // 30-32 KB lowest since boot) so a healthy device stays OK. Short dips
 // (TLS handshakes, WebUI sessions, OTA) are expected; sustained low heap is
 // what matters, so tune "max check attempts" in Checkmk rather than these.
-static constexpr unsigned CHECKMK_CPU_WARN_PERCENT = 80;
-static constexpr unsigned CHECKMK_CPU_CRIT_PERCENT = 90;
-static constexpr size_t CHECKMK_HEAP_FREE_WARN_BYTES = 25 * 1024;
-static constexpr size_t CHECKMK_HEAP_FREE_CRIT_BYTES = 22 * 1024;
+static constexpr unsigned CHECKMK_CPU_WARN_PERCENT    = 80;
+static constexpr unsigned CHECKMK_CPU_CRIT_PERCENT    = 90;
+static constexpr size_t CHECKMK_HEAP_FREE_WARN_BYTES  = 25 * 1024;
+static constexpr size_t CHECKMK_HEAP_FREE_CRIT_BYTES  = 22 * 1024;
 static constexpr size_t CHECKMK_HEAP_BLOCK_WARN_BYTES = 16 * 1024;
 static constexpr size_t CHECKMK_HEAP_BLOCK_CRIT_BYTES = 8 * 1024;
 
@@ -476,15 +476,13 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
             const double cpu = g_sysInfo->getCpuUsage();
             APPEND_CHECKMK("P \"CPU utilization\" util=%.1f;%u;%u;0;100 "
                            "Total CPU: %.1f%% (both cores, FreeRTOS run-time statistics)\n",
-                           cpu,
-                           (unsigned)CHECKMK_CPU_WARN_PERCENT,
-                           (unsigned)CHECKMK_CPU_CRIT_PERCENT,
-                           cpu);
+                           cpu, (unsigned)CHECKMK_CPU_WARN_PERCENT,
+                           (unsigned)CHECKMK_CPU_CRIT_PERCENT, cpu);
         }
         {
-            const size_t heap_total = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
-            const size_t heap_free = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-            const size_t heap_min = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_total   = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_free    = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_min     = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
             const size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
             APPEND_CHECKMK("P \"Heap\" "
                            "heap_free=%u;%u:;%u:;0;%u|"
@@ -492,20 +490,16 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
                            "heap_largest_free_block=%u;%u:;%u:;0;%u "
                            "Free %u kB of %u kB, lowest since boot %u kB, "
                            "largest free block %u kB\n",
-                           (unsigned)heap_free,
-                           (unsigned)CHECKMK_HEAP_FREE_WARN_BYTES,
-                           (unsigned)CHECKMK_HEAP_FREE_CRIT_BYTES,
-                           (unsigned)heap_total,
-                           (unsigned)heap_min, (unsigned)heap_total,
-                           (unsigned)heap_largest,
+                           (unsigned)heap_free, (unsigned)CHECKMK_HEAP_FREE_WARN_BYTES,
+                           (unsigned)CHECKMK_HEAP_FREE_CRIT_BYTES, (unsigned)heap_total,
+                           (unsigned)heap_min, (unsigned)heap_total, (unsigned)heap_largest,
                            (unsigned)CHECKMK_HEAP_BLOCK_WARN_BYTES,
-                           (unsigned)CHECKMK_HEAP_BLOCK_CRIT_BYTES,
-                           (unsigned)heap_total,
+                           (unsigned)CHECKMK_HEAP_BLOCK_CRIT_BYTES, (unsigned)heap_total,
                            (unsigned)(heap_free / 1024), (unsigned)(heap_total / 1024),
                            (unsigned)(heap_min / 1024), (unsigned)(heap_largest / 1024));
         }
 
-        #undef APPEND_CHECKMK
+#undef APPEND_CHECKMK
 
         // send() may legally write only part of the buffer. Finish the bounded
         // 2 KB response or fail explicitly instead of silently truncating it.
