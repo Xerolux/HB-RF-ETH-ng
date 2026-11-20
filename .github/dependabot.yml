@@ -31,7 +31,7 @@ updates:
       - "Xerolux"
     labels:
       - "dependencies"
-      - "github-actions"
+      - "ci"
     commit-message:
       prefix: "chore(ci)"
       include: "scope"

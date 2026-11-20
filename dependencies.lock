@@ -46,7 +46,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 6.1.0
+    version: 6.1.1
 direct_dependencies:
 - espressif/cjson
 - espressif/lan87xx

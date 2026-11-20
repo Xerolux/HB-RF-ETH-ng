@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Build and package the firmware with ESP-IDF v6.1.1.
+
+### Fixed
+
+- Allocate the MQTT command worker and queue only when MQTT commands are enabled at client startup (#496).
+- Reject incomplete or oversized MQTT command messages before queueing them.
+- Keep the board revision string alive while registering the Home Assistant mDNS service.
+- Clarify serial installation for releases without an OTA initialization image (#497).
+
 ## [2.4.1-Beta.2] - 2026-11-19
 
 ### Changes

@@ -23,6 +23,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <string>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -409,10 +410,11 @@ void app_main()
             // the hb-rf-eth-hass integration's "_hb-rf-eth._tcp" manifest
             // entry. TXT records let the config flow prefill host, serial
             // and firmware version without a login round trip.
+            const std::string board_revision = sysInfo.getBoardRevisionString();
             mdns_txt_item_t svc_txt[] = {
                 {"serial", sysInfo.getSerialNumber()},
                 {"version", sysInfo.getCurrentVersion()},
-                {"board", sysInfo.getBoardRevisionString().c_str()},
+                {"board", board_revision.c_str()},
             };
             mdns_service_add(NULL, "_hb-rf-eth", "_tcp", 80, svc_txt,
                              sizeof(svc_txt) / sizeof(svc_txt[0]));

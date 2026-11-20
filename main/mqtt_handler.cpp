@@ -90,7 +90,7 @@ static std::atomic<bool> mqtt_extras_pending{false};
 // serialized on this dedicated worker (also a nice ordering guarantee).
 typedef struct {
     char command[64];
-    char payload[512];
+    char payload[513];
     int payload_len;
 } mqtt_command_msg_t;
 static QueueHandle_t mqtt_command_queue = NULL;
@@ -439,30 +439,26 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             snprintf(command_topic_prefix, sizeof(command_topic_prefix), "%s/command/", current_mqtt_config.topic_prefix);
             size_t prefix_len = strlen(command_topic_prefix);
 
-            if ((size_t)event->topic_len > prefix_len &&
+            if (event->topic != NULL && event->topic_len > static_cast<int>(prefix_len) &&
                 strncmp(event->topic, command_topic_prefix, prefix_len) == 0) {
-                char command[64];
-                size_t cmd_len = (size_t)event->topic_len - prefix_len;
-                if (cmd_len >= sizeof(command)) cmd_len = sizeof(command) - 1;
-                memcpy(command, event->topic + prefix_len, cmd_len);
-                command[cmd_len] = '\0';
-                // Execute on the dedicated worker: command handling includes
-                // NVS writes, the ~6.7 KiB monitoring config (heap on the
-                // worker) and state republishes - all beyond the 2.3 KiB
-                // event-loop stack. Serialized execution also orders
-                // concurrent commands.
                 mqtt_command_msg_t msg = {};
-                snprintf(msg.command, sizeof(msg.command), "%s", command);
-                msg.payload_len = event->data_len;
-                if (msg.payload_len > (int)sizeof(msg.payload)) {
-                    msg.payload_len = sizeof(msg.payload);
+                const size_t cmd_len = static_cast<size_t>(event->topic_len) - prefix_len;
+                if (cmd_len >= sizeof(msg.command) || event->current_data_offset != 0 ||
+                    event->data_len != event->total_data_len || event->data_len < 0 ||
+                    event->data_len >= static_cast<int>(sizeof(msg.payload)) ||
+                    (event->data_len > 0 && event->data == NULL)) {
+                    mqtt_handler_publish_event(
+                        "event/command_rejected", "reason=invalid_message");
+                    break;
                 }
-                if (event->data != NULL && msg.payload_len > 0) {
+                memcpy(msg.command, event->topic + prefix_len, cmd_len);
+                msg.payload_len = event->data_len;
+                if (msg.payload_len > 0) {
                     memcpy(msg.payload, event->data, msg.payload_len);
                 }
                 if (mqtt_command_queue != NULL &&
                     xQueueSend(mqtt_command_queue, &msg, 0) != pdTRUE) {
-                    ESP_LOGW(TAG, "MQTT command queue full; rejecting %s", command);
+                    ESP_LOGW(TAG, "MQTT command queue full; rejecting %s", msg.command);
                     mqtt_handler_publish_event(
                         "event/command_rejected", "reason=worker_busy");
                 }
@@ -1247,10 +1243,6 @@ static void mqtt_command_worker(void *)
         if (xQueueReceive(mqtt_command_queue, &msg, portMAX_DELAY) != pdTRUE) {
             continue;
         }
-        msg.payload[msg.payload_len >= 0 &&
-                            msg.payload_len < (int)sizeof(msg.payload)
-                        ? msg.payload_len
-                        : 0] = '\0';
         handle_mqtt_command(msg.command, msg.payload, msg.payload_len);
     }
 }
@@ -1261,22 +1253,6 @@ esp_err_t mqtt_handler_init(void)
     // entity payload. Registered once here; publish calls are no-ops while
     // the broker is not connected.
     event_journal_set_listener(mqtt_diagnostics_on_journal_event);
-
-    if (mqtt_command_queue == NULL) {
-        mqtt_command_queue = xQueueCreate(8, sizeof(mqtt_command_msg_t));
-    }
-    if (mqtt_command_queue == NULL) {
-        ESP_LOGE(TAG, "MQTT command queue unavailable");
-        return ESP_ERR_NO_MEM;
-    }
-    static bool command_worker_started = false;
-    if (!command_worker_started) {
-        if (xTaskCreate(mqtt_command_worker, "mqtt_cmd", 6144, NULL, 5, NULL) != pdPASS) {
-            ESP_LOGE(TAG, "MQTT command worker could not be created");
-            return ESP_ERR_NO_MEM;
-        }
-        command_worker_started = true;
-    }
 
     if (mqtt_lifecycle_mutex == NULL) {
         mqtt_lifecycle_mutex =
@@ -1373,6 +1349,22 @@ static esp_err_t mqtt_start_locked(const mqtt_config_t *config)
     if (strlen(config->server) == 0) {
         ESP_LOGE(TAG, "MQTT Server address is empty");
         return ESP_ERR_INVALID_ARG;
+    }
+
+    // Keep the queue and worker available for subsequent client restarts.
+    // Boards that never enable commands do not pay their heap cost.
+    if (config->command_enabled && mqtt_command_queue == NULL) {
+        mqtt_command_queue = xQueueCreate(8, sizeof(mqtt_command_msg_t));
+        if (mqtt_command_queue == NULL) {
+            ESP_LOGE(TAG, "MQTT command queue unavailable");
+            return ESP_ERR_NO_MEM;
+        }
+        if (xTaskCreate(mqtt_command_worker, "mqtt_cmd", 6144, NULL, 5, NULL) != pdPASS) {
+            vQueueDelete(mqtt_command_queue);
+            mqtt_command_queue = NULL;
+            ESP_LOGE(TAG, "MQTT command worker could not be created");
+            return ESP_ERR_NO_MEM;
+        }
     }
 
     ESP_LOGI(TAG, "Starting MQTT client connecting to %s:%d", config->server, config->port);

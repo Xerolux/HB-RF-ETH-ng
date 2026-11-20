@@ -4,9 +4,9 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-STABLE_IDF = "v6.1"
-LOCKFILE_IDF_VERSION = "6.1.0"
-SDKCONFIG_IDF_INIT_VERSION = "6.1.0"
+STABLE_IDF = "v6.1.1"
+LOCKFILE_IDF_VERSION = "6.1.1"
+SDKCONFIG_IDF_INIT_VERSION = "6.1.1"
 FIRMWARE_WORKFLOWS = (
     ".github/workflows/build.yml",
     ".github/workflows/pr-check.yml",
@@ -58,7 +58,7 @@ class InterruptSafetyPolicyTest(unittest.TestCase):
         self.assertIn(f'ESP_IDF_VERSION="${{ESP_IDF_VERSION:-{STABLE_IDF}}}"', setup_script)
 
         readme = self.read("README.md")
-        self.assertIn("ESP-IDF 6.1", readme)
+        self.assertIn("ESP-IDF 6.1.1", readme)
 
     def test_idf_patches_are_applied_in_every_firmware_workflow(self) -> None:
         # Both IDF patches are part of the firmware, not of the CI recipe: a
