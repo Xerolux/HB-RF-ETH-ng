@@ -198,13 +198,18 @@ class MonitoringIntegrityPolicyTest(unittest.TestCase):
             "monitoring_update_request_complete(schedule_err, response)", post
         )
 
+        self.assertIn("config_heap.release()", post)
         worker = section(
             MONITORING,
             "static void apply_config_task",
             "// Schedule configuration update asynchronously",
         )
         self.assertLess(
-            worker.index("monitoring_update_config(&job->config)"),
+            worker.index("monitoring_update_config(job->config)"),
+            worker.index("completion(update_result, completion_context)"),
+        )
+        self.assertLess(
+            worker.index("free(job->config)"),
             worker.index("completion(update_result, completion_context)"),
         )
         self.assertLess(

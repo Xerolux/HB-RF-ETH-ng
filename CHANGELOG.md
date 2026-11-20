@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Allocate the MQTT command worker and queue only when MQTT commands are enabled at client startup (#496).
 - Reject incomplete or oversized MQTT command messages before queueing them.
+- Allocate MQTT command payloads when received, reducing idle heap use.
+- Transfer the monitoring configuration to the background worker without allocating a second copy.
 - Keep the board revision string alive while registering the Home Assistant mDNS service.
 - Clarify serial installation for releases without an OTA initialization image (#497).
 
