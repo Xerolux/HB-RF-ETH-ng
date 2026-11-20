@@ -303,6 +303,20 @@ SysInfo* monitoring_get_sysinfo(void) {
     return g_sysInfo;
 }
 
+// Levels for the Checkmk local checks emitted by the agent below. The heap
+// levels deliberately sit above the heap watchdog's restart threshold
+// (HEAP_WATCHDOG_CRITICAL_BYTES = 20 KB) so monitoring warns first, and
+// below the steady-state free heap of 2.4.x (38-43 KB on a running device,
+// 30-32 KB lowest since boot) so a healthy device stays OK. Short dips
+// (TLS handshakes, WebUI sessions, OTA) are expected; sustained low heap is
+// what matters, so tune "max check attempts" in Checkmk rather than these.
+static constexpr unsigned CHECKMK_CPU_WARN_PERCENT    = 80;
+static constexpr unsigned CHECKMK_CPU_CRIT_PERCENT    = 90;
+static constexpr size_t CHECKMK_HEAP_FREE_WARN_BYTES  = 25 * 1024;
+static constexpr size_t CHECKMK_HEAP_FREE_CRIT_BYTES  = 22 * 1024;
+static constexpr size_t CHECKMK_HEAP_BLOCK_WARN_BYTES = 16 * 1024;
+static constexpr size_t CHECKMK_HEAP_BLOCK_CRIT_BYTES = 8 * 1024;
+
 static void checkmk_agent_cycle(const checkmk_config_t &config)
 {
     struct sockaddr_in server_addr;
@@ -439,18 +453,104 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
         APPEND_CHECKMK("<<<uptime>>>\n");
         APPEND_CHECKMK("%lu\n", (unsigned long)(days * 86400 + hours * 3600 + minutes * 60));
 
-        // Memory section
-        APPEND_CHECKMK("<<<mem>>>\n");
-        APPEND_CHECKMK("MemTotal: %lu kB\n",
-                       (unsigned long)(heap_caps_get_total_size(MALLOC_CAP_DEFAULT) / 1024));
-        APPEND_CHECKMK("MemFree: %lu kB\n",
-                       (unsigned long)(heap_caps_get_free_size(MALLOC_CAP_DEFAULT) / 1024));
+        // CPU and heap as Checkmk local checks.
+        //
+        // The previous <<<cpu>>> and <<<mem>>> sections borrowed the names of
+        // the Linux agent sections but not their formats, so Checkmk dropped
+        // both without creating a service: <<<cpu>>> must look like
+        // /proc/loadavg ("0.26 0.47 0.52 2/459 19531 4"), and <<<mem>>> is only
+        // evaluated when it carries the full /proc/meminfo key set (Buffers,
+        // Cached, Dirty, Writeback, Swap*). An ESP32 has neither a load
+        // average nor those memory classes, so faking them would be wrong.
+        //
+        // Local checks are understood by every Checkmk edition without a
+        // server-side plugin. State "P" lets Checkmk derive OK/WARN/CRIT from
+        // the levels in the metrics ("N:" is a lower level: alert when the
+        // value drops below N); several metrics are joined by "|". The heap
+        // levels sit above HEAP_WATCHDOG_CRITICAL_BYTES so Checkmk warns
+        // before the heap watchdog restarts the device.
+        APPEND_CHECKMK("<<<local:sep(0)>>>\n");
+        if (g_sysInfo) {
+            // Checkmk shows the text as the service summary; the metric value
+            // itself only appears in the details, so repeat it in the text.
+            const double cpu = g_sysInfo->getCpuUsage();
+            APPEND_CHECKMK("P \"CPU utilization\" util=%.1f;%u;%u;0;100 "
+                           "Total CPU: %.1f%% (both cores, FreeRTOS run-time statistics)\n",
+                           cpu, (unsigned)CHECKMK_CPU_WARN_PERCENT,
+                           (unsigned)CHECKMK_CPU_CRIT_PERCENT, cpu);
+        }
+        {
+            const size_t heap_total   = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_free    = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_min     = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+            const size_t heap_largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+            APPEND_CHECKMK("P \"Heap\" "
+                           "heap_free=%u;%u:;%u:;0;%u|"
+                           "heap_min_free=%u;;;0;%u|"
+                           "heap_largest_free_block=%u;%u:;%u:;0;%u "
+                           "Free %u kB of %u kB, lowest since boot %u kB, "
+                           "largest free block %u kB\n",
+                           (unsigned)heap_free, (unsigned)CHECKMK_HEAP_FREE_WARN_BYTES,
+                           (unsigned)CHECKMK_HEAP_FREE_CRIT_BYTES, (unsigned)heap_total,
+                           (unsigned)heap_min, (unsigned)heap_total, (unsigned)heap_largest,
+                           (unsigned)CHECKMK_HEAP_BLOCK_WARN_BYTES,
+                           (unsigned)CHECKMK_HEAP_BLOCK_CRIT_BYTES, (unsigned)heap_total,
+                           (unsigned)(heap_free / 1024), (unsigned)(heap_total / 1024),
+                           (unsigned)(heap_min / 1024), (unsigned)(heap_largest / 1024));
+        }
 
-        // CPU section
-        APPEND_CHECKMK("<<<cpu>>>\n");
-        APPEND_CHECKMK("esp32 0 0 0\n");
+        // Device status as local checks with fixed states: the things that
+        // break HomeMatic for the user even while the board itself is up.
+        if (g_ethernet) {
+            const bool up      = g_ethernet->isConnected();
+            const int speed    = g_ethernet->getLinkSpeedMbps();
+            const char *duplex = g_ethernet->getDuplexMode();
+            // 10 Mbit/s or half duplex on a 100 Mbit/s PHY points to a cable,
+            // port or autonegotiation problem.
+            const int state = !up ? 2 : (speed < 100 || strcmp(duplex, "Full") != 0) ? 1 : 0;
+            if (up) {
+                APPEND_CHECKMK("%d \"Ethernet\" - Link up, %d Mbit/s, %s duplex\n", state, speed,
+                               duplex);
+            } else {
+                APPEND_CHECKMK("2 \"Ethernet\" - Link down\n");
+            }
+        }
+        {
+            char ccu_ip[16] = "";
+            if (raw_uart_session_active() && raw_uart_remote_ip_str(ccu_ip, sizeof(ccu_ip))) {
+                APPEND_CHECKMK("0 \"CCU connection\" - Connected to CCU %s\n", ccu_ip);
+            } else {
+                APPEND_CHECKMK("2 \"CCU connection\" - No CCU connected\n");
+            }
+        }
+        if (g_radioModuleDetector) {
+            const char *type = NULL;
+            switch (g_radioModuleDetector->getRadioModuleType()) {
+                case RADIO_MODULE_HM_MOD_RPI_PCB:
+                    type = "HM-MOD-RPI-PCB";
+                    break;
+                case RADIO_MODULE_RPI_RF_MOD:
+                    type = "RPI-RF-MOD";
+                    break;
+                case RADIO_MODULE_HMIP_RFUSB:
+                    type = "HmIP-RFUSB";
+                    break;
+                default:
+                    break;
+            }
+            if (type) {
+                const uint8_t *fw = g_radioModuleDetector->getFirmwareVersion();
+                APPEND_CHECKMK("0 \"Radio module\" - %s, firmware %u.%u.%u, serial %s\n", type,
+                               (unsigned)fw[0], (unsigned)fw[1], (unsigned)fw[2],
+                               g_radioModuleDetector->getSerial());
+            } else {
+                APPEND_CHECKMK("2 \"Radio module\" - No radio module detected\n");
+            }
+        }
+        // Informational: why the device last restarted (watchdog, update, ...).
+        APPEND_CHECKMK("0 \"Last restart\" - %s\n", ResetInfo::getResetDetails());
 
-        #undef APPEND_CHECKMK
+#undef APPEND_CHECKMK
 
         // send() may legally write only part of the buffer. Finish the bounded
         // 2 KB response or fail explicitly instead of silently truncating it.
