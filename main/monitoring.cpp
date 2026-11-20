@@ -499,19 +499,18 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
                            (unsigned)(heap_min / 1024), (unsigned)(heap_largest / 1024));
         }
 
-
         // Device status as local checks with fixed states: the things that
         // break HomeMatic for the user even while the board itself is up.
         if (g_ethernet) {
-            const bool up = g_ethernet->isConnected();
-            const int speed = g_ethernet->getLinkSpeedMbps();
+            const bool up      = g_ethernet->isConnected();
+            const int speed    = g_ethernet->getLinkSpeedMbps();
             const char *duplex = g_ethernet->getDuplexMode();
             // 10 Mbit/s or half duplex on a 100 Mbit/s PHY points to a cable,
             // port or autonegotiation problem.
             const int state = !up ? 2 : (speed < 100 || strcmp(duplex, "Full") != 0) ? 1 : 0;
             if (up) {
-                APPEND_CHECKMK("%d \"Ethernet\" - Link up, %d Mbit/s, %s duplex\n",
-                               state, speed, duplex);
+                APPEND_CHECKMK("%d \"Ethernet\" - Link up, %d Mbit/s, %s duplex\n", state, speed,
+                               duplex);
             } else {
                 APPEND_CHECKMK("2 \"Ethernet\" - Link down\n");
             }
@@ -527,15 +526,22 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
         if (g_radioModuleDetector) {
             const char *type = NULL;
             switch (g_radioModuleDetector->getRadioModuleType()) {
-            case RADIO_MODULE_HM_MOD_RPI_PCB: type = "HM-MOD-RPI-PCB"; break;
-            case RADIO_MODULE_RPI_RF_MOD:     type = "RPI-RF-MOD"; break;
-            case RADIO_MODULE_HMIP_RFUSB:     type = "HmIP-RFUSB"; break;
-            default: break;
+                case RADIO_MODULE_HM_MOD_RPI_PCB:
+                    type = "HM-MOD-RPI-PCB";
+                    break;
+                case RADIO_MODULE_RPI_RF_MOD:
+                    type = "RPI-RF-MOD";
+                    break;
+                case RADIO_MODULE_HMIP_RFUSB:
+                    type = "HmIP-RFUSB";
+                    break;
+                default:
+                    break;
             }
             if (type) {
                 const uint8_t *fw = g_radioModuleDetector->getFirmwareVersion();
-                APPEND_CHECKMK("0 \"Radio module\" - %s, firmware %u.%u.%u, serial %s\n",
-                               type, (unsigned)fw[0], (unsigned)fw[1], (unsigned)fw[2],
+                APPEND_CHECKMK("0 \"Radio module\" - %s, firmware %u.%u.%u, serial %s\n", type,
+                               (unsigned)fw[0], (unsigned)fw[1], (unsigned)fw[2],
                                g_radioModuleDetector->getSerial());
             } else {
                 APPEND_CHECKMK("2 \"Radio module\" - No radio module detected\n");
@@ -544,7 +550,7 @@ static void checkmk_agent_cycle(const checkmk_config_t &config)
         // Informational: why the device last restarted (watchdog, update, ...).
         APPEND_CHECKMK("0 \"Last restart\" - %s\n", ResetInfo::getResetDetails());
 
-        #undef APPEND_CHECKMK
+#undef APPEND_CHECKMK
 
         // send() may legally write only part of the buffer. Finish the bounded
         // 2 KB response or fail explicitly instead of silently truncating it.
