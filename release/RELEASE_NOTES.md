@@ -1,4 +1,4 @@
-# 🚀 HB-RF-ETH-ng v2.4.0-Beta.6
+# 🚀 HB-RF-ETH-ng v2.4.1-Beta.2
 
 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md)
 [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases)
@@ -11,16 +11,15 @@ HB-RF-ETH-ng ist eine modernisierte Fork der originalen HB-RF-ETH Firmware von A
 Diese Firmware ermöglicht es, ein Homematic Funkmodul (HM-MOD-RPI-PCB oder RPI-RF-MOD) per Netzwerk
 an eine CCU-Installation (piVCCU3, debmatic, OpenCCU) anzubinden.
 
-## 🆕 Was ist neu in v2.4.0-Beta.6?
+## 🆕 Was ist neu in v2.4.1-Beta.2?
 
 ### Changes
-- fix(diagnostics): bound crash-tail capture and stream diagnostic output
-- chore: update manifests for v2.4.0-Beta.5
+- fix(webui,log): legacy /esp redirect and line-aligned log exports
+- chore: update manifests for v2.4.1-Beta.1
 
 ### Fixed
-- (diag) Task-stack diagnostics use a single checked, per-call workspace for enumeration, sorting and compact output. HTTP streams escaped text in 128-byte chunks instead of allocating output and escape copies; MQTT keeps its existing string payload. Task stack allocations and diagnostic coverage remain unchanged.
-- (diag) Protective-restart crash snapshots copy only the newest 1024 ring-buffer bytes under a bounded lock into one checked allocation (at most 1051 bytes including tag). No full-log copy, substring allocation or second blob is needed.
-- (diag) Crash-log HTTP responses stream JSON without escaped/body copies and keep the persisted snapshot when transmission fails. Complete panic transcripts retain their full contents and existing format.
+- fix(webui): legacy `/esp/*` paths (old firmware pages still polled once a minute by stale browser tabs and CCU `/esp` reverse-proxy embeddings via `POST /esp/system.htm?action=UpdateUI`) now answer with a 301 redirect to the WebUI root instead of an unmatched route whose 404 the CCU proxy reported as recurring HTTP 500 log spam; `max_uri_handlers` raised accordingly
+- fix(log): system-log snapshot and download now start at a line boundary when older ring-buffer content was overwritten — no more garbled first line (e.g. `mI (678) ...` missing its ANSI colour escape) in exported logs
 
 ## ✨ Hauptfunktionen
 
@@ -57,7 +56,7 @@ SHA256-Prüfsummen befinden sich in `SHA256SUMS.txt`.
 
 ## 📦 Im Release enthalten
 
-- **Firmware-Binary** (`firmware_2.4.0-Beta.6.bin`)
+- **Firmware-Binary** (`firmware_2.4.1-Beta.2.bin`)
 - **Kompatibles WebUI-Binary** (`webui_1.2.0-Beta.2.bin`)
 - **Bootloader** (`bootloader.bin`)
 - **Partitionstabelle** (`partitions.bin`)

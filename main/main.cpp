@@ -404,7 +404,20 @@ void app_main()
             mdns_hostname_set(mdns_name);
             mdns_instance_name_set(hostname);
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
-            ESP_LOGI(TAG, "mDNS: announcing %s.local (_http._tcp)", mdns_name);
+            // Dedicated service type for Home Assistant discovery: HA's
+            // zeroconf router ignores the generic _http._tcp, but picks up
+            // the hb-rf-eth-hass integration's "_hb-rf-eth._tcp" manifest
+            // entry. TXT records let the config flow prefill host, serial
+            // and firmware version without a login round trip.
+            mdns_txt_item_t svc_txt[] = {
+                {"serial", sysInfo.getSerialNumber()},
+                {"version", sysInfo.getCurrentVersion()},
+                {"board", sysInfo.getBoardRevisionString().c_str()},
+            };
+            mdns_service_add(NULL, "_hb-rf-eth", "_tcp", 80, svc_txt,
+                             sizeof(svc_txt) / sizeof(svc_txt[0]));
+            ESP_LOGI(TAG, "mDNS: announcing %s.local (_http._tcp, _hb-rf-eth._tcp)",
+                     mdns_name);
         }
         else
         {

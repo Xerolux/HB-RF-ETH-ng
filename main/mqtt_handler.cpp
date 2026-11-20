@@ -22,6 +22,8 @@
  */
 
 #include "mqtt_handler.h"
+#include "mqtt_commands.h"
+#include "mqtt_diagnostics.h"
 #include "monitoring.h"
 #include "sysinfo.h"
 #include "update_check.h"
@@ -42,6 +44,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/timers.h"
+#include "freertos/queue.h"
 #include "cJSON.h"
 #include "lwip/ip4_addr.h"
 #include "ethernet.h"
@@ -73,6 +76,24 @@ static mqtt_config_t current_mqtt_config;
 static mqtt_config_t *mqtt_pending_restart_config = NULL;
 static char mqtt_lwt_topic[160];
 static std::atomic<bool> mqtt_restart_command_pending{false};
+
+// Stack discipline (stage-1/2): the ESP event-loop task has a 2.3 KiB stack,
+// which the discovery batch (~90 configs) and the settings/diagnostics state
+// batches would overflow. Connect-time extras are therefore published by the
+// mqtt_publish task (5 KiB stack): the event handler only sets this flag and
+// notifies the task.
+static std::atomic<bool> mqtt_extras_pending{false};
+
+// Command execution worker: settings writes (Settings::save), monitoring
+// config transactions and state republishes are too heavy for the event-loop
+// task as well. Commands arrive on the MQTT event task and are executed
+// serialized on this dedicated worker (also a nice ordering guarantee).
+typedef struct {
+    char command[64];
+    char payload[512];
+    int payload_len;
+} mqtt_command_msg_t;
+static QueueHandle_t mqtt_command_queue = NULL;
 
 // ESP-MQTT waits for half the configured reconnect interval while it is in
 // MQTT_STATE_WAIT_RECONNECT. esp_mqtt_client_stop() does not wake that wait, so
@@ -220,6 +241,14 @@ static void mqtt_restart_command_task(void *)
 static void handle_mqtt_command(const char* command, const char* payload, int payload_len)
 {
     ESP_LOGI(TAG, "Received MQTT command: %s (payload %d bytes)", command, payload_len);
+
+    // Stage-1 HA control surface: settings, monitoring toggles and update
+    // actions. These carry JSON payloads ({"token":...,"value":...}) and do
+    // their own authentication, so they must run before the legacy plain
+    // token byte-compare below.
+    if (mqtt_commands_try_handle(command, payload, payload_len)) {
+        return;
+    }
 
     if (!command_token_ok(payload, payload_len)) {
         ESP_LOGW(TAG, "Command %s rejected: missing/invalid token", command);
@@ -391,10 +420,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         publish_legacy_topic_cleanup();
         // Publish initial status (includes online marker)
         mqtt_handler_publish_status();
-        // Publish HA discovery config if enabled
-        if (current_mqtt_config.ha_discovery_enabled) {
-            mqtt_handler_publish_ha_discovery();
-        }
+        // Discovery configs and the settings/diagnostics state batches run
+        // on the mqtt_publish task (stack budget, see mqtt_extras_pending).
+        mqtt_extras_pending.store(true, std::memory_order_release);
+        mqtt_handler_trigger_status_publish();
         break;
     case MQTT_EVENT_DISCONNECTED:
         mqtt_release_tls_gate_if_held();
@@ -417,7 +446,26 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 if (cmd_len >= sizeof(command)) cmd_len = sizeof(command) - 1;
                 memcpy(command, event->topic + prefix_len, cmd_len);
                 command[cmd_len] = '\0';
-                handle_mqtt_command(command, event->data, event->data_len);
+                // Execute on the dedicated worker: command handling includes
+                // NVS writes, the ~6.7 KiB monitoring config (heap on the
+                // worker) and state republishes - all beyond the 2.3 KiB
+                // event-loop stack. Serialized execution also orders
+                // concurrent commands.
+                mqtt_command_msg_t msg = {};
+                snprintf(msg.command, sizeof(msg.command), "%s", command);
+                msg.payload_len = event->data_len;
+                if (msg.payload_len > (int)sizeof(msg.payload)) {
+                    msg.payload_len = sizeof(msg.payload);
+                }
+                if (event->data != NULL && msg.payload_len > 0) {
+                    memcpy(msg.payload, event->data, msg.payload_len);
+                }
+                if (mqtt_command_queue != NULL &&
+                    xQueueSend(mqtt_command_queue, &msg, 0) != pdTRUE) {
+                    ESP_LOGW(TAG, "MQTT command queue full; rejecting %s", command);
+                    mqtt_handler_publish_event(
+                        "event/command_rejected", "reason=worker_busy");
+                }
             }
         }
         break;
@@ -450,6 +498,19 @@ void mqtt_publish_task(void *pvParameters)
             continue;
         }
 
+        // Connect-time extras (discovery + full state batches) and journal
+        // refreshes run HERE on the 5 KiB publish task, never on the
+        // 2.3 KiB ESP event-loop task (boot-crash root cause, stage-2 fix).
+        if (mqtt_extras_pending.exchange(false)) {
+            if (current_mqtt_config.ha_discovery_enabled) {
+                mqtt_handler_publish_ha_discovery();
+            }
+            mqtt_commands_publish_states(&current_mqtt_config);
+            mqtt_diagnostics_publish_states(&current_mqtt_config);
+        } else if (mqtt_diagnostics_consume_journal_change()) {
+            mqtt_diagnostics_publish_journal_snapshot(&current_mqtt_config);
+        }
+
         if (publish_cycle == 0) {
             ESP_LOGI(TAG, "mqtt_publish stack high water mark: %u bytes free",
                      (unsigned)uxTaskGetStackHighWaterMark(NULL));
@@ -463,6 +524,17 @@ void mqtt_publish_task(void *pvParameters)
         // post-update drift when the user files a bug.
         if (publish_cycle % 6 == 0) {
             mqtt_handler_publish_task_stacks();
+            // Settings states converge slowly too: MQTT commands republish
+            // immediately; this cycle only catches up WebUI-side edits.
+            mqtt_commands_publish_states(&current_mqtt_config);
+            // Journal history / log tail / crash tail share the same slow
+            // cadence; live events themselves are published immediately by
+            // the journal listener.
+            mqtt_diagnostics_publish_states(&current_mqtt_config);
+        } else {
+            // Update entity states ride every cycle so "in_progress"
+            // install progress tracks the installer at ~60 s resolution.
+            mqtt_commands_publish_update_states(&current_mqtt_config);
         }
 
         // 60 s base cadence (was 10 s): each cycle publishes ~30 retained
@@ -525,6 +597,19 @@ void mqtt_handler_publish_event(const char *subtopic, const char *payload)
     snprintf(topic, sizeof(topic), "%s/%s", current_mqtt_config.topic_prefix, subtopic);
     // Non-retained, QoS 0: events are transient by definition.
     mqtt_publish_connected(topic, payload, 0, 0, 0);
+}
+
+int mqtt_handler_publish_retained(const char *topic, const char *payload, int qos)
+{
+    if (topic == NULL || payload == NULL) {
+        return -1;
+    }
+    return mqtt_publish_connected(topic, payload, 0, qos, 1);
+}
+
+const mqtt_config_t *mqtt_handler_current_config(void)
+{
+    return &current_mqtt_config;
 }
 
 // Publish the FreeRTOS task stack high-water marks as a single retained string.
@@ -1130,13 +1215,69 @@ void mqtt_handler_publish_ha_discovery(void)
     // Remove destructive/retired entities retained by older firmware.
     remove_config("button", "factory_reset");
     remove_config("button", "check_update");
-    remove_config("update", "firmware_update");
+    // Policy change (stage-1 HA control): update installation IS exposed to
+    // Home Assistant again - as native update entities with token-gated
+    // install commands (see mqtt_commands_publish_discovery below, which
+    // re-creates update/firmware_update on the same topic with the new
+    // contract - retained overwrite, no removal flicker). Factory reset
+    // deliberately remains unreachable via MQTT: a misfiring automation
+    // must never wipe the device; it stays bound to the WebUI, /recovery
+    // and the physical button.
+
+    // Stage-1 controllable entities (switches, numbers, selects, texts,
+    // action buttons, update entities incl. install). Reuses the device
+    // block above; publishes nothing when commands are disabled.
+    mqtt_commands_publish_discovery(&current_mqtt_config,
+                                    sysInfo->getSerialNumber(), device);
+
+    // Stage-2 diagnostic entities (event entity, journal/log/crash sensors,
+    // radio-UART metrics, clear-crash-log button).
+    mqtt_diagnostics_publish_discovery(&current_mqtt_config,
+                                       sysInfo->getSerialNumber(), device);
 
     cJSON_Delete(device);
 }
 
+// Serialized command executor (see mqtt_command_msg_t). 6 KiB stack covers
+// settings transactions and the heap-based monitoring config handling.
+static void mqtt_command_worker(void *)
+{
+    mqtt_command_msg_t msg;
+    for (;;) {
+        if (xQueueReceive(mqtt_command_queue, &msg, portMAX_DELAY) != pdTRUE) {
+            continue;
+        }
+        msg.payload[msg.payload_len >= 0 &&
+                            msg.payload_len < (int)sizeof(msg.payload)
+                        ? msg.payload_len
+                        : 0] = '\0';
+        handle_mqtt_command(msg.command, msg.payload, msg.payload_len);
+    }
+}
+
 esp_err_t mqtt_handler_init(void)
 {
+    // Stage-2 diagnostics: every journalled event becomes a live HA event
+    // entity payload. Registered once here; publish calls are no-ops while
+    // the broker is not connected.
+    event_journal_set_listener(mqtt_diagnostics_on_journal_event);
+
+    if (mqtt_command_queue == NULL) {
+        mqtt_command_queue = xQueueCreate(8, sizeof(mqtt_command_msg_t));
+    }
+    if (mqtt_command_queue == NULL) {
+        ESP_LOGE(TAG, "MQTT command queue unavailable");
+        return ESP_ERR_NO_MEM;
+    }
+    static bool command_worker_started = false;
+    if (!command_worker_started) {
+        if (xTaskCreate(mqtt_command_worker, "mqtt_cmd", 6144, NULL, 5, NULL) != pdPASS) {
+            ESP_LOGE(TAG, "MQTT command worker could not be created");
+            return ESP_ERR_NO_MEM;
+        }
+        command_worker_started = true;
+    }
+
     if (mqtt_lifecycle_mutex == NULL) {
         mqtt_lifecycle_mutex =
             xSemaphoreCreateMutexStatic(&mqtt_lifecycle_mutex_buffer);

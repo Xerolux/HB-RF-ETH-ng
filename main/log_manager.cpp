@@ -333,7 +333,23 @@ std::string LogManager::getLogSnapshot(uint64_t offset, uint64_t *snapshot_total
             if (local_total - ring_start_offset > log_buffer_size) {
                 oldest = local_total - log_buffer_size;
             }
-            if (offset < oldest) offset = oldest;
+            // When older content was already overwritten, the oldest
+            // available byte usually sits in the middle of a line (or of an
+            // ANSI colour escape), which made downloads start with a garbled
+            // fragment like "mI (678) ...". Advance to the next line boundary
+            // so every export starts with a complete line. A client that
+            // resumes at its own offset inside the retained window keeps its
+            // exact position and is not affected.
+            if (offset < oldest) {
+                offset = oldest;
+                while (offset < local_total &&
+                       log_buffer[offset % log_buffer_size] != '\n') {
+                    offset++;
+                }
+                if (offset < local_total) {
+                    offset++; // step past the newline itself
+                }
+            }
             if (offset >= local_total) {
                 xSemaphoreGive(_mutex);
                 return "";
@@ -401,7 +417,20 @@ size_t LogManager::readChunk(uint64_t *absolute_offset, char *destination,
     if (local_total - ring_start_offset > log_buffer_size) {
         oldest = local_total - log_buffer_size;
     }
-    if (requested < oldest) requested = oldest;
+    // Align to the next line boundary when older content was overwritten so a
+    // download never begins with a partial line (rationale in
+    // getLogSnapshot). Mid-stream wraps during a slow download jump forward
+    // the same way, keeping the exported text line-coherent.
+    if (requested < oldest) {
+        requested = oldest;
+        while (requested < local_total &&
+               log_buffer[requested % log_buffer_size] != '\n') {
+            requested++;
+        }
+        if (requested < local_total) {
+            requested++; // step past the newline itself
+        }
+    }
 
     const uint64_t available64 = local_total - requested;
     const size_t available = available64 > SIZE_MAX

@@ -813,9 +813,15 @@ test('CCU connection changes and low heap are emitted as notifiable events', asy
     monitoringSource.indexOf('static void heap_watchdog_task'),
     monitoringSource.indexOf('static void schedule_mqtt_retry();')
   )
-  expect(watchdog.indexOf('events_emit(EVENT_LOW_HEAP'))
-    .toBeLessThan(watchdog.indexOf('esp_restart()'))
-  expect(watchdog).toContain('if (low_heap_streak == 1)')
+  const lowHeap = watchdog.slice(
+    watchdog.indexOf('if (free_heap < HEAP_WATCHDOG_CRITICAL_BYTES)'),
+    watchdog.indexOf('// ---- tcpip liveness sentinel')
+  )
+  const notification = lowHeap.indexOf('events_emit(EVENT_LOW_HEAP')
+  const firstLowHeapHit = lowHeap.indexOf('if (low_heap_streak == 1)')
+  expect(firstLowHeapHit).toBeGreaterThanOrEqual(0)
+  expect(notification).toBeGreaterThan(firstLowHeapHit)
+  expect(notification).toBeLessThan(lowHeap.indexOf('esp_restart()'))
 })
 
 test('CCU relay latency is measured in the receive path and reported to MQTT', async () => {
