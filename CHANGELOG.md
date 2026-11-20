@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1-Beta.3] - 2026-11-20
+
+### Changes
+- Merge pull request #501 from Xerolux/Xe/pre-release-audit-2026-11-20
+- style: format Beta.3 firmware changes
+- fix(monitoring): avoid copying staged config for Beta.3
+- Merge remote-tracking branch 'origin/main' into Xe/pre-release-audit-2026-11-20
+- Merge pull request #492 from Xerolux/dependabot/github_actions/dependabot/fetch-metadata-3
+- Merge remote-tracking branch 'origin/main' into Xe/pre-release-audit-2026-11-20
+- Merge branch 'main' into dependabot/github_actions/dependabot/fetch-metadata-3
+- Merge pull request #499 from ischraub/feat/checkmk-status-checks
+- Merge pull request #498 from ischraub/fix/checkmk-cpu-mem-sections
+- fix(mqtt): allocate queued command payloads on demand
+- Merge branch 'main' into dependabot/github_actions/dependabot/fetch-metadata-3
+- Merge pull request #500 from Xerolux/Xe/fix-low-heap-ci-2026-11-20
+- style(checkmk): format monitoring status checks
+- Merge commit '655f3eccc1fb6f9477fe691b57e582458ce80274' into HEAD
+- style(checkmk): format monitoring local checks
+- Merge commit 'd763474' into HEAD
+- docs(api): document the legacy WebUI redirect
+- fix(ci): scope watchdog regression to low-heap restart
+- Prepare next firmware release with ESP-IDF v6.1.1 and MQTT heap fixes
+- Merge branch 'fix/checkmk-cpu-mem-sections' into feat/checkmk-status-checks
+- fix(monitoring): leave more headroom below the normal heap minimum
+- feat(monitoring): report Ethernet, CCU, radio module and last restart to Checkmk
+- fix(monitoring): show the CPU value in the Checkmk service summary
+- fix(monitoring): fit Checkmk heap levels to the 2.4.x baseline
+- fix(monitoring): report CPU and heap to Checkmk as local checks
+- chore: update manifests for v2.4.1-Beta.2
+- chore(ci)(deps): bump dependabot/fetch-metadata from 2 to 3
+
 ### Changed
 
 - Build and package the firmware with ESP-IDF v6.1.1.
