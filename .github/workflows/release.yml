@@ -284,6 +284,9 @@ jobs:
         run: |
           FIRMWARE_VERSION="${{ steps.firmware.outputs.VERSION }}"
           python generate_release_notes.py "$FIRMWARE_VERSION" release/RELEASE_NOTES.md
+          if [ -f "docs/release-notes/firmware-${FIRMWARE_VERSION}.md" ]; then
+            exit 0
+          fi
           cat >> release/RELEASE_NOTES.md <<'EOF'
 
           ## Included WebUI

@@ -82,6 +82,10 @@ def extract_readme_changes(version: str) -> str:
 def generate_release_notes(version: str) -> str:
     """Generate comprehensive release notes: intro, changelog, features, installation, support."""
 
+    curated = Path("docs/release-notes") / f"firmware-{version}.md"
+    if curated.is_file():
+        return curated.read_text(encoding="utf-8")
+
     is_prerelease = any(tag in version.lower() for tag in ['alpha', 'beta', 'rc'])
     webui_version = json.loads(
         Path("webui/package.json").read_text(encoding="utf-8")
@@ -234,7 +238,7 @@ def main():
 
     try:
         notes = generate_release_notes(version)
-        Path(output_file).write_text(notes)
+        Path(output_file).write_text(notes, encoding="utf-8", newline="\n")
         print(f"Release notes written to {output_file}")
     except Exception as e:
         print(f"Error generating release notes: {e}")
