@@ -78,6 +78,10 @@ def filter_webui_bullets(block: str) -> list[str]:
 
 
 def generate(version: str, min_firmware: str, api_version: str) -> str:
+    curated = Path("docs/release-notes") / f"webui-{version}.md"
+    if curated.is_file():
+        return curated.read_text(encoding="utf-8")
+
     unreleased = extract_unreleased()
     bullets = filter_webui_bullets(unreleased)
 
@@ -141,7 +145,7 @@ def main() -> None:
 
     notes = generate(version, min_firmware, api_version)
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_file.write_text(notes, encoding="utf-8")
+    output_file.write_text(notes, encoding="utf-8", newline="\n")
     print(f"WebUI release notes written to {output_file}")
 
 

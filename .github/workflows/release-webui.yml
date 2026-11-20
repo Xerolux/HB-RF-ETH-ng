@@ -138,6 +138,9 @@ jobs:
 
       - name: Generate WebUI release notes
         run: |
+          WEBUI_VERSION="${{ steps.webui.outputs.VERSION }}"
+          notes="docs/release-notes/webui-${WEBUI_VERSION}.md"
+          test -s "$notes" || { printf 'Missing release notes: %s\n' "$notes" >&2; exit 1; }
           python generate_webui_release_notes.py \
             "${{ steps.webui.outputs.VERSION }}" \
             "${{ inputs.min_firmware_version }}" \
