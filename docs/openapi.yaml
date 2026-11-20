@@ -45,6 +45,30 @@ security:
   - TokenAuth: []
 
 paths:
+
+  /esp/*:
+    get:
+      summary: Redirect a legacy WebUI route
+      description: The wildcard matches paths below /esp/ and redirects them to the current WebUI.
+      responses:
+        '301':
+          description: Redirect to the WebUI root
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /
+    post:
+      summary: Redirect a legacy WebUI request
+      description: Supports old CCU reverse-proxy requests for the legacy WebUI.
+      responses:
+        '301':
+          description: Redirect to the WebUI root
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /
   /login.json:
     post:
       tags:
