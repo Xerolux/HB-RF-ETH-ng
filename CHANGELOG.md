@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-11-20
+
+### Changes
+- chore: update WebUI manifest for webui-v1.2.0
+
 ## [2.4.1-Beta.3] - 2026-11-20
 
 ### Changes
