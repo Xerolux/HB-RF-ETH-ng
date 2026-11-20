@@ -79,3 +79,11 @@ tools/revoked_keys.json
 tools/SupporterKeyManager.exe
 tools/SupporterKeyManager.spec
 tools/pyi_build/
+
+# Local agent settings and generated test artifacts
+/.claude/settings.local.json
+/.codex-remote-attachments/
+/.playwright-mcp/
+/.tmp-pr*/
+/gui-test-screenshots/
+/test-results/
