@@ -193,10 +193,9 @@ typedef void (*monitoring_update_completion_t)(esp_err_t result,
 // Schedule configuration update asynchronously. Blocking service transitions
 // stay off the caller task; completion receives their final result. The worker
 // takes ownership of the malloc-allocated config only on ESP_OK.
-esp_err_t monitoring_schedule_update_config(
-    monitoring_config_t *config,
-    monitoring_update_completion_t completion,
-    void *completion_context);
+esp_err_t monitoring_schedule_update_config(monitoring_config_t *config,
+                                            monitoring_update_completion_t completion,
+                                            void *completion_context);
 
 // Temporarily stop heap-heavy monitoring workers before activating an uploaded
 // firmware image. On success, paused_mask receives an opaque bitmask for

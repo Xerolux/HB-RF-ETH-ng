@@ -411,7 +411,7 @@ void app_main()
             // entry. TXT records let the config flow prefill host, serial
             // and firmware version without a login round trip.
             const std::string board_revision = sysInfo.getBoardRevisionString();
-            mdns_txt_item_t svc_txt[] = {
+            mdns_txt_item_t svc_txt[]        = {
                 {"serial", sysInfo.getSerialNumber()},
                 {"version", sysInfo.getCurrentVersion()},
                 {"board", board_revision.c_str()},

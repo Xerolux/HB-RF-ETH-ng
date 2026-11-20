@@ -88,7 +88,7 @@ static std::atomic<bool> mqtt_extras_pending{false};
 // config transactions and state republishes are too heavy for the event-loop
 // task as well. Commands arrive on the MQTT event task and are executed
 // serialized on this dedicated worker (also a nice ordering guarantee).
-static constexpr size_t MQTT_COMMAND_NAME_CAPACITY = 64;
+static constexpr size_t MQTT_COMMAND_NAME_CAPACITY    = 64;
 static constexpr size_t MQTT_COMMAND_PAYLOAD_CAPACITY = 513;
 
 typedef struct {
@@ -449,15 +449,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                     event->data_len != event->total_data_len || event->data_len < 0 ||
                     event->data_len >= static_cast<int>(MQTT_COMMAND_PAYLOAD_CAPACITY) ||
                     (event->data_len > 0 && event->data == NULL)) {
-                    mqtt_handler_publish_event(
-                        "event/command_rejected", "reason=invalid_message");
+                    mqtt_handler_publish_event("event/command_rejected", "reason=invalid_message");
                     break;
                 }
-                auto *msg = static_cast<mqtt_command_msg_t *>(
-                    calloc(1, sizeof(mqtt_command_msg_t)));
+                auto *msg =
+                    static_cast<mqtt_command_msg_t *>(calloc(1, sizeof(mqtt_command_msg_t)));
                 if (msg == NULL) {
-                    mqtt_handler_publish_event(
-                        "event/command_rejected", "reason=worker_no_memory");
+                    mqtt_handler_publish_event("event/command_rejected", "reason=worker_no_memory");
                     break;
                 }
                 memcpy(msg->command, event->topic + prefix_len, cmd_len);

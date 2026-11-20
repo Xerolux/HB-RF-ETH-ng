@@ -2482,10 +2482,9 @@ static void apply_config_task(void *pvParameters)
 }
 
 // Schedule configuration update asynchronously - returns immediately, update runs in background
-esp_err_t monitoring_schedule_update_config(
-    monitoring_config_t *config,
-    monitoring_update_completion_t completion,
-    void *completion_context)
+esp_err_t monitoring_schedule_update_config(monitoring_config_t *config,
+                                            monitoring_update_completion_t completion,
+                                            void *completion_context)
 {
     if (config == NULL) return ESP_ERR_INVALID_ARG;
     if (config_mutex == NULL) return ESP_ERR_INVALID_STATE;
@@ -2504,7 +2503,7 @@ esp_err_t monitoring_schedule_update_config(
         operation_finish(OperationState::MONITORING_UPDATE);
         return ESP_ERR_NO_MEM;
     }
-    job->config = config;
+    job->config             = config;
     job->completion = completion;
     job->completion_context = completion_context;
 
