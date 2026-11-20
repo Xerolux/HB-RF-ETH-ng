@@ -61,7 +61,7 @@ HB-RF-ETH-ng/
 
 | Tool | Version |
 |------|---------|
-| ESP-IDF | v6.1 (cloned fresh in CI from `espressif/esp-idf`) |
+| ESP-IDF | v6.1.1 (cloned fresh in CI from `espressif/esp-idf`) |
 | IDF target | `esp32` |
 | SDK config | `sdkconfig.defaults;sdkconfig.hb-rf-eth-ng` |
 

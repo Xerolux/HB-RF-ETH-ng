@@ -121,7 +121,7 @@ Die Firmware wurde kürzlich mit wichtigen neuen Funktionen und Verbesserungen a
 * **Event-basierte Benachrichtigungen** - Nicht-retained Events für Automatisierungen
 
 ### Technische Basis
-* **ESP-IDF 6.1** mit nativer `idf.py` Toolchain
+* **ESP-IDF 6.1.1** mit nativer `idf.py` Toolchain
 * **Xtensa GCC 14.2.0+20251107** Toolchain (xtensa-esp-elf)
 * **CMake** Build-System für Firmware (nicht PlatformIO)
 * **Vue.js 3** mit Composition API, Vue Router, Pinia, Vue i18n
@@ -192,6 +192,13 @@ einen **Web-Flasher** – eine Seite, die die Firmware direkt über das USB-Kabe
 im Browser flasht, ohne Python oder sonstige Installation:
 
 **→ [https://xerolux.github.io/HB-RF-ETH-ng/flash/](https://xerolux.github.io/HB-RF-ETH-ng/flash/)**
+
+**Erstinstallation per esptool:** Verwende `bootloader.bin` bei `0x1000`,
+`partitions.bin` bei `0x8000` und `firmware_*.bin` bei `0x10000`.
+Falls das Release `ota_data_initial.bin` enthält, schreibe sie bei `0xd000`.
+Bei v2.3.1 fehlt diese Datei. Bei leerer OTA-Datenpartition startet der
+Bootloader die Firmware bei `0x10000`. Ein vollständiges Löschen des
+Flash-Speichers entfernt auch die gespeicherten Einstellungen.
 
 **Voraussetzungen:**
 - Desktop-Browser mit Web-Serial-Unterstützung: **Chrome oder Edge** (kein

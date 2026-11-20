@@ -2451,7 +2451,7 @@ void monitoring_resume_after_ota(uint32_t paused_mask)
 }
 
 struct monitoring_update_job_t {
-    monitoring_config_t config;
+    monitoring_config_t *config;
     monitoring_update_completion_t completion;
     void *completion_context;
 };
@@ -2461,7 +2461,8 @@ static void apply_config_task(void *pvParameters)
 {
     monitoring_update_job_t *job =
         static_cast<monitoring_update_job_t *>(pvParameters);
-    esp_err_t update_result = monitoring_update_config(&job->config);
+    esp_err_t update_result = monitoring_update_config(job->config);
+    free(job->config);
     if (update_result != ESP_OK) {
         ESP_LOGE(TAG, "Asynchronous monitoring config update failed: %s",
                  esp_err_to_name(update_result));
@@ -2481,10 +2482,9 @@ static void apply_config_task(void *pvParameters)
 }
 
 // Schedule configuration update asynchronously - returns immediately, update runs in background
-esp_err_t monitoring_schedule_update_config(
-    const monitoring_config_t *config,
-    monitoring_update_completion_t completion,
-    void *completion_context)
+esp_err_t monitoring_schedule_update_config(monitoring_config_t *config,
+                                            monitoring_update_completion_t completion,
+                                            void *completion_context)
 {
     if (config == NULL) return ESP_ERR_INVALID_ARG;
     if (config_mutex == NULL) return ESP_ERR_INVALID_STATE;
@@ -2503,7 +2503,7 @@ esp_err_t monitoring_schedule_update_config(
         operation_finish(OperationState::MONITORING_UPDATE);
         return ESP_ERR_NO_MEM;
     }
-    memcpy(&job->config, config, sizeof(job->config));
+    job->config             = config;
     job->completion = completion;
     job->completion_context = completion_context;
 

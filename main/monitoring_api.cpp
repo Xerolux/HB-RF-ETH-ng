@@ -345,7 +345,8 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     // Load current config first to preserve fields not sent by frontend
     // (e.g., MQTT password is never sent back for security reasons).
     // Heap-allocated: the ~6.7 KB struct would overflow the httpd task stack.
-    std::unique_ptr<monitoring_config_t> config_heap(new (std::nothrow) monitoring_config_t());
+    std::unique_ptr<monitoring_config_t, decltype(&free)> config_heap(
+        static_cast<monitoring_config_t *>(calloc(1, sizeof(monitoring_config_t))), free);
     if (!config_heap)
     {
         cJSON_Delete(root);
@@ -792,6 +793,8 @@ esp_err_t post_monitoring_handler_func(httpd_req_t *req)
     if (schedule_err != ESP_OK) {
         // Once detached, every path must answer and complete the async copy.
         monitoring_update_request_complete(schedule_err, response);
+    } else {
+        config_heap.release();
     }
 
     return ESP_OK;

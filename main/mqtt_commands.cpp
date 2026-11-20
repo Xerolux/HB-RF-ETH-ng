@@ -753,12 +753,11 @@ static bool apply_monitoring_field(const mqtt_config_t *cfg, const char *command
         return true;
     }
     snprintf(ctx->topic_prefix, sizeof(ctx->topic_prefix), "%s", cfg->topic_prefix);
-    // monitoring_schedule_update_config copies the config into its job.
     if (monitoring_schedule_update_config(config, monitoring_cmd_done, ctx) != ESP_OK) {
+        free(config);
         free(ctx);
         reject(command, "schedule_failed");
     }
-    free(config);
     return true;
 }
 
