@@ -41,9 +41,11 @@
 // handshake just as reliably as an exhausted one, so neither figure alone is a
 // usable gate.
 //
-// Hence: a nominal case with a modest block requirement, plus a compensated
-// case that admits slightly less total memory when the heap is notably less
-// fragmented. Both branches sit above the floors below.
+// Hence three calibrated branches: a nominal case with a modest block
+// requirement, a compensated case that admits slightly less total memory when
+// the heap is notably less fragmented, and a compact case for the moderately
+// fragmented steady state of a fully equipped gateway. All branches sit above
+// the floors below.
 //
 // Rejecting is never silent. The caller records the reason and surfaces it, so
 // "skipped, too little memory" can never again be displayed as "up to date".
@@ -55,6 +57,19 @@
 // Compensated: less total memory, but a markedly larger contiguous block.
 #define UPDATE_CHECK_COMPENSATED_FREE_BYTES  (52u * 1024u)
 #define UPDATE_CHECK_COMPENSATED_BLOCK_BYTES (28u * 1024u)
+
+// Compact: the steady state measured on a fully equipped 2.4.1 field gateway
+// (MQTT with Home Assistant discovery, external WebUI mounted, active CCU
+// session) once the monitoring workers were released for the fetch:
+// free=52 KiB / largest=22 KiB. Both earlier branches miss that state by a
+// few KiB on one axis each, so every check on such a device was skipped for
+// good. The hardest allocation a handshake makes is the ~16 KiB dynamic TLS
+// RX buffer (CONFIG_MBEDTLS_DYNAMIC_BUFFER with asymmetric content lengths);
+// everything else it needs is a few scattered KiB. 48 KiB total with a 20 KiB
+// block clears that with margin on both axes, while a degraded heap stays
+// below.
+#define UPDATE_CHECK_COMPACT_FREE_BYTES  (48u * 1024u)
+#define UPDATE_CHECK_COMPACT_BLOCK_BYTES (20u * 1024u)
 
 /**
  * @brief Decide whether a manifest fetch may start.
@@ -69,7 +84,9 @@ static inline bool update_check_heap_allows(size_t free_bytes, size_t largest_bl
                          largest_block >= UPDATE_CHECK_NOMINAL_BLOCK_BYTES;
     const bool compensated = free_bytes >= UPDATE_CHECK_COMPENSATED_FREE_BYTES &&
                              largest_block >= UPDATE_CHECK_COMPENSATED_BLOCK_BYTES;
-    return nominal || compensated;
+    const bool compact = free_bytes >= UPDATE_CHECK_COMPACT_FREE_BYTES &&
+                         largest_block >= UPDATE_CHECK_COMPACT_BLOCK_BYTES;
+    return nominal || compensated || compact;
 }
 
 // A device whose steady state sits below the gate is not out of luck: the
