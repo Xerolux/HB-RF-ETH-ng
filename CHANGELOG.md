@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2-Beta.1] - 2026-11-21
+
+### Changes
+- docs(release): curate notes for firmware 2.4.2-Beta.1
+- fix(update): admit moderately fragmented heaps in the update check gate
+- fix(update): survive transient heap pressure in scheduled update checks
+- Merge pull request #507 from Xerolux/Xe/cleanup-local-settings
+- chore: keep local settings and test artifacts out of Git
+- Merge pull request #506 from Xerolux/Xe/curated-release-notes
+- ci: require curated notes before publishing releases
+- docs: use curated changelogs for firmware and WebUI
+- chore: update manifests for v2.4.1
+
 ## [2.4.1] - 2026-11-20
 
 ### ⚠️ Upgrade notes
