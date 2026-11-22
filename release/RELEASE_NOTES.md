@@ -1,20 +1,17 @@
-## [2.4.2-Beta.1] - 2026-11-21
+## [2.4.2] - 2026-11-22
 
-> ⭐ [Star the project on GitHub](https://github.com/Xerolux/HB-RF-ETH-ng/stargazers)
+### Upgrade notes
 
-### ⚠️ Upgrade notes
+- Back up the gateway configuration before updating. Installing the firmware restarts the gateway and briefly interrupts the CCU connection. This release ships with WebUI 1.2.0.
 
-- **Beta test build for the update-search fixes.** Back up the gateway configuration before updating. The firmware installation restarts the gateway and briefly interrupts the CCU connection.
+### Firmware fixes
 
-### 🐛 Bugfixes
+- Manual and scheduled update searches can run with moderately fragmented memory, including configurations with MQTT discovery, the external WebUI and an active CCU connection.
+- After releasing monitoring resources, the firmware gives the heap time to recover before rejecting a search. A scheduled search that was skipped because of low memory retries after one hour.
 
-- **The update search works on fully equipped gateways again.** A gateway running MQTT with Home Assistant discovery, the mounted external WebUI and an active CCU session sits just below both admission thresholds of the update check, so every manual and scheduled search reported "Too little free memory" although the fetch would have fit. The admission gate gains a compact branch calibrated on that measured state, so the search proceeds after the monitoring workers are released for the moment of the fetch.
-- **Update checks survive transient heap pressure.** The admission gate samples the heap for about two seconds after releasing the monitoring workers before refusing, and a scheduled check retries an hour later instead of waiting the full interval - the refused attempt never reached the network.
+### Web Flasher fixes
 
-### ☕ Support the project
+- Fixed a JavaScript syntax error that prevented release selection and USB connection. The flasher loads its serial library from the project site and shows a message when the browser cannot select a serial port.
+- GitHub Pages waits for the uploaded deployment artifact and includes the latest stable firmware in the flasher catalog.
 
-[GitHub Sponsors](https://github.com/sponsors/xerolux) · [Buy Me a Coffee](https://buymeacoffee.com/xerolux)
-
----
-
-[Full changelog: v2.4.1...v2.4.2-Beta.1](https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.4.1...v2.4.2-Beta.1)
+[Full changelog: v2.4.1...v2.4.2](https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.4.1...v2.4.2)
