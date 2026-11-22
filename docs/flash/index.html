@@ -238,8 +238,6 @@
 </footer>
 
 <script type="module">
-import { ESPLoader, Transport } from "https://cdn.jsdelivr.net/npm/esptool-js@0.7.0/+esm";
-
 // ---------------------------------------------------------------- i18n
 const I18N = {
     de: {
@@ -282,7 +280,7 @@ const I18N = {
         after3: "Danach die Weboberfläche öffnen und unter <span class=\"mono\">System</span> die installierte Version prüfen.",
         successTitle: "✓ Flashen abgeschlossen",
         successText: "Die Firmware wurde übertragen und das Gerät startet neu. Jetzt Schritt 4 oben beachten – insbesondere die 60 Sekunden Ruhe nach dem Start.",
-        openDevice: "Gerät öffnen: {url} (ca. 60&nbsp;s nach dem Start warten)."
+        openDevice: "Gerät öffnen: {url} (ca. 60&nbsp;s nach dem Start warten).",
         footerMain: "Web-Flasher für HB-RF-ETH-ng · Nutzt <a href=\"https://github.com/espressif/esptool-js\" target=\"_blank\" rel=\"noopener\">esptool-js</a> (Apache-2.0) von Espressif und die Web Serial API.",
         footerCredits: "Basierend auf der HB-RF-ETH-Hardware und -Firmware von Alexander Reinert.",
         // dynamic
@@ -296,7 +294,8 @@ const I18N = {
         connectedChip: "Verbunden: {chip} – bereit zum Flashen.",
         connectFailed: "Verbindung fehlgeschlagen. Häufigste Ursachen: Ladekabel statt Datenkabel, Funkmodul noch aufgesteckt, falscher Port, oder das Gerät ist nicht über USB verbunden.",
         wrongChip: "Am Port meldet sich „{chip}“ – dieser Flasher ist nur für ESP32-Boards (HB-RF-ETH).",
-        abortedByUser: "Kein Port ausgewählt – abgebrochen.",
+        serialUnavailable: "Kein serieller Port ausgewählt oder verfügbar. Falls die Liste leer ist, prüfe, ob das Betriebssystem den USB-Seriell-Adapter erkennt und der Browser darauf zugreifen darf.",
+        loaderUnavailable: "Die Flash-Bibliothek konnte nicht geladen werden. Lade die Seite neu und versuche es erneut.",
         fetchImages: "Lade Firmware-Dateien herunter und prüfe Prüfsummen …",
         shaOk: "Prüfsumme OK: {file} ({size} KB)",
         shaBad: "PRÜFSUMMEN-FEHLER bei {file} – Download beschädigt. Bitte Version neu wählen oder Seite neu laden.",
@@ -362,7 +361,8 @@ const I18N = {
         connectedChip: "Connected: {chip} – ready to flash.",
         connectFailed: "Connection failed. Most common causes: charge-only cable, radio module still attached, wrong port, or the board is not connected via USB.",
         wrongChip: "The port reports “{chip}” – this flasher is for ESP32 boards (HB-RF-ETH) only.",
-        abortedByUser: "No port selected – aborted.",
+        serialUnavailable: "No serial port selected or available. If the list is empty, check that the operating system detects the USB serial adapter and the browser can access it.",
+        loaderUnavailable: "The flash library could not be loaded. Reload the page and try again.",
         fetchImages: "Downloading firmware files and verifying checksums …",
         shaOk: "Checksum OK: {file} ({size} KB)",
         shaBad: "CHECKSUM MISMATCH for {file} – download corrupted. Please re-select the version or reload.",
@@ -560,7 +560,7 @@ function renderReleases() {
     const r = channel() === "stable" ? stableEntry() : betaEntry();
     if (!r) {
         sel.disabled = true;
-        meta.textContent = t("noBeta");
+        meta.textContent = t(channel() === "beta" ? "noBeta" : "loadFailed");
         return;
     }
     sel.disabled = false;
@@ -577,7 +577,6 @@ function profile() { return document.querySelector("input[name=profile]:checked"
 // After a successful flash, link straight to the device's WebUI via mDNS.
 // The default hostname is HB-RF-ETH-<last 3 MAC bytes uppercase> (see
 // settings.cpp), announced as <hostname-lowercase>.local by the firmware.
-// esptool-js exposes the MAC as mac_addr() on the loader instance.
 async function fillSuccessDeviceLink() {
     const box = $("successDeviceLink");
     box.classList.add("hidden");
@@ -594,7 +593,7 @@ async function fillSuccessDeviceLink() {
         box.appendChild(a);
         box.classList.remove("hidden");
     } catch {
-        // Older esptool-js without mac_addr(): the success card stays as-is.
+        // The success card remains usable if the MAC is unavailable.
     }
 }
 
@@ -674,18 +673,28 @@ let connectedMac = null;
 async function connect() {
     showError("");
     $("connectButton").disabled = true;
-    setStatus("connectStatus", t("connectWait"), "");
     let port;
     try {
         port = await navigator.serial.requestPort({});
     } catch (e) {
-        setStatus("connectStatus", t("abortedByUser"), "err");
+        setStatus("connectStatus", t("serialUnavailable"), "err");
+        logLine(e?.message || String(e));
+        $("connectButton").disabled = false;
+        return;
+    }
+    setStatus("connectStatus", t("connectWait"), "");
+    let library;
+    try {
+        library = await import("./esptool.bundle.js");
+    } catch (e) {
+        setStatus("connectStatus", t("loaderUnavailable"), "err");
+        logLine(e?.message || String(e));
         $("connectButton").disabled = false;
         return;
     }
     try {
-        transport = new Transport(port, true);
-        esploader = new ESPLoader({
+        transport = new library.Transport(port, false);
+        esploader = new library.ESPLoader({
             transport,
             baudrate: parseInt($("baudSelect").value, 10),
             romBaudrate: 115200,
@@ -693,7 +702,7 @@ async function connect() {
         });
         const chip = await esploader.main();
         const chipName = String(chip).trim();
-        if (chipName !== "ESP32" && !/^ESP32\b/.test(chipName)) {
+        if (esploader.chip.CHIP_NAME !== "ESP32") {
             setStatus("connectStatus", t("wrongChip", { chip: chipName }), "err");
             await transport.disconnect().catch(() => {});
             esploader = null; transport = null;
@@ -702,11 +711,12 @@ async function connect() {
         }
         setStatus("connectStatus", t("connectedChip", { chip: chipName }), "ok");
         try {
-            const raw = typeof esploader.mac_addr === "function" ? await esploader.mac_addr() : null;
+            const raw = await esploader.chip.readMac(esploader);
             connectedMac = raw ? String(raw).replace(/[^0-9a-fA-F]/g, "").toUpperCase() : null;
         } catch { connectedMac = null; }
         $("flashButton").disabled = false;
     } catch (e) {
+        if (transport) await transport.disconnect().catch(() => {});
         esploader = null; transport = null;
         setStatus("connectStatus", t("connectFailed"), "err");
         logLine("Error: " + (e && e.message ? e.message : e));
