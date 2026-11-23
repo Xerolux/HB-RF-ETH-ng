@@ -25,6 +25,7 @@
 #include "nvs_storage_lock.h"
 #include "security_headers.h"
 #include "webui_compatibility.h"
+#include "webui_route_gate.h"
 
 // Defined in webui.cpp. Both update paths deliberately share the existing
 // constant-time admin-token validation.
@@ -1259,6 +1260,14 @@ esp_err_t hb_webui_register_uri_handler(httpd_handle_t server,
     if (!server || !uri_handler || !uri_handler->uri)
     {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    // webui_route_gate.h: a route added while sessions are being served is
+    // published to the server before it is initialised (issue #491). Nothing
+    // registers this late today; keep it that way, and say so if it changes.
+    if (webui_route_gate_released()) {
+        ESP_LOGW("WebUIStorage", "Registering %s after the server started serving sessions",
+                 uri_handler->uri);
     }
 
     register_storage_endpoints_once(server);

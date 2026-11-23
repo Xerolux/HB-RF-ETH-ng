@@ -65,6 +65,7 @@
 #include "update_schedule_policy.h"
 #include "validation.h"
 #include "log_stream.h"
+#include "webui_route_gate.h"
 #include "pins.h"
 
 static const char *TAG = "WebUI";
@@ -2264,12 +2265,19 @@ void WebUI::start()
     config.max_uri_handlers = 56;
     config.uri_match_fn = httpd_uri_match_wildcard;
     config.close_fn = log_stream_close_socket;
+    // The server accepts connections as soon as httpd_start() returns, but the
+    // routes below are only registered afterwards. ESP-IDF publishes each
+    // handler slot before initialising it, so a request dispatched in that
+    // window dereferences uninitialised memory in the URI matcher (issue #491).
+    // Hold every session until the last registration is done.
+    config.open_fn = webui_route_gate_open_session;
     // Increase stack: POST handlers allocate content buffers + config structs
     // that together exceed the default 4096-byte stack, causing overflow/corruption.
     config.stack_size = 8192;
 
     _httpd_handle = NULL;
 
+    webui_route_gate_init();
     if (httpd_start(&_httpd_handle, &config) == ESP_OK)
     {
         // Make the WebSocket log stream available as soon as the server starts
@@ -2333,6 +2341,9 @@ void WebUI::start()
         httpd_register_uri_handler(_httpd_handle, &legacy_esp_redirect_post_handler);
         // SPA catch-all last.
         httpd_register_uri_handler(_httpd_handle, &index_html_gz_handler);
+
+        // Route table complete: let the sessions queued by the gate through.
+        webui_route_gate_release();
     }
 }
 
