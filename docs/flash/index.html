@@ -142,6 +142,7 @@
             <li data-i18n="prep3">Platine <b>nur über USB</b> versorgen; PoE/Ethernet während des Flashens abziehen.</li>
             <li data-i18n="prep4">Browser: <b>Chrome oder Edge am PC/Mac</b> (Web Serial). Firefox und Safari unterstützen das nicht.</li>
             <li data-i18n="prep5">Windows: Falls der Port nicht erscheint, einmalig den CH340-Treiber von wch-ic.com installieren.</li>
+            <li data-i18n="prep6">macOS: Der CH340 braucht keinen Treiber. Erscheint kein Port, im Terminal mit <span class="mono">ls /dev/cu.*</span> prüfen, ob das Board erkannt wird (z. B. <span class="mono">cu.wchusbserial…</span>). Fehlt der Eintrag, ein installiertes CH34x-Treiber-Paket eines Drittherstellers entfernen – es kann den integrierten Treiber nach einem macOS-Update blockieren – und anderes Kabel und anderen USB-Port testen.</li>
         </ul>
     </section>
 
@@ -251,6 +252,7 @@ const I18N = {
         prep3: "Platine <b>nur über USB</b> versorgen; PoE/Ethernet während des Flashens abziehen.",
         prep4: "Browser: <b>Chrome oder Edge am PC/Mac</b> (Web Serial). Firefox und Safari unterstützen das nicht.",
         prep5: "Windows: Falls der Port nicht erscheint, einmalig den CH340-Treiber von wch-ic.com installieren.",
+        prep6: "macOS: Der CH340 braucht keinen Treiber. Erscheint kein Port, im Terminal mit <span class=\"mono\">ls /dev/cu.*</span> prüfen, ob das Board erkannt wird (z. B. <span class=\"mono\">cu.wchusbserial…</span>). Fehlt der Eintrag, ein installiertes CH34x-Treiber-Paket eines Drittherstellers entfernen – es kann den integrierten Treiber nach einem macOS-Update blockieren – und anderes Kabel und anderen USB-Port testen.",
         step2Title: "Firmware wählen",
         channelLabel: "Kanal",
         chStable: "Stabil (empfohlen)",
@@ -294,7 +296,7 @@ const I18N = {
         connectedChip: "Verbunden: {chip} – bereit zum Flashen.",
         connectFailed: "Verbindung fehlgeschlagen. Häufigste Ursachen: Ladekabel statt Datenkabel, Funkmodul noch aufgesteckt, falscher Port, oder das Gerät ist nicht über USB verbunden.",
         wrongChip: "Am Port meldet sich „{chip}“ – dieser Flasher ist nur für ESP32-Boards (HB-RF-ETH).",
-        serialUnavailable: "Kein serieller Port ausgewählt oder verfügbar. Falls die Liste leer ist, prüfe, ob das Betriebssystem den USB-Seriell-Adapter erkennt und der Browser darauf zugreifen darf.",
+        serialUnavailable: "Kein serieller Port ausgewählt oder verfügbar. Ist die Liste leer, beachten Sie Schritt 1 (macOS/Windows): Das Betriebssystem muss das Board erst als USB-Seriell-Adapter erkennen.",
         loaderUnavailable: "Die Flash-Bibliothek konnte nicht geladen werden. Lade die Seite neu und versuche es erneut.",
         fetchImages: "Lade Firmware-Dateien herunter und prüfe Prüfsummen …",
         shaOk: "Prüfsumme OK: {file} ({size} KB)",
@@ -319,6 +321,7 @@ const I18N = {
         prep3: "Power the board <b>from USB only</b>; disconnect PoE/Ethernet while flashing.",
         prep4: "Browser: <b>Chrome or Edge on desktop</b> (Web Serial). Firefox and Safari do not support it.",
         prep5: "Windows: if no port shows up, install the CH340 driver from wch-ic.com once.",
+        prep6: "macOS: the CH340 needs no driver. If no port appears, run <span class=\"mono\">ls /dev/cu.*</span> in Terminal to check that the board is detected (e.g. <span class=\"mono\">cu.wchusbserial…</span>). If the entry is missing, remove any third-party CH34x driver package – after a macOS update it can block the built-in driver – and try another cable and USB port.",
         step2Title: "Choose firmware",
         channelLabel: "Channel",
         chStable: "Stable (recommended)",
@@ -361,7 +364,7 @@ const I18N = {
         connectedChip: "Connected: {chip} – ready to flash.",
         connectFailed: "Connection failed. Most common causes: charge-only cable, radio module still attached, wrong port, or the board is not connected via USB.",
         wrongChip: "The port reports “{chip}” – this flasher is for ESP32 boards (HB-RF-ETH) only.",
-        serialUnavailable: "No serial port selected or available. If the list is empty, check that the operating system detects the USB serial adapter and the browser can access it.",
+        serialUnavailable: "No serial port selected or available. If the list is empty, see step 1 (macOS/Windows): the operating system must detect the board as a USB serial adapter first.",
         loaderUnavailable: "The flash library could not be loaded. Reload the page and try again.",
         fetchImages: "Downloading firmware files and verifying checksums …",
         shaOk: "Checksum OK: {file} ({size} KB)",

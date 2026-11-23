@@ -74,7 +74,11 @@ Micro-USB cable (many cheap cables are charge-only). Depending on the
 host, the port appears as `/dev/ttyUSB0` (Linux),
 `/dev/tty.wchusbserial*` or `/dev/tty.usbserial*` (macOS) or
 `USB-SERIAL CH340 (COMx)` in the Windows Device Manager (the CH340
-driver from wch-ic.com may be required on Windows).
+driver from wch-ic.com may be required on Windows). macOS detects the
+CH340 with its built-in driver, so no third-party driver is needed; an
+older CH34x driver package that is still installed can block the built-in
+one after a macOS update. `ls /dev/cu.*` in Terminal shows whether the
+board is detected.
 
 ```bash
 # Linux/Mac
