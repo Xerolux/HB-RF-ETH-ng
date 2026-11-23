@@ -55,6 +55,14 @@ int main()
     assert(!update_check_heap_allows(kib(48) - 1, kib(20)));
     assert(!update_check_heap_allows(kib(48), kib(20) - 1));
 
+    // The issue #496 report: a 2.4.1 gateway was refused for good at
+    // free=49 KiB / largest=20 KiB, measured after the worker release. The
+    // compact branch admits exactly that state, and one KiB less on either
+    // axis stays refused.
+    assert(update_check_heap_allows(kib(49), kib(20)));
+    assert(!update_check_heap_allows(kib(49), kib(20) - 1));
+    assert(!update_check_heap_allows(kib(47), kib(20)));
+
     // The compensated near-misses are deliberate overlap, not accidents:
     // once compact exists, a state like the issue #462 device (51/27) or a
     // one-byte-short compensated boundary (51/28, 52/27) is admitted, because
@@ -94,6 +102,11 @@ int main()
     // both original branches) motivated the release phase and now clears the
     // compact branch outright.
     assert(update_check_heap_decide(kib(51), kib(27), false) == UPDATE_CHECK_HEAP_PROCEED);
+
+    // The issue #496 device (free=49 KiB / largest=20 KiB) is admitted from
+    // its steady state, so the search no longer depends on a release first.
+    assert(update_check_heap_decide(kib(49), kib(20), false) == UPDATE_CHECK_HEAP_PROCEED);
+    assert(update_check_heap_decide(kib(49), kib(20), true) == UPDATE_CHECK_HEAP_PROCEED);
 
     // Below the compact floor the release phase still has a job: refuse only
     // once the workers have been released and the heap did not recover.
