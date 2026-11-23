@@ -1,21 +1,11 @@
-## [2.4.3] - 2026-11-23
-
-### Upgrade notes
-
-- Back up the gateway configuration before updating. Installing the firmware restarts the gateway and briefly interrupts the CCU connection. This release ships with WebUI 1.2.0.
-- Identical to 2.4.3-Beta.1 apart from the version string.
+## [2.4.4] - 2026-11-23
 
 ### Firmware fixes
 
-- **The web server no longer takes requests while it is still registering its routes at boot.** ESP-IDF publishes each route before it is fully initialised. A client that reconnects while the gateway boots - a poller, or an open WebUI tab that keeps retrying - could hit that window and crash the gateway with a `LoadProhibited` panic (#491). Requests that arrive during boot are now answered instead of turning into "404 Not Found".
-- **The two-stage update marker is written without truncation.** No change for existing installations; it also fixes a host test that no longer compiled with GCC 14.
+- The online installer downloads firmware and WebUI images in verified 4 KiB HTTP ranges. This reduces peak TLS memory use on gateways where a full-size response previously failed with a connection error.
+- After pausing monitoring, the installer allows up to two seconds for network buffers and worker memory to be released. The system log records free memory and the largest contiguous block before the manifest fetch.
 
-### Web Flasher
+### Hardware verification
 
-- The preparation checklist explains what to do when a macOS computer does not show the board's serial port (#508).
-
-### Verification
-
-- Installed on an HB-RF-ETH (board revision 1.8, RPI-RF-MOD, CCU connected) through the device's own online update from the beta channel: search, download, verification, restart. The first request after the restart was answered correctly, every WebUI route and the WebSocket log stream work, and a ten-minute session with live log polling and the WebSocket stream ran without an error or a restart. No crash transcript was recorded. This was done on 2.4.3-Beta.1; the reboot race itself was not stressed with repeated restarts.
-
-[Full changelog: v2.4.2...v2.4.3](https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.4.2...v2.4.3)
+- A gateway with board revision 1.8 and an RPI-RF-MOD ran the corrected installer and updated to the published 2.4.3 firmware through the device's online installation endpoint. The gateway restarted, reported the expected firmware version and reconnected to the CCU.
+- Devices running an earlier installer can install this firmware once through the manual upload in the WebUI if the online download fails. The bundled WebUI version is 1.2.0.
