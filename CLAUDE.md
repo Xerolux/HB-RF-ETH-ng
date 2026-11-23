@@ -190,6 +190,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 | `update_check.cpp` | Manual reporting-only update search: heap admission policy, bounded manifest fetch, version comparison |
 | `update_api.cpp` | `/api/update/check` and `/api/update/status` REST endpoints |
 | `webui_internal.h` | Shared surface between the three WebUI handler units (internal to `main/`, not public API) |
+| `webui_route_gate.cpp` | Boot-time session gate (`httpd_config_t::open_fn`): holds HTTP sessions until `WebUI::start()` has registered every route — ESP-IDF publishes handler slots before initialising them (issue #491) |
 | `settings.cpp` | Persistent config via NVS Flash |
 | `monitoring.cpp` | CheckMK agent and MQTT monitoring; owns `g_net_fetch_mutex`, which serializes TLS fetches (syslog, events, mqtt) so concurrent handshakes don't exhaust the ESP32 heap |
 | `mqtt_handler.cpp` | MQTT client, reconnect logic, message dispatch, remote commands (`restart`) |
@@ -220,6 +221,7 @@ The firmware runs on FreeRTOS with separate tasks per subsystem. Key source file
 - NVS namespace keys are short strings (max 15 chars per ESP-IDF NVS constraint).
 - Thread safety: mutexes (`SemaphoreHandle_t`) are used wherever data is shared across FreeRTOS tasks. The monitoring/MQTT subsystem was specifically refactored for thread-safety.
 - HTTP handler functions follow the pattern `esp_err_t <name>_handler_func(httpd_req_t *req)`, registered via a matching `httpd_uri_t` struct. They live in `webui.cpp`, `webui_backup.cpp` or `webui_ota.cpp`; every route is registered from `WebUI::start()` in `webui.cpp`, so a handler defined outside it needs an `extern httpd_uri_t` entry in `webui_internal.h`.
+- **Register routes only inside `WebUI::start()`, before `webui_route_gate_release()`.** ESP-IDF's `httpd_register_uri_handler()` publishes a handler slot before initialising it; a route added while sessions are being served can crash request dispatch with a `LoadProhibited` in `httpd_uri_match_wildcard` (issue #491). The gate holds sessions until the boot-time registrations are complete — it does not protect later registrations.
 - Settings persistence uses `settings.cpp` — avoid direct NVS calls elsewhere.
 - **`vTaskDelay(pdMS_TO_TICKS(ms))` overflows for large `ms` values.** `pdMS_TO_TICKS` multiplies `ms * configTICK_RATE_HZ` in 32-bit `TickType_t` arithmetic before dividing by 1000; a 24h value (86,400,000 ms) overflows `uint32_t` and silently wraps to a much shorter delay. For long delays, loop in smaller chunks (e.g. N × 1h) instead of passing the full duration directly.
 - Any code performing an outbound TLS/HTTPS request should serialize via `g_net_fetch_mutex` (declared in `monitoring.h`) — see `events.cpp` for the pattern.
