@@ -1,7 +1,37 @@
 {
   "schema": 1,
-  "updatedAt": "2026-11-23T12:03:32Z",
+  "updatedAt": "2026-11-23T12:47:17Z",
   "releases": [
+    {
+      "version": "2.4.3",
+      "channel": "stable",
+      "isPrerelease": false,
+      "publishedAt": "2026-11-23T12:47:17Z",
+      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.3/firmware_2.4.3.bin",
+      "sha256": "9c7943c50777750c2f0caa9a0f5c0b417d1c1156edec3b515351be633de097d6",
+      "size": 1400704,
+      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.3",
+      "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.3",
+      "webui": {
+        "version": "1.2.0",
+        "design": "newdesign",
+        "apiVersion": 1,
+        "minFirmwareVersion": "2.3.1",
+        "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.4.3/webui_1.2.0.bin",
+        "sha256": "da2dd8a973b53a9d5bb29ac91de0104b8479f6e4f371fac358054dfb7ed80f72",
+        "size": 327680,
+        "partition": "spiffs",
+        "format": 1,
+        "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.4.3",
+        "publishedAt": "2026-11-23T12:47:17Z"
+      },
+      "tagName": "v2.4.3",
+      "name": "HB-RF-ETH-ng v2.4.3",
+      "prerelease": false,
+      "assetName": "firmware_2.4.3.bin",
+      "webuiAssetName": "webui_1.2.0.bin",
+      "notesExcerpt": "## [2.4.3] - 2026-11-23 ### Upgrade notes - Back up the gateway configuration before updating. Installing the firmware restarts the gateway and briefly interrupts the CCU connection. This release ships with WebUI 1.2.0. - Identical to 2.4.3-Beta.1 apart from the version string. ### Firmware fixes -\u2026"
+    },
     {
       "version": "2.4.3-Beta.1",
       "channel": "beta",
@@ -1449,35 +1479,6 @@
       "assetName": "firmware_2.2.5.bin",
       "webuiAssetName": "webui_1.0.0-Beta.15.bin",
       "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.2.5 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) ## \ud83d\udccb \u00dcberblick HB-RF-ETH-ng ist eine modernisierte Fork de\u2026"
-    },
-    {
-      "version": "2.2.5-Beta.19",
-      "channel": "beta",
-      "isPrerelease": true,
-      "publishedAt": "2026-07-25T20:24:35Z",
-      "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.19/firmware_2.2.5-Beta.19.bin",
-      "sha256": "85167356a805b2259dd23e4010e1fc7c0912f9a175731d99a3900ddcf6de4f44",
-      "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.19",
-      "notesUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.19",
-      "webui": {
-        "version": "1.0.0-Beta.15",
-        "design": "newdesign",
-        "apiVersion": 1,
-        "minFirmwareVersion": "2.2.5-Beta.1",
-        "downloadUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/download/v2.2.5-Beta.19/webui_1.0.0-Beta.15.bin",
-        "sha256": "818c896a220243c75dac4ad6d8291db15b905c1d33f8e1f9cf05657f528c3e6b",
-        "size": 327680,
-        "partition": "spiffs",
-        "format": 1,
-        "releaseUrl": "https://github.com/Xerolux/HB-RF-ETH-ng/releases/tag/v2.2.5-Beta.19",
-        "publishedAt": "2026-07-25T20:24:35Z"
-      },
-      "tagName": "v2.2.5-Beta.19",
-      "name": "HB-RF-ETH-ng v2.2.5-Beta.19",
-      "prerelease": true,
-      "assetName": "firmware_2.2.5-Beta.19.bin",
-      "webuiAssetName": "webui_1.0.0-Beta.15.bin",
-      "notesExcerpt": "# \ud83d\ude80 HB-RF-ETH-ng v2.2.5-Beta.19 [![License](https://img.shields.io/github/license/Xerolux/HB-RF-ETH-ng)](LICENSE.md) [![Downloads](https://img.shields.io/github/downloads/Xerolux/HB-RF-ETH-ng/total)](https://github.com/Xerolux/HB-RF-ETH-ng/releases) > \u26a0\ufe0f **Pre-Release** - Testversion, Nutzung auf ei\u2026"
     }
   ]
 }
