@@ -48,6 +48,8 @@
 #include "semver.h"
 #include "system_reset.h"
 #include "update_check.h"
+#include "updatecheck_heap_policy.h"
+#include "esp_heap_caps.h"
 #include "update_url_policy.h"
 #include "webui_compatibility.h"
 #include "webui_internal.h"
@@ -58,7 +60,7 @@
 // One downloader, two sinks — the code that writes flash already exists and is
 // not duplicated here:
 //
-//     HTTPS stream --4 KiB--> esp_ota_write()               (firmware)
+//     HTTPS ranges --1 KiB--> esp_ota_write()               (firmware)
 //                          \-> webui_storage_update_write()  (WebUI image)
 //
 // The rules this module implements are the plan's acceptance criteria, not
@@ -70,7 +72,10 @@
 
 static const char *TAG = "UpdateInstall";
 
-static constexpr size_t DOWNLOAD_BUFFER_SIZE = 4096;
+// Bound each HTTP response as well as the flash write buffer. Reading a
+// full response in small pieces still lets the CDN send 16 KiB TLS records.
+static constexpr uint32_t DOWNLOAD_RANGE_SIZE = 4096;
+static constexpr size_t DOWNLOAD_BUFFER_SIZE = 1024;
 
 // Plan rule 12: a stalled peer must not wedge the device. Absolute caps
 // instead of per-read hopes. Both values are milliseconds.
@@ -372,7 +377,18 @@ static void install_task(void *parameter)
         // ESP_ERR_INVALID_STATE: workers already stopped by another
         // transaction; the heap is as released as it gets and the resume is
         // not ours to perform.
-        vTaskDelay(pdMS_TO_TICKS(200));
+        // Idle-task cleanup and network teardown may return memory after the
+        // workers acknowledge the pause. Give them time before opening TLS.
+        unsigned waited_ms = 0;
+        size_t free_bytes, largest;
+        do {
+            vTaskDelay(pdMS_TO_TICKS(250));
+            waited_ms += 250;
+            free_bytes = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        } while (waited_ms < 2000 && !update_check_heap_allows(free_bytes, largest));
+        ESP_LOGI(TAG, "Heap before install manifest: free=%u, largest=%u, waited=%u ms",
+                 (unsigned)free_bytes, (unsigned)largest, waited_ms);
     }
 
     if (g_net_fetch_mutex == NULL) {
@@ -486,8 +502,6 @@ static void install_task(void *parameter)
         const int64_t deadline_ms = esp_timer_get_time() / 1000 + DOWNLOAD_TOTAL_TIMEOUT_MS;
         int64_t last_progress_ms  = esp_timer_get_time() / 1000;
         bool download_ok          = false;
-        // Declared before the client so `goto download_done` below cannot
-        // cross its initialization (C++ forbids that even for scalars).
         bool opened               = false;
 
         // Plan rule 7 + GitHub reality: release assets answer with a 302 to a
@@ -508,48 +522,27 @@ static void install_task(void *parameter)
         struct redirect_context {
             char location[EFFECTIVE_URL_MAX_BYTES];
             bool has_location;
+            char expected_range[64];
+            bool range_matches;
         };
         redirect_context redirect_ctx = {};
 
         esp_http_client_handle_t client = NULL;
         int redirect_hops = 0;
-        char *effective_url = static_cast<char *>(malloc(EFFECTIVE_URL_MAX_BYTES));
-        if (!effective_url) {
-            finish_with_error("Not enough memory for the redirect buffer");
-            goto download_done;
-        }
-        strlcpy(effective_url, url, EFFECTIVE_URL_MAX_BYTES);
-
-        for (;;) {
-            opened = false;
-            redirect_ctx.has_location = false;
-
-            esp_http_client_config_t cfg = {};
-            configure_ota_http_client(cfg, effective_url);
-            cfg.method     = HTTP_METHOD_GET;
-            cfg.timeout_ms = remaining_ms(deadline_ms);
-            cfg.is_async   = true;
-            cfg.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
-                if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key != NULL &&
-                    evt->header_value != NULL && strcasecmp(evt->header_key, "Location") == 0) {
-                    auto *ctx = static_cast<redirect_context *>(evt->user_data);
-                    strlcpy(ctx->location, evt->header_value, sizeof(ctx->location));
-                    ctx->has_location = true;
-                }
-                return ESP_OK;
-            };
-            cfg.user_data = &redirect_ctx;
-
-            client = esp_http_client_init(&cfg);
-            if (!client) {
-                finish_with_error("HTTP client could not be created");
-                goto download_done;
-            }
-
+        uint32_t range_end = 0; // exclusive
+        auto request_range = [&](uint32_t start) -> const char * {
+            const uint32_t left = expected_size - start;
+            range_end = start + (left < DOWNLOAD_RANGE_SIZE ? left : DOWNLOAD_RANGE_SIZE);
+            char range[48];
+            snprintf(range, sizeof(range), "bytes=%u-%u", (unsigned)start, (unsigned)(range_end - 1));
+            snprintf(redirect_ctx.expected_range, sizeof(redirect_ctx.expected_range),
+                     "bytes %u-%u/%u", (unsigned)start, (unsigned)(range_end - 1), (unsigned)expected_size);
+            redirect_ctx.range_matches = false;
+            if (esp_http_client_set_header(client, "Range", range) != ESP_OK)
+                return "Could not set the download range";
             for (;;) {
                 if (!step_ready(client, deadline_ms)) {
-                    finish_with_error("Timeout while connecting");
-                    goto client_done;
+                    return "Timeout while connecting";
                 }
                 const esp_err_t err = esp_http_client_open(client, 0);
                 if (err == ESP_OK) {
@@ -558,27 +551,69 @@ static void install_task(void *parameter)
                 }
                 if (err != ESP_ERR_HTTP_EAGAIN) {
                     snprintf(error, sizeof(error), "Connection failed: %s", esp_err_to_name(err));
-                    finish_with_error(error);
-                    goto client_done;
+                    return error;
                 }
                 retry_delay(deadline_ms);
             }
             for (;;) {
                 if (!step_ready(client, deadline_ms)) {
-                    finish_with_error("Timeout while reading response headers");
-                    goto client_done;
+                    return "Timeout while reading response headers";
                 }
                 const int64_t headers = esp_http_client_fetch_headers(client);
                 if (headers >= 0) break;
                 if (headers != -ESP_ERR_HTTP_EAGAIN) {
-                    finish_with_error("Could not read response headers");
-                    goto client_done;
+                    return "Could not read response headers";
                 }
                 retry_delay(deadline_ms);
             }
 
+            return nullptr;
+        };
+        auto valid_range = [&](uint32_t start) {
+            return esp_http_client_get_status_code(client) == 206 && redirect_ctx.range_matches &&
+                   esp_http_client_get_content_length(client) == (int64_t)(range_end - start);
+        };
+        // esp_http_client_init copies the URL. Reuse the same storage for
+        // the next Location header instead of keeping a second 2 KiB buffer.
+        strlcpy(redirect_ctx.location, url, sizeof(redirect_ctx.location));
+
+        for (;;) {
+            opened = false;
+            redirect_ctx.has_location = false;
+
+            esp_http_client_config_t cfg = {};
+            configure_ota_http_client(cfg, redirect_ctx.location);
+            cfg.method     = HTTP_METHOD_GET;
+            cfg.timeout_ms = remaining_ms(deadline_ms);
+            cfg.is_async   = true;
+            cfg.event_handler = [](esp_http_client_event_t *evt) -> esp_err_t {
+                if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key != NULL &&
+                    evt->header_value != NULL && strcasecmp(evt->header_key, "Location") == 0) {
+                    auto *ctx = static_cast<redirect_context *>(evt->user_data);
+                    ctx->has_location = strlcpy(ctx->location, evt->header_value,
+                                                sizeof(ctx->location)) < sizeof(ctx->location);
+                } else if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->header_key &&
+                           evt->header_value && strcasecmp(evt->header_key, "Content-Range") == 0) {
+                    auto *ctx = static_cast<redirect_context *>(evt->user_data);
+                    ctx->range_matches = strcmp(evt->header_value, ctx->expected_range) == 0;
+                }
+                return ESP_OK;
+            };
+            cfg.user_data = &redirect_ctx;
+
+            client = esp_http_client_init(&cfg);
+            if (!client) {
+                finish_with_error("HTTP client could not be created");
+                goto client_done;
+            }
+
+            if (const char *failure = request_range(0)) {
+                finish_with_error(failure);
+                goto client_done;
+            }
+
             const int status = esp_http_client_get_status_code(client);
-            if (status == 200) break;
+            if (status == 206 || status == 200) break;
 
             if (status == 301 || status == 302 || status == 307 || status == 308) {
                 if (++redirect_hops > MAX_REDIRECT_HOPS) {
@@ -596,11 +631,6 @@ static void install_task(void *parameter)
                     finish_with_error(error);
                     goto client_done;
                 }
-                if (strlen(location) >= EFFECTIVE_URL_MAX_BYTES) {
-                    finish_with_error("Redirect URL too long");
-                    goto client_done;
-                }
-                strlcpy(effective_url, location, EFFECTIVE_URL_MAX_BYTES);
                 if (opened) esp_http_client_close(client);
                 esp_http_client_cleanup(client);
                 client = NULL;
@@ -612,8 +642,8 @@ static void install_task(void *parameter)
             goto client_done;
         }
 
-        if (esp_http_client_get_content_length(client) != (int64_t)expected_size) {
-            finish_with_error("Download size does not match the manifest");
+        if (!valid_range(0)) {
+            finish_with_error("Server did not return the requested image range");
             goto client_done;
         }
 
@@ -649,10 +679,28 @@ static void install_task(void *parameter)
                     goto client_done;
                 }
 
+                if (received == range_end) {
+                    // A CDN may retire an idle or long-lived keep-alive socket.
+                    // No bytes from this range have reached flash yet.
+                    if (request_range(received) != nullptr) {
+                        esp_http_client_close(client);
+                        opened = false;
+                        if (const char *failure = request_range(received)) {
+                            finish_with_error(failure);
+                            goto client_done;
+                        }
+                    }
+                    if (!valid_range(received)) {
+                        finish_with_error("Server did not return the requested image range");
+                        goto client_done;
+                    }
+                }
+
+                const uint32_t remaining = range_end - received;
                 errno        = 0;
                 const int got = esp_http_client_read(client,
                                                      reinterpret_cast<char *>(download_buf),
-                                                     DOWNLOAD_BUFFER_SIZE);
+                                                     remaining < DOWNLOAD_BUFFER_SIZE ? remaining : DOWNLOAD_BUFFER_SIZE);
                 if (got <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR ||
                                  (got == 0 && errno == 0 &&
                                   !esp_http_client_is_complete_data_received(client)))) {
@@ -725,8 +773,6 @@ static void install_task(void *parameter)
             esp_http_client_cleanup(client);
         }
 
-    download_done:
-        free(effective_url);
         if (!download_ok) {
             if (sha_started) {
                 sha_abort(&sha);
