@@ -249,9 +249,26 @@ static void test_stage_marker()
     char tiny_fw[3], tiny_ui[32];
     assert(update_stage_parse("waf|2.3.0|1.1.0", tiny_fw, sizeof(tiny_fw), tiny_ui, sizeof(tiny_ui)) == false);
 
-    // Oversized input cannot be formatted into a small buffer.
-    char small[8];
+    // Oversized input cannot be formatted into a small buffer, and a failed
+    // call leaves the destination untouched.
+    char small[8] = "keepme!";
     assert(!update_stage_format(small, sizeof(small), "2.3.0", "1.1.0"));
+    assert(strcmp(small, "keepme!") == 0);
+
+    // The fit is exact: 15 characters plus the terminator.
+    char exact[16] = "untouched";
+    assert(update_stage_format(exact, sizeof(exact), "2.3.0", "1.1.0"));
+    assert(strcmp(exact, "waf|2.3.0|1.1.0") == 0);
+    assert(!update_stage_format(exact, sizeof(exact) - 1, "2.3.0", "1.1.0"));
+    assert(strcmp(exact, "waf|2.3.0|1.1.0") == 0);
+
+    // A missing version is an empty field, not an error.
+    assert(update_stage_format(buffer, sizeof(buffer), NULL, NULL));
+    assert(strcmp(buffer, "waf||") == 0);
+
+    // Without a destination or space nothing is written.
+    assert(!update_stage_format(NULL, 16, "2.3.0", "1.1.0"));
+    assert(!update_stage_format(buffer, 0, "2.3.0", "1.1.0"));
 
     // Applicability: boots_since_write 0 means "written during the current
     // boot, install reboot still ahead" -> not yet applicable. 1 and 2 are

@@ -281,15 +281,30 @@ static inline update_install_blocked_t update_schedule_install_blocked(bool want
 /**
  * @brief Serialize the marker as "waf|<fwVersion>|<uiVersion>".
  * @return true when the result fits into size bytes including the NUL.
+ *         On false, out is left untouched.
  */
 static inline bool update_stage_format(char *out, size_t size,
                                        const char *fw_version, const char *ui_version)
 {
     if (out == NULL || size == 0) return false;
-    const int written = snprintf(out, size, "%s%s|%s", UPDATE_STAGE_PREFIX,
-                                 fw_version != NULL ? fw_version : "",
-                                 ui_version != NULL ? ui_version : "");
-    return written > 0 && (size_t)written < size;
+    const char *fw = fw_version != NULL ? fw_version : "";
+    const char *ui = ui_version != NULL ? ui_version : "";
+
+    // Measure before writing. A bounded snprintf() would truncate instead,
+    // and a shortened version parses as a plausible different one; it is
+    // also what -Wformat-truncation reports as soon as a caller's buffer is
+    // known to be too small (GCC 14 fails the host test on exactly that).
+    const size_t prefix_len = strlen(UPDATE_STAGE_PREFIX);
+    const size_t fw_len     = strlen(fw);
+    const size_t ui_len     = strlen(ui);
+    if (prefix_len + fw_len + 1 + ui_len + 1 > size) return false;
+
+    memcpy(out, UPDATE_STAGE_PREFIX, prefix_len);
+    memcpy(out + prefix_len, fw, fw_len);
+    out[prefix_len + fw_len] = '|';
+    // Copies the terminator as well.
+    memcpy(out + prefix_len + fw_len + 1, ui, ui_len + 1);
+    return true;
 }
 
 /**
