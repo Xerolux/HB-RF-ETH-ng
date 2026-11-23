@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.3-Beta.1] - 2026-11-23
+
+### Changes
+- docs(release): curate notes for firmware 2.4.3-Beta.1 (#516)
+- fix(update): measure the stage marker before writing it (#514)
+- docs(flasher): explain a missing serial port on macOS (#513)
+- test(update): pin the issue #496 heap figures to the admission policy (#512)
+- fix(webui): hold HTTP sessions until the route table is complete (#511)
+- chore(deps)(deps): bump vue-i18n from 11.4.21 to 11.4.23 in /webui (#510)
+- chore: update manifests for v2.4.2
+
 ## [2.4.2] - 2026-11-22
 
 ### Upgrade notes

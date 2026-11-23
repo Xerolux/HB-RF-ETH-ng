@@ -1,17 +1,24 @@
-## [2.4.2] - 2026-11-22
+## [2.4.3-Beta.1] - 2026-11-23
 
-### Upgrade notes
+> ⭐ [Star the project on GitHub](https://github.com/Xerolux/HB-RF-ETH-ng/stargazers)
 
-- Back up the gateway configuration before updating. Installing the firmware restarts the gateway and briefly interrupts the CCU connection. This release ships with WebUI 1.2.0.
+### ⚠️ Upgrade notes
 
-### Firmware fixes
+- **Beta test build for the web server boot fix.** Back up the gateway configuration before updating. The firmware installation restarts the gateway and briefly interrupts the CCU connection.
 
-- Manual and scheduled update searches can run with moderately fragmented memory, including configurations with MQTT discovery, the external WebUI and an active CCU connection.
-- After releasing monitoring resources, the firmware gives the heap time to recover before rejecting a search. A scheduled search that was skipped because of low memory retries after one hour.
+### 🐛 Bugfixes
 
-### Web Flasher fixes
+- **The web server no longer takes requests while it is still registering its routes.** ESP-IDF publishes each route before it is fully initialised. A client that reconnects while the gateway boots - a poller, or an open WebUI tab that keeps retrying - could hit that window and crash the gateway with a `LoadProhibited` panic in the web server (#491). New connections now wait until the route table is complete; none is refused, and requests that arrive during boot are answered instead of turning into "404 Not Found".
+- **The two-stage update marker is written without truncation.** The marker for "firmware now, WebUI after reboot" is measured before it is written, so a buffer that is too small is rejected instead of silently shortened. No change for existing installations; it also fixes a host test that no longer compiled with GCC 14.
 
-- Fixed a JavaScript syntax error that prevented release selection and USB connection. The flasher loads its serial library from the project site and shows a message when the browser cannot select a serial port.
-- GitHub Pages waits for the uploaded deployment artifact and includes the latest stable firmware in the flasher catalog.
+### 🌐 Web Flasher
 
-[Full changelog: v2.4.1...v2.4.2](https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.4.1...v2.4.2)
+- The preparation checklist explains what to do when a macOS computer does not show the board's serial port (#508).
+
+### ☕ Support the project
+
+[GitHub Sponsors](https://github.com/sponsors/xerolux) · [Buy Me a Coffee](https://buymeacoffee.com/xerolux)
+
+---
+
+[Full changelog: v2.4.2...v2.4.3-Beta.1](https://github.com/Xerolux/HB-RF-ETH-ng/compare/v2.4.2...v2.4.3-Beta.1)
