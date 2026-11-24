@@ -457,9 +457,17 @@ long enough. The rule applies to **every** firmware update, not only to the
 initial migration: after a restart, leave the device powered for at least
 one minute.
 
-If the device reverts even though it was left powered undisturbed, the new
-application itself reset inside the window; capture the serial log (below)
-to identify the panic.
+In [issue #515](https://github.com/Xerolux/HB-RF-ETH-ng/issues/515), the
+board had a single 5 V supply. Disconnecting that supply was a full power
+cycle. The first HTTP response 11 seconds after power returned showed 1.3.0.
+An HTTP poll can miss an early boot failure. Only a response from 2.3.1
+establishes that the new application reached its web server. To distinguish
+bootloader rejection from an application reset, collect the serial boot log.
+
+[PR #480](https://github.com/Xerolux/HB-RF-ETH-ng/pull/480) changes the
+gateway's reconnect reply once ng is running. Driver 1.26 uses the changed
+session ID for automatic RF-stack recovery. With 1.24, do not rely on that
+recovery. The CCU driver plays no part in OTA boot selection.
 
 **Final outcome (issue #461, resolved 2026-10-20):** the migration was then
 verified successfully — the last missing piece was not firmware at all. The
@@ -504,12 +512,10 @@ upload/preflight/verification failed; an accepted upload alone is never success.
 **If 1.3.x is still running:**
 
 1. Use `--verify-only` to check the device API independently of browser caching.
-2. Re-run the migration once with the device left completely undisturbed for
-   at least 60 seconds after the requested power-cycle. Most reverts are a
-   power-cycle inside the 15-second self-test window. The power-cycle must
-   unplug **both** PoE and the Micro-USB cable — with USB attached, the
-   board stays powered and never reboots (see the final outcome note above).
-3. If it reverts again, capture the serial output at **115200 baud** from
+2. If the board had only a 5 V supply and you already disconnected it once,
+   proceed to diagnosis. On boards with multiple power sources, disconnect
+   all of them once and leave power on for at least a minute after reconnecting.
+3. For diagnosis, capture the serial output at **115200 baud** from
    power-on through fallback to the old application, through the board's
    Micro-USB port (see *Serial Console Access* above; no external UART
    adapter is required — a data-capable Micro-USB cable is enough). Reading

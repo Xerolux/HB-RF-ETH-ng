@@ -451,6 +451,7 @@ class MigrationVerificationTest(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn("migration NOT verified", output)
         self.assertIn("running firmware 1.3.0", output)
+        self.assertIn("never observed during polling", output)
         self.assertNotIn("Verified:", output)
 
     def test_reboot_to_expected_version_is_observed_before_success(self):
@@ -470,6 +471,8 @@ class MigrationVerificationTest(unittest.TestCase):
         result, output = self.run_main(FakeClock(reboot_then_rollback))
         self.assertEqual(result, 1)
         self.assertIn("migration NOT verified", output)
+
+        self.assertIn("target version responded during polling", output)
 
     def test_verify_only_never_logs_in_or_uploads(self):
         self.args.verify_only = True
